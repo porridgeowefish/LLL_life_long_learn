@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+Thumbs.db
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+tmp/
+temp/
+frontend/.vite/
+research/raw/

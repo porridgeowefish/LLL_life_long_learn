@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepThink Claude Orchestrator</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand">
+        <div class="logo">DT</div>
+        <div>
+          <h1>DeepThink</h1>
+          <p>Claude Code 学习编排器</p>
+        </div>
+      </div>
+
+      <nav>
+        <button class="active" data-view="compose"><i data-lucide="send"></i>发起任务</button>
+        <button data-view="tasks"><i data-lucide="activity"></i>任务监控</button>
+        <button data-view="library"><i data-lucide="copy-check"></i>提示模板</button>
+      </nav>
+
+      <div class="side-card">
+        <span>连接状态</span>
+        <strong id="connectionState">连接中</strong>
+      </div>
+      <div class="side-card">
+        <span>运行任务</span>
+        <strong id="runningCount">0</strong>
+      </div>
+      <div class="side-card">
+        <span>总任务</span>
+        <strong id="totalCount">0</strong>
+      </div>
+    </aside>
+
+    <main>
+      <header>
+        <div>
+          <h2>把 DeepThink 的学习动作直接派发给 Claude Code</h2>
+          <p>前端生成结构化任务，后端启动 Claude Code，页面实时同步终端输出、状态和结果。</p>
+        </div>
+        <div class="header-actions">
+          <button class="secondary" id="copyPromptBtn"><i data-lucide="copy"></i>复制提示词</button>
+          <button class="primary" id="runBtn"><i data-lucide="play"></i>调用 Claude Code</button>
+        </div>
+      </header>
+
+      <section class="panel view" id="view-compose">
+        <div class="panel-head">
+          <h3>任务提取</h3>
+          <span>生成后可复制，也可一键调用后端 Claude Code</span>
+        </div>
+        <div class="compose-grid">
+          <label>学习主题
+            <input id="topic" value="腾讯云商务拓展面试知识体系">
+          </label>
+          <label>学习目标
+            <select id="goal">
+              <option>能跟人聊</option>
+              <option selected>能做项目</option>
+              <option>能教别人</option>
+              <option>能创新突破</option>
+            </select>
+          </label>
+          <label>已有水平
+            <select id="level">
+              <option>完全陌生</option>
+              <option selected>听过概念</option>
+              <option>了解基本原理</option>
+              <option>有实际经验</option>
+            </select>
+          </label>
+          <label>熟悉领域
+            <input id="domain" value="商业分析、零售数字化、AI Agent">
+          </label>
+          <label>Claude 权限模式
+            <select id="permissionMode">
+              <option value="default" selected>default</option>
+              <option value="acceptEdits">acceptEdits</option>
+              <option value="auto">auto</option>
+              <option value="plan">plan</option>
+              <option value="dontAsk">dontAsk</option>
+            </select>
+          </label>
+          <label>工作目录
+            <input id="cwd" value="">
+          </label>
+        </div>
+        <label class="full">补充材料或任务要求
+          <textarea id="notes">请结合当前工作区资料，生成完整学习笔记、MECE 知识图谱、复习材料、闪卡、自测题、费曼检验题和刻意练习任务。输出 Markdown，并说明后续复习节奏。</textarea>
+        </label>
+        <label class="full">即将发送给 Claude Code 的提示词
+          <textarea id="promptPreview" class="prompt"></textarea>
+        </label>
+      </section>
+
+      <section class="panel view hidden" id="view-library">
+        <div class="panel-head">
+          <h3>提示模板</h3>
+          <span>点击模板填入任务要求</span>
+        </div>
+        <div class="template-grid" id="templateGrid"></div>
+      </section>
+
+      <section class="panel view" id="view-tasks">
+        <div class="panel-head">
+          <h3>任务监控</h3>
+          <span id="taskHint">等待任务启动</span>
+        </div>
+        <div class="monitor">
+          <div class="task-list" id="taskList"></div>
+          <div class="terminal-wrap">
+            <div class="terminal-head">
+              <div>
+                <strong id="activeTaskTitle">终端输出</strong>
+                <span id="activeTaskMeta">未选择任务</span>
+              </div>
+              <div class="terminal-actions">
+                <div class="segmented" id="resultMode">
+                  <button class="active" data-mode="terminal">终端</button>
+                  <button data-mode="rendered">渲染</button>
+                </div>
+                <button class="secondary small-btn" id="copyResultBtn"><i data-lucide="clipboard"></i>复制结果</button>
+                <button class="danger small-btn" id="cancelBtn"><i data-lucide="square"></i>终止</button>
+              </div>
+            </div>
+            <pre id="terminal"></pre>
+            <article id="renderedResult" class="markdown-body hidden"></article>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
