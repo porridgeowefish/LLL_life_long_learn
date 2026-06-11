@@ -1,0 +1,160 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--bg);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.filters {
+  display: flex;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.filterBtn {
+  background: none;
+  border: none;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.72rem;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.filterBtn:hover {
+  background: var(--bg);
+}
+
+.filterActive {
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.empty {
+  font-size: 0.78rem;
+  color: var(--muted);
+  padding: 8px 0;
+}
+
+/* ── Confusion Item ── */
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 6px;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.item:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.itemSelected {
+  border-color: var(--accent);
+  background: rgba(124, 154, 114, 0.04);
+}
+
+.itemCheck {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.itemCheck input {
+  accent-color: var(--accent);
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quote {
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 3px solid var(--border);
+  font-size: 0.78rem;
+  color: var(--fg);
+  line-height: 1.5;
+  background: var(--bg-subtle, #f8f7f4);
+  border-radius: 0 4px 4px 0;
+  word-break: break-word;
+}
+
+.notes {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stateTag {
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--bg-subtle, #f0efec);
+  color: var(--muted);
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: var(--muted);
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.deleteBtn:hover {
+  color: var(--pink);
+}
+
+/* ── Footer ── */
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.footHint {
+  font-size: 0.7rem;
+  color: var(--muted);
+}

@@ -11,7 +11,9 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 01 | Core orchestrator foundation | [iteration-01-core-orchestrator-foundation](./iteration-01-core-orchestrator-foundation/README.md) |
+| 03 | Five agents and learning loops (draft, scoping) | [iteration-03-five-agents-and-learning-loops](./iteration-03-five-agents-and-learning-loops/README.md) |
+| 02 | Local learning workbench foundation | [iteration-02-local-learning-workbench-foundation](./iteration-02-local-learning-workbench-foundation/README.md) |
+| 01 | Core orchestrator foundation (superseded baseline) | [iteration-01-core-orchestrator-foundation](./iteration-01-core-orchestrator-foundation/README.md) |
 
 ## Required Files
 

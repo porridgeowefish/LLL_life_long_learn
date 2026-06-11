@@ -1,0 +1,38 @@
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 4px;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  line-height: 1.4;
+}
+
+.t-neutral {
+  background: rgba(124, 154, 114, 0.08);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.t-accent {
+  background: rgba(124, 154, 114, 0.14);
+  color: var(--accent);
+}
+.t-orange {
+  background: rgba(232, 148, 90, 0.14);
+  color: var(--orange);
+}
+.t-sky {
+  background: rgba(135, 181, 212, 0.16);
+  color: var(--sky);
+}
+.t-pink {
+  background: rgba(196, 113, 94, 0.14);
+  color: var(--pink);
+}
+.t-muted {
+  background: rgba(158, 149, 136, 0.14);
+  color: var(--muted);
+}

@@ -1,9 +1,16 @@
 # Iteration 01: Core Orchestrator Foundation
 
-Status: active  
+Status: superseded baseline  
 Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Last reviewed: 2026-06-08  
 Source of truth: this directory defines the first LLL delivery slice.
+
+## Position
+
+This slice remains valuable as the first runnable local Claude Code orchestration baseline.
+
+It is no longer the current product direction.
+The active direction is iteration 02, which upgrades LLL into a project-based local learning workbench.
 
 ## Goal
 

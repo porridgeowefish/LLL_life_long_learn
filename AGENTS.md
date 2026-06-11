@@ -12,9 +12,14 @@ Keep this file short. Read this file first, then:
 ```text
 docs/INDEX.md
 docs/00-product-and-architecture/agent-rules/README.md
+docs/00-product-and-architecture/LESSONS_LEARNED.md   ← 必读：调试教训防再犯
 ```
 
 Read only the rule files triggered by the current task. Do not preload the whole docs tree.
+
+**LESSONS_LEARNED.md** contains 11 hard-won rules (Claude CLI modes, React
+state sync, math preprocessing, etc.). Every agent MUST read it before
+touching the launcher, the frontend, or any charter/primitive file.
 
 ## 1. Team Principles
 
@@ -58,3 +63,29 @@ testing
 task orchestration and safety
 long-task refresh
 ```
+
+## 3. Frontend Stack (iter-02.3)
+
+The frontend is a Vite + React 18 + TypeScript SPA under `frontend/`. The
+Go binary serves `frontend/dist/` in production with an SPA fallback
+(see `backend-go/internal/server/router.go`). Read `frontend/README.md`
+before touching any UI code.
+
+Quick reference:
+
+```text
+npm run dev        # Vite on :5173, proxies /api /files /events to Go :8787
+npm run build      # emits frontend/dist/
+npm run test       # Vitest run
+npm run test:watch # Vitest watch
+```
+
+State management boundary:
+
+```text
+TanStack Query  — server state (projects, agents, sessions, memory, health)
+Zustand slices  — client state (ui, project, session, connection)
+```
+
+SSE: a single useSSE() hook is mounted once at <AppShell />. Do not open
+new EventSource instances from individual pages.

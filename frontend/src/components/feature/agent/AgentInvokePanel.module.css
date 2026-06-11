@@ -1,0 +1,70 @@
+.host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.muted {
+  font-size: 0.8rem;
+  color: var(--muted);
+  padding: 6px 0;
+}
+
+.agentSelect {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  background: var(--card);
+  color: var(--fg);
+  outline: none;
+  font-family: inherit;
+  flex-shrink: 0;
+  max-width: 180px;
+}
+
+.agentSelect:focus {
+  border-color: var(--accent);
+}
+
+.intentInput {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  background: var(--card);
+  color: var(--fg);
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+}
+
+.intentInput:focus {
+  border-color: var(--accent);
+}
+
+.intentInput::placeholder {
+  color: var(--muted);
+}
+
+.errorInline {
+  font-size: 0.72rem;
+  color: var(--pink);
+  flex-shrink: 0;
+  cursor: help;
+}
+
+.invokedInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.invokeBtn {
+  flex-shrink: 0;
+}

@@ -1,0 +1,264 @@
+package promptassembly
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	"github.com/xmz14/lll/backend-go/internal/workspace"
+)
+
+func TestBuild_HappyPath(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	// Create a project on disk.
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	// Write a predecessor file so Explain has Intro context.
+	if err := workspace.SafeWriteArtifact("test", workspace.ZoneIntro, "output.md", []byte("# Intro\n\nCuriosity hook.")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Build a fake registry with explain agent.
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "explain", []workspace.ZoneName{workspace.ZoneExplain})
+
+	// Build prompt.
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneExplain,
+		AgentID:     "explain",
+		Intent:      "Explain Rust ownership in 200 words.",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if pkg.PromptMd == "" {
+		t.Fatal("PromptMd empty")
+	}
+	// Must contain the charter, intent, user story section, and predecessor.
+	checks := []string{
+		"# Agent Identity",
+		"# User Story",
+		"# Charter",
+		"Explain Rust ownership in 200 words.",
+		"intro",
+		"output.md",
+	}
+	for _, c := range checks {
+		if !strings.Contains(pkg.PromptMd, c) {
+			t.Errorf("prompt missing %q\n--- prompt ---\n%s", c, pkg.PromptMd)
+		}
+	}
+	// Predecessor must be marked as existing (✓).
+	if !strings.Contains(pkg.PromptMd, "✓") {
+		t.Errorf("expected predecessor to be marked exists (✓) in prompt:\n%s", pkg.PromptMd)
+	}
+	// Run dir must contain agent name.
+	if !strings.Contains(pkg.RunDirName, "-explain") {
+		t.Errorf("RunDirName = %q, want suffix -explain", pkg.RunDirName)
+	}
+	// Package meta JSON serializes.
+	js, err := pkg.MarshalPackageMeta()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(js), `"agentId": "explain"`) {
+		t.Errorf("package meta missing agentId: %s", js)
+	}
+}
+
+func TestBuild_RejectsUnknownAgent(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	_, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneExplain,
+		AgentID:     "nonexistent",
+		Intent:      "hi",
+	}, reg)
+	if err == nil {
+		t.Fatal("expected error for unknown agent")
+	}
+}
+
+func TestBuild_RejectsZoneMismatch(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "explain", []workspace.ZoneName{workspace.ZoneExplain})
+
+	// Explain agent is not allowed in Practice zone.
+	_, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZonePractice,
+		AgentID:     "explain",
+		Intent:      "drill",
+	}, reg)
+	if err == nil {
+		t.Fatal("expected zone-mismatch error")
+	}
+}
+
+// writeTestAgent adds an in-memory agent to the registry by writing to a
+// temp dir and reloading.
+func writeTestAgent(t *testing.T, reg *agentregistry.Registry, id string, zones []workspace.ZoneName) {
+	t.Helper()
+	dir := t.TempDir()
+	regDir := filepath.Join(dir, "registry")
+	if err := os.MkdirAll(regDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	chPath := filepath.Join(dir, "charters", id+".md")
+	if err := os.MkdirAll(filepath.Dir(chPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(chPath, []byte("# Test charter"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	data := []byte(`{
+  "id": "` + id + `",
+  "name": "` + id + `",
+  "userStory": "test user story for ` + id + `",
+  "allowedZones": ["` + string(zones[0]) + `"],
+  "charterPath": "` + strings.ReplaceAll(chPath, "\\", "\\\\") + `",
+  "defaultOutputTargets": [{"zone": "` + string(zones[0]) + `", "filename": "output.md"}]
+}`)
+	if err := os.WriteFile(filepath.Join(regDir, id+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := agentregistry.AgentsRootForTest()
+	agentregistry.SetAgentsRootForTest(dir)
+	defer agentregistry.SetAgentsRootForTest(old)
+	if err := reg.Load(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// writeTestAgentWithPrimitives is like writeTestAgent but also declares
+// reasoning primitives and writes the primitive files under the same
+// agents root. Returns a cleanup func the caller must defer — agents root
+// must stay overridden until AFTER Build has read the primitives from disk.
+func writeTestAgentWithPrimitives(
+	t *testing.T,
+	reg *agentregistry.Registry,
+	id string,
+	zones []workspace.ZoneName,
+	required, optional []string,
+) func() {
+	t.Helper()
+	dir := t.TempDir()
+	regDir := filepath.Join(dir, "registry")
+	_ = os.MkdirAll(regDir, 0o755)
+	primDir := filepath.Join(dir, "primitives")
+	_ = os.MkdirAll(primDir, 0o755)
+	chPath := filepath.Join(dir, "charters", id+".md")
+	_ = os.MkdirAll(filepath.Dir(chPath), 0o755)
+	_ = os.WriteFile(chPath, []byte("# Test charter with primitives"), 0o644)
+	for _, name := range append(append([]string{}, required...), optional...) {
+		_ = os.WriteFile(filepath.Join(primDir, name+".md"), []byte("BODY:"+name), 0o644)
+	}
+	reqJSON := "["
+	for i, n := range required {
+		if i > 0 {
+			reqJSON += ","
+		}
+		reqJSON += `"` + n + `"`
+	}
+	reqJSON += "]"
+	optJSON := "["
+	for i, n := range optional {
+		if i > 0 {
+			optJSON += ","
+		}
+		optJSON += `"` + n + `"`
+	}
+	optJSON += "]"
+	data := []byte(`{
+  "id": "` + id + `",
+  "name": "` + id + `",
+  "userStory": "test user story for ` + id + `",
+  "primitives": {"required": ` + reqJSON + `, "optional": ` + optJSON + `},
+  "allowedZones": ["` + string(zones[0]) + `"],
+  "charterPath": "` + strings.ReplaceAll(chPath, "\\", "\\\\") + `",
+  "defaultOutputTargets": [{"zone": "` + string(zones[0]) + `", "filename": "output.md"}]
+}`)
+	if err := os.WriteFile(filepath.Join(regDir, id+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := agentregistry.AgentsRootForTest()
+	agentregistry.SetAgentsRootForTest(dir)
+	if err := reg.Load(); err != nil {
+		t.Fatal(err)
+	}
+	return func() { agentregistry.SetAgentsRootForTest(old) }
+}
+
+func TestBuild_PrimitivesSectionIncluded(t *testing.T) {
+	ClearPrimitiveCacheForTest()
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	cleanup := writeTestAgentWithPrimitives(t, reg, "explain",
+		[]workspace.ZoneName{workspace.ZoneExplain},
+		[]string{"mece_decompose", "first_principles"},
+		[]string{"analogy"})
+	defer cleanup()
+	ClearPrimitiveCacheForTest()
+
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneExplain,
+		AgentID:     "explain",
+		Intent:      "Explain Rust ownership.",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	checks := []string{
+		"# User Story",
+		"# Reasoning Primitives",
+		"### Required primitives",
+		"### Optional primitives",
+		"BODY:mece_decompose",
+		"BODY:first_principles",
+		"BODY:analogy",
+	}
+	for _, c := range checks {
+		if !strings.Contains(pkg.PromptMd, c) {
+			t.Errorf("prompt missing %q\n--- prompt tail ---\n%s", c, tail(pkg.PromptMd, 2000))
+		}
+	}
+}
+
+func tail(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[len(s)-n:]
+}

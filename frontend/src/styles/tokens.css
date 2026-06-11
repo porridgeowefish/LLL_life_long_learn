@@ -1,0 +1,27 @@
+/* LLL design tokens — copied verbatim from legacy frontend/css/styles.css:3-8
+   to preserve v2 visual identity (decision D4 in the refactor plan).
+   These tokens are the single source of truth for color, spacing, and shadow
+   across all CSS Modules in this app. */
+
+:root {
+  /* palette */
+  --bg: #faf8f4;
+  --fg: #3d3229;
+  --card: #fff;
+  --border: #e8e2d9;
+  --muted: #9e9588;
+
+  --accent: #7c9a72;
+  --accent2: #6b8a62;
+  --orange: #e8945a;
+  --sky: #87b5d4;
+  --pink: #c4715e;
+
+  /* shape */
+  --radius: 8px;
+  --shadow: 0 2px 8px rgba(61, 50, 41, 0.06);
+
+  /* layout — minimal sidebars, max content room */
+  --sidebar-w: 144px;
+  --header-h: 44px;
+}

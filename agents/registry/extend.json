@@ -1,0 +1,17 @@
+{
+  "id": "extend",
+  "name": "拓展智能体",
+  "icon": "🔗",
+  "description": "Probes the topic with counterfactual cascades, sibling/competitor relational mapping, and edge-case failure analysis — turning familiarity into opinion.",
+  "userStory": "作为学习者已读过讲解并动手尝试过，我希望有人把我推过「听过」的边界——用反事实推演、同主题关系映射、边界失效案例——让这个主题成为我有观点的东西，而不只是我听过的东西。本 agent 不做：激发好奇（→ Intro）、结构化讲解（→ Explain）、练习设计（→ Practice）、复习总结（→ Summary）。",
+  "primitives": {
+    "required": [
+      "critical_thinking"
+    ]
+  },
+  "allowedZones": ["Extend"],
+  "charterPath": "agents/charters/extend.md",
+  "defaultOutputTargets": [
+    {"zone": "Extend", "filename": "relation-notes.md"}
+  ]
+}

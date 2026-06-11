@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>记忆 — LifeLongLearn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+  .mem-empty{padding:30px;text-align:center;color:var(--muted);font-style:italic;border:1px dashed var(--border);border-radius:10px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/index.html" class="topbar-logo">Life<span class="accent">Long</span>Learn</a>
+  <div class="topbar-sep"></div>
+  <div class="topbar-nav">
+    <a href="/index.html">总览</a>
+    <a href="/project.html">项目</a>
+    <a href="/agents.html">智能体</a>
+    <a href="/memory.html" class="active">记忆</a>
+  </div>
+  <div class="topbar-right">
+    <span id="connectionState">连接中</span>
+  </div>
+</div>
+
+<svg style="display:none">
+  <symbol id="ico-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4" r="1.2" fill="currentColor"/><circle cx="9" cy="13" r="1" fill="currentColor"/><circle cx="15" cy="13" r="1" fill="currentColor"/></symbol>
+  <symbol id="ico-brain" viewBox="0 0 24 24"><path d="M9 4 a3 3 0 0 0 -3 3 v1 a3 3 0 0 0 -2 3 v1 a3 3 0 0 0 2 3 v1 a3 3 0 0 0 3 3 h1 V4 z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15 4 a3 3 0 0 1 3 3 v1 a3 3 0 0 1 2 3 v1 a3 3 0 0 1 -2 3 v1 a3 3 0 0 1 -3 3 h-1 V4 z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="ico-zap" viewBox="0 0 24 24"><polygon points="13 3 5 14 11 14 10 21 19 9 13 9 14 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="ico-folder" viewBox="0 0 24 24"><path d="M3 6 a2 2 0 0 1 2-2 h4 l2 2 h8 a2 2 0 0 1 2 2 v9 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+</svg>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-head"><span>导航</span></div>
+    <div class="sidebar-scroll">
+      <div class="tree-section">快捷入口</div>
+      <a href="/index.html" class="tree-item"><span class="icon"><svg class="ico"><use href="#ico-zap"/></svg></span>学习总览</a>
+      <a href="/agents.html" class="tree-item"><span class="icon"><svg class="ico"><use href="#ico-bot"/></svg></span>智能体管理</a>
+      <a href="/memory.html" class="tree-item active"><span class="icon"><svg class="ico"><use href="#ico-brain"/></svg></span>记忆系统</a>
+
+      <div class="tree-section">项目记忆</div>
+      <div id="memory-project-list">
+        <div class="muted-mini">加载中…</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main main-wide">
+    <div class="main-scroll">
+      <div class="page-header">
+        <h1>记忆系统</h1>
+        <p>项目级记忆文件。Learner-owned：智能体只读不写，修改请直接编辑下方文本框并保存。</p>
+      </div>
+
+      <div id="memory-host"></div>
+
+      <h2 class="h-section">记忆规则</h2>
+      <div class="card">
+        <ul style="font-size:.82rem;line-height:1.85;padding-left:20px;color:var(--fg)">
+          <li>记忆<strong>引导个性化</strong>，绝不静默覆盖学习者控制权</li>
+          <li>总结文件是<strong>学习者所有</strong>——智能体可提议修改，不可覆盖</li>
+          <li>记忆写入是<strong>受控且可审查</strong>的</li>
+          <li>项目记忆仅在<strong>有意义的运行后</strong>更新</li>
+          <li>学习者记忆<strong>跨项目</strong>随时间演进</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { listProjects, getHealth } from './js/api.js';
+
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+let projectsCache = [];
+
+async function init() {
+  try {
+    const h = await getHealth();
+    $('connectionState').textContent = h.claude && h.claude.available ? '在线' : 'Claude 未就绪';
+    $('connectionState').style.color = h.claude && h.claude.available ? 'var(--accent)' : 'var(--orange)';
+  } catch {}
+  const { projects } = await listProjects();
+  projectsCache = projects;
+  renderSidebarProjects(projects);
+  renderMain(projects);
+}
+
+function renderSidebarProjects(projects) {
+  const c = $('memory-project-list');
+  if (!projects.length) {
+    c.innerHTML = `<div class="muted-mini">尚无项目</div>`;
+    return;
+  }
+  c.innerHTML = projects.map(p => `
+    <a href="#proj-${esc(p.slug)}" class="tree-item"><span class="icon"><svg class="ico"><use href="#ico-folder"/></svg></span>${esc(p.title)}</a>
+  `).join('');
+}
+
+async function renderMain(projects) {
+  const c = $('memory-host');
+  if (!projects.length) {
+    c.innerHTML = `<div class="mem-empty">尚无项目记忆。先到「项目」页创建一个项目。</div>`;
+    return;
+  }
+  const cards = await Promise.all(projects.map(async p => {
+    let memText = '';
+    try {
+      const r = await fetch(`/files/projects/${p.slug}/memory/project-memory.md`);
+      if (r.ok) memText = await r.text();
+    } catch {}
+    return `
+      <div class="mem-card" id="proj-${esc(p.slug)}">
+        <h4>${esc(p.title)} <span class="muted" style="font-size:.72rem;font-weight:400">· memory/project-memory.md</span>
+          <button class="btn btn-outline btn-sm" data-save="${esc(p.slug)}">保存修改</button>
+        </h4>
+        <p class="mem-meta">Learner-owned：编辑后点击"保存修改"覆盖磁盘文件。</p>
+        <textarea data-mem="${esc(p.slug)}">${esc(memText)}</textarea>
+      </div>
+    `;
+  }));
+  c.innerHTML = cards.join('');
+  c.querySelectorAll('button[data-save]').forEach(btn => {
+    btn.addEventListener('click', () => saveMemory(btn.dataset.save));
+  });
+}
+
+async function saveMemory(slug) {
+  const ta = document.querySelector(`textarea[data-mem="${slug}"]`);
+  if (!ta) return;
+  const r = await fetch(`/files/projects/${slug}/memory/project-memory.md`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: ta.value,
+  });
+  if (r.ok) {
+    ta.style.borderColor = 'var(--accent)';
+    setTimeout(() => ta.style.borderColor = '', 1500);
+  } else {
+    alert('保存失败: ' + r.status);
+  }
+}
+
+init();
+</script>
+</body>
+</html>

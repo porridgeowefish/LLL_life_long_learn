@@ -1,0 +1,18 @@
+{
+  "id": "intro",
+  "name": "引入智能体",
+  "icon": "🌱",
+  "description": "Sparks curiosity, activates prior knowledge, and frames the topic with anchor statements and entry questions.",
+  "userStory": "作为学习者刚接触一个新主题，我希望有人帮我激发好奇、激活已有知识、提出值得追逐的入口问题——以便带着动机进入结构化讲解，而不是冷启动。本 agent 不做：结构化讲解（→ Explain）、练习设计（→ Practice）、反事实推演（→ Extend）、复习总结（→ Summary）。",
+  "primitives": {
+    "required": [
+      "knowledge_anchor",
+      "boundary_map"
+    ]
+  },
+  "allowedZones": ["Intro"],
+  "charterPath": "agents/charters/intro.md",
+  "defaultOutputTargets": [
+    {"zone": "Intro", "filename": "output.md"}
+  ]
+}

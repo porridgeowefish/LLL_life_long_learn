@@ -1,0 +1,24 @@
+{
+  "id": "explain",
+  "name": "讲解智能体",
+  "icon": "📖",
+  "description": "Delivers structured understanding of a topic: definition, first-principles derivation, MECE decomposition, concept graph, worked examples, misconceptions, and boundary map.",
+  "userStory": "作为学习者，我对一个新概念希望获得结构化的完整理解——边界、第一性原理、MECE 拆解、关系图谱、常见误区——足以支撑后续练习与拓展。本 agent 不做：激发好奇（→ Intro）、出题练习（→ Practice）、同主题高阶推演（→ Extend）、复习总结（→ Summary）。",
+  "primitives": {
+    "required": [
+      "mece_decompose",
+      "first_principles",
+      "concept_graph",
+      "misconception",
+      "boundary_map"
+    ],
+    "optional": [
+      "analogy"
+    ]
+  },
+  "allowedZones": ["Explain"],
+  "charterPath": "agents/charters/explain.md",
+  "defaultOutputTargets": [
+    {"zone": "Explain", "filename": "output.md"}
+  ]
+}

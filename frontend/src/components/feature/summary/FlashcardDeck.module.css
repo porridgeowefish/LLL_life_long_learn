@@ -1,0 +1,157 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0;
+}
+
+.loading {
+  padding: 32px;
+  color: var(--muted);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filters {
+  display: flex;
+  gap: 2px;
+  background: var(--border);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.filterBtn {
+  background: none;
+  border: none;
+  padding: 3px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.74rem;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.filterBtn:hover {
+  background: var(--bg);
+}
+
+.filterActive {
+  background: var(--bg);
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.counter {
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ── Card flip ── */
+
+.cardArea {
+  perspective: 800px;
+}
+
+.card {
+  position: relative;
+  min-height: 200px;
+  cursor: pointer;
+  transition: transform 0.5s;
+  transform-style: preserve-3d;
+  border-radius: 10px;
+}
+
+.cardFlipped {
+  transform: rotateY(180deg);
+}
+
+.cardFront,
+.cardBack {
+  backface-visibility: hidden;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 200px;
+}
+
+.cardFront {
+  background: var(--bg);
+}
+
+.cardBack {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  background: rgba(124, 154, 114, 0.04);
+  border-color: var(--accent);
+}
+
+.cardLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.cardText {
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--fg);
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.cardHint {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── Grade buttons ── */
+
+.gradeRow {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.gradeBtn {
+  flex: 1;
+  max-width: 120px;
+  padding: 8px 0;
+  border: 2px solid;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.gradeBtn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* ── Nav ── */
+
+.nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}

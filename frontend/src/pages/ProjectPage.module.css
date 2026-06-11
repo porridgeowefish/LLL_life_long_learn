@@ -1,0 +1,205 @@
+.host {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 144px 1fr;
+  overflow: hidden;
+}
+
+.hostAsideHidden {
+  grid-template-columns: 0 1fr;
+}
+
+.aside {
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.asideHead {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.asideHeadBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.projTitle {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 0.85rem;
+  color: var(--fg);
+  margin-bottom: 1px;
+  word-break: break-word;
+  line-height: 1.2;
+}
+
+.projSlug {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--muted);
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asideToggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.asideToggle:hover {
+  color: var(--fg);
+  background: rgba(124, 154, 114, 0.08);
+}
+
+.expandAside {
+  align-self: flex-start;
+  margin: 8px 12px 0;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expandAside:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ===== MAIN column — single, full-width =====
+   OutputViewer takes 100% of horizontal space. The invoke bar
+   lives at the bottom of this column as a sticky band, not as a
+   right column. */
+
+.main {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  min-width: 0;
+  height: 100%;
+}
+
+.header {
+  padding: 12px 20px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.title {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.2rem;
+  color: var(--fg);
+}
+
+.subtitle {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ===== Bottom invoke bar ===== */
+
+.invokeBar {
+  border-top: 1px solid var(--border);
+  background: var(--card);
+  padding: 10px 16px;
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 48px;
+}
+
+.invokeBar > :global(.agentInvokeHost) {
+  flex: 1;
+  min-width: 0;
+}
+
+.invokeExpand {
+  flex: 1;
+  border: 1px dashed var(--border);
+  background: rgba(124, 154, 114, 0.04);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--accent);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.invokeExpand:hover {
+  border-color: var(--accent);
+  background: rgba(124, 154, 114, 0.08);
+}
+
+.invokeCollapse {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 3px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 6px;
+}
+
+.invokeCollapse:hover {
+  color: var(--fg);
+  background: rgba(124, 154, 114, 0.08);
+}
+
+/* ===== Zone-specific layouts ===== */
+
+.zoneLayout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  padding: 0 20px;
+}
+
+.zoneMain {
+  min-width: 0;
+}
+
+.zoneSide {
+  min-width: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 16px;
+}

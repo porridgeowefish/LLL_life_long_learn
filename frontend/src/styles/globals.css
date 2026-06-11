@@ -1,0 +1,77 @@
+/* Globals: reset + body + element-level defaults. Component-scoped styles
+   live in *.module.css files next to each component. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+}
+
+body {
+  font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--fg);
+}
+
+/* Global italic override.
+   The user dislikes italic styling and prefers emphasis conveyed by
+   weight. We force font-style: normal on all <em>, <i>, and every
+   heading (which several components style as Lora italic). Only the
+   topbar logo is exempt so the brand mark keeps its design identity. */
+em,
+i,
+h1, h2, h3, h4, h5, h6 {
+  font-style: normal !important;
+}
+
+em {
+  font-weight: 700;
+}
+
+:global(.topbar-logo) {
+  font-style: italic !important;
+}
+
+/* scrollbar — subtle, Notion-warm */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(61, 50, 41, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(61, 50, 41, 0.25);
+}

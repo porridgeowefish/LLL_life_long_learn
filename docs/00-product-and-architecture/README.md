@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Last reviewed: 2026-06-09  
 Source of truth: `docs/INDEX.md` routes readers here; each linked document owns its topic.
 
 This directory stores long-lived documents that answer:
@@ -21,12 +21,18 @@ Which rules guide implementation and delivery
 - [SYSTEM_ARCHITECTURE.md](./SYSTEM_ARCHITECTURE.md)
 - [DOMAIN_MODEL.md](./DOMAIN_MODEL.md)
 - [DATA_MODEL.md](./DATA_MODEL.md)
+- [BACKEND_ARCHITECTURE.md](./BACKEND_ARCHITECTURE.md)
 - [AGENT_ARCHITECTURE.md](./AGENT_ARCHITECTURE.md)
+- [LEARNING_PROJECT_STRUCTURE.md](./LEARNING_PROJECT_STRUCTURE.md)
 - [API_CONTRACT_STRATEGY.md](./API_CONTRACT_STRATEGY.md)
 - [MVP_ROADMAP.md](./MVP_ROADMAP.md)
+- [WORKBENCH_ALIGNMENT_REVIEW.html](./WORKBENCH_ALIGNMENT_REVIEW.html)
+- [LEARNING_AGENTS_USER_STORY_ALIGNMENT.html](./LEARNING_AGENTS_USER_STORY_ALIGNMENT.html)
 - [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md)
 - [agent-rules/README.md](./agent-rules/README.md)
 - [ADR/0001-documentation-structure.md](./ADR/0001-documentation-structure.md)
+- [ADR/0002-local-learning-workbench-structure.md](./ADR/0002-local-learning-workbench-structure.md)
+- [ADR/0003-backend-session-and-project-runtime.md](./ADR/0003-backend-session-and-project-runtime.md)
 
 ## Relationship To Iteration Docs
 

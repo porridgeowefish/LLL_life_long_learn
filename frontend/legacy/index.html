@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LifeLongLearn — 学习总览</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,500;1,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<style>
+  /* page-specific layout tweaks */
+  .sidebar-section{padding:14px 6px 4px}
+  .sidebar-link{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:6px;font-size:.82rem;color:var(--fg);text-decoration:none;cursor:pointer;transition:background .15s}
+  .sidebar-link:hover{background:rgba(124,154,114,.06)}
+  .sidebar-link.active{background:rgba(124,154,114,.12);color:var(--accent);font-weight:600}
+  .sidebar-link .ico{font-size:.95rem;color:var(--muted)}
+  .sidebar-link.active .ico{color:var(--accent)}
+  .sidebar-statusdot{width:6px;height:6px;border-radius:50%;display:inline-block}
+  .recent-grid{display:grid;grid-template-columns:1fr;gap:8px}
+  .recent-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px;display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit;transition:all .15s}
+  .recent-card:hover{box-shadow:0 2px 10px rgba(61,50,41,.06)}
+  .recent-card .ico{color:var(--accent);font-size:1.1rem;flex-shrink:0}
+  .recent-card .recent-body{flex:1;min-width:0}
+  .recent-card h4{font-size:.85rem;font-weight:600;margin-bottom:2px}
+  .recent-card p{font-size:.72rem;color:var(--muted)}
+  .recent-card .recent-meta{font-size:.68rem;color:var(--muted);display:flex;gap:8px;margin-top:2px}
+  .running-tile{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--orange);border-radius:10px;padding:14px 18px;box-shadow:var(--shadow);display:flex;gap:14px;align-items:center;margin:6px 0 16px}
+  .running-tile .running-icon{width:34px;height:34px;border-radius:8px;background:rgba(232,148,90,.12);display:flex;align-items:center;justify-content:center;color:var(--orange);flex-shrink:0}
+  .running-tile .running-icon .ico{font-size:1.1rem}
+  .running-tile .running-body{flex:1;min-width:0}
+  .running-tile h4{font-size:.92rem;font-weight:600;margin-bottom:2px}
+  .running-tile p{font-size:.75rem;color:var(--muted);line-height:1.5}
+  .running-tile .running-meta{font-size:.68rem;color:var(--muted);display:flex;gap:10px;margin-top:4px}
+  .empty-state{padding:40px 24px;text-align:center;border:1px dashed var(--border);border-radius:10px;background:rgba(255,255,255,.4)}
+  .empty-state h3{font-family:'Playfair Display',serif;font-size:1.2rem;font-weight:700;margin-bottom:6px;color:var(--fg)}
+  .empty-state p{font-size:.82rem;color:var(--muted);max-width:380px;margin:0 auto;line-height:1.6}
+  .empty-state .empty-cta{margin-top:16px;display:inline-block;padding:9px 22px;background:var(--accent);color:#fff;border-radius:var(--radius);font-size:.82rem;font-weight:600;cursor:pointer;border:none}
+  .empty-state .empty-cta:hover{background:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/index.html" class="topbar-logo">Life<span class="accent">Long</span>Learn</a>
+  <div class="topbar-sep"></div>
+  <div class="topbar-nav">
+    <a href="/index.html" class="active">总览</a>
+    <a href="/project.html">项目</a>
+    <a href="/agents.html">智能体</a>
+    <a href="/memory.html">记忆</a>
+  </div>
+  <div class="topbar-right">
+    <span id="connectionState" style="font-size:.74rem">连接中</span>
+    <span id="workspaceLabel" style="font-family:'JetBrains Mono',monospace;font-size:.68rem"></span>
+  </div>
+</div>
+
+<!-- SVG icon sprite injection -->
+<svg style="display:none">
+  <symbol id="ico-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><line x1="12" y1="4" x2="12" y2="8" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="4" r="1.2" fill="currentColor"/><circle cx="9" cy="13" r="1" fill="currentColor"/><circle cx="15" cy="13" r="1" fill="currentColor"/></symbol>
+  <symbol id="ico-brain" viewBox="0 0 24 24"><path d="M9 4 a3 3 0 0 0 -3 3 v1 a3 3 0 0 0 -2 3 v1 a3 3 0 0 0 2 3 v1 a3 3 0 0 0 3 3 h1 V4 z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15 4 a3 3 0 0 1 3 3 v1 a3 3 0 0 1 2 3 v1 a3 3 0 0 1 -2 3 v1 a3 3 0 0 1 -3 3 h-1 V4 z" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="ico-zap" viewBox="0 0 24 24"><polygon points="13 3 5 14 11 14 10 21 19 9 13 9 14 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  <symbol id="ico-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><polyline points="12 7 12 12 15 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+  <symbol id="ico-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+</svg>
+
+<div class="shell">
+
+  <!-- ===== SIDEBAR (UX-1) ===== -->
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <span>导航</span>
+    </div>
+    <div class="sidebar-scroll" id="sidebar">
+      <div class="sidebar-section tree-section">快捷入口</div>
+      <a href="/index.html" class="sidebar-link active"><svg class="ico"><use href="#ico-zap"/></svg> 学习总览</a>
+      <a href="/agents.html" class="sidebar-link"><svg class="ico"><use href="#ico-bot"/></svg> 智能体管理</a>
+      <a href="/memory.html" class="sidebar-link"><svg class="ico"><use href="#ico-brain"/></svg> 记忆系统</a>
+
+      <div class="sidebar-section tree-section">最近项目</div>
+      <div id="sidebar-projects">
+        <div class="tree-empty">加载中…</div>
+      </div>
+
+      <div class="sidebar-section tree-section">活跃会话</div>
+      <div id="sidebar-active">
+        <div class="muted-mini">无活跃会话</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+    <div class="main-scroll">
+
+      <div class="page-header">
+        <h1>学习总览</h1>
+        <p>你的本地学习工作台一览。</p>
+      </div>
+
+      <!-- ===== HERO STATS (UX-3) ===== -->
+      <div class="dash-stats" id="dash-stats">
+        <div class="dash-stat"><div class="num" id="stat-projects">—</div><div class="label">学习项目</div></div>
+        <div class="dash-stat"><div class="num" id="stat-sessions">—</div><div class="label">会话总数</div></div>
+        <div class="dash-stat"><div class="num" id="stat-turns">—</div><div class="label">对话轮次</div></div>
+        <div class="dash-stat"><div class="num" id="stat-active">—</div><div class="label">运行中</div></div>
+      </div>
+
+      <!-- ===== RUNNING CARD (UX-2 part 1) ===== -->
+      <div id="running-section" style="display:none"></div>
+
+      <!-- ===== RECENT PROJECTS GRID (UX-4) ===== -->
+      <h2 class="h-section">学习项目</h2>
+      <div id="projects-grid" class="grid-2">
+        <div class="empty">加载中…</div>
+      </div>
+
+      <!-- ===== RECENT RUNS (UX-2 part 2) ===== -->
+      <h2 class="h-section">最近运行</h2>
+      <div id="recent-runs" class="recent-grid">
+        <div class="empty">暂无运行记录</div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import { getHealth, listProjects, listActiveSessions, listSessions, createProject } from './js/api.js';
+import { mountCreateProjectModal } from './js/create-project-modal.js';
+
+const $ = id => document.getElementById(id);
+const esc = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+// Mount the rich create-project modal once; openCreate() opens it on demand.
+const openCreate = mountCreateProjectModal({
+  onSuccess: (project) => {
+    location.href = `/project.html?id=${encodeURIComponent(project.slug)}`;
+  },
+});
+
+async function init() {
+  try {
+    const [health, { projects }, { sessions: active }, { sessions: recent }] = await Promise.all([
+      getHealth(),
+      listProjects(),
+      listActiveSessions().catch(() => ({ sessions: [] })),
+      listSessions({ recent: true, limit: 5 }).catch(() => ({ sessions: [] })),
+    ]);
+
+    // ===== Stats (UX-3) =====
+    const stats = health.stats || {};
+    $('stat-projects').textContent = stats.projects ?? projects.length ?? 0;
+    $('stat-sessions').textContent = stats.sessions ?? 0;
+    $('stat-turns').textContent = stats.turns ?? 0;
+    $('stat-active').textContent = stats.activeSessions ?? 0;
+
+    // Connection indicator
+    const claudeOk = health.claude && health.claude.available;
+    $('connectionState').textContent = claudeOk ? '在线' : 'Claude 未就绪';
+    $('connectionState').style.color = claudeOk ? 'var(--accent)' : 'var(--orange)';
+    $('workspaceLabel').textContent = health.workspace || '';
+
+    // ===== Sidebar recent projects (UX-1 part) =====
+    renderSidebarProjects(projects);
+
+    // ===== Sidebar active sessions (UX-1 part) =====
+    renderSidebarActive(active || []);
+
+    // ===== Running card (UX-2 part 1) =====
+    renderRunningSection(active || []);
+
+    // ===== Projects grid (UX-4) =====
+    renderProjectsGrid(projects);
+
+    // ===== Recent runs (UX-2 part 2) =====
+    renderRecentRuns(recent || []);
+  } catch (e) {
+    console.error(e);
+    $('projects-grid').innerHTML = `<div class="empty">连接失败：${esc(e.message)}</div>`;
+    $('connectionState').textContent = '离线';
+    $('connectionState').style.color = 'var(--pink)';
+  }
+}
+
+function renderSidebarProjects(projects) {
+  const c = $('sidebar-projects');
+  if (!projects.length) {
+    c.innerHTML = `<div class="tree-empty">尚未创建项目</div>`;
+    return;
+  }
+  // Show top 8 most recent (assume listProjects returns ordered; if not, show all)
+  const top = projects.slice(0, 8);
+  c.innerHTML = top.map(p => `
+    <a class="sidebar-link" href="/project.html?id=${encodeURIComponent(p.slug)}" title="${esc(p.title)}">
+      <span class="sidebar-statusdot" style="background:${statusColor(p.activeZone)}"></span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.title)}</span>
+    </a>
+  `).join('');
+}
+
+function renderSidebarActive(sessions) {
+  const c = $('sidebar-active');
+  if (!sessions.length) {
+    c.innerHTML = `<div class="muted-mini">无活跃会话</div>`;
+    return;
+  }
+  c.innerHTML = sessions.map(s => `
+    <a class="sidebar-link" href="/project.html?id=${encodeURIComponent(s.projectSlug)}" title="${esc(s.agentId)} · ${esc(s.zoneName)}">
+      <svg class="ico" style="color:var(--orange)"><use href="#ico-zap"/></svg>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.agentId)} · ${esc(s.zoneName)}</span>
+    </a>
+  `).join('');
+}
+
+function renderRunningSection(activeSessions) {
+  const c = $('running-section');
+  if (!activeSessions.length) {
+    c.style.display = 'none';
+    return;
+  }
+  c.style.display = 'block';
+  c.innerHTML = activeSessions.map(s => `
+    <div class="running-tile">
+      <div class="running-icon"><svg class="ico"><use href="#ico-zap"/></svg></div>
+      <div class="running-body">
+        <h4>${esc(s.projectSlug)} <span class="badge badge-orange">${esc(s.state)}</span></h4>
+        <p>${esc(s.agentId)} 智能体正在 ${esc(s.zoneName)} 阶段工作。</p>
+        <div class="running-meta">
+          <span>开始于 ${fmtTime(s.createdAt)}</span>
+          <span>已 ${s.turns ? s.turns.length : 0} 轮</span>
+        </div>
+      </div>
+      <a href="/project.html?id=${encodeURIComponent(s.projectSlug)}" class="btn btn-primary btn-sm">查看项目</a>
+    </div>
+  `).join('');
+}
+
+function renderProjectsGrid(projects) {
+  const c = $('projects-grid');
+  if (!projects.length) {
+    // Empty state — honest guidance instead of fake placeholder data
+    c.style.display = 'block';
+    c.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <h3>开始你的第一个学习项目</h3>
+        <p>LLL 用五个阶段（引入 / 讲解 / 练习 / 拓展 / 总结）组织任意主题的结构化学习。创建项目后，由智能体陪你走完每个阶段。</p>
+        <button class="empty-cta" id="empty-create-btn">+ 新建项目</button>
+      </div>
+    `;
+    bindCreateBtn($('empty-create-btn'));
+    return;
+  }
+  c.style.display = 'grid';
+  const cards = projects.map(p => `
+    <a class="project-card" href="/project.html?id=${encodeURIComponent(p.slug)}">
+      <h4>${esc(p.title)}</h4>
+      <p>${esc(p.slug)}${p.parentProjectId ? ' · 子项目' : ''}</p>
+      <div class="meta">
+        <span><span class="status-dot ${statusDotClass(p.activeZone)}"></span>${esc(p.activeZone || '未开始')}</span>
+        ${p.hasSubprojects ? `<span>含子项目</span>` : ''}
+      </div>
+    </a>
+  `).join('');
+  const createCard = `
+    <div class="project-card new-project-card" id="new-proj-card">
+      <span class="plus"><svg class="ico"><use href="#ico-plus"/></svg> 新建项目</span>
+    </div>
+  `;
+  c.innerHTML = cards + createCard;
+  bindCreateBtn($('new-proj-card'));
+}
+
+function renderRecentRuns(sessions) {
+  const c = $('recent-runs');
+  if (!sessions.length) {
+    c.innerHTML = `<div class="empty">暂无运行记录</div>`;
+    return;
+  }
+  c.innerHTML = sessions.map(s => {
+    const turnCount = s.turns ? s.turns.length : 0;
+    const stateLabel = stateToLabel(s.state);
+    const stateBadge = stateToBadge(s.state);
+    return `
+      <a class="recent-card" href="/project.html?id=${encodeURIComponent(s.projectSlug)}">
+        <svg class="ico"><use href="#ico-clock"/></svg>
+        <div class="recent-body">
+          <h4>${esc(s.agentId)} 智能体 <span class="badge ${stateBadge}">${stateLabel}</span></h4>
+          <p>${esc(s.projectSlug)} · ${esc(s.zoneName)} 阶段</p>
+          <div class="recent-meta">
+            <span>${fmtTime(s.createdAt)}</span>
+            <span>${turnCount} 轮</span>
+            ${s.exitCode != null ? `<span>exit=${s.exitCode}</span>` : ''}
+          </div>
+        </div>
+      </a>
+    `;
+  }).join('');
+}
+
+function bindCreateBtn(el) {
+  if (!el) return;
+  el.addEventListener('click', () => openCreate());
+}
+
+// === Helpers ===
+function statusColor(zone) {
+  if (!zone) return 'var(--muted)';
+  return 'var(--accent)';
+}
+function statusDotClass(zone) {
+  if (!zone) return 'dot-blue';
+  return 'dot-green';
+}
+function stateToLabel(s) {
+  return ({preparing:'准备中', launching:'启动中', running:'运行中', completed:'已完成', cancelled:'已取消', failed:'失败', 'awaiting-follow-up':'等待追问'})[s] || s;
+}
+function stateToBadge(s) {
+  if (s === 'completed') return 'badge-green';
+  if (s === 'running' || s === 'launching' || s === 'preparing' || s === 'awaiting-follow-up') return 'badge-orange';
+  if (s === 'failed' || s === 'cancelled') return 'badge-orange';
+  return 'badge-blue';
+}
+function fmtTime(iso) {
+  if (!iso) return '—';
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return '刚刚';
+    if (diffMin < 60) return `${diffMin} 分钟前`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr} 小时前`;
+    return d.toLocaleDateString();
+  } catch { return iso; }
+}
+
+init();
+</script>
+</body>
+</html>

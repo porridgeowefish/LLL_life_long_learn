@@ -1,14 +1,16 @@
 {
   "name": "lll",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Local Learning Lab orchestrator with Claude Code task monitoring.",
-  "type": "module",
+  "description": "LifeLongLearn — local learning workbench (Go backend + static frontend).",
   "scripts": {
-    "start": "node backend/server.js",
-    "dev": "node backend/server.js"
+    "build": "go build -o dist/lll.exe ./backend-go/cmd/lll",
+    "run": "go run ./backend-go/cmd/lll",
+    "start": "dist/lll.exe",
+    "test": "go test ./...",
+    "test:verbose": "go test -v ./..."
   },
   "engines": {
-    "node": ">=20"
+    "go": ">=1.22"
   }
 }

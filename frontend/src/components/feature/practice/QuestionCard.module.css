@@ -1,0 +1,175 @@
+.root {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg);
+  transition: border-color 0.15s;
+}
+
+.root:hover {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.readonly {
+  background: var(--bg-subtle, #f8f7f4);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle {
+  font-size: 0.75rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.typeTag {
+  font-size: 0.65rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(124, 154, 114, 0.1);
+  color: var(--accent);
+  text-transform: capitalize;
+  flex-shrink: 0;
+}
+
+.questionPreview {
+  font-size: 0.82rem;
+  color: var(--fg);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreTag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.pass {
+  background: rgba(124, 154, 114, 0.12);
+  color: var(--accent);
+}
+
+.fail {
+  background: rgba(200, 80, 80, 0.1);
+  color: var(--pink);
+}
+
+.body {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.questionFull {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--fg);
+  white-space: pre-wrap;
+}
+
+.answerInput {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.55;
+  background: #fdfbf7;
+  color: var(--fg);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.answerInput:focus {
+  border-color: var(--accent);
+}
+
+.answerDisplay {
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--fg);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.answerDisplay p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
+.assessRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.assessLabel {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.assessBtn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--bg);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.assessBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.assessActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.assessHint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.assessDisplay {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.feedback {
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--fg);
+  padding: 8px 10px;
+  border-radius: 5px;
+  background: rgba(124, 154, 114, 0.06);
+  border-left: 3px solid var(--accent);
+}

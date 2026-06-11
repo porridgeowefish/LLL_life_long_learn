@@ -1,0 +1,80 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn .iconLeft,
+.btn .iconRight {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Sizes */
+.s-sm {
+  padding: 5px 10px;
+  font-size: 0.75rem;
+}
+
+.s-md {
+  padding: 7px 14px;
+  font-size: 0.82rem;
+}
+
+/* Variants */
+.v-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.v-primary:hover:not(:disabled) {
+  background: var(--accent2);
+  border-color: var(--accent2);
+}
+
+.v-outline {
+  background: transparent;
+  color: var(--fg);
+  border-color: var(--border);
+}
+.v-outline:hover:not(:disabled) {
+  background: rgba(124, 154, 114, 0.06);
+  border-color: var(--accent);
+}
+
+.v-ghost {
+  background: transparent;
+  color: var(--fg);
+  border-color: transparent;
+}
+.v-ghost:hover:not(:disabled) {
+  background: rgba(124, 154, 114, 0.08);
+}
+
+.v-danger {
+  background: transparent;
+  color: var(--pink);
+  border-color: var(--pink);
+}
+.v-danger:hover:not(:disabled) {
+  background: rgba(196, 113, 94, 0.08);
+}
+
+.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}

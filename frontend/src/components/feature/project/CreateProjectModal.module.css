@@ -1,0 +1,98 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.field input[type='text'],
+.field textarea {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  background: var(--card);
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  color: var(--fg);
+}
+
+.field input[type='text']:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+}
+
+.hint {
+  font-size: 0.7rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.req {
+  color: var(--pink);
+}
+
+.error {
+  font-size: 0.74rem;
+  color: var(--pink);
+  margin-top: 2px;
+}
+
+.fieldRow {
+  display: flex;
+  gap: 12px;
+}
+
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  background: var(--card);
+  transition: all 0.15s;
+}
+
+.radio:hover {
+  border-color: var(--accent);
+}
+
+.radio input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.radio:has(input:checked) {
+  background: rgba(124, 154, 114, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}

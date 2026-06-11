@@ -1,0 +1,20 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+.shell {
+  display: flex;
+  flex: 1;
+  min-height: calc(100vh - var(--header-h));
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
