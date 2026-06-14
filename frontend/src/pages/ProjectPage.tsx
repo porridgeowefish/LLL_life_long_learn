@@ -29,7 +29,6 @@ export function ProjectPage() {
   const selectProject = useProjectStore((s) => s.selectProject);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [invokeCollapsed, setInvokeCollapsed] = useState(false);
 
   useEffect(() => {
     if (slug) selectProject(slug);
@@ -84,10 +83,7 @@ export function ProjectPage() {
               <OutputViewer slug={slug} zone={zone} />
             </div>
             <div className={s.zoneSide}>
-              <ConfusionPanel
-                projectSlug={slug}
-                onBatchAsk={() => setInvokeCollapsed(false)}
-              />
+              <ConfusionPanel projectSlug={slug} />
             </div>
           </div>
         );
@@ -145,44 +141,23 @@ export function ProjectPage() {
         )}
 
         <header className={s.header}>
-          <h1 className={s.title}>{project.title}</h1>
-          <p className={s.subtitle}>
-            当前阶段：<strong>{ZONE_DISPLAY[zone]}</strong>
-          </p>
+          <div className={s.headerTop}>
+            <div className={s.headerBody}>
+              <h1 className={s.title}>{project.title}</h1>
+              <p className={s.subtitle}>
+                当前阶段：<strong>{ZONE_DISPLAY[zone]}</strong>
+              </p>
+            </div>
+            {zone !== 'Practice' && (
+              <div className={s.headerActions}>
+                <AgentInvokePanel slug={slug} zone={zone} />
+              </div>
+            )}
+          </div>
         </header>
 
         <div className={s.scroll}>
           {renderZoneContent()}
-        </div>
-
-        <div className={s.invokeBar}>
-          {invokeCollapsed ? (
-            <button
-              type="button"
-              className={s.invokeExpand}
-              onClick={() => setInvokeCollapsed(false)}
-            >
-              <Icon name="plus" size={13} />
-              <span>调用 {ZONE_DISPLAY[zone]} Agent</span>
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className={s.invokeCollapse}
-                onClick={() => setInvokeCollapsed(true)}
-                title="收起"
-                aria-label="收起调用栏"
-              >
-                <Icon name="x" size={11} />
-              </button>
-              <AgentInvokePanel
-                slug={slug}
-                zone={zone}
-                onInvoked={() => setInvokeCollapsed(true)}
-              />
-            </>
-          )}
         </div>
       </main>
     </div>

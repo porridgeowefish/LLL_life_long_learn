@@ -5,26 +5,32 @@ Owner: project maintainer
 Last reviewed: 2026-06-04  
 Source of truth: this README is a project entry point; domain facts live in `docs/`.
 
-LLL is a local AI learning lab for orchestrating study tasks, dispatching Claude Code work, monitoring task execution, and turning model output into readable study artifacts with Markdown and Mermaid rendering.
+LLL is a local AI learning lab for orchestrating study tasks, launching agent sessions, and turning model output into readable study artifacts.
 
 ## What Exists Today
 
-- Backend task orchestrator:
-  `backend/server.js`
-- Frontend operator console:
-  `frontend/index.html`, `frontend/app.js`, `frontend/styles.css`
-- Study source materials:
-  `research/raw/`
+- Backend runtime:
+  `backend-go/`
+- Frontend app:
+  `frontend/`
+- Agent definitions:
+  `agents/`
 - Documentation system:
   `docs/`
+- Local runtime/project data:
+  `projects/`
 
 ## Repository Map
 
 ```text
-backend/                      Node backend that launches and monitors Claude Code tasks
-frontend/                     Browser console for composing prompts and watching runs
+backend-go/                   Go backend runtime and API
+frontend/                     Vite + React workbench
+frontend/legacy/              Legacy static frontend, archive/reference only
+frontend-designs/             Mock/design reference, not executable truth
+agents/                       Agent registry, charters, primitives
 docs/                         Product, architecture, iteration, and archive documents
-research/raw/                 Local raw study materials, not tracked by git
+projects/                     Local learner projects and run artifacts
+research/                     Raw study / reference materials
 AGENTS.md                     Shared instructions for AI coding agents
 CLAUDE.md                     Thin Claude-specific loader
 ```
@@ -33,7 +39,7 @@ CLAUDE.md                     Thin Claude-specific loader
 
 ```bash
 cd D:\2_Study\LLL
-npm start
+go run ./backend-go/cmd/lll
 ```
 
 Then open:

@@ -126,9 +126,8 @@ E2E with Playwright is deferred (W6 of the refactor plan).
 
 ## Legacy Reference
 
-`frontend/legacy/` contains the v2 static HTML + JS implementation for
-diffing against the new build. Delete it once the new stack has been
-validated end-to-end.
+`frontend/legacy/` is archive/reference material from the older static UI.
+It is not a product fallback and should not be treated as the active frontend contract.
 
 ## Decisions
 

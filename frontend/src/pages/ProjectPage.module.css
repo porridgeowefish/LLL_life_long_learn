@@ -92,13 +92,13 @@
 }
 
 /* ===== MAIN column — single, full-width =====
-   OutputViewer takes 100% of horizontal space. The invoke bar
-   lives at the bottom of this column as a sticky band, not as a
-   right column. */
+   Header at top (title + per-zone invoke control), scrollable
+   zone content below. The invoke control lives in the header,
+   not as a bottom bar. */
 
 .main {
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
   min-width: 0;
   height: 100%;
@@ -108,6 +108,26 @@
   padding: 12px 20px 8px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
+}
+
+.headerTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.headerBody {
+  min-width: 0;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 360px;
+  min-width: min(100%, 360px);
 }
 
 .title {
@@ -127,62 +147,6 @@
 .scroll {
   overflow-y: auto;
   min-height: 0;
-}
-
-/* ===== Bottom invoke bar ===== */
-
-.invokeBar {
-  border-top: 1px solid var(--border);
-  background: var(--card);
-  padding: 10px 16px;
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  min-height: 48px;
-}
-
-.invokeBar > :global(.agentInvokeHost) {
-  flex: 1;
-  min-width: 0;
-}
-
-.invokeExpand {
-  flex: 1;
-  border: 1px dashed var(--border);
-  background: rgba(124, 154, 114, 0.04);
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 0.85rem;
-  color: var(--accent);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: inherit;
-}
-
-.invokeExpand:hover {
-  border-color: var(--accent);
-  background: rgba(124, 154, 114, 0.08);
-}
-
-.invokeCollapse {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--muted);
-  padding: 3px;
-  display: inline-flex;
-  align-items: center;
-  border-radius: 4px;
-  flex-shrink: 0;
-  align-self: flex-start;
-  margin-top: 6px;
-}
-
-.invokeCollapse:hover {
-  color: var(--fg);
-  background: rgba(124, 154, 114, 0.08);
 }
 
 /* ===== Zone-specific layouts ===== */

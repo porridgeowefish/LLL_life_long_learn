@@ -54,9 +54,6 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	if !workspace.ValidateZoneName(string(req.ZoneName)) {
 		return nil, fmt.Errorf("invalid zone: %s", req.ZoneName)
 	}
-	if strings.TrimSpace(req.Intent) == "" {
-		return nil, fmt.Errorf("intent is required")
-	}
 	agent, ok := reg.Get(req.AgentID)
 	if !ok {
 		return nil, fmt.Errorf("agent not found: %s", req.AgentID)
@@ -205,9 +202,11 @@ func renderPrompt(agent *agentregistry.Agent, req Request, preds []workspace.Pre
 		}
 	}
 
-	b.WriteString("\n# User Intent\n\n")
-	b.WriteString(strings.TrimSpace(req.Intent))
-	b.WriteString("\n")
+	if intent := strings.TrimSpace(req.Intent); intent != "" {
+		b.WriteString("\n# Additional Guidance\n\n")
+		b.WriteString(intent)
+		b.WriteString("\n")
+	}
 
 	return b.String()
 }

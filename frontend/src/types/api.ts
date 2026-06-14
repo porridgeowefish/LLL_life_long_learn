@@ -57,7 +57,7 @@ export interface CreateSubprojectRequest {
 export interface InvokeAgentRequest {
   projectId: string;
   zone: ZoneName;
-  intent: string;
+  intent?: string;
   permissionMode?: string;
   sourceRefs?: string[];
 }

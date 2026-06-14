@@ -38,7 +38,7 @@ var validSlugPattern = regexp.MustCompile(`^[a-z0-9\p{Ll}\p{Lo}][a-z0-9\p{Ll}\p{
 var zoneFilenames = map[ZoneName]string{
 	ZoneIntro:   "output.md",
 	ZoneExplain: "output.md",
-	ZonePractice: "tasks.md",
+	ZonePractice: "tasks.json",
 	ZoneExtend:   "prompts.md",
 	ZoneSummary:  "summary.md",
 }

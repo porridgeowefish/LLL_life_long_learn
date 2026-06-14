@@ -33,10 +33,14 @@ export interface Evaluation {
 }
 
 /** Get practice tasks for a project. */
-export function usePracticeTasks(projectSlug: string | undefined) {
+export function usePracticeTasks(
+  projectSlug: string | undefined,
+  options?: { refetchInterval?: number | false },
+) {
   return useQuery({
     queryKey: ['practice', 'tasks', projectSlug],
     enabled: !!projectSlug,
+    refetchInterval: options?.refetchInterval,
     queryFn: async () => {
       const res = await http.get<{ tasks: PracticeTask[] | null; generated: boolean; generatedAt?: string }>(
         `/api/projects/${encodeURIComponent(projectSlug!)}/practice/tasks`,

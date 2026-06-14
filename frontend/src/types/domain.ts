@@ -27,7 +27,7 @@ export const ZONE_DISPLAY: Record<ZoneName, string> = {
 export const ZONE_FILENAME: Record<ZoneName, string> = {
   Intro: 'output.md',
   Explain: 'output.md',
-  Practice: 'tasks.md',
+  Practice: 'tasks.json',
   Extend: 'prompts.md',
   Summary: 'summary.md',
 };

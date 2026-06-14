@@ -60,10 +60,6 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	intent := strings.TrimSpace(req.Intent)
-	if intent == "" {
-		httpx.Error(w, http.StatusBadRequest, "intent is required")
-		return
-	}
 	exists, err := workspace.ProjectExists(req.ProjectID)
 	if err != nil || !exists {
 		httpx.Error(w, http.StatusNotFound, "project not found")

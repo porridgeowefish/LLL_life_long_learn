@@ -16,9 +16,10 @@ interface AgentInvokePanelProps {
   onInvoked?: () => void;
 }
 
-// AgentInvokePanel — now a horizontal bottom-bar, not a side card.
-// Renders inline inside the sticky invoke bar at the bottom of the main
-// column. Layout (left to right): agent select | intent input | invoke button.
+// AgentInvokePanel — horizontal invoke control rendered in the page
+// header (top of the main column) for zones without their own entry
+// (Intro/Explain/Extend/Summary). Practice uses its own GenerationEntry.
+// Layout (left to right): agent select | optional guidance toggle/input | invoke button.
 // Permission mode is intentionally NOT exposed — the runtime default
 // (acceptEdits) is what 99% of learning sessions want.
 export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInvokePanelProps) {
@@ -34,6 +35,7 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
     compatibleAgents[0]?.id ?? '',
   );
   const [intent, setIntent] = useState('');
+  const [showIntentInput, setShowIntentInput] = useState(false);
   const [justInvoked, setJustInvoked] = useState(false);
 
   useEffect(() => {
@@ -45,13 +47,13 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
   }, [compatibleAgents, selectedAgentId]);
 
   const handleInvoke = async () => {
-    if (!selectedAgentId || !intent.trim()) return;
+    if (!selectedAgentId) return;
     const res = await invoke.mutateAsync({
       agentId: selectedAgentId,
       payload: {
         projectId: slug,
         zone,
-        intent: intent.trim(),
+        intent: intent.trim() || undefined,
         permissionMode: PERMISSION_MODES.acceptEdits,
         sourceRefs,
       },
@@ -85,20 +87,31 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
         ))}
       </select>
 
-      <input
-        type="text"
-        className={s.intentInput}
-        placeholder={`向 ${zone} Agent 描述你想学什么…`}
-        value={intent}
-        onChange={(e) => setIntent(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleInvoke();
-          }
-        }}
-        aria-label="学习意图"
-      />
+      <button
+        type="button"
+        className={s.intentToggle}
+        onClick={() => setShowIntentInput((v) => !v)}
+        aria-expanded={showIntentInput}
+      >
+        {showIntentInput ? '收起补充说明' : '补充说明（可选）'}
+      </button>
+
+      {showIntentInput && (
+        <input
+          type="text"
+          className={s.intentInput}
+          placeholder={`补充告诉 ${zone} Agent 你的目标、约束或偏好…`}
+          value={intent}
+          onChange={(e) => setIntent(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleInvoke();
+            }
+          }}
+          aria-label="补充说明"
+        />
+      )}
 
       {invoke.error && (
         <span className={s.errorInline} title={(invoke.error as Error).message}>
@@ -115,7 +128,7 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
         variant="primary"
         onClick={handleInvoke}
         loading={invoke.isPending}
-        disabled={!intent.trim() || !selectedAgentId}
+        disabled={!selectedAgentId}
         className={s.invokeBtn}
       >
         调用

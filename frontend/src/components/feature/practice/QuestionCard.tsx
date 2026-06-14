@@ -1,101 +1,102 @@
-// QuestionCard — one practice question with MarkdownEditor for answer + self-assess.
+// QuestionCard — single-question exam card (one question shown at a time).
+// Header (number + type tag) → markdown stem → AnswerField → 1-5 self-assess.
+// submitted state shows feedback.
 
-import { useState } from 'react';
-import clsx from 'clsx';
-
-import type { PracticeTask } from '@/api/practice';
+import { Tag } from '@/components/primitive/Tag';
+import { Card } from '@/components/primitive/Card';
+import { useMarkdown } from '@/hooks/useMarkdown';
+import { AnswerField } from './AnswerField';
+import type { PracticeTask, EvaluationResult } from '@/api/practice';
+import type { DraftEntry } from '@/lib/practiceDraft';
 
 import s from './QuestionCard.module.css';
 
+// AC P-06 self-assessment labels (1-5 mastery scale).
+const ASSESS_LABELS = ['', '完全不会', '勉强', '基本会', '较熟练', '能迁移'];
+
+const TYPE_TAG: Record<PracticeTask['type'], { tone: 'sky' | 'orange' | 'pink'; label: string }> = {
+  'short-answer': { tone: 'sky', label: '简答' },
+  essay: { tone: 'orange', label: '论述' },
+  code: { tone: 'pink', label: '代码' },
+};
+
 interface QuestionCardProps {
   task: PracticeTask;
-  answer: string;
-  selfAssess: number;
-  onChange: (taskId: string, answer: string, selfAssess: number) => void;
+  index: number;
+  total: number;
+  draft: DraftEntry;
+  onAnswerChange: (taskId: string, answer: string) => void;
+  onAssessChange: (taskId: string, selfAssess: number) => void;
   readonly?: boolean;
-  score?: number;
-  feedback?: string;
+  feedback?: EvaluationResult;
 }
-
-const MASTERY_LABELS = ['', '完全不会', '有印象', '理解思路', '能写出', '熟练掌握'];
 
 export function QuestionCard({
   task,
-  answer,
-  selfAssess,
-  onChange,
+  index,
+  total,
+  draft,
+  onAnswerChange,
+  onAssessChange,
   readonly = false,
-  score,
   feedback,
 }: QuestionCardProps) {
-  const [expanded, setExpanded] = useState(true);
+  const { html } = useMarkdown(task.question);
+  const tag = TYPE_TAG[task.type] ?? TYPE_TAG.essay;
 
   return (
-    <div className={clsx(s.root, readonly && s.readonly)}>
-      <header className={s.head} onClick={() => setExpanded(!expanded)}>
-        <span className={s.toggle}>{expanded ? '▾' : '▸'}</span>
-        <span className={s.typeTag}>{task.type}</span>
-        <span className={s.questionPreview}>
-          {task.question.slice(0, 80)}{task.question.length > 80 ? '…' : ''}
-        </span>
-        {score !== undefined && (
-          <span className={clsx(s.scoreTag, score >= 3 ? s.pass : s.fail)}>
-            {score}/5
-          </span>
-        )}
+    <Card variant="outlined" className={s.root}>
+      <header className={s.head}>
+        <span className={s.number}>第 {index + 1} 题</span>
+        <Tag tone={tag.tone}>{tag.label}</Tag>
+        <span className={s.progress}>{index + 1} / {total}</span>
       </header>
 
-      {expanded && (
-        <div className={s.body}>
-          <div className={s.questionFull}>{task.question}</div>
+      <div
+        className={s.stem}
+        // eslint-disable-next-line react/no-danger -- sanitised in useMarkdown
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
 
-          {readonly ? (
-            <div className={s.answerDisplay}>
-              <strong>你的回答：</strong>
-              <p>{answer || '（未作答）'}</p>
-            </div>
-          ) : (
-            <textarea
-              className={s.answerInput}
-              placeholder="在这里写回答…"
-              value={answer}
-              onChange={(e) => onChange(task.id, e.target.value, selfAssess)}
-              rows={5}
-              spellCheck={false}
-            />
-          )}
+      <div className={s.answerSection}>
+        <div className={s.answerLabel}>作答</div>
+        <AnswerField
+          type={task.type}
+          value={draft.answer}
+          onChange={(v) => onAnswerChange(task.id, v)}
+          readonly={readonly}
+        />
+      </div>
 
-          {readonly ? (
-            <div className={s.assessDisplay}>
-              自评：{MASTERY_LABELS[selfAssess] || `${selfAssess}/5`}
-            </div>
-          ) : (
-            <div className={s.assessRow}>
-              <span className={s.assessLabel}>掌握程度：</span>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  className={clsx(s.assessBtn, selfAssess === n && s.assessActive)}
-                  onClick={() => onChange(task.id, answer, n)}
-                  title={MASTERY_LABELS[n]}
-                  type="button"
-                >
-                  {n}
-                </button>
-              ))}
-              {selfAssess > 0 && (
-                <span className={s.assessHint}>{MASTERY_LABELS[selfAssess]}</span>
-              )}
-            </div>
-          )}
-
-          {feedback && (
-            <div className={s.feedback}>
-              <strong>反馈：</strong> {feedback}
-            </div>
+      <div className={s.assessSection}>
+        <div className={s.assessLabel}>掌握程度自评</div>
+        <div className={s.scaleRow}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              className={`${s.assessBtn} ${draft.selfAssess === n ? s.assessActive : ''}`}
+              onClick={() => !readonly && onAssessChange(task.id, n)}
+              disabled={readonly}
+              title={ASSESS_LABELS[n]}
+            >
+              {n}
+            </button>
+          ))}
+          {draft.selfAssess > 0 && (
+            <span className={s.assessText}>{ASSESS_LABELS[draft.selfAssess]}</span>
           )}
         </div>
+      </div>
+
+      {feedback && (
+        <div className={s.feedback}>
+          <div className={s.feedbackHead}>
+            评估 <strong>{feedback.score}/5</strong> {feedback.passed ? '✅' : '❌'}
+          </div>
+          <div className={s.feedbackBody}>{feedback.feedback}</div>
+        </div>
       )}
-    </div>
+    </Card>
   );
 }

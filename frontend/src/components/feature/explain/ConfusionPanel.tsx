@@ -20,12 +20,10 @@ type Filter = 'all' | ConfusionState;
 
 interface ConfusionPanelProps {
   projectSlug: string;
-  /** Called with selected confusion IDs when learner clicks "统一提问". */
-  onBatchAsk?: (ids: string[]) => void;
   className?: string;
 }
 
-export function ConfusionPanel({ projectSlug, onBatchAsk, className }: ConfusionPanelProps) {
+export function ConfusionPanel({ projectSlug, className }: ConfusionPanelProps) {
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -49,7 +47,6 @@ export function ConfusionPanel({ projectSlug, onBatchAsk, className }: Confusion
     for (const id of selected) {
       updateConfusion.mutate({ projectSlug, confusionId: id, patch: { state: 'asked' } });
     }
-    onBatchAsk?.(Array.from(selected));
     setSelected(new Set());
   };
 

@@ -11,3 +11,8 @@ tmp/
 temp/
 frontend/.vite/
 research/raw/
+
+# Local runtime data & TS incremental build cache
+projects/
+videos/
+*.tsbuildinfo

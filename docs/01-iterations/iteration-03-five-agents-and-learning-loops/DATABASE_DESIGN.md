@@ -34,7 +34,7 @@ projects/<slug>/
 │   ├── confusions.json              [NEW] 困惑清单（事实源）[E-02 / D-E-04 / D-Q-03]
 │   └── versions/                    [NEW] 讲解版本（重新调用保留）[E-01]
 ├── practice/
-│   ├── tasks.md                     [NEW] 题目（学习者可见，无答案）[P-02]
+│   ├── tasks.json                   [NEW] 题目（学习者可见，无答案）[P-02]
 │   ├── submissions/                 [NEW] 作答 [P-05]
 │   │   └── <attempt>/
 │   │       ├── <qid>.md             每题草稿+提交快照
@@ -103,19 +103,22 @@ iter-03 不改 Session/Turn 结构。新增的 confusion/practice/flashcard 是�
 字段约束 `[D-Q-03]`：charStart/charEnd/quoteSnapshot 必填（数据从第一天字符级）；
 state 枚举 open | asked | resolved | deleted（deleted 为墓碑，DATA-01 软删除）。
 
-### 4.2 practice/tasks.md `[P-01]` `[P-02]`
+### 4.2 practice/tasks.json `[P-01]` `[P-02]`
 
-人类可读 markdown（学习者可见）。YAML frontmatter 存 metadata（不泄答案）：
+JSON 题库（学习者可见，无答案）。Practice Agent 按 charter 输出契约写：
 
-```yaml
----
-requested_count: 5
-generated_at: 2026-06-09T10:00:00Z
-difficulty: regular
-question_objective_map:
-  q1: { objective: obj-01, confusion: confusion-001, source: explain/output.md }
----
+```json
+{
+  "tasks": [
+    { "id": "q1", "type": "essay", "question": "迁移题：场景+约束+自检" }
+  ],
+  "generatedAt": "2026-06-09T10:00:00Z"
+}
 ```
+
+- `type`：`short-answer` | `essay` | `code`
+- 题量 1-10，默认 5（P-01）；不含答案/解析/评分（P-02）。
+- `[P-03 deferred]` question → objective / confusion / source 映射待 objective 体系（讲解产出 objective id）落地后补；当前 sourceRefs 注入已覆盖"针对困惑出题"。
 
 答案/解析存评审 artifact（学习者不可见）：`runs/<session>/private-rubric.md`。
 

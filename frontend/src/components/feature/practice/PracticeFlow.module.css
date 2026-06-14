@@ -1,51 +1,51 @@
-.root {
+.exam {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px 0;
+  gap: 16px;
+  padding: 16px 20px 24px;
+  max-width: 760px;
 }
 
-.loading {
-  padding: 32px;
-  color: var(--muted);
-  font-style: italic;
-}
-
-.head {
+.examHead {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 
-.title {
-  font-size: 0.95rem;
-  font-weight: 600;
+.examTitle {
+  font-family: 'Lora', Georgia, serif;
+  font-weight: 500;
+  font-size: 1.15rem;
   color: var(--fg);
 }
 
-.count {
-  font-size: 0.72rem;
+.examMeta {
+  font-size: 0.74rem;
   padding: 1px 8px;
   border-radius: 10px;
   background: rgba(124, 154, 114, 0.1);
   color: var(--accent);
 }
 
-.evalHint {
-  font-size: 0.78rem;
-  color: var(--muted);
+.submittedBadge {
   margin-left: auto;
+  font-size: 0.76rem;
+  color: var(--muted);
 }
 
-.cards {
+.nav {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.foot {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 8px;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+.navInfo {
+  margin: 0 auto;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  flex: 1;
 }

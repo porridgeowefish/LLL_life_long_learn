@@ -118,9 +118,15 @@ iter-03 扩展：
 }
 ```
 
+```text
+intent 为可选字段。
+前端允许直接拉起 Agent，不必强制填写补充提示词。
+像 Practice 这类需要结构化补充说明的页面，仍然可以主动传 intent。
+```
+
 行为链（已核实 promptassembly.Build + claudelauncher.Launch）：
 ```text
-1. 验证 agent / projectId / zone / intent
+1. 验证 agent / projectId / zone；intent 如有值则 trim 后注入 prompt
 2. 若 sourceRefs 非空：从 explain/confusions.json 解析对应 quote_snapshot
 3. promptassembly.Build 组装 prompt（注入 source_refs 引用段）
 4. sessionstore.Create 建 session（StatePreparing）
@@ -185,7 +191,7 @@ POST 请求：
 
 ```text
 POST   /api/projects/{id}/practice/tasks          生成题（题量 1-10，默认 5）
-GET    /api/projects/{id}/practice/tasks          读 tasks.md
+GET    /api/projects/{id}/practice/tasks          读 tasks.json
 POST   /api/projects/{id}/practice/submit         整批提交（锁定 attempt 快照）
 POST   /api/projects/{id}/practice/evaluations    AI 整批评估
 GET    /api/projects/{id}/practice/evaluations/{attempt}   读评估

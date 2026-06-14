@@ -106,7 +106,7 @@ Recommended project structure:
     map.mmd
   practice/
     brief.md
-    tasks.md
+    tasks.json
     submissions/
     reflections.md
   extend/

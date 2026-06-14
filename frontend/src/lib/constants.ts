@@ -4,6 +4,12 @@ export const API_BASE = ''; // Same-origin in prod, proxied by Vite in dev.
 
 export const HEALTH_POLL_INTERVAL_MS = 30_000;
 
+// Practice generation polling — agent writes tasks.json async (TUI), so the
+// frontend polls until tasks appear. SSE artifact-updated is defined but
+// currently unconsumed, so polling is the reliable path.
+export const PRACTICE_GEN_POLL_MS = 3_000;
+export const PRACTICE_GEN_TIMEOUT_MS = 5 * 60 * 1_000;
+
 // SSE event names emitted by backend-go/internal/httpx/sse.go.
 export const SSE_EVENTS = {
   hello: 'hello',

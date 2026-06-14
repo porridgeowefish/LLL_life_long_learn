@@ -1,0 +1,99 @@
+.root {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 560px;
+}
+
+.title {
+  font-family: 'Lora', Georgia, serif;
+  font-weight: 500;
+  font-size: 1.2rem;
+  color: var(--fg);
+}
+
+.desc {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.countRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin-right: 4px;
+}
+
+.stepBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.stepBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.countInput {
+  width: 64px;
+  height: 36px;
+  text-align: center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--card);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.countInput:focus {
+  border-color: var(--accent);
+}
+
+.hint {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+.warn {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #b06a36;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: rgba(232, 148, 90, 0.1);
+  border-left: 3px solid var(--orange);
+}
+
+.warnConfirmed {
+  color: var(--accent);
+  background: rgba(124, 154, 114, 0.08);
+  border-left-color: var(--accent);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}

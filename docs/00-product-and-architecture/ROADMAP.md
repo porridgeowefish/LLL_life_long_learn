@@ -63,14 +63,14 @@ Intro Agent
 
 Practice Agent
   Zone:           Practice
-  User story:     design constrained tasks that force learner output
+  User story:     generate a 1-10 question transfer quiz (default 5)
   Required:       transfer
-  Output target:  practice/tasks.md
+  Output target:  practice/tasks.json
   Output contract:
-    - Transfer task scenario
-    - Constraints (no AI, no library X, time-box N)
-    - Concrete deliverable spec
-    - Three self-check diagnostic questions
+    - JSON quiz: { tasks: [{id, type, question}], generatedAt }
+    - Each question is a transfer task (scenario + constraints + self-check)
+    - No answers / solutions (P-02)
+    - 1-10 questions, default 5 (P-01)
   Estimated:      ~1 day
 
 Extend Agent

@@ -38,6 +38,7 @@ Raw material informs the product, but does not by itself expand the current impl
 
 - Agent entry: [AGENTS.md](../AGENTS.md)
 - Documentation standard: [DOCUMENTATION_STANDARD.md](./00-product-and-architecture/DOCUMENTATION_STANDARD.md)
+- Repository map: [REPOSITORY_MAP.md](./00-product-and-architecture/REPOSITORY_MAP.md)
 - Product and architecture overview: [00-product-and-architecture/README.md](./00-product-and-architecture/README.md)
 - Iteration overview: [01-iterations/README.md](./01-iterations/README.md)
 - Archive overview: [99-archive/README.md](./99-archive/README.md)

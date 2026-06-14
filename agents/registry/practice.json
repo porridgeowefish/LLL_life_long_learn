@@ -2,8 +2,8 @@
   "id": "practice",
   "name": "练习智能体",
   "icon": "✏️",
-  "description": "Designs a constraint-bounded transfer task that forces the learner to produce, with explicit AI-use boundaries and a self-check.",
-  "userStory": "作为学习者刚获得结构化讲解，我希望有一道约束性任务逼我自己动手产出（少 AI 辅助），用来检验讲解是否真的变成了可用知识——而不只是听懂的词汇。本 agent 不做：激发好奇（→ Intro）、结构化讲解（→ Explain）、反事实推演（→ Extend）、复习总结（→ Summary）。",
+  "description": "生成一批约束性迁移题（1-10 题，默认 5），逼学习者动手产出，检验讲解是否变成可用知识。题目不含答案。",
+  "userStory": "作为学习者刚获得结构化讲解，我希望有一批约束性任务逼我自己动手产出（少 AI 辅助），用来检验讲解是否真的变成了可用知识——而不只是听懂的词汇。本 agent 不做：激发好奇（→ Intro）、结构化讲解（→ Explain）、反事实推演（→ Extend）、复习总结（→ Summary）。",
   "primitives": {
     "required": [
       "transfer"
@@ -12,6 +12,6 @@
   "allowedZones": ["Practice"],
   "charterPath": "agents/charters/practice.md",
   "defaultOutputTargets": [
-    {"zone": "Practice", "filename": "tasks.md"}
+    {"zone": "Practice", "filename": "tasks.json"}
   ]
 }

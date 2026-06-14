@@ -119,6 +119,32 @@ func TestBuild_RejectsZoneMismatch(t *testing.T) {
 	}
 }
 
+func TestBuild_AllowsEmptyIntent(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "intro", []workspace.ZoneName{workspace.ZoneIntro})
+
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+		Intent:      "",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build should allow empty intent: %v", err)
+	}
+	if strings.Contains(pkg.PromptMd, "# Additional Guidance") {
+		t.Fatalf("prompt should omit optional guidance section when intent is empty:\n%s", pkg.PromptMd)
+	}
+}
+
 // writeTestAgent adds an in-memory agent to the registry by writing to a
 // temp dir and reloading.
 func writeTestAgent(t *testing.T, reg *agentregistry.Registry, id string, zones []workspace.ZoneName) {

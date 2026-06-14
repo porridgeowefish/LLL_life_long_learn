@@ -215,7 +215,7 @@ Acceptance:
 
 Data:
 - `practice/runs/<run>/requested_count`
-- `practice/tasks.md` metadata
+- `practice/tasks.json` metadata
 
 ### US-P-02 (from P-02) 无答案训练题
 
@@ -228,7 +228,7 @@ Acceptance:
 - 提示分层解锁，第一层不揭示关键步骤。
 
 Data:
-- `practice/tasks.md`（学习者可见）
+- `practice/tasks.json`（学习者可见）
 - `runs/<session>/private-rubric.md`（学习者不可见）
 - `task.answer_visibility=false` 标记
 

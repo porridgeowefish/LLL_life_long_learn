@@ -1,5 +1,6 @@
-// Package practicestore manages practice/tasks.md and submission/evaluation
-// files under a project's practice/ directory. File-backed (iter-03).
+// Package practicestore manages practice/tasks.json (the Practice Agent's
+// quiz output) and submission/evaluation files under a project's practice/
+// directory. File-backed (iter-03).
 package practicestore
 
 import (
@@ -19,8 +20,8 @@ type Task struct {
 	Type    string `json:"type"`      // "short-answer" | "essay" | "code"
 }
 
-// TasksFile is the on-disk structure for practice/tasks.md (actually JSON for
-// structured parsing, with a .md extension because it lives in the practice dir).
+// TasksFile is the on-disk structure for practice/tasks.json — the Practice
+// Agent writes a 1-10 question quiz per the charter output contract.
 type TasksFile struct {
 	Tasks     []Task  `json:"tasks"`
 	GeneratedAt string `json:"generatedAt"`

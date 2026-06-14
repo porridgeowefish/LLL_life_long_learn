@@ -1,6 +1,7 @@
 .host {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
 }
@@ -28,8 +29,24 @@
   border-color: var(--accent);
 }
 
+.intentToggle {
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.intentToggle:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .intentInput {
-  flex: 1;
+  flex: 1 1 280px;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 7px 12px;
