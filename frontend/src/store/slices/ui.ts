@@ -9,9 +9,11 @@ import { STORAGE_KEYS } from '@/lib/constants';
 
 interface UiState {
   sidebarCollapsed: boolean;
+  summaryPanelCollapsed: boolean;
   drawerOpen: boolean;
   createProjectModalOpen: boolean;
   setSidebarCollapsed: (v: boolean) => void;
+  setSummaryPanelCollapsed: (v: boolean) => void;
   setDrawerOpen: (v: boolean) => void;
   toggleDrawer: () => void;
   openCreateProjectModal: () => void;
@@ -22,9 +24,11 @@ export const useUiStore = create<UiState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
+      summaryPanelCollapsed: false,
       drawerOpen: false,
       createProjectModalOpen: false,
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
+      setSummaryPanelCollapsed: (v) => set({ summaryPanelCollapsed: v }),
       setDrawerOpen: (v) => set({ drawerOpen: v }),
       toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
       openCreateProjectModal: () => set({ createProjectModalOpen: true }),
@@ -34,7 +38,10 @@ export const useUiStore = create<UiState>()(
       name: STORAGE_KEYS.uiSidebarCollapsed,
       // Only the sidebarCollapsed field is worth persisting across sessions;
       // modals and drawers should always start closed.
-      partialize: (s) => ({ sidebarCollapsed: s.sidebarCollapsed }),
+      partialize: (s) => ({
+        sidebarCollapsed: s.sidebarCollapsed,
+        summaryPanelCollapsed: s.summaryPanelCollapsed,
+      }),
     },
   ),
 );

@@ -25,6 +25,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+.stars {
+  color: var(--orange);
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+}
+
 /* stem — rendered markdown */
 .stem {
   font-size: 0.92rem;
@@ -158,4 +164,13 @@
   line-height: 1.6;
   color: var(--fg);
   white-space: pre-wrap;
+}
+
+.correct {
+  border-left-color: var(--accent);
+}
+
+.incorrect {
+  border-left-color: var(--pink);
+  background: rgba(196, 113, 94, 0.06);
 }

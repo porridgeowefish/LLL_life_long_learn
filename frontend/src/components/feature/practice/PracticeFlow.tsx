@@ -1,20 +1,25 @@
-// PracticeFlow — single-question exam UI with a useReducer state machine.
-//
-// Phases: idle → generating → answering → confirming → submitting → submitted
-//         (error reachable from generating on agent-fail / timeout / corrupt)
-//
-// Generation: invoke the Practice Agent with an intent naming the count
-// (charter takes the count from intent), then poll tasks.json until it
-// appears (refetchInterval driven by phase). Drafts persist in localStorage
-// keyed by task fingerprint so a regenerate never bleeds old answers.
-
 import { useEffect, useReducer } from 'react';
 
 import { useInvokeAgent } from '@/api/agents';
-import { usePracticeTasks, useSubmitPractice, usePracticeEvaluation, type Submission } from '@/api/practice';
+import {
+  isObjectiveTask,
+  useCheckObjective,
+  useCreatePracticeAttempt,
+  usePracticeEvaluation,
+  usePracticeTasks,
+  useSubmitPracticeAttempt,
+  type ObjectiveResult,
+  type PracticeAnswer,
+  type PracticeTask,
+  type Submission,
+} from '@/api/practice';
+import { useProjectProgress } from '@/api/progress';
 import { PERMISSION_MODES, PRACTICE_GEN_POLL_MS, PRACTICE_GEN_TIMEOUT_MS } from '@/lib/constants';
 import {
-  loadDraft, saveDraft, clearDraft, draftMatches, getLastAttempt, setLastAttempt,
+  clearDraft,
+  draftMatches,
+  loadDraft,
+  saveDraft,
   type DraftEntry,
 } from '@/lib/practiceDraft';
 import { Button } from '@/components/primitive/Button';
@@ -36,6 +41,7 @@ interface State {
   generatedAt: string | null;
   drafts: Record<string, DraftEntry>;
   attempt: number;
+  objectiveResults: Record<string, ObjectiveResult>;
   errorKind: ErrorKind;
 }
 
@@ -46,26 +52,20 @@ const initialState: State = {
   generatedAt: null,
   drafts: {},
   attempt: 0,
+  objectiveResults: {},
   errorKind: null,
 };
 
 type Action =
   | { type: 'GENERATE' }
-  | { type: 'TASKS_READY'; taskIds: string[]; generatedAt: string; drafts: Record<string, DraftEntry> }
-  | { type: 'INIT_SUBMITTED'; attempt: number }
-  | { type: 'TIMEOUT' }
-  | { type: 'AGENT_FAILED' }
-  | { type: 'CORRUPT' }
+  | { type: 'TASKS_READY'; taskIds: string[]; generatedAt: string; drafts: Record<string, DraftEntry>; attempt: number }
+  | { type: 'ATTEMPT_READY'; attempt: number }
+  | { type: 'TIMEOUT' | 'AGENT_FAILED' | 'CORRUPT' | 'OPEN_CONFIRM' | 'CLOSE_CONFIRM' | 'SUBMIT' | 'SUBMIT_FAILED' | 'REGENERATE' | 'BACK_TO_IDLE' }
   | { type: 'SET_INDEX'; index: number }
-  | { type: 'ANSWER'; taskId: string; answer: string }
+  | { type: 'ANSWER'; taskId: string; answer: PracticeAnswer }
   | { type: 'ASSESS'; taskId: string; selfAssess: number }
-  | { type: 'OPEN_CONFIRM' }
-  | { type: 'CLOSE_CONFIRM' }
-  | { type: 'SUBMIT' }
-  | { type: 'SUBMITTED'; attempt: number }
-  | { type: 'SUBMIT_FAILED' }
-  | { type: 'REGENERATE' }
-  | { type: 'BACK_TO_IDLE' };
+  | { type: 'OBJECTIVE_CHECKED'; result: ObjectiveResult }
+  | { type: 'SUBMITTED'; attempt: number };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
@@ -78,10 +78,11 @@ function reducer(state: State, action: Action): State {
         taskIds: action.taskIds,
         generatedAt: action.generatedAt,
         drafts: action.drafts,
+        attempt: action.attempt,
         currentIndex: 0,
       };
-    case 'INIT_SUBMITTED':
-      return { ...state, phase: 'submitted', attempt: action.attempt };
+    case 'ATTEMPT_READY':
+      return { ...state, attempt: action.attempt };
     case 'TIMEOUT':
       return { ...state, phase: 'error', errorKind: 'timeout' };
     case 'AGENT_FAILED':
@@ -98,32 +99,35 @@ function reducer(state: State, action: Action): State {
       const prev = state.drafts[action.taskId] ?? { answer: '', selfAssess: 0 };
       return { ...state, drafts: { ...state.drafts, [action.taskId]: { ...prev, selfAssess: action.selfAssess } } };
     }
+    case 'OBJECTIVE_CHECKED':
+      return {
+        ...state,
+        objectiveResults: { ...state.objectiveResults, [action.result.taskId]: action.result },
+      };
     case 'OPEN_CONFIRM':
       return { ...state, phase: 'confirming' };
     case 'CLOSE_CONFIRM':
+    case 'SUBMIT_FAILED':
       return { ...state, phase: 'answering' };
     case 'SUBMIT':
       return { ...state, phase: 'submitting' };
     case 'SUBMITTED':
       return { ...state, phase: 'submitted', attempt: action.attempt };
-    case 'SUBMIT_FAILED':
-      return { ...state, phase: 'answering' };
     case 'REGENERATE':
-      return { ...state, phase: 'generating', currentIndex: 0, drafts: {}, errorKind: null };
+      return { ...initialState, phase: 'generating' };
     case 'BACK_TO_IDLE':
-      return { ...state, phase: 'idle', errorKind: null };
+      return { ...initialState };
     default:
       return state;
   }
 }
 
-interface PracticeFlowProps {
-  projectSlug: string;
-}
-
-export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
+export function PracticeFlow({ projectSlug }: { projectSlug: string }) {
   const invoke = useInvokeAgent();
-  const submitPractice = useSubmitPractice();
+  const createAttempt = useCreatePracticeAttempt();
+  const checkObjective = useCheckObjective();
+  const submitAttempt = useSubmitPracticeAttempt();
+  const progress = useProjectProgress(projectSlug);
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const tasksData = usePracticeTasks(projectSlug, {
@@ -132,55 +136,49 @@ export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
   const tasks = tasksData.data?.tasks ?? [];
   const generatedAt = tasksData.data?.generatedAt;
   const hasTasks = tasksData.data?.generated === true && Array.isArray(tasks) && tasks.length > 0;
-
-  // submitted → poll evaluation for the attempt (agent writes it async)
   const evalQuery = usePracticeEvaluation(
     state.phase === 'submitted' ? projectSlug : undefined,
     state.attempt,
   );
 
-  // Hydrate + poll-hit: when tasks appear (initial or after generate), enter answering.
   useEffect(() => {
-    if (tasksData.isLoading) return;
-    if (state.phase !== 'idle' && state.phase !== 'generating') return;
+    if (tasksData.isLoading || (state.phase !== 'idle' && state.phase !== 'generating')) return;
     if (hasTasks && generatedAt) {
       const stored = loadDraft(projectSlug);
-      const drafts = draftMatches(stored, tasks.map((t) => t.id), generatedAt)
-        ? stored!.drafts
-        : {};
-      dispatch({ type: 'TASKS_READY', taskIds: tasks.map((t) => t.id), generatedAt, drafts });
-    } else if (state.phase === 'idle') {
-      const lastAttempt = getLastAttempt(projectSlug);
-      if (lastAttempt) dispatch({ type: 'INIT_SUBMITTED', attempt: lastAttempt });
+      const matches = draftMatches(stored, tasks.map((task) => task.id), generatedAt);
+      dispatch({
+        type: 'TASKS_READY',
+        taskIds: tasks.map((task) => task.id),
+        generatedAt,
+        drafts: matches ? stored!.drafts : {},
+        attempt: matches ? stored?.attempt ?? 0 : 0,
+      });
     }
-  }, [hasTasks, generatedAt, tasksData.isLoading, state.phase, projectSlug, tasks]);
+  }, [generatedAt, hasTasks, projectSlug, state.phase, tasks, tasksData.isLoading]);
 
-  // corrupt guard: generated=true but tasks not a real array
   useEffect(() => {
-    if (tasksData.data?.generated === true && !Array.isArray(tasksData.data.tasks)) {
-      dispatch({ type: 'CORRUPT' });
-    }
-  }, [tasksData.data]);
+    if (state.phase !== 'answering' || state.attempt > 0 || createAttempt.isPending) return;
+    void createAttempt.mutateAsync(projectSlug).then((result) => {
+      dispatch({ type: 'ATTEMPT_READY', attempt: result.attempt });
+    });
+  }, [createAttempt, projectSlug, state.attempt, state.phase]);
 
-  // poll timeout
   useEffect(() => {
     if (state.phase !== 'generating') return;
     const timer = setTimeout(() => dispatch({ type: 'TIMEOUT' }), PRACTICE_GEN_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [state.phase]);
 
-  // draft persistence: save on every draft/index change while answering
   useEffect(() => {
-    if (state.phase !== 'answering' && state.phase !== 'confirming') return;
-    if (!state.generatedAt || state.taskIds.length === 0) return;
+    if ((state.phase !== 'answering' && state.phase !== 'confirming') || !state.generatedAt) return;
     saveDraft(projectSlug, {
       generatedAt: state.generatedAt,
       taskIds: state.taskIds,
       drafts: state.drafts,
+      attempt: state.attempt || undefined,
     });
-  }, [state.drafts, state.currentIndex, state.phase, state.generatedAt, state.taskIds, projectSlug]);
+  }, [projectSlug, state.attempt, state.drafts, state.generatedAt, state.phase, state.taskIds]);
 
-  // ---- handlers ----
   const handleGenerate = async (count: number) => {
     try {
       await invoke.mutateAsync({
@@ -188,7 +186,7 @@ export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
         payload: {
           projectId: projectSlug,
           zone: 'Practice',
-          intent: `生成 ${count} 道迁移练习题，覆盖讲解中的核心概念。每题给一个新场景+约束+自检问题，不含答案或解析。`,
+          intent: `生成 ${count} 道由易到难的练习题。按一星到五星递进，包含判断题、选择题和主观迁移题；同时写 tasks.json 与 answer-key.json。`,
           permissionMode: PERMISSION_MODES.acceptEdits,
         },
       });
@@ -198,66 +196,54 @@ export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
     }
   };
 
-  const handleSubmit = async () => {
-    dispatch({ type: 'SUBMIT' });
-    const submissions: Submission[] = state.taskIds.map((id) => {
-      const d = state.drafts[id] ?? { answer: '', selfAssess: 0 };
-      return { taskId: id, answer: d.answer, selfAssess: d.selfAssess };
+  const handleCheckObjective = async (task: PracticeTask, draft: DraftEntry) => {
+    if (state.attempt < 1) return;
+    const response = await checkObjective.mutateAsync({
+      projectSlug,
+      attempt: state.attempt,
+      taskId: task.id,
+      answer: draft.answer,
     });
+    dispatch({ type: 'OBJECTIVE_CHECKED', result: response.result });
+  };
+
+  const handleSubmit = async () => {
+    if (state.attempt < 1) return;
+    dispatch({ type: 'SUBMIT' });
+    const submissions: Submission[] = tasks
+      .filter((task) => !isObjectiveTask(task))
+      .map((task) => {
+        const draft = state.drafts[task.id] ?? { answer: '', selfAssess: 0 };
+        return { taskId: task.id, answer: draft.answer, selfAssess: draft.selfAssess };
+      });
     try {
-      const res = await submitPractice.mutateAsync({ projectSlug, submissions });
+      const response = await submitAttempt.mutateAsync({
+        projectSlug,
+        attempt: state.attempt,
+        submissions,
+      });
       clearDraft(projectSlug);
-      setLastAttempt(projectSlug, res.attempt);
-      dispatch({ type: 'SUBMITTED', attempt: res.attempt });
+      dispatch({ type: 'SUBMITTED', attempt: response.attempt });
     } catch {
       dispatch({ type: 'SUBMIT_FAILED' });
     }
   };
 
-  // ---- render by phase ----
   if (state.phase === 'idle') {
     return <GenerationEntry onGenerate={handleGenerate} isInvoking={invoke.isPending} />;
   }
-
   if (state.phase === 'generating') {
-    return (
-      <EmptyState
-        title="正在生成练习题…"
-        description={<>练习智能体已启动，题目就绪后自动显示（每 3 秒检查一次，最长等 5 分钟）。</>}
-      />
-    );
+    return <EmptyState title="正在生成渐进题组…" description="题目与答案键就绪后会自动显示。" />;
   }
-
   if (state.phase === 'error') {
-    const msgs: Record<string, { title: string; desc: string }> = {
-      timeout: {
-        title: '生成超时',
-        desc: '超过 5 分钟未收到题目。练习智能体可能仍在后台运行，或已失败。',
-      },
-      agent: {
-        title: '调用失败',
-        desc: '练习智能体未能启动。请确认后端在线、claude 可用后重试。',
-      },
-      corrupt: {
-        title: '题目文件损坏',
-        desc: 'practice/tasks.json 格式异常，无法解析。可重新生成。',
-      },
-    };
-    const m = msgs[state.errorKind ?? 'agent'];
     return (
       <EmptyState
-        title={m.title}
-        description={m.desc}
-        action={
-          <Button variant="primary" onClick={() => dispatch({ type: 'BACK_TO_IDLE' })}>
-            返回题量选择
-          </Button>
-        }
+        title="练习题暂时不可用"
+        description={`错误类型：${state.errorKind ?? 'unknown'}`}
+        action={<Button onClick={() => dispatch({ type: 'BACK_TO_IDLE' })}>返回题量选择</Button>}
       />
     );
   }
-
-  // answering / confirming / submitting / submitted → exam view
   if (tasks.length === 0) {
     return <EmptyState title="没有可作答的题目" description="请重新生成练习题。" />;
   }
@@ -265,25 +251,22 @@ export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
   const currentTask = tasks[state.currentIndex] ?? tasks[0];
   const currentDraft = state.drafts[currentTask.id] ?? { answer: '', selfAssess: 0 };
   const readonly = state.phase === 'submitting' || state.phase === 'submitted';
-  const evalMap = new Map((evalQuery.data?.results ?? []).map((r) => [r.taskId, r]));
-
+  const evalMap = new Map((evalQuery.data?.results ?? []).map((result) => [result.taskId, result]));
   const isLast = state.currentIndex === tasks.length - 1;
 
   return (
     <div className={s.exam}>
       <header className={s.examHead}>
-        <h3 className={s.examTitle}>练习作答</h3>
+        <h3 className={s.examTitle}>渐进练习</h3>
         <span className={s.examMeta}>{tasks.length} 题</span>
-        {state.phase === 'submitted' && (
-          <span className={s.submittedBadge}>第 {state.attempt} 次已提交 · 等待评估</span>
-        )}
+        <span className={s.growth}>项目成长值 <strong>{progress.data?.total ?? 0}</strong></span>
       </header>
 
       <PracticeProgress
         tasks={tasks}
         drafts={state.drafts}
         currentIndex={state.currentIndex}
-        onJump={(i) => dispatch({ type: 'SET_INDEX', index: i })}
+        onJump={(index) => dispatch({ type: 'SET_INDEX', index })}
         locked={readonly}
       />
 
@@ -292,49 +275,53 @@ export function PracticeFlow({ projectSlug }: PracticeFlowProps) {
         index={state.currentIndex}
         total={tasks.length}
         draft={currentDraft}
-        onAnswerChange={(id, answer) => dispatch({ type: 'ANSWER', taskId: id, answer })}
-        onAssessChange={(id, selfAssess) => dispatch({ type: 'ASSESS', taskId: id, selfAssess })}
+        onAnswerChange={(taskId, answer) => dispatch({ type: 'ANSWER', taskId, answer })}
+        onAssessChange={(taskId, selfAssess) => dispatch({ type: 'ASSESS', taskId, selfAssess })}
+        onCheckObjective={handleCheckObjective}
+        checking={checkObjective.isPending}
         readonly={readonly}
+        objectiveResult={state.objectiveResults[currentTask.id]}
         feedback={evalMap.get(currentTask.id)}
       />
 
-      {state.phase === 'submitted' ? (
-        <div className={s.nav}>
-          <Button variant="outline" onClick={() => dispatch({ type: 'REGENERATE' })}>
-            重新生成（新题）
-          </Button>
-          <span className={s.navInfo}>
-            已提交的第 {state.attempt} 次作答保留在历史中，不会被覆盖。
-          </span>
-        </div>
-      ) : (
-        <div className={s.nav}>
-          <Button
-            variant="ghost"
-            onClick={() => dispatch({ type: 'SET_INDEX', index: state.currentIndex - 1 })}
-            disabled={state.currentIndex === 0}
-          >
-            ← 上一题
-          </Button>
-          <span className={s.navInfo}>第 {state.currentIndex + 1} / {tasks.length} 题</span>
-          {isLast ? (
-            <Button variant="primary" onClick={() => dispatch({ type: 'OPEN_CONFIRM' })}>
-              提交全部
-            </Button>
-          ) : (
+      <div className={s.nav}>
+        {state.phase === 'submitted' ? (
+          <>
+            <Button variant="outline" onClick={() => dispatch({ type: 'REGENERATE' })}>生成新题组</Button>
+            <span className={s.navInfo}>
+              {evalQuery.data ? `主观题评估完成：${evalQuery.data.overallScore.toFixed(1)} / 5` : '客观题已即时判定，主观题等待整批评估。'}
+            </span>
+          </>
+        ) : (
+          <>
             <Button
-              variant="outline"
-              onClick={() => dispatch({ type: 'SET_INDEX', index: state.currentIndex + 1 })}
+              variant="ghost"
+              onClick={() => dispatch({ type: 'SET_INDEX', index: state.currentIndex - 1 })}
+              disabled={state.currentIndex === 0}
             >
-              下一题 →
+              上一题
             </Button>
-          )}
-        </div>
-      )}
+            <span className={s.navInfo}>第 {state.currentIndex + 1} / {tasks.length} 题</span>
+            {isLast ? (
+              <Button
+                variant="primary"
+                onClick={() => dispatch({ type: 'OPEN_CONFIRM' })}
+                disabled={state.attempt < 1}
+              >
+                提交整组
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => dispatch({ type: 'SET_INDEX', index: state.currentIndex + 1 })}>
+                下一题
+              </Button>
+            )}
+          </>
+        )}
+      </div>
 
       <ConfirmSubmitModal
         open={state.phase === 'confirming' || state.phase === 'submitting'}
-        onOpenChange={(o) => { if (!o && state.phase === 'confirming') dispatch({ type: 'CLOSE_CONFIRM' }); }}
+        onOpenChange={(open) => { if (!open && state.phase === 'confirming') dispatch({ type: 'CLOSE_CONFIRM' }); }}
         tasks={tasks}
         drafts={state.drafts}
         onConfirm={handleSubmit}

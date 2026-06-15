@@ -6,8 +6,10 @@
 //   lll.draft.practice.{slug}            — { generatedAt, taskIds, drafts }
 //   lll.practice.{slug}.lastAttempt      — last submitted attempt number
 
+import type { PracticeAnswer } from '@/api/practice';
+
 export interface DraftEntry {
-  answer: string;
+  answer: PracticeAnswer;
   selfAssess: number; // 0 = not yet self-assessed
 }
 
@@ -15,6 +17,11 @@ export interface PracticeDraft {
   generatedAt: string;
   taskIds: string[];
   drafts: Record<string, DraftEntry>;
+  attempt?: number;
+}
+
+export function isEmptyPracticeAnswer(answer: PracticeAnswer | undefined): boolean {
+  return answer === undefined || answer === '' || (Array.isArray(answer) && answer.length === 0);
 }
 
 const DRAFT_PREFIX = 'lll.draft.practice';

@@ -6,6 +6,7 @@ import clsx from 'clsx';
 
 import type { PracticeTask } from '@/api/practice';
 import type { DraftEntry } from '@/lib/practiceDraft';
+import { isEmptyPracticeAnswer } from '@/lib/practiceDraft';
 import { Icon } from '@/components/primitive/Icon';
 
 import s from './PracticeProgress.module.css';
@@ -26,7 +27,7 @@ function cellState(
   locked: boolean,
 ): CellState {
   if (isCurrent && !locked) return 'current';
-  if (!draft || draft.answer.trim() === '') return 'unanswered';
+  if (!draft || isEmptyPracticeAnswer(draft.answer)) return 'unanswered';
   if (draft.selfAssess === 0) return 'answered';
   return 'completed';
 }

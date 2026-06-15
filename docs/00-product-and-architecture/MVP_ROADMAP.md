@@ -17,7 +17,7 @@ Task persistence and local history.
 Iteration 03
 Study artifact organization and export.
 
-Iteration 04
+Iteration 04: three-agent learning experience; prior deferred work moves to Iteration 05+
 Prompt pipelines, agent role presets, and reusable study jobs.
 
 Iteration 05

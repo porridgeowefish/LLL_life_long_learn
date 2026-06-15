@@ -8,15 +8,17 @@ See `docs/00-product-and-architecture/AGENT_PRIMITIVES.md` for the design ration
 
 ### Explain Agent (required)
 
-- `mece_decompose.md` — MECE breakdown with 80/20 star markers
-- `first_principles.md` — Axiom-to-topic derivation chain
-- `concept_graph.md` — Mermaid concept graph (≤ 12 nodes)
+- `research_question_frame.md` — Tutorial-wide research question structure
+- `prerequisite_scaffold.md` — Minimal prerequisite teaching without learner diagnosis
 - `misconception.md` — Three-plus common misconceptions with counterexamples
-- `boundary_map.md` — IN SCOPE / ADJACENT / PREREQUISITE sections (shared with Intro)
+- `boundary_map.md` — Scope boundary used once in the overview (shared with Intro)
 
 ### Explain Agent (optional)
 
 - `analogy.md` — Engineering / CS analogy mapping
+- `mece_decompose.md` — Optional decomposition when one stable axis exists
+- `concept_graph.md` — Optional graph for non-linear concept relations
+- `first_principles.md` — Final core-viewpoint compression only; never a standalone section
 
 ### Intro Agent (required, primitive ready — agent pending)
 

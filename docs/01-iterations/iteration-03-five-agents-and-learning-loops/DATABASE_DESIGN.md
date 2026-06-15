@@ -193,7 +193,7 @@ practice 评估的持久化：文件为事实源，iter-03 **不实现 DB 索引
 3. 任一步失败 → 保留已写文件，返回失败让前端重试
 ```
 
-冲突策略：文件胜。后续若引入 SQLite（iter-04+），DB 仅作加速索引，
+冲突策略：文件胜。后续若引入 SQLite（未来迭代），DB 仅作加速索引，
 可从 `evaluations/*.json` 重建，绝不成为事实源（D-Q-04）。
 
 ## 6. 保护规则 `[iter-02 不变]`
@@ -212,5 +212,5 @@ project-memory.md           同上（learner-owned）
 不建独立 trace/ 目录（D6）
 不实现文件版本系统（explain/versions 仅占位，E-01 重调用保留策略实现期定）
 不实现 extend/*.mmd 关系图（D-Q-07，改引导性思考文本 output.md）
-不实现 memory/summary proposal schema（DATA-03 / S-06 defer iter-04）
+不实现 memory/summary proposal schema（DATA-03 / S-06 defer iter-05+）
 ```

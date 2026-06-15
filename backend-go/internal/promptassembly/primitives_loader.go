@@ -77,10 +77,10 @@ func ClearPrimitiveCacheForTest() {
 //     skipped — optional primitives may legitimately not exist on disk
 //     (e.g. an agent's optional list mentions a future primitive).
 //
-// The activation of optional primitives in v1 is unconditional: every
-// declared optional is included. Per-intent activation rules will be added
-// in a later iteration via a registry-side schema; for now, charter authors
-// should treat "optional" as "always include, but small".
+// Optional primitive bodies are included as reference material, not as output
+// requirements. The charter decides whether a mechanism is activated for the
+// current topic. The prompt preface below makes that distinction explicit so
+// merely listing an optional primitive does not create a matching section.
 func ExpandPrimitives(required, optional []string) (string, error) {
 	var b strings.Builder
 	if len(required) > 0 {
@@ -98,7 +98,8 @@ func ExpandPrimitives(required, optional []string) (string, error) {
 		}
 	}
 	if len(optional) > 0 {
-		b.WriteString("### Optional primitives\n\n")
+		b.WriteString("### Optional primitive references\n\n")
+		b.WriteString("The following mechanisms are reference material only. Do not create a page or section merely because a mechanism is listed here. Activate one only when the charter's conditions fit the current topic.\n\n")
 		for _, name := range optional {
 			body, err := LoadPrimitive(name)
 			if err != nil {

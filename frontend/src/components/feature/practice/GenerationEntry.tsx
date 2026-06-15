@@ -34,7 +34,7 @@ export function GenerationEntry({ onGenerate, isInvoking = false }: GenerationEn
     <Card variant="outlined" className={s.root}>
       <h3 className={s.title}>生成练习题</h3>
       <p className={s.desc}>
-        选择题量，调用练习智能体生成迁移题。题目不含答案——自己动手才算学会。
+        选择题量，生成从一星到五星的渐进题组。客观题答后立即展示答案解析，主观题整批评估。
       </p>
 
       <div className={s.countRow}>

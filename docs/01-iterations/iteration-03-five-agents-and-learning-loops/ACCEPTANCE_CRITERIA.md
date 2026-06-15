@@ -167,7 +167,7 @@ summary/summary.md 始终由用户最终控制，不被盲覆盖              [S
 明确"已掌握"的证据门槛与不确定性                              [S-05]
 交付成果有完成 / 部分完成 / 未完成状态 + 证据链接             [S-05]
 
-[S-06 总结 AI 建议子系统 — DEFERRED iter-04，见 README Deferred。
+[S-06 总结 AI 建议子系统 — DEFERRED iter-05+，见 README Deferred。
  iter-03 的 summary.md 由用户完全手写，无 AI 建议注入流程。]
 ```
 
@@ -182,7 +182,7 @@ AI 推断与用户原始输入分开存储                                  [DAT
 文件为事实源；DB 索引层 iter-03 不实现                         [DATA-02]
 写入失败明确展示哪一层失败并允许重试                          [DATA-02]
 
-[DATA-03 记忆建议子系统 — DEFERRED iter-04，见 README Deferred。
+[DATA-03 记忆建议子系统 — DEFERRED iter-05+，见 README Deferred。
  iter-03 项目记忆只读，无建议 accept/rewrite/reject 流程。]
 ```
 
@@ -236,8 +236,8 @@ Explain zone 调用后 OutputViewer 渲染区无右侧大片空白          [C-0
 | Explain E | 3 + D-E-04 | ✅ |
 | Practice P | 9 + D-Q-02 | ✅ |
 | Extend D | 6 + D-Q-01 + D-Q-07 | ✅ |
-| Summary S | 4 + D-Q-05（S-06 defer iter-04） | ✅ |
-| Data DATA | 3（DATA-02 瘦文件优先；DATA-03 defer iter-04） | ✅ |
+| Summary S | 4 + D-Q-05（S-06 defer iter-05+） | ✅ |
+| Data DATA | 3（DATA-02 瘦文件优先；DATA-03 defer iter-05+） | ✅ |
 | 导航 BTN-01 | 1 | ✅ |
 | 编辑器 BTN-04 | 1（D-BTN-04 高优） | ✅ |
 | Carryover | C-01..04 | ✅ |

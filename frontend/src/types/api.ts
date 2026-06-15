@@ -52,6 +52,10 @@ export interface CreateProjectRequest {
 export interface CreateSubprojectRequest {
   title: string;
   slug?: string;
+  why?: string;
+  current?: string;
+  target?: string;
+  standard?: string;
 }
 
 export interface InvokeAgentRequest {
@@ -60,6 +64,7 @@ export interface InvokeAgentRequest {
   intent?: string;
   permissionMode?: string;
   sourceRefs?: string[];
+  parentPageId?: string;
 }
 
 export interface FollowUpRequest {

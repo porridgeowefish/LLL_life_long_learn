@@ -3,7 +3,7 @@
 Status: draft
 Owner: project maintainer
 Last reviewed: 2026-06-09
-Source of truth: 36 条认同项 + 1 条已拍板需修改项（US-BTN-04，高优先级）= 37 条 user stories。其中 US-S-06 / US-DATA-03 标记 **defer iter-04**（iter-03 不实现）；US-D-01..06 已按 **D-Q-07** 改为引导性思考（不画图）。G-02/G-03 为流程治理项，已移至 README "Process Constraints" 节。
+Source of truth: 36 条认同项 + 1 条已拍板需修改项（US-BTN-04，高优先级）= 37 条 user stories。其中 US-S-06 / US-DATA-03 标记 **defer iter-05+**（iter-03 不实现）；US-D-01..06 已按 **D-Q-07** 改为引导性思考（不画图）。G-02/G-03 为流程治理项，已移至 README "Process Constraints" 节。
 
 每条 story 编号对齐原对齐包 ID（G/IN/I/E/P/D/S/DATA/BTN），便于回溯。
 
@@ -463,10 +463,10 @@ Data:
 - `summary/next-steps.md`
 - `summary/deliverables-status.json`
 
-### US-S-06 (from S-06) AI 建议必须审阅 [DEFERRED iter-04]
+### US-S-06 (from S-06) AI 建议必须审阅 [DEFERRED iter-05+]
 
-> **本轮 defer iter-04**（见 README Deferred）：总结 AI 建议子系统（accept/rewrite/reject）
-> 不进 iter-03。iter-03 的 `summary.md` 由用户完全手写。本 story 保留供 iter-04 接续。
+> **本轮 defer iter-05+**（见 README Deferred）：总结 AI 建议子系统（accept/rewrite/reject）
+> 不进 iter-03。iter-03 的 `summary.md` 由用户完全手写。本 story 保留供未来迭代接续。
 
 As a learner, I want AI to help organize but not ghost-write, so the final knowledge stays mine.
 
@@ -513,10 +513,10 @@ Data:
 - `practice/evaluations/<attempt>.json`（事实源）
 - `practice/evaluations/<attempt>.md`（可读副本）
 
-### US-DATA-03 (from DATA-03) 记忆更新可见可审阅 [DEFERRED iter-04]
+### US-DATA-03 (from DATA-03) 记忆更新可见可审阅 [DEFERRED iter-05+]
 
-> **本轮 defer iter-04**（见 README Deferred）：记忆建议子系统（accept/rewrite/reject/undo）
-> 不进 iter-03。iter-03 项目记忆只读。本 story 保留供 iter-04 接续。
+> **本轮 defer iter-05+**（见 README Deferred）：记忆建议子系统（accept/rewrite/reject/undo）
+> 不进 iter-03。iter-03 项目记忆只读。本 story 保留供未来迭代接续。
 
 As a learner, I want the system to remember useful patterns, but I can see and correct its judgment.
 
@@ -572,6 +572,6 @@ Data:
 
 ## 范围外（明确不进 iter-03）
 
-- 字符级 UI 高亮：iter-04 或更晚
-- 全文 / 跨项目搜索：iter-04 或更晚
+- 字符级 UI 高亮：未来迭代
+- 全文 / 跨项目搜索：未来迭代
 - 移动端 / 暗色模式 / i18n / 离线 PWA：暂不规划

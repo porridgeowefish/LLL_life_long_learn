@@ -12,7 +12,7 @@ iter-02      Go backend + Five-zone model + Explain Agent + v2 frontend  ✓
 iter-02.1    Mock alignment + UX repair + reasoning-primitive scaffolding ✓
 iter-02.2    Deepthink replacement + reasoning-primitive library shipped  ✓
 iter-03      Intro / Practice / Extend / Summary agents (planned)
-iter-04      PTY-backed real session continuity (planned)
+iter-05+     PTY-backed real session continuity (planned)
 iter-05      Memory auto-update layer (planned)
 ```
 
@@ -101,7 +101,7 @@ Summary Agent
   Estimated:      ~1.5 days
 ```
 
-## iter-04+ Plan: Real Session Continuity
+## iter-05+ Plan: Real Session Continuity
 
 ```text
 PTY-backed follow-ups

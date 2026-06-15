@@ -16,7 +16,7 @@ import (
 
 // Server bundles runtime dependencies shared across handlers.
 type Server struct {
-	ClaudeBin      string
+	ClaudeBin       string
 	ClaudeAvailable bool
 }
 
@@ -76,7 +76,11 @@ func (s *Server) Handler() http.Handler {
 	// Practice
 	mux.HandleFunc("GET /api/projects/{id}/practice/tasks", s.handleGetPracticeTasks)
 	mux.HandleFunc("POST /api/projects/{id}/practice/submit", s.handleSubmitPractice)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts", s.handleCreatePracticeAttempt)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/objective/{taskId}/check", s.handleCheckObjective)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/submit", s.handleSubmitPracticeAttempt)
 	mux.HandleFunc("GET /api/projects/{id}/practice/evaluation", s.handleGetPracticeEvaluation)
+	mux.HandleFunc("GET /api/projects/{id}/progress", s.handleGetProgress)
 
 	// Summary (flashcards)
 	mux.HandleFunc("GET /api/projects/{id}/summary/flashcards", s.handleListFlashcards)

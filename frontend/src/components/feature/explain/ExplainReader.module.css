@@ -1,0 +1,235 @@
+.layout {
+  min-height: 100%;
+}
+
+.toc {
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+
+.tocTitle {
+  font-family: 'Lora', Georgia, serif;
+  font-weight: 600;
+  margin-bottom: 14px;
+  font-size: 1.05rem;
+}
+
+.tocNavigation {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+}
+
+.tocScroller {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.tocScroller::-webkit-scrollbar {
+  display: none;
+}
+
+.slideButton {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--fg);
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.slideButton:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent2);
+  background: rgba(124, 154, 114, 0.07);
+}
+
+.slideButton:disabled {
+  color: var(--muted);
+  opacity: 0.38;
+  cursor: default;
+}
+
+.tocItem {
+  flex: 0 0 auto;
+  min-width: 170px;
+  max-width: 230px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 5px 8px;
+  border-radius: var(--radius);
+  text-align: left;
+  font-size: 0.82rem;
+}
+
+.tocItem:hover {
+  background: rgba(124, 154, 114, 0.09);
+  color: var(--fg);
+}
+
+.pageNode {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--muted);
+  font-weight: 600;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.active {
+  color: var(--fg);
+}
+
+.active .pageNode {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.pageTitle {
+  line-height: 1.35;
+}
+
+.tocItem small {
+  grid-column: 2;
+  margin-top: -6px;
+  color: var(--orange);
+}
+
+.reader {
+  min-width: 0;
+  padding: 20px 28px 32px;
+}
+
+.page {
+  max-width: 78ch;
+  position: relative;
+}
+
+.selectionBar {
+  position: absolute;
+  z-index: 10;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border-radius: 6px;
+  background: var(--fg);
+  box-shadow: var(--shadow);
+}
+
+.selectionBar button {
+  border: 0;
+  background: transparent;
+  color: #fff;
+  padding: 3px 7px;
+  font-size: 0.72rem;
+}
+
+.selectionBar button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.selectionBar button:disabled {
+  color: rgba(255, 255, 255, 0.55);
+  cursor: default;
+}
+
+.page > code {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.markdown {
+  font-size: 0.94rem;
+  line-height: 1.8;
+}
+
+.markdown :global(mark[data-summary-id]) {
+  color: inherit;
+  background: linear-gradient(
+    transparent 18%,
+    rgba(238, 205, 91, 0.5) 18%,
+    rgba(238, 205, 91, 0.5) 88%,
+    transparent 88%
+  );
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  padding: 0 0.08em;
+  border-radius: 2px;
+}
+
+.markdown :global(h1),
+.markdown :global(h2),
+.markdown :global(h3) {
+  font-family: 'Lora', Georgia, serif;
+  margin: 1.3em 0 0.5em;
+}
+
+.markdown :global(p),
+.markdown :global(ul),
+.markdown :global(ol) {
+  margin: 0.65em 0;
+}
+
+.markdown :global(ul),
+.markdown :global(ol) {
+  padding-left: 1.5em;
+}
+
+.markdown :global(pre) {
+  overflow: auto;
+  background: #2a2018;
+  color: #e8e2d9;
+  padding: 14px;
+  border-radius: 6px;
+}
+
+.loading {
+  padding: 28px;
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .toc {
+    padding: 14px 12px 12px;
+  }
+
+  .tocNavigation {
+    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    gap: 6px;
+  }
+
+  .slideButton {
+    width: 30px;
+    height: 30px;
+  }
+
+  .tocItem {
+    min-width: 150px;
+  }
+
+  .reader {
+    padding: 18px 16px 28px;
+  }
+}

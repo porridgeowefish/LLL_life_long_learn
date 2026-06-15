@@ -29,6 +29,7 @@ type invokeRequest struct {
 	Intent         string   `json:"intent"`
 	PermissionMode string   `json:"permissionMode,omitempty"`
 	SourceRefs     []string `json:"sourceRefs,omitempty"` // confusion IDs to inject
+	ParentPageID   string   `json:"parentPageId,omitempty"`
 }
 
 // handleInvokeAgent orchestrates an agent invocation: validates, resolves
@@ -69,11 +70,12 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 
 	// Build the prompt package.
 	pkg, err := promptassembly.Build(promptassembly.Request{
-		ProjectSlug: req.ProjectID,
-		ZoneName:    zoneName,
-		AgentID:     agent.ID,
-		Intent:      intent,
-		SourceRefs:  req.SourceRefs,
+		ProjectSlug:  req.ProjectID,
+		ZoneName:     zoneName,
+		AgentID:      agent.ID,
+		Intent:       intent,
+		SourceRefs:   req.SourceRefs,
+		ParentPageID: strings.TrimSpace(req.ParentPageID),
 	}, agents)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())
@@ -132,8 +134,8 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 
 	// Return the session to the caller immediately.
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"session":  sess,
-		"runDir":   pkg.RunDirName,
+		"session": sess,
+		"runDir":  pkg.RunDirName,
 	})
 }
 
@@ -229,10 +231,10 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 	priorPaths := collectPriorResultPaths(sess)
 
 	pkg, err := promptassembly.Build(promptassembly.Request{
-		ProjectSlug:            sess.ProjectSlug,
-		ZoneName:               workspace.ZoneName(sess.ZoneName),
-		AgentID:                sess.AgentID,
-		Intent:                 text,
+		ProjectSlug:              sess.ProjectSlug,
+		ZoneName:                 workspace.ZoneName(sess.ZoneName),
+		AgentID:                  sess.AgentID,
+		Intent:                   text,
 		FollowupPriorResultPaths: priorPaths,
 	}, agents)
 	if err != nil {

@@ -75,14 +75,15 @@
 .active {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
 }
 
 .activeTile {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 14px 18px;
+  gap: 10px;
+  min-height: 48px;
+  padding: 7px 12px;
   background: var(--card);
   border: 1px solid var(--border);
   border-left: 3px solid var(--orange);
@@ -91,9 +92,9 @@
 }
 
 .activeIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   background: rgba(232, 148, 90, 0.12);
   color: var(--orange);
   display: inline-flex;
@@ -108,7 +109,7 @@
 }
 
 .activeBody h4 {
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--fg);
   margin-bottom: 2px;
@@ -145,14 +146,15 @@
 .recent {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
 }
 
 .recentCard {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  min-height: 46px;
+  padding: 7px 12px;
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -174,7 +176,7 @@
 }
 
 .recentBody h4 {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   margin-bottom: 2px;
 }

@@ -109,7 +109,12 @@ func (s *Server) handleCreateSubproject(w http.ResponseWriter, r *http.Request) 
 		httpx.Error(w, http.StatusBadRequest, "invalid child slug: "+childSlug)
 		return
 	}
-	if err := workspace.CreateProjectSkeleton(childSlug, title, parentSlug); err != nil {
+	if err := workspace.CreateSubprojectWithInput(parentSlug, childSlug, title, workspace.ProjectInput{
+		Why:      req.Why,
+		Current:  req.Current,
+		Target:   req.Target,
+		Standard: req.Standard,
+	}); err != nil {
 		if workspace.IsSlugConflict(err) {
 			httpx.Error(w, http.StatusConflict, "child project already exists: "+childSlug)
 			return
@@ -121,8 +126,8 @@ func (s *Server) handleCreateSubproject(w http.ResponseWriter, r *http.Request) 
 	cache.Invalidate(parentSlug)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
 		"project": map[string]any{
-			"slug":     childSlug,
-			"title":    title,
+			"slug":            childSlug,
+			"title":           title,
 			"parentProjectId": parentSlug,
 		},
 	})
@@ -144,7 +149,15 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"project": state})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"project": struct {
+			*workspace.ProjectState
+			GeneratedZones []workspace.ZoneName `json:"generatedZones"`
+		}{
+			ProjectState:   state,
+			GeneratedZones: state.GeneratedZones,
+		},
+	})
 }
 
 // handleProjectTree returns a tree-shaped sidebar payload.
@@ -240,6 +253,10 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 	allowedTop := map[string]bool{"memory": true, "summary": true, "intro": true, "explain": true, "practice": true, "extend": true}
 	if !allowedTop[top] {
 		httpx.Error(w, http.StatusForbidden, "directory not readable")
+		return
+	}
+	if top == "practice" && len(parts) == 2 && parts[1] == "answer-key.json" {
+		httpx.Error(w, http.StatusForbidden, "answer key is private")
 		return
 	}
 	data, err := os.ReadFile(abs)

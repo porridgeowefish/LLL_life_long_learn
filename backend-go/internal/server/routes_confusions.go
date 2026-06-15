@@ -91,7 +91,7 @@ func (s *Server) handleUpdateConfusion(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"confusion": updated})
 }
 
-// handleDeleteConfusion soft-deletes a confusion.
+// handleDeleteConfusion permanently removes a saved summary.
 func (s *Server) handleDeleteConfusion(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
 	confID := r.PathValue("confusionId")

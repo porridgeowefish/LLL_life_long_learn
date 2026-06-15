@@ -1,36 +1,35 @@
-// ConfusionPanel — lists / filters confusion markers for the Explain zone.
-// Allows "统一提问" batch action (marks selected confusions as "asked").
-
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { ChevronLeftIcon, ChevronRightIcon, CopyIcon, TrashIcon } from '@radix-ui/react-icons';
 import clsx from 'clsx';
 
-import { useConfusions, useDeleteConfusion, useUpdateConfusion, type Confusion, type ConfusionState } from '@/api/confusions';
+import { useConfusions, useDeleteConfusion, type Confusion } from '@/api/confusions';
 import { Button } from '@/components/primitive/Button';
+import { Modal } from '@/components/primitive/Modal';
 
 import s from './ConfusionPanel.module.css';
 
-const STATE_LABELS: Record<ConfusionState, string> = {
-  open: '待提问',
-  asked: '已提问',
-  resolved: '已解决',
-  deleted: '已删除',
-};
-
-type Filter = 'all' | ConfusionState;
-
 interface ConfusionPanelProps {
   projectSlug: string;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
   className?: string;
 }
 
-export function ConfusionPanel({ projectSlug, className }: ConfusionPanelProps) {
-  const [filter, setFilter] = useState<Filter>('all');
+export function ConfusionPanel({
+  projectSlug,
+  collapsed = false,
+  onCollapsedChange,
+  className,
+}: ConfusionPanelProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
-
-  const stateFilter = filter === 'all' ? undefined : filter;
-  const { data: confusions, isLoading } = useConfusions(projectSlug, stateFilter);
+  const [deleteTarget, setDeleteTarget] = useState<Confusion | null>(null);
+  const [copied, setCopied] = useState(false);
+  const { data: confusions = [], isLoading } = useConfusions(projectSlug);
   const deleteConfusion = useDeleteConfusion();
-  const updateConfusion = useUpdateConfusion();
+  const visible = useMemo(
+    () => confusions.filter((item) => item.state !== 'deleted'),
+    [confusions],
+  );
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -41,74 +40,129 @@ export function ConfusionPanel({ projectSlug, className }: ConfusionPanelProps) 
     });
   };
 
-  const handleBatchAsk = () => {
-    if (selected.size === 0) return;
-    // Mark each selected confusion as "asked".
-    for (const id of selected) {
-      updateConfusion.mutate({ projectSlug, confusionId: id, patch: { state: 'asked' } });
-    }
-    setSelected(new Set());
+  const copySelected = async () => {
+    const text = visible
+      .filter((item) => selected.has(item.id))
+      .map((item, index) => `${index + 1}. ${item.quoteSnapshot}`)
+      .join('\n\n');
+    if (!text) return;
+    await copyText(text);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const openCount = confusions?.filter((c) => c.state === 'open').length ?? 0;
+  if (collapsed) {
+    return (
+      <div className={clsx(s.collapsed, className)}>
+        <button
+          type="button"
+          className={s.collapseButton}
+          onClick={() => onCollapsedChange?.(false)}
+          aria-label="展开摘要"
+          title="展开摘要"
+        >
+          <ChevronLeftIcon />
+        </button>
+        <span className={s.collapsedLabel}>摘要</span>
+        {visible.length > 0 && <span className={s.count}>{visible.length}</span>}
+      </div>
+    );
+  }
 
   return (
     <div className={clsx(s.root, className)}>
       <header className={s.head}>
-        <h4 className={s.title}>困惑标记</h4>
-        <div className={s.filters}>
-          {(['all', 'open', 'asked', 'resolved'] as const).map((f) => (
-            <button
-              key={f}
-              className={clsx(s.filterBtn, filter === f && s.filterActive)}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'all' ? '全部' : STATE_LABELS[f]}
-            </button>
-          ))}
+        <div>
+          <h4 className={s.title}>摘要</h4>
+          <p className={s.subtitle}>选中教程文字即可保存</p>
         </div>
+        <button
+          type="button"
+          className={s.collapseButton}
+          onClick={() => onCollapsedChange?.(true)}
+          aria-label="收起摘要"
+          title="收起摘要"
+        >
+          <ChevronRightIcon />
+        </button>
       </header>
 
-      {isLoading && <div className={s.empty}>加载中…</div>}
+      <div className={s.list}>
+        {isLoading && <div className={s.empty}>加载中…</div>}
+        {!isLoading && visible.length === 0 && (
+          <div className={s.empty}>还没有摘要。用鼠标选中讲解正文，点击“保存摘要”。</div>
+        )}
+        {visible.map((item) => (
+          <SummaryItem
+            key={item.id}
+            summary={item}
+            selected={selected.has(item.id)}
+            onToggle={() => toggleSelect(item.id)}
+            onDelete={() => setDeleteTarget(item)}
+          />
+        ))}
+      </div>
 
-      {!isLoading && (!confusions || confusions.length === 0) && (
-        <div className={s.empty}>暂无困惑标记。在讲解内容中选择文字 → "标困惑" 添加。</div>
-      )}
-
-      {confusions?.map((c) => (
-        <ConfusionItem
-          key={c.id}
-          confusion={c}
-          selected={selected.has(c.id)}
-          onToggle={() => toggleSelect(c.id)}
-          onDelete={() => deleteConfusion.mutate({ projectSlug, confusionId: c.id })}
-        />
-      ))}
-
-      {openCount > 0 && (
+      {visible.length > 0 && (
         <footer className={s.foot}>
           <Button
             variant="primary"
             size="sm"
             disabled={selected.size === 0}
-            onClick={handleBatchAsk}
+            iconLeft={<CopyIcon />}
+            onClick={copySelected}
           >
-            统一提问 ({selected.size})
+            {copied ? '已复制' : `复制 (${selected.size})`}
           </Button>
-          <span className={s.footHint}>选择困惑后批量提问给 Explain Agent</span>
         </footer>
       )}
+
+      <Modal
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title="删除这条摘要？"
+        description="删除后，教程正文中的黄色高亮也会消失。"
+        size="sm"
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button
+              variant="danger"
+              loading={deleteConfusion.isPending}
+              onClick={async () => {
+                if (!deleteTarget) return;
+                await deleteConfusion.mutateAsync({
+                  projectSlug,
+                  confusionId: deleteTarget.id,
+                });
+                setSelected((prev) => {
+                  const next = new Set(prev);
+                  next.delete(deleteTarget.id);
+                  return next;
+                });
+                setDeleteTarget(null);
+              }}
+            >
+              删除
+            </Button>
+          </>
+        )}
+      >
+        <blockquote className={s.deletePreview}>{deleteTarget?.quoteSnapshot}</blockquote>
+      </Modal>
     </div>
   );
 }
 
-function ConfusionItem({
-  confusion,
+function SummaryItem({
+  summary,
   selected,
   onToggle,
   onDelete,
 }: {
-  confusion: Confusion;
+  summary: Confusion;
   selected: boolean;
   onToggle: () => void;
   onDelete: () => void;
@@ -116,28 +170,33 @@ function ConfusionItem({
   return (
     <div className={clsx(s.item, selected && s.itemSelected)}>
       <label className={s.itemCheck}>
-        <input
-          type="checkbox"
-          checked={selected}
-          onChange={onToggle}
-          disabled={confusion.state !== 'open'}
-        />
+        <input type="checkbox" checked={selected} onChange={onToggle} />
       </label>
-      <div className={s.itemBody}>
-        <blockquote className={s.quote}>{confusion.quoteSnapshot}</blockquote>
-        {confusion.notes && <p className={s.notes}>{confusion.notes}</p>}
-        <div className={s.meta}>
-          <span className={s.stateTag}>{STATE_LABELS[confusion.state]}</span>
-        </div>
-      </div>
+      <blockquote className={s.quote}>{summary.quoteSnapshot}</blockquote>
       <button
-        className={s.deleteBtn}
+        className={s.deleteButton}
         onClick={onDelete}
-        title="删除"
+        title="删除摘要"
+        aria-label="删除摘要"
         type="button"
       >
-        ×
+        <TrashIcon />
       </button>
     </div>
   );
+}
+
+async function copyText(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  textarea.remove();
 }

@@ -21,14 +21,14 @@ func withTempWorkspace(t *testing.T) (string, func()) {
 
 func TestSlugify(t *testing.T) {
 	cases := map[string]string{
-		"Recommender Systems":  "recommender-systems",
-		"  Rust  Ownership ":   "rust-ownership",
-		"Multiple   Spaces":    "multiple-spaces",
-		"场论 (Field Theory)":    "场论-field-theory",
-		"UPPER--CASE":          "upper-case",
-		"with/slash\\dot":      "with-slash-dot",
-		"":                     "",
-		"---":                  "",
+		"Recommender Systems": "recommender-systems",
+		"  Rust  Ownership ":  "rust-ownership",
+		"Multiple   Spaces":   "multiple-spaces",
+		"场论 (Field Theory)":   "场论-field-theory",
+		"UPPER--CASE":         "upper-case",
+		"with/slash\\dot":     "with-slash-dot",
+		"":                    "",
+		"---":                 "",
 	}
 	for in, want := range cases {
 		got := Slugify(in)
@@ -62,7 +62,7 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 	}
 
 	// Verify folder tree.
-	wantDirs := []string{"", "memory", "intro", "explain", "practice", "extend", "summary", "runs", "runs/_index", "assets", "subprojects"}
+	wantDirs := []string{"", "memory", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets", "subprojects"}
 	for _, d := range wantDirs {
 		p := filepath.Join(projectsRootOverride, "recommender-systems", d)
 		if info, err := os.Stat(p); err != nil || !info.IsDir() {
@@ -297,5 +297,69 @@ func TestSlugConflictErrorChain(t *testing.T) {
 	wrapped := errors.New("wrapped: " + (&SlugConflictError{Slug: "x"}).Error())
 	if !strings.Contains(wrapped.Error(), "x") {
 		t.Errorf("error message lost slug")
+	}
+}
+
+func TestNestedProjectResolvesByOwnSlug(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+	if err := CreateProjectSkeleton("parent", "Parent", ""); err != nil {
+		t.Fatal(err)
+	}
+	if err := CreateSubprojectWithInput("parent", "child-topic", "Child", ProjectInput{
+		Why: "prerequisite",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	state, err := ReadProjectState("child-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ParentProjectID != "parent" {
+		t.Fatalf("parentProjectId = %q, want parent", state.ParentProjectID)
+	}
+	root, err := ProjectRootForSlug("child-topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if filepath.Base(filepath.Dir(root)) != "subprojects" {
+		t.Fatalf("child root %q is not nested under subprojects", root)
+	}
+}
+
+func TestReadProjectStateDetectsGeneratedZones(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+	if err := CreateProjectSkeleton("generated-zones", "Generated Zones", ""); err != nil {
+		t.Fatal(err)
+	}
+	root, err := ProjectRootForSlug("generated-zones")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"intro/assessment.json":    `{"schemaVersion":1}`,
+		"explain/manifest.json":    `{"pages":[{"id":"p001"}]}`,
+		"practice/tasks.json":      `{"tasks":[{"id":"q1"}]}`,
+		"extend/relation-notes.md": "related topic",
+		"summary/review-pack.md":   "review",
+	}
+	for rel, content := range files {
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	state, err := ReadProjectState("generated-zones")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.GeneratedZones) != len(AllZones) {
+		t.Fatalf("expected all zones generated, got %v", state.GeneratedZones)
+	}
+	for i, zone := range AllZones {
+		if state.GeneratedZones[i] != zone {
+			t.Fatalf("zone %d: expected %s, got %s", i, zone, state.GeneratedZones[i])
+		}
 	}
 }

@@ -248,9 +248,9 @@ POST /grade 请求：
 
 验收 `[D-Q-05]`：单路由 /summary；闪卡/总结是 tab 切换不是分屏；切换不丢进度。
 
-> [S-06 Summary Proposals + DATA-03 Memory Proposals — **DEFERRED iter-04**，见 README Deferred。]
+> [S-06 Summary Proposals + DATA-03 Memory Proposals — **DEFERRED iter-05+**，见 README Deferred。]
 > iter-03 不实现 AI 建议 / 记忆建议子系统。`summary.md` 与 `project-memory.md` 均由用户直接编辑。
-> 原 §7 Summary Proposals 子节与 §8 Memory Proposals 端点族移除，iter-04 接续。
+> 原 §7 Summary Proposals 子节与 §8 Memory Proposals 端点族移除，iter-05+ 接续。
 
 ## 8. Files — 扩展写白名单 `[BTN-04]` `[E-02]`
 
@@ -291,6 +291,6 @@ payload 含 projectId + 资源 id，前端用 queryClient.invalidateQueries 驱�
 不新增独立 trace/ 端点（D6，trace 落 runs/transcript.ndjson）
 不引入 SQLite（D-Q-04，DB 索引层仅定义边界不实现）
 不改 zone id（D-Q-01，仅前端显示名改"拓展"）
-不新增 memory/summary proposal 端点（DATA-03 / S-06 defer iter-04，见 README Deferred）
+不新增 memory/summary proposal 端点（DATA-03 / S-06 defer iter-05+，见 README Deferred）
 Extend 不产 .mmd 关系图（D-Q-07，agent 产物走 invoke+/files，引导性思考文本）
 ```

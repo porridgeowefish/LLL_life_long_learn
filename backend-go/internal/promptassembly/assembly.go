@@ -20,7 +20,8 @@ type Request struct {
 	Intent      string
 
 	// SourceRefs are confusion IDs to inject into the prompt as source references.
-	SourceRefs []string
+	SourceRefs   []string
+	ParentPageID string
 
 	// FollowupPriorResultPaths is set when this invocation is a follow-up.
 	// Each path points to a prior run's result.md.
@@ -29,21 +30,22 @@ type Request struct {
 
 // Package is the assembled prompt package.
 type Package struct {
-	PromptMd       string    // the full prompt text passed to Claude
-	RunDirName     string    // e.g. "2026-06-08T15-22-11-explain"
-	PackageMeta    PackageMeta
+	PromptMd    string // the full prompt text passed to Claude
+	RunDirName  string // e.g. "2026-06-08T15-22-11-explain"
+	PackageMeta PackageMeta
 }
 
 // PackageMeta is written to run dir / package.json.
 type PackageMeta struct {
-	ProjectSlug       string                  `json:"projectSlug"`
-	ZoneName          workspace.ZoneName      `json:"zoneName"`
-	AgentID           string                  `json:"agentId"`
-	PredecessorFiles  []workspace.PredecessorFile `json:"predecessorFiles"`
-	OutputTargets     []agentregistry.OutputTarget `json:"outputTargets"`
-	MemorySnapshot    *memorystore.Snapshot   `json:"memorySnapshot,omitempty"`
-	FollowupPrior     []string                `json:"followupPriorResultPaths,omitempty"`
-	GeneratedAt       time.Time               `json:"generatedAt"`
+	ProjectSlug      string                       `json:"projectSlug"`
+	ZoneName         workspace.ZoneName           `json:"zoneName"`
+	AgentID          string                       `json:"agentId"`
+	PredecessorFiles []workspace.PredecessorFile  `json:"predecessorFiles"`
+	OutputTargets    []agentregistry.OutputTarget `json:"outputTargets"`
+	MemorySnapshot   *memorystore.Snapshot        `json:"memorySnapshot,omitempty"`
+	FollowupPrior    []string                     `json:"followupPriorResultPaths,omitempty"`
+	ParentPageID     string                       `json:"parentPageId,omitempty"`
+	GeneratedAt      time.Time                    `json:"generatedAt"`
 }
 
 // Build constructs the prompt package. Returns error on validation failure.
@@ -86,6 +88,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 			OutputTargets:    agent.DefaultOutputTargets,
 			MemorySnapshot:   memSnap,
 			FollowupPrior:    req.FollowupPriorResultPaths,
+			ParentPageID:     req.ParentPageID,
 			GeneratedAt:      time.Now().UTC(),
 		},
 	}, nil
@@ -142,12 +145,27 @@ func renderPrompt(agent *agentregistry.Agent, req Request, preds []workspace.Pre
 		}
 	}
 
+	if agent.ID == "explain" {
+		b.WriteString("# Explain Tutorial Artifact Contract\n\n")
+		b.WriteString("- 目标产物是可独立阅读的教程，不是智能体回复、对话记录或学习诊断报告。\n")
+		b.WriteString("- 正文直接陈述知识，不称呼读者，不使用“你”“我们”等对话人称。\n")
+		b.WriteString("- 项目背景与 Intro 诊断只用于控制深度和选择样例；禁止写入“用户说”“用户自述”“判断依据”“校准缺口”“根据 assessment/project.md”等元信息。\n")
+		b.WriteString("- 第一性原理不得成为独立页面、章节、标题或逐步推导；若使用，只能融入最后一页的“核心观点”，限 2-4 句话。\n")
+		b.WriteString("- 研究问题框架由整套教程整体覆盖，不得让每一页机械重复同一组栏目。\n")
+		b.WriteString("- 不写文件协议、追问机制、生成过程、交付摘要、后续邀请或智能体自述。\n\n")
+	}
+
 	b.WriteString("# Behavior Rules\n\n")
-	b.WriteString("- Cite predecessor files when building on prior zone output.\n")
+	if agent.ID == "explain" {
+		b.WriteString("- Silently use predecessor files to choose depth and examples; never cite their filenames or narrate learner-profile evidence in tutorial prose.\n")
+		b.WriteString("- Missing learner context is not tutorial content. Use a neutral beginner explanation without reporting what the learner did or did not provide.\n")
+	} else {
+		b.WriteString("- Cite predecessor files when building on prior zone output.\n")
+		b.WriteString("- If information is missing, say so explicitly rather than fabricating.\n")
+	}
 	b.WriteString("- Do NOT edit `summary/summary.md`. That file is learner-owned.\n")
 	b.WriteString("- Write Markdown that renders cleanly with GitHub-flavored Markdown + Mermaid.\n")
-	b.WriteString("- If information is missing, say so explicitly rather than fabricating.\n")
-	b.WriteString("- Each required reasoning primitive's output must appear under its own heading in the deliverable.\n\n")
+	b.WriteString("- Follow the charter's file and heading contracts exactly; JSON deliverables must remain pure JSON.\n\n")
 
 	b.WriteString("# Project Context\n\n")
 	b.WriteString(fmt.Sprintf("- Project slug: `%s`\n", req.ProjectSlug))
@@ -186,6 +204,12 @@ func renderPrompt(agent *agentregistry.Agent, req Request, preds []workspace.Pre
 		for _, p := range req.FollowupPriorResultPaths {
 			b.WriteString(fmt.Sprintf("- `%s`\n", p))
 		}
+	}
+
+	if strings.TrimSpace(req.ParentPageID) != "" {
+		b.WriteString("\n# Explain Page Context\n\n")
+		b.WriteString(fmt.Sprintf("- parentPageId: `%s`\n", req.ParentPageID))
+		b.WriteString("- Treat this invocation as a follow-up page. Preserve existing pages and append one manifest entry.\n")
 	}
 
 	b.WriteString("\n# Output Targets\n\n")

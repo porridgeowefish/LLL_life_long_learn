@@ -8,10 +8,13 @@ import { ZoneTimeline } from '@/components/feature/project/ZoneTimeline';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
 import { AgentInvokePanel } from '@/components/feature/agent/AgentInvokePanel';
 import { ConfusionPanel } from '@/components/feature/explain/ConfusionPanel';
+import { ExplainReader } from '@/components/feature/explain/ExplainReader';
+import { IntroPage } from '@/components/feature/intro/IntroPage';
 import { PracticeFlow } from '@/components/feature/practice/PracticeFlow';
 import { ExtendPage } from '@/components/feature/extend/ExtendPage';
 import { SummaryPage } from '@/components/feature/summary/SummaryPage';
 import { useProjectStore } from '@/store/slices/project';
+import { useUiStore } from '@/store/slices/ui';
 import { ZONE_DISPLAY, type ZoneName } from '@/types/domain';
 
 import s from './ProjectPage.module.css';
@@ -29,6 +32,8 @@ export function ProjectPage() {
   const selectProject = useProjectStore((s) => s.selectProject);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const summaryPanelCollapsed = useUiStore((state) => state.summaryPanelCollapsed);
+  const setSummaryPanelCollapsed = useUiStore((state) => state.setSummaryPanelCollapsed);
 
   useEffect(() => {
     if (slug) selectProject(slug);
@@ -78,15 +83,21 @@ export function ProjectPage() {
     switch (zone) {
       case 'Explain':
         return (
-          <div className={s.zoneLayout}>
+          <div className={`${s.zoneLayout} ${summaryPanelCollapsed ? s.zoneLayoutCollapsed : ''}`}>
             <div className={s.zoneMain}>
-              <OutputViewer slug={slug} zone={zone} />
+              <ExplainReader projectSlug={slug} />
             </div>
             <div className={s.zoneSide}>
-              <ConfusionPanel projectSlug={slug} />
+              <ConfusionPanel
+                projectSlug={slug}
+                collapsed={summaryPanelCollapsed}
+                onCollapsedChange={setSummaryPanelCollapsed}
+              />
             </div>
           </div>
         );
+      case 'Intro':
+        return <IntroPage projectSlug={slug} />;
       case 'Practice':
         return <PracticeFlow projectSlug={slug} />;
       case 'Extend':
@@ -94,7 +105,6 @@ export function ProjectPage() {
       case 'Summary':
         return <SummaryPage projectSlug={slug} />;
       default:
-        // Intro and fallback — just the output viewer.
         return <OutputViewer slug={slug} zone={zone} />;
     }
   };
@@ -120,9 +130,7 @@ export function ProjectPage() {
           </div>
           <ZoneTimeline
             currentZone={zone}
-            hasOutput={new Set(
-              (project.lastArtifacts ?? []).map((a) => a.zoneName),
-            )}
+            hasOutput={new Set(project.generatedZones ?? [])}
             onSelect={handleZoneSelect}
           />
         </aside>

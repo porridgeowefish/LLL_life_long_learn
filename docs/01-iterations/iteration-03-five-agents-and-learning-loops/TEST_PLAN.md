@@ -171,12 +171,12 @@ learner-owned 文件（summary.md / project-memory.md）→ 断言不被盲覆�
 说明：Intro/Extend 以 E2E 覆盖为主（行为合同难单元化）；DATA 以单元+集成为主（无 UI）。
 D-Q-03 字符级数据由 confusionstore + charRange lib 双重断言。
 D-Q-07 Extend 无 .mmd，E2E 流 1 断言"无图、有四维度追问"。
-DATA-03 / S-06 建议子系统 defer iter-04，本轮无 proposalstore 测试。
+DATA-03 / S-06 建议子系统 defer iter-05+，本轮无 proposalstore 测试。
 
 ## 范围外
 
 ```text
-不实现性能基准测试（Lighthouse 等留 iter-04）
+不实现性能基准测试（Lighthouse 等留未来迭代）
 不做覆盖率门禁（先建立测试存在，覆盖率后续提）
 不 mock Claude CLI 真实输出（launcher 是真 TUI，E2E 只断言窗口+落盘）
 ```

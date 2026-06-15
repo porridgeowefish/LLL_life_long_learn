@@ -2,7 +2,7 @@
 
 Status: draft
 Owner: project maintainer
-Last reviewed: 2026-06-09
+Last reviewed: 2026-06-15
 Source of truth: design rules for the LLL reasoning primitives library.
 
 ## Intent
@@ -56,7 +56,7 @@ the second agent arrives.
 The middle ground is **primitives declared by the charter, expanded by the runtime**:
 
 ```text
-charter says: I require mece_decompose + first_principles + ...
+charter says: I require research_question_frame + prerequisite_scaffold + ...
 runtime loads each named primitive .md and inlines it
 charter stays small and self-describing
 mechanism text lives in one place
@@ -70,16 +70,18 @@ This table is the authoritative mapping from the legacy `deepthink` mechanism li
 ┌────┬──────────────────────────┬─────────────────────────┬──────────────┐
 │ #  │ Mechanism                │ Primitive file          │ Owner agent  │
 ├────┼──────────────────────────┼─────────────────────────┼──────────────┤
-│  1 │ MECE decomposition       │ mece_decompose.md       │ Explain      │
-│  2 │ First-principles         │ first_principles.md     │ Explain      │
-│  3 │ Concept graph (Mermaid)  │ concept_graph.md        │ Explain      │
-│  4 │ Misconception hunting    │ misconception.md        │ Explain      │
-│  5 │ Boundary mapping         │ boundary_map.md         │ Explain+Intro│
-│  6 │ Analogy (CS / engineering│ analogy.md              │ Explain opt. │
-│  7 │ Critical thinking        │ critical_thinking.md    │ Extend       │
-│  8 │ Knowledge anchor         │ knowledge_anchor.md     │ Intro        │
-│  9 │ Knowledge transfer       │ transfer.md             │ Practice     │
-│ 10 │ Review pack (Feynman/SRS)│ review_pack.md          │ Summary      │
+│  1 │ Research question frame  │ research_question_frame.md│ Explain    │
+│  2 │ Prerequisite scaffold    │ prerequisite_scaffold.md│ Explain+Intro│
+│  3 │ MECE decomposition       │ mece_decompose.md       │ Explain opt. │
+│  4 │ First-principles         │ first_principles.md     │ Explain opt. │
+│  5 │ Concept graph (Mermaid)  │ concept_graph.md        │ Explain opt. │
+│  6 │ Misconception hunting    │ misconception.md        │ Explain      │
+│  7 │ Boundary mapping         │ boundary_map.md         │ Explain+Intro│
+│  8 │ Analogy (CS / engineering│ analogy.md              │ Explain opt. │
+│  9 │ Critical thinking        │ critical_thinking.md    │ Extend       │
+│ 10 │ Knowledge anchor         │ knowledge_anchor.md     │ Intro        │
+│ 11 │ Knowledge transfer       │ transfer.md             │ Practice     │
+│ 12 │ Review pack (Feynman/SRS)│ review_pack.md          │ Summary      │
 └────┴──────────────────────────┴─────────────────────────┴──────────────┘
 ```
 
@@ -131,6 +133,11 @@ One complete example for reference (not for copying).
 
 The runtime reads these declarations, loads the named files, and inserts a `# Reasoning Primitives` block into the prompt after the `# Charter` block.
 
+Required primitive bodies define tutorial-wide obligations. Optional primitive
+bodies are injected only as reference material: their presence in the prompt
+does not require a matching page or section. The charter's activation
+conditions decide whether an optional mechanism is used.
+
 ## Anti-patterns
 
 ```text
@@ -142,6 +149,11 @@ DO NOT declare more than six required primitives per agent.
 
 DO NOT let two primitives own the same output section.
    Each Output Contract section maps to at most one primitive.
+
+DO NOT let optional Explain primitives become a repeated page template.
+   MECE and concept graphs are used only when the topic structure benefits.
+   First-principles reasoning is limited to final core-viewpoint compression
+   and never owns a standalone section.
 
 DO NOT inline a primitive's text into a charter by hand.
    Always reference by id so the test suite can verify coverage.

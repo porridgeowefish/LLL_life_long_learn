@@ -85,8 +85,11 @@ func TestExpandPrimitives_RequiredAndOptional(t *testing.T) {
 	if !strings.Contains(out, "### Required primitives") {
 		t.Errorf("missing required section header in output:\n%s", out)
 	}
-	if !strings.Contains(out, "### Optional primitives") {
+	if !strings.Contains(out, "### Optional primitive references") {
 		t.Errorf("missing optional section header in output:\n%s", out)
+	}
+	if !strings.Contains(out, "Do not create a page or section merely because a mechanism is listed here.") {
+		t.Errorf("missing optional activation guard in output:\n%s", out)
 	}
 }
 

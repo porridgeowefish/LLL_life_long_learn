@@ -23,6 +23,8 @@ func TestPrimitivesCoverage_AllPresent(t *testing.T) {
 		"concept_graph",
 		"misconception",
 		"boundary_map",
+		"research_question_frame",
+		"prerequisite_scaffold",
 		// Explain optional
 		"analogy",
 		// Extend required (primitive ready, agent pending)
@@ -57,9 +59,8 @@ func TestPrimitivesCoverage_ExplainDeclaresAll(t *testing.T) {
 		t.Error("explain agent missing userStory")
 	}
 	expected := []string{
-		"mece_decompose",
-		"first_principles",
-		"concept_graph",
+		"research_question_frame",
+		"prerequisite_scaffold",
 		"misconception",
 		"boundary_map",
 	}
@@ -115,11 +116,11 @@ func TestPrimitivesCoverage_AllFiveAgentsShipped(t *testing.T) {
 		t.Fatalf("registry load: %v", err)
 	}
 	expected := map[string][]string{
-		"explain":   {"mece_decompose", "first_principles", "concept_graph", "misconception", "boundary_map"},
-		"intro":     {"knowledge_anchor", "boundary_map"},
-		"practice":  {"transfer"},
-		"extend":    {"critical_thinking"},
-		"summary":   {"review_pack"},
+		"explain":  {"research_question_frame", "prerequisite_scaffold", "misconception", "boundary_map"},
+		"intro":    {"prerequisite_scaffold", "boundary_map"},
+		"practice": {"transfer"},
+		"extend":   {"critical_thinking"},
+		"summary":  {"review_pack"},
 	}
 	for id, requiredPrims := range expected {
 		a, ok := reg.Get(id)
@@ -155,6 +156,7 @@ func TestPrimitivesCoverage_NoPrimitiveIsOrphaned(t *testing.T) {
 		"mece_decompose", "first_principles", "concept_graph",
 		"misconception", "boundary_map", "analogy",
 		"critical_thinking", "knowledge_anchor", "transfer", "review_pack",
+		"research_question_frame", "prerequisite_scaffold",
 	}
 	reg := agentregistry.New()
 	if err := reg.Load(); err != nil {
@@ -172,6 +174,36 @@ func TestPrimitivesCoverage_NoPrimitiveIsOrphaned(t *testing.T) {
 	for _, name := range allPrimitives {
 		if !owned[name] {
 			t.Errorf("primitive %s is an orphan — no agent references it", name)
+		}
+	}
+}
+
+func TestIteration04CharterContracts(t *testing.T) {
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("registry load: %v", err)
+	}
+	checks := map[string][]string{
+		"intro": {"3-5 个短校准问题", "intro/assessment.json", "不得无证据"},
+		"explain": {
+			"研究目的",
+			"explain/manifest.json",
+			"parentPageId",
+			"可独立阅读的教程",
+			"不得创建名为“第一性原理”",
+			"不写“用户说”",
+		},
+		"practice": {"practice/answer-key.json", "true-false", "difficulty"},
+	}
+	for id, fragments := range checks {
+		agent, ok := reg.Get(id)
+		if !ok {
+			t.Fatalf("agent %s missing", id)
+		}
+		for _, fragment := range fragments {
+			if !strings.Contains(agent.CharterText, fragment) {
+				t.Errorf("agent %s charter missing contract fragment %q", id, fragment)
+			}
 		}
 	}
 }

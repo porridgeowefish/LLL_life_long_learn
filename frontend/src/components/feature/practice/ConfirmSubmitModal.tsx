@@ -9,6 +9,7 @@ import { Modal } from '@/components/primitive/Modal';
 import { Button } from '@/components/primitive/Button';
 import type { PracticeTask } from '@/api/practice';
 import type { DraftEntry } from '@/lib/practiceDraft';
+import { isEmptyPracticeAnswer } from '@/lib/practiceDraft';
 
 import s from './ConfirmSubmitModal.module.css';
 
@@ -33,7 +34,7 @@ export function ConfirmSubmitModal({
   let missingAssess = 0;
   for (const t of tasks) {
     const d = drafts[t.id];
-    if (!d || d.answer.trim() === '') {
+    if (!d || isEmptyPracticeAnswer(d.answer)) {
       unanswered++;
     } else if (d.selfAssess === 0) {
       missingAssess++;

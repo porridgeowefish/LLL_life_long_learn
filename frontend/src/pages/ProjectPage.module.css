@@ -152,10 +152,14 @@
 /* ===== Zone-specific layouts ===== */
 
 .zoneLayout {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 280px;
-  gap: 16px;
-  padding: 0 20px;
+  min-height: 100%;
+}
+
+.zoneLayoutCollapsed {
+  grid-template-columns: minmax(0, 1fr) 38px;
 }
 
 .zoneMain {
@@ -165,5 +169,22 @@
 .zoneSide {
   min-width: 0;
   border-left: 1px solid var(--border);
-  padding-left: 16px;
+  background: var(--card);
+}
+
+@media (max-width: 900px) {
+  .zoneLayout,
+  .zoneLayoutCollapsed {
+    grid-template-columns: minmax(0, 1fr) 38px;
+  }
+
+  .zoneLayout:not(.zoneLayoutCollapsed) .zoneSide {
+    position: absolute;
+    z-index: 20;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(300px, 86vw);
+    box-shadow: -10px 0 28px rgba(61, 50, 41, 0.12);
+  }
 }

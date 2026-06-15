@@ -36,8 +36,8 @@ var validSlugPattern = regexp.MustCompile(`^[a-z0-9\p{Ll}\p{Lo}][a-z0-9\p{Ll}\p{
 
 // zoneFilename is the file each zone writes to (slice-relevant subset).
 var zoneFilenames = map[ZoneName]string{
-	ZoneIntro:   "output.md",
-	ZoneExplain: "output.md",
+	ZoneIntro:    "output.md",
+	ZoneExplain:  "output.md",
 	ZonePractice: "tasks.json",
 	ZoneExtend:   "prompts.md",
 	ZoneSummary:  "summary.md",
@@ -45,32 +45,33 @@ var zoneFilenames = map[ZoneName]string{
 
 // ProjectState is the persistent per-project state.
 type ProjectState struct {
-	ID              string    `json:"id"`
-	Title           string    `json:"title"`
-	Slug            string    `json:"slug"`
-	ParentProjectID string    `json:"parentProjectId,omitempty"`
-	Status          string    `json:"status"`
-	ActiveZone      ZoneName  `json:"activeZone"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
-	ChildProjectIDs []string  `json:"childProjectIds,omitempty"`
+	ID              string        `json:"id"`
+	Title           string        `json:"title"`
+	Slug            string        `json:"slug"`
+	ParentProjectID string        `json:"parentProjectId,omitempty"`
+	Status          string        `json:"status"`
+	ActiveZone      ZoneName      `json:"activeZone"`
+	CreatedAt       time.Time     `json:"createdAt"`
+	UpdatedAt       time.Time     `json:"updatedAt"`
+	ChildProjectIDs []string      `json:"childProjectIds,omitempty"`
 	LastArtifacts   []ArtifactRef `json:"lastArtifacts,omitempty"`
+	GeneratedZones  []ZoneName    `json:"-"`
 }
 
 // ArtifactRef links a session/turn to a curated zone file.
 type ArtifactRef struct {
-	ZoneName   ZoneName `json:"zoneName"`
-	Filename   string   `json:"filename"`
-	SessionID  string   `json:"sessionId,omitempty"`
-	RunDirRel  string   `json:"runDirRel,omitempty"`
-	WrittenAt  time.Time `json:"writtenAt"`
+	ZoneName  ZoneName  `json:"zoneName"`
+	Filename  string    `json:"filename"`
+	SessionID string    `json:"sessionId,omitempty"`
+	RunDirRel string    `json:"runDirRel,omitempty"`
+	WrittenAt time.Time `json:"writtenAt"`
 }
 
 // PredecessorFile represents one input to a zone's prompt.
 type PredecessorFile struct {
 	ZoneName ZoneName `json:"zoneName"`
-	Path     string   `json:"path"`     // absolute path
-	RelPath  string   `json:"relPath"`  // relative to project root
+	Path     string   `json:"path"`    // absolute path
+	RelPath  string   `json:"relPath"` // relative to project root
 	Exists   bool     `json:"exists"`
 }
 
@@ -109,6 +110,12 @@ func projectRoot(slug string) (string, error) {
 		return "", fmt.Errorf("invalid slug: %q", slug)
 	}
 	root := filepath.Join(activeProjectsRoot(), slug)
+	if _, err := os.Stat(filepath.Join(root, "state.json")); err == nil {
+		return filepath.Abs(root)
+	}
+	if nested, ok := findNestedProjectRoot(activeProjectsRoot(), slug); ok {
+		return filepath.Abs(nested)
+	}
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return "", err
@@ -122,6 +129,22 @@ func projectRoot(slug string) (string, error) {
 		return "", fmt.Errorf("slug escapes projects root: %q", slug)
 	}
 	return abs, nil
+}
+
+// findNestedProjectRoot locates an existing child project by leaf slug.
+func findNestedProjectRoot(root, slug string) (string, bool) {
+	var found string
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || found != "" || !d.IsDir() || d.Name() != slug || path == filepath.Join(root, slug) {
+			return nil
+		}
+		if _, statErr := os.Stat(filepath.Join(path, "state.json")); statErr == nil {
+			found = path
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return found, found != ""
 }
 
 // subprojectRoot returns the path to a child project under a parent.
@@ -190,7 +213,7 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	// Folder tree.
 	dirs := []string{
 		"", "memory", "intro", "explain", "practice", "extend", "summary",
-		"runs", "runs/_index", "assets", "subprojects",
+		"progress", "runs", "runs/_index", "assets", "subprojects",
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
@@ -233,10 +256,10 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 
 	// memory/project-state.json (empty initial state)
 	memState := map[string]any{
-		"understood":   []string{},
-		"confusion":    []string{},
-		"knownGaps":    []string{},
-		"lastUpdated":  parsed,
+		"understood":  []string{},
+		"confusion":   []string{},
+		"knownGaps":   []string{},
+		"lastUpdated": parsed,
 	}
 	memBytes, _ := json.MarshalIndent(memState, "", "  ")
 	if err := AtomicWriteFile(filepath.Join(root, "memory", "project-state.json"), memBytes, 0o644); err != nil {
@@ -264,6 +287,12 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	return nil
 }
 
+// CreateSubprojectWithInput applies the same learner background contract to a
+// child project as CreateProjectSkeletonWithInput does to a root project.
+func CreateSubprojectWithInput(parentSlug, slug, title string, in ProjectInput) error {
+	return CreateProjectSkeletonWithInput(slug, title, parentSlug, in)
+}
+
 // ReadProjectState reads and decodes a project's state.json.
 // For subprojects, pass the full slug path joined as "parent/child"
 // — but for now this slice only supports top-level reads here.
@@ -281,7 +310,72 @@ func ReadProjectState(slug string) (*ProjectState, error) {
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("decode state.json: %w", err)
 	}
+	s.GeneratedZones = detectGeneratedZones(root)
 	return &s, nil
+}
+
+func detectGeneratedZones(root string) []ZoneName {
+	var generated []ZoneName
+	if nonEmptyFile(filepath.Join(root, "intro", "output.md")) ||
+		validJSONObject(filepath.Join(root, "intro", "assessment.json")) {
+		generated = append(generated, ZoneIntro)
+	}
+	if validExplainManifest(filepath.Join(root, "explain", "manifest.json")) ||
+		nonEmptyFile(filepath.Join(root, "explain", "output.md")) {
+		generated = append(generated, ZoneExplain)
+	}
+	if validTaskSet(filepath.Join(root, "practice", "tasks.json")) {
+		generated = append(generated, ZonePractice)
+	}
+	if nonEmptyFile(filepath.Join(root, "extend", "relation-notes.md")) ||
+		nonEmptyFile(filepath.Join(root, "extend", "prompts.md")) {
+		generated = append(generated, ZoneExtend)
+	}
+	if nonEmptyFile(filepath.Join(root, "summary", "review-pack.md")) ||
+		nonEmptyFile(filepath.Join(root, "summary", "summary.md")) {
+		generated = append(generated, ZoneSummary)
+	}
+	return generated
+}
+
+func nonEmptyFile(path string) bool {
+	data, err := os.ReadFile(path)
+	return err == nil && len(strings.TrimSpace(string(data))) > 0
+}
+
+func validJSONObject(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
+		return false
+	}
+	var value map[string]any
+	return json.Unmarshal(data, &value) == nil
+}
+
+func validExplainManifest(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var manifest struct {
+		Pages []json.RawMessage `json:"pages"`
+	}
+	return json.Unmarshal(data, &manifest) == nil && len(manifest.Pages) > 0
+}
+
+func validTaskSet(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var taskSet struct {
+		Tasks []json.RawMessage `json:"tasks"`
+	}
+	if json.Unmarshal(data, &taskSet) == nil && len(taskSet.Tasks) > 0 {
+		return true
+	}
+	var legacy []json.RawMessage
+	return json.Unmarshal(data, &legacy) == nil && len(legacy) > 0
 }
 
 // WriteProjectState persists state.json atomically. parentSlug is non-empty
@@ -375,10 +469,11 @@ func walkProjects(dir string, parentID string, out *[]ProjectMeta) error {
 
 // ResolvePredecessorFiles returns the input file paths for a given zone
 // according to the dependency graph:
-//   Intro -> Explain
-//   Explain -> Practice, Extend
-//   Practice -> Extend
-//   Intro + Explain + Practice + Extend -> Summary
+//
+//	Intro -> Explain
+//	Explain -> Practice, Extend
+//	Practice -> Extend
+//	Intro + Explain + Practice + Extend -> Summary
 func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, error) {
 	root, err := projectRoot(slug)
 	if err != nil {

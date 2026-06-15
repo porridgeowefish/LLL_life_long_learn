@@ -76,3 +76,26 @@
 .placeholder {
   color: var(--muted);
 }
+
+.choiceList {
+  display: grid;
+  gap: 8px;
+}
+
+.choice {
+  display: grid;
+  grid-template-columns: 18px auto 1fr;
+  align-items: start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.choice:hover,
+.choiceActive {
+  border-color: var(--accent);
+  background: rgba(124, 154, 114, 0.06);
+}

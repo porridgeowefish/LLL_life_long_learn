@@ -61,9 +61,9 @@ export function HomePage() {
                   <Icon name="bot" size={16} />
                 </span>
                 <div className={s.activeBody}>
-                  <h4>{sess.projectId} · {sess.agentId}</h4>
+                  <h4>{sess.projectSlug} · {sess.agentId}</h4>
                   <p>
-                    <Tag tone="orange">{sess.status}</Tag>{' '}
+                    <Tag tone="orange">{sess.state}</Tag>{' '}
                     <span className={s.activeMeta}>{sess.zoneName} zone</span>
                   </p>
                 </div>
@@ -107,17 +107,17 @@ export function HomePage() {
                   key={sess.id}
                   variant="outlined"
                   className={s.recentCard}
-                  onClick={() => navigate(`/project/${sess.projectId}`)}
+                  onClick={() => navigate(`/project/${sess.projectSlug}/${sess.zoneName}`)}
                 >
                   <span className={s.recentIcon}>
                     <Icon name="clock" size={16} />
                   </span>
                   <div className={s.recentBody}>
-                    <h4>{sess.projectId} · {sess.agentId}</h4>
-                    <p>{formatRelativeTime(sess.startedAt)} · {sess.zoneName}</p>
+                    <h4>{sess.projectSlug} · {sess.agentId}</h4>
+                    <p>{formatRelativeTime(sess.createdAt)} · {sess.zoneName}</p>
                   </div>
-                  <Tag tone={sess.status === 'completed' ? 'accent' : 'muted'}>
-                    {sess.status}
+                  <Tag tone={sess.state === 'completed' ? 'accent' : 'muted'}>
+                    {sess.state}
                   </Tag>
                 </Card>
               ))}

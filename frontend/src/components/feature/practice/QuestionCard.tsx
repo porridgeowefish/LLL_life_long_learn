@@ -1,20 +1,24 @@
-// QuestionCard — single-question exam card (one question shown at a time).
-// Header (number + type tag) → markdown stem → AnswerField → 1-5 self-assess.
-// submitted state shows feedback.
-
+import { Button } from '@/components/primitive/Button';
 import { Tag } from '@/components/primitive/Tag';
 import { Card } from '@/components/primitive/Card';
 import { useMarkdown } from '@/hooks/useMarkdown';
 import { AnswerField } from './AnswerField';
-import type { PracticeTask, EvaluationResult } from '@/api/practice';
-import type { DraftEntry } from '@/lib/practiceDraft';
+import { isEmptyPracticeAnswer, type DraftEntry } from '@/lib/practiceDraft';
+import {
+  isObjectiveTask,
+  type EvaluationResult,
+  type ObjectiveResult,
+  type PracticeTask,
+} from '@/api/practice';
 
 import s from './QuestionCard.module.css';
 
-// AC P-06 self-assessment labels (1-5 mastery scale).
 const ASSESS_LABELS = ['', '完全不会', '勉强', '基本会', '较熟练', '能迁移'];
 
-const TYPE_TAG: Record<PracticeTask['type'], { tone: 'sky' | 'orange' | 'pink'; label: string }> = {
+const TYPE_TAG: Record<PracticeTask['type'], { tone: 'sky' | 'orange' | 'pink' | 'accent'; label: string }> = {
+  'true-false': { tone: 'sky', label: '判断' },
+  'single-choice': { tone: 'sky', label: '单选' },
+  'multiple-choice': { tone: 'accent', label: '多选' },
   'short-answer': { tone: 'sky', label: '简答' },
   essay: { tone: 'orange', label: '论述' },
   code: { tone: 'pink', label: '代码' },
@@ -25,9 +29,12 @@ interface QuestionCardProps {
   index: number;
   total: number;
   draft: DraftEntry;
-  onAnswerChange: (taskId: string, answer: string) => void;
+  onAnswerChange: (taskId: string, answer: DraftEntry['answer']) => void;
   onAssessChange: (taskId: string, selfAssess: number) => void;
+  onCheckObjective: (task: PracticeTask, draft: DraftEntry) => void;
+  checking?: boolean;
   readonly?: boolean;
+  objectiveResult?: ObjectiveResult;
   feedback?: EvaluationResult;
 }
 
@@ -38,34 +45,49 @@ export function QuestionCard({
   draft,
   onAnswerChange,
   onAssessChange,
+  onCheckObjective,
+  checking = false,
   readonly = false,
+  objectiveResult,
   feedback,
 }: QuestionCardProps) {
   const { html } = useMarkdown(task.question);
   const tag = TYPE_TAG[task.type] ?? TYPE_TAG.essay;
+  const objective = isObjectiveTask(task);
+  const answerLocked = readonly || !!objectiveResult;
 
   return (
     <Card variant="outlined" className={s.root}>
       <header className={s.head}>
         <span className={s.number}>第 {index + 1} 题</span>
         <Tag tone={tag.tone}>{tag.label}</Tag>
+        <span className={s.stars} aria-label={`${task.difficulty} 星难度`}>
+          {'★'.repeat(task.difficulty)}{'☆'.repeat(5 - task.difficulty)}
+        </span>
         <span className={s.progress}>{index + 1} / {total}</span>
       </header>
 
-      <div
-        className={s.stem}
-        // eslint-disable-next-line react/no-danger -- sanitised in useMarkdown
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
+      <div className={s.stem} dangerouslySetInnerHTML={{ __html: html }} />
 
       <div className={s.answerSection}>
         <div className={s.answerLabel}>作答</div>
         <AnswerField
-          type={task.type}
+          task={task}
           value={draft.answer}
-          onChange={(v) => onAnswerChange(task.id, v)}
-          readonly={readonly}
+          onChange={(answer) => onAnswerChange(task.id, answer)}
+          readonly={answerLocked}
         />
+        {objective && !objectiveResult && !readonly && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => onCheckObjective(task, draft)}
+            disabled={isEmptyPracticeAnswer(draft.answer)}
+            loading={checking}
+          >
+            提交本题并查看解析
+          </Button>
+        )}
       </div>
 
       <div className={s.assessSection}>
@@ -83,20 +105,36 @@ export function QuestionCard({
               {n}
             </button>
           ))}
-          {draft.selfAssess > 0 && (
-            <span className={s.assessText}>{ASSESS_LABELS[draft.selfAssess]}</span>
-          )}
+          {draft.selfAssess > 0 && <span className={s.assessText}>{ASSESS_LABELS[draft.selfAssess]}</span>}
         </div>
       </div>
 
+      {objectiveResult && (
+        <div className={`${s.feedback} ${objectiveResult.correct ? s.correct : s.incorrect}`}>
+          <div className={s.feedbackHead}>
+            {objectiveResult.correct ? '回答正确' : '回答错误'}
+            {objectiveResult.growthDelta > 0 && <strong> +{objectiveResult.growthDelta} 成长值</strong>}
+          </div>
+          <div className={s.feedbackBody}>
+            <strong>正确答案：</strong>{formatAnswer(objectiveResult.correctAnswer)}
+            <br />
+            {objectiveResult.explanation}
+          </div>
+        </div>
+      )}
+
       {feedback && (
         <div className={s.feedback}>
-          <div className={s.feedbackHead}>
-            评估 <strong>{feedback.score}/5</strong> {feedback.passed ? '✅' : '❌'}
-          </div>
+          <div className={s.feedbackHead}>AI 评估 <strong>{feedback.score}/5</strong></div>
           <div className={s.feedbackBody}>{feedback.feedback}</div>
         </div>
       )}
     </Card>
   );
+}
+
+function formatAnswer(answer: ObjectiveResult['correctAnswer']) {
+  if (Array.isArray(answer)) return answer.join('、');
+  if (typeof answer === 'boolean') return answer ? '正确' : '错误';
+  return answer;
 }

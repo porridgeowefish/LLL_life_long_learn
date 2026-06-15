@@ -51,6 +51,7 @@ export interface ProjectState {
   updatedAt: string;
   childProjectIds?: string[];
   lastArtifacts?: ArtifactRef[];
+  generatedZones?: ZoneName[];
 }
 
 export interface ProjectMeta {
@@ -77,24 +78,27 @@ export type SessionStatus =
   | 'cancelled';
 
 export interface SessionTurn {
-  index: number;
-  role: 'user' | 'agent';
+  id: number;
+  ordinal: number;
+  type: 'user' | 'assistant' | 'system';
   content: string;
-  timestamp: string;
+  createdAt: string;
+  runDirRel?: string;
 }
 
 export interface Session {
   id: string;
-  projectId: string;
+  projectSlug: string;
   zoneName: ZoneName;
   agentId: string;
-  status: SessionStatus;
-  startedAt: string;
-  endedAt?: string;
+  state: SessionStatus | 'awaiting-follow-up';
+  createdAt: string;
+  finishedAt?: string;
   runDirRel?: string;
-  turns: SessionTurn[];
   promptPath?: string;
-  resultPath?: string;
+  turns: SessionTurn[];
+  exitCode?: number;
+  lastMessage?: string;
 }
 
 export interface OutputTarget {

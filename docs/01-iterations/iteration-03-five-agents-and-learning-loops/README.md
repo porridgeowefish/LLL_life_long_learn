@@ -362,9 +362,9 @@ Each decision records: 选项 / 拒绝方案 / 理由 / 影响 / 数据落点 / 
 
 ---
 
-### Deferred to iter-04（本轮范围瘦身，用户确认）
+### Deferred to iter-05+（本轮范围瘦身，用户确认）
 
-下列项**不进 iter-03 实现**，defer iter-04 或更晚。iter-03 文档已同步移除其端点 / schema / 验收点：
+下列项**不进 iter-03 实现**，defer iter-05 或更晚。iter-03 文档已同步移除其端点 / schema / 验收点：
 
 ```text
 DATA-02  评估"双写合同"（file + DB 索引 / contentHash / 回滚 / 重建）
@@ -375,7 +375,7 @@ DATA-01  trace 事件写入实现 → 保留 schema 冻结，砍事件写入
 编辑器   split-pane 分栏 fallback → iter-03 只做 live-render
 B 类 infra（iter-02 声明留给 iter-03 但未接，非本轮新增）
          PTY 会话连续性 / 重启 session 索引重建 / slog 结构化日志
-         / zones 响应 artifact+session references / 跨平台 console → 全 defer iter-04
+         / zones 响应 artifact+session references / 跨平台 console → 全 defer iter-05+
 ```
 
 ## Carryover (遗留事项)

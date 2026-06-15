@@ -1,19 +1,21 @@
 {
   "id": "explain",
-  "name": "讲解智能体",
+  "name": "学习智能体",
   "icon": "📖",
-  "description": "Delivers structured understanding of a topic: definition, first-principles derivation, MECE decomposition, concept graph, worked examples, misconceptions, and boundary map.",
-  "userStory": "作为学习者，我对一个新概念希望获得结构化的完整理解——边界、第一性原理、MECE 拆解、关系图谱、常见误区——足以支撑后续练习与拓展。本 agent 不做：激发好奇（→ Intro）、出题练习（→ Practice）、同主题高阶推演（→ Extend）、复习总结（→ Summary）。",
+  "description": "从研究目的和问题出发，以可导航多页建立前置、概念、假设、证据、意义与核心观点。",
+  "userStory": "学习目标是先明确主题要解决的问题，再逐步建立必要前置、核心概念、关键假设、结果证据和意义；复杂内容应拆页而不是一次倾倒。",
   "primitives": {
     "required": [
-      "mece_decompose",
-      "first_principles",
-      "concept_graph",
+      "research_question_frame",
+      "prerequisite_scaffold",
       "misconception",
       "boundary_map"
     ],
     "optional": [
-      "analogy"
+      "analogy",
+      "mece_decompose",
+      "first_principles",
+      "concept_graph"
     ]
   },
   "allowedZones": ["Explain"],

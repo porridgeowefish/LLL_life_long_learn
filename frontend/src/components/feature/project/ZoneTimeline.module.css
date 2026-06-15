@@ -68,11 +68,15 @@
   color: #fff;
 }
 
-.current .dot {
+.current:not(.done) .dot {
   background: var(--card);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(124, 154, 114, 0.18);
   animation: pulse 2s ease-in-out infinite;
+}
+
+.current.done .dot {
+  box-shadow: 0 0 0 3px rgba(124, 154, 114, 0.2);
 }
 
 .body {

@@ -270,7 +270,7 @@ func TestBuild_PrimitivesSectionIncluded(t *testing.T) {
 		"# User Story",
 		"# Reasoning Primitives",
 		"### Required primitives",
-		"### Optional primitives",
+		"### Optional primitive references",
 		"BODY:mece_decompose",
 		"BODY:first_principles",
 		"BODY:analogy",
@@ -278,6 +278,91 @@ func TestBuild_PrimitivesSectionIncluded(t *testing.T) {
 	for _, c := range checks {
 		if !strings.Contains(pkg.PromptMd, c) {
 			t.Errorf("prompt missing %q\n--- prompt tail ---\n%s", c, tail(pkg.PromptMd, 2000))
+		}
+	}
+}
+
+func TestBuild_ExplainIncludesTutorialArtifactContract(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "explain", []workspace.ZoneName{workspace.ZoneExplain})
+
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneExplain,
+		AgentID:     "explain",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	checks := []string{
+		"# Explain Tutorial Artifact Contract",
+		"可独立阅读的教程",
+		"不使用“你”“我们”等对话人称",
+		"第一性原理不得成为独立页面、章节、标题或逐步推导",
+		"只能融入最后一页的“核心观点”",
+		"不得让每一页机械重复同一组栏目",
+		"Silently use predecessor files",
+	}
+	for _, check := range checks {
+		if !strings.Contains(pkg.PromptMd, check) {
+			t.Errorf("explain prompt missing tutorial contract %q\n--- prompt ---\n%s", check, pkg.PromptMd)
+		}
+	}
+	if strings.Contains(pkg.PromptMd, "Cite predecessor files when building on prior zone output.") {
+		t.Errorf("explain prompt must not require predecessor citations:\n%s", pkg.PromptMd)
+	}
+}
+
+func TestBuild_ProductionExplainPromptHasNoLegacyFirstPrinciplesContract(t *testing.T) {
+	ClearPrimitiveCacheForTest()
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load production registry: %v", err)
+	}
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneExplain,
+		AgentID:     "explain",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	forbidden := []string{
+		`**必选** 讲解智能体的"第一性原理"章节`,
+		"5-8 步推理链",
+		"每步必须显式",
+	}
+	for _, fragment := range forbidden {
+		if strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("production explain prompt still contains legacy first-principles contract %q", fragment)
+		}
+	}
+	required := []string{
+		"第一性原理只能影响最终观点的压缩方式",
+		"不得出现独立的第一性原理标题、页面或逐步推导",
+		"never cite their filenames or narrate learner-profile evidence",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("production explain prompt missing contract %q", fragment)
 		}
 	}
 }

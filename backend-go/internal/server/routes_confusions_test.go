@@ -116,7 +116,7 @@ func TestConfusionCRUD(t *testing.T) {
 		t.Fatalf("update: status %d, body %s", w.Code, w.Body.String())
 	}
 
-	// 5. Delete (soft)
+	// 5. Delete (hard)
 	req = httptest.NewRequest("DELETE", "/api/projects/testproj/confusions/"+confID, nil)
 	req.SetPathValue("id", "testproj")
 	req.SetPathValue("confusionId", confID)
@@ -124,6 +124,14 @@ func TestConfusionCRUD(t *testing.T) {
 	srv.handleDeleteConfusion(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("delete: status %d, body %s", w.Code, w.Body.String())
+	}
+	req = httptest.NewRequest("GET", "/api/projects/testproj/confusions", nil)
+	req.SetPathValue("id", "testproj")
+	w = httptest.NewRecorder()
+	srv.handleListConfusions(w, req)
+	json.Unmarshal(w.Body.Bytes(), &listRes)
+	if len(listRes.Confusions) != 0 {
+		t.Fatalf("expected hard delete, got %d records", len(listRes.Confusions))
 	}
 }
 
@@ -140,8 +148,8 @@ func TestPracticeSubmitAndGetTasks(t *testing.T) {
 		t.Fatalf("get tasks: status %d, body %s", w.Code, w.Body.String())
 	}
 	var tasksRes struct {
-		Tasks     any   `json:"tasks"`
-		Generated bool  `json:"generated"`
+		Tasks     any  `json:"tasks"`
+		Generated bool `json:"generated"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &tasksRes); err != nil {
 		t.Fatal(err)
@@ -254,5 +262,55 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		if !tt.ok && w.Code != http.StatusForbidden {
 			t.Errorf("write %s: expected 403, got %d — %s", tt.path, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestReadFile_BlocksPracticeAnswerKey(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	root, err := workspace.ProjectRootForSlug("testproj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(root+"/practice/answer-key.json", []byte(`{"answers":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("GET", "/files/projects/testproj/practice/answer-key.json", nil)
+	req.SetPathValue("id", "testproj")
+	w := httptest.NewRecorder()
+	srv.handleReadFile(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetProjectIncludesDerivedGeneratedZones(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+	root, err := workspace.ProjectRootForSlug("testproj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(root+"/intro/output.md", []byte("# Intro"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/projects/testproj", nil)
+	req.SetPathValue("id", "testproj")
+	w := httptest.NewRecorder()
+	srv.handleGetProject(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", w.Code, w.Body.String())
+	}
+	var response struct {
+		Project struct {
+			GeneratedZones []string `json:"generatedZones"`
+		} `json:"project"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Project.GeneratedZones) != 1 || response.Project.GeneratedZones[0] != "Intro" {
+		t.Fatalf("unexpected generatedZones: %v", response.Project.GeneratedZones)
 	}
 }

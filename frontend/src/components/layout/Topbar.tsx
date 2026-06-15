@@ -21,7 +21,8 @@ export function Topbar() {
   return (
     <header className={s.topbar}>
       <a href="/" className={s.logo}>
-        Life<span className={s.accent}>Long</span>Learn
+        <img className={s.logoMark} src="/logo-lychee.svg" alt="" aria-hidden="true" />
+        <span>Life<span className={s.accent}>Long</span>Learn</span>
       </a>
       <span className={s.sep} />
       <nav className={s.nav}>

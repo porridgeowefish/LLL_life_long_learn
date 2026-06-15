@@ -101,8 +101,12 @@ func (s *Store) List(stateFilter State) []Confusion {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if stateFilter == "" {
-		out := make([]Confusion, len(s.data))
-		copy(out, s.data)
+		out := make([]Confusion, 0, len(s.data))
+		for _, c := range s.data {
+			if c.State != StateDeleted {
+				out = append(out, c)
+			}
+		}
 		return out
 	}
 	var out []Confusion
@@ -153,13 +157,13 @@ func (s *Store) Update(id string, patch map[string]any) (Confusion, error) {
 	return Confusion{}, os.ErrNotExist
 }
 
-// Delete removes a confusion by ID (soft-delete: sets state=deleted).
+// Delete permanently removes a saved summary by ID.
 func (s *Store) Delete(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i, c := range s.data {
 		if c.ID == id {
-			s.data[i].State = StateDeleted
+			s.data = append(s.data[:i], s.data[i+1:]...)
 			s.dirty = true
 			return s.save()
 		}

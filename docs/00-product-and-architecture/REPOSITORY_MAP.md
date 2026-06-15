@@ -114,9 +114,13 @@ Observed stores:
 ```text
 projects/<slug>/... files
 explain/confusions.json
-practice/tasks.json
+intro/assessment.json
+explain/manifest.json + explain/pages/*.md
+practice/tasks.json + practice/answer-key.json
+practice/attempts/*.json
 practice/submissions/*.json
 practice/evaluations/*.json + *.md
+progress/events.jsonl + progress/summary.json
 summary/flashcards.json
 summary/flashcard-progress.json
 runs/_index/*.json
@@ -147,4 +151,16 @@ project creation still uses why/current/target/standard, not the new 4-field con
 iter-03 API contract contains endpoints/shapes not yet matched by code
 Explain "统一提问" is not yet wired end-to-end into one invoke with sourceRefs from the UI
 some docs still describe legacy/fallback material as if it were active
+```
+
+### Iteration 04 Additions
+
+Implemented in code:
+
+```text
+evidence-based Intro assessment and prerequisite child-project creation
+manifest-owned Explain pages with follow-up parent links
+six Practice question types with private answer-key checking
+project-local idempotent growth events
+legacy Explain and Practice readers
 ```
