@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 )
 
@@ -18,6 +19,8 @@ import (
 type Server struct {
 	ClaudeBin       string
 	ClaudeAvailable bool
+	ImageConfig     *imageconfig.Config
+	ImageAvailable  bool
 }
 
 // broadcaster is the package-global SSE event bus.
@@ -34,7 +37,32 @@ func New() *Server {
 	if err := agents.Load(); err != nil {
 		println("agent-registry: load warning:", err.Error())
 	}
-	return &Server{ClaudeBin: bin, ClaudeAvailable: available}
+
+	// Load image configuration
+	imgCfg, err := imageconfig.Load()
+	if err != nil {
+		println("image-config: load error:", err.Error())
+		imgCfg = nil
+	}
+	if imgCfg == nil {
+		println("image-config: not configured")
+	}
+
+	imgAvailable := false
+	if imgCfg != nil && imgCfg.PythonBin != "" {
+		if probeBin(imgCfg.PythonBin, "--version") {
+			imgAvailable = true
+		} else {
+			println("image-config: python binary not available:", imgCfg.PythonBin)
+		}
+	}
+
+	return &Server{
+		ClaudeBin:       bin,
+		ClaudeAvailable: available,
+		ImageConfig:     imgCfg,
+		ImageAvailable:  imgAvailable,
+	}
 }
 
 // Handler returns the root HTTP handler with all routes mounted.
@@ -89,6 +117,10 @@ func (s *Server) Handler() http.Handler {
 	// Summary (flashcards)
 	mux.HandleFunc("GET /api/projects/{id}/summary/flashcards", s.handleListFlashcards)
 	mux.HandleFunc("POST /api/projects/{id}/summary/flashcards/grade", s.handleGradeFlashcard)
+
+	// Explain infographic
+	mux.HandleFunc("POST /api/projects/{id}/explain/infographic", s.handleRequestExplainInfographic)
+	mux.HandleFunc("GET /api/projects/{id}/explain/infographic", s.handleGetExplainInfographic)
 
 	// Events (SSE)
 	mux.HandleFunc("GET /api/events", broadcaster.SSEHandler(map[string]any{
@@ -168,6 +200,15 @@ func probeClaude(bin string, timeout time.Duration) bool {
 		return false
 	}
 	return strings.TrimSpace(string(out)) != ""
+}
+
+// probeBin runs a binary with given arguments and a short timeout; returns true on success.
+func probeBin(bin string, args ...string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bin, args...)
+	_, err := cmd.Output()
+	return err == nil
 }
 
 func envOr(key, fallback string) string {

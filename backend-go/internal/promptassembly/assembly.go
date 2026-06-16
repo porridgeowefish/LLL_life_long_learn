@@ -331,6 +331,12 @@ func readProjectBrief(projectSlug string) (string, string, error) {
 	return projectFile, strings.TrimSpace(string(data)), nil
 }
 
+// MakeRunDirName constructs a timestamped run directory name for a given agentID.
+// The format is "YYYY-MM-DDTHH-MM-SS-agentID" (filesystem-safe ISO timestamp).
+func MakeRunDirName(agentID string, at time.Time) string {
+	return timestampRunDir(agentID, at)
+}
+
 func timestampRunDir(agentID string, at time.Time) string {
 	// Filesystem-safe ISO timestamp (colons are forbidden in Windows folder names).
 	stamp := at.Format("2006-01-02T15-04-05")

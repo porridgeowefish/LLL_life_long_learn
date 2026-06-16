@@ -79,7 +79,7 @@ explain/pages/003-core-concepts.md
 - `file` 必须位于 `pages/`，使用三位数字顺序前缀。
 - 页面按 `order` 严格递增。
 - 初次生成页面的 `kind` 为 `core`。
-- 先写全部页面，再原子更新 manifest，避免清单指向不存在的文件。
+- 逐页落盘、逐页更新 manifest：每写完一页文件后立即重写 manifest，只收录此刻已落盘的页面，再继续写下一页。manifest 任何时候都必须自洽——清单中每一个 `pages[].file` 都已存在于 `pages/`。目的是让学习者在第一页落盘后即可开始读，讲解边读边生成。
 - 不再把完整正文写入 `explain/output.md`；可以写一段兼容提示，指向 manifest。
 
 ## 追问协议

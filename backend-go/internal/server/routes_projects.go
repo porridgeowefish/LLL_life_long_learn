@@ -14,6 +14,25 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
+// contentTypeFor returns the appropriate Content-Type for a file based on its extension.
+func contentTypeFor(name string) string {
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".svg":
+		return "image/svg+xml"
+	default:
+		return "text/plain; charset=utf-8"
+	}
+}
+
 // validMemoryFilename limits POST writes to memory/ to safe filenames only.
 var validMemoryFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 
@@ -264,7 +283,7 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "file not found")
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", contentTypeFor(filepath.Base(abs)))
 	w.Write(data)
 }
 

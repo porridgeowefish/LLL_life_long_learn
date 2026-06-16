@@ -5,6 +5,7 @@ import { useConfusions, useCreateConfusion } from '@/api/confusions';
 import { useExplainManifest, useExplainPage } from '@/api/learningArtifacts';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
+import { ExplainInfographic } from './ExplainInfographic';
 import { useMarkdown } from '@/hooks/useMarkdown';
 import {
   applyHighlights,
@@ -125,6 +126,8 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
       <main className={s.reader}>
         <ExplainPage projectSlug={projectSlug} file={current.file} />
       </main>
+
+      {pages.length > 0 && <ExplainInfographic projectSlug={projectSlug} />}
     </div>
   );
 }

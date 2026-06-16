@@ -382,7 +382,7 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 	}
 	go func() {
 		defer practiceEvaluationJobs.Delete(jobKey)
-		_ = claudelauncher.LaunchHeadless(context.Background(), slug, agent.ID, s.ClaudeBin, pkg)
+		_ = claudelauncher.LaunchHeadless(context.Background(), slug, agent.ID, s.ClaudeBin, "", pkg)
 	}()
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "queued", "attempt": attemptID})
 }

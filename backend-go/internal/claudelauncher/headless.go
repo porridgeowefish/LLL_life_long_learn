@@ -16,11 +16,13 @@ import (
 
 // LaunchHeadless runs a single-shot background task for product workflows
 // that must not expose the interactive Claude terminal to the learner.
+// The model parameter, when non-empty, injects a --model flag before --permission-mode.
 func LaunchHeadless(
 	ctx context.Context,
 	projectSlug string,
 	agentID string,
 	claudeBin string,
+	model string,
 	pkg *promptassembly.Package,
 ) error {
 	projectRoot, err := workspace.ProjectRootForSlug(projectSlug)
@@ -54,7 +56,12 @@ func LaunchHeadless(
 	defer stderr.Close()
 
 	startedAt := time.Now().UTC()
-	cmd := exec.CommandContext(ctx, claudeBin, "-p", "--permission-mode", NormalizePermissionMode(""))
+	args := []string{"-p"}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+	args = append(args, "--permission-mode", NormalizePermissionMode(""))
+	cmd := exec.CommandContext(ctx, claudeBin, args...)
 	cmd.Dir = projectRoot
 	cmd.Stdin = strings.NewReader(pkg.PromptMd)
 	cmd.Stdout = stdout
