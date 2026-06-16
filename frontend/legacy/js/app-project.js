@@ -211,7 +211,7 @@ async function onInvokeAgent() {
       projectId: state.projectSlug,
       zone: state.zoneName,
       intent,
-      permissionMode: 'acceptEdits',
+      permissionMode: 'auto',
     });
     state.sessionId = result.session.id;
     state.session = result.session;

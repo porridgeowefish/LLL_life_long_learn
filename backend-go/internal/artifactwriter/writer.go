@@ -27,7 +27,7 @@ type PromoteOptions struct {
 //   - summary/summary.md is NEVER overwritten here. The runtime never
 //     passes force=true; learner must explicitly save via the summary API.
 //   - If the target file already exists and is non-trivial (>200 bytes), it
-//     means Claude (under acceptEdits) authored the file directly. In that
+//     means Claude authored the file directly during the agent run. In that
 //     case we SKIP the overwrite but still record the ArtifactRef so the
 //     audit trail shows the file was produced this session.
 //   - All writes go through workspace.SafeWriteArtifact (atomic).

@@ -4,14 +4,22 @@
 
 学习者需要从低负荷识别题逐步走向高负荷迁移题，并在客观题作答后获得确定答案与解析。题目、答案和来源必须是前端可稳定读取的结构化数据。
 
-## 输出文件
+## 工作模式
 
-每次生成必须同时写：
+### 生成题组
+
+prompt 未指定 `Practice Evaluation Artifact Contract` 时，同时写：
 
 ```text
 practice/tasks.json
 practice/answer-key.json
 ```
+
+如果 prompt 提供 `Practice Generation Contract`：
+
+- 必须严格生成其中指定的题目数量，不能自行增减或截断。
+- 每次重新生成必须创建新的 `setId` 和 `generatedAt`，不得沿用旧题组标识。
+- `tasks.json` 的题目数与 `answer-key.json` 的答案条目数必须完全一致。
 
 `tasks.json` 是公开题目：
 
@@ -59,6 +67,18 @@ practice/answer-key.json
 - `multiple-choice`: 选项 id 字符串数组。
 - 主观题的 `correctAnswer` 可写评分要点数组，仅供后续 AI 评估，不由前端直接展示。
 
+### 整批评估
+
+prompt 指定 `Practice Evaluation Artifact Contract` 时，进入评估模式：
+
+- 读取当前题组、私有答案键、指定 attempt 和提交文件。
+- 不修改 `tasks.json`、`answer-key.json` 或学习者提交。
+- 为每道已提交主观题给出 `0-5` 分、针对性反馈和一份直接作答的参考回答。
+- 输出总体总结，包含优势、反复出现的缺口和下一步学习动作。
+- 严格写入 prompt 指定的 `practice/evaluations/{attempt}.json` 与同名 Markdown 文件。
+- 评估 JSON 必须符合 prompt 中的字段合同，不能只写笼统鼓励或省略参考回答。
+- 评估是提交后的后台产物，文字直接面向题目与答案，不写对话开场、调用说明或“用户说”等元叙述。
+
 ## 题型与难度
 
 支持：
@@ -86,7 +106,7 @@ practice/answer-key.json
 - 全中文输出，不写执行日志。
 - 读取 `explain/manifest.json` 及其页面；没有 manifest 时兼容读取 `explain/output.md`。
 - `tasks.json` 绝不出现答案、解析或评分要点。
-- `answer-key.json` 不得遗漏任何题目。
+- 生成题组模式下，`answer-key.json` 不得遗漏任何题目。
 - 两个文件的 `setId` 必须完全一致。
 - 使用文件编辑工具直接写两个目标文件。
 - 不编辑学习者提交物或总结。

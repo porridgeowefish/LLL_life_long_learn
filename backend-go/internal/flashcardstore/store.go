@@ -4,19 +4,44 @@ package flashcardstore
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 // Flashcard is a single Q&A card.
 type Flashcard struct {
-	ID       string `json:"id"`
-	Front    string `json:"front"`    // question / prompt (markdown)
-	Back     string `json:"back"`     // answer / explanation (markdown)
-	Zone     string `json:"zone"`     // source zone
-	SourceID string `json:"sourceId"` // confusion / task / output reference
+	ID              string   `json:"id"`
+	Front           string   `json:"front"`
+	Back            string   `json:"back"`
+	Category        string   `json:"category,omitempty"`
+	SourceRefs      []string `json:"sourceRefs,omitempty"`
+	GeneratedReason string   `json:"generatedReason,omitempty"`
+	Zone            string   `json:"zone,omitempty"`     // legacy
+	SourceID        string   `json:"sourceId,omitempty"` // legacy
+}
+
+type FlashcardsFile struct {
+	Version int         `json:"version"`
+	Cards   []Flashcard `json:"cards"`
+}
+
+type rawFlashcard struct {
+	ID              string   `json:"id"`
+	Front           string   `json:"front"`
+	Back            string   `json:"back"`
+	Question        string   `json:"question"`
+	Answer          string   `json:"answer"`
+	Prompt          string   `json:"prompt"`
+	Response        string   `json:"response"`
+	Category        string   `json:"category,omitempty"`
+	SourceRefs      []string `json:"sourceRefs,omitempty"`
+	GeneratedReason string   `json:"generatedReason,omitempty"`
+	Zone            string   `json:"zone,omitempty"`
+	SourceID        string   `json:"sourceId,omitempty"`
 }
 
 // CardProgress tracks learner's review history for one card.
@@ -54,8 +79,8 @@ func (s *Store) ReadFlashcards() ([]Flashcard, error) {
 		}
 		return nil, err
 	}
-	var cards []Flashcard
-	if err := json.Unmarshal(raw, &cards); err != nil {
+	cards, err := ParseFlashcards(raw)
+	if err != nil {
 		return nil, err
 	}
 	return cards, nil
@@ -67,11 +92,107 @@ func (s *Store) WriteFlashcards(cards []Flashcard) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	raw, err := json.MarshalIndent(cards, "", "  ")
+	if err := validateFlashcards(cards); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(FlashcardsFile{Version: 1, Cards: cards}, "", "  ")
 	if err != nil {
 		return err
 	}
 	return workspace.AtomicWriteFile(filepath.Join(dir, "flashcards.json"), raw, 0o644)
+}
+
+// ParseFlashcards accepts the canonical versioned envelope plus common legacy
+// and agent-output variants, then normalizes them into the canonical card
+// shape used by the frontend.
+func ParseFlashcards(raw []byte) ([]Flashcard, error) {
+	clean := []byte(stripJSONFence(strings.TrimSpace(strings.TrimPrefix(string(raw), "\ufeff"))))
+	var file struct {
+		Version       int            `json:"version"`
+		SchemaVersion int            `json:"schemaVersion"`
+		Cards         []rawFlashcard `json:"cards"`
+		Flashcards    []rawFlashcard `json:"flashcards"`
+		Items         []rawFlashcard `json:"items"`
+	}
+	if err := json.Unmarshal(clean, &file); err == nil {
+		switch {
+		case file.Cards != nil:
+			return normalizeRawCards(file.Cards)
+		case file.Flashcards != nil:
+			return normalizeRawCards(file.Flashcards)
+		case file.Items != nil:
+			return normalizeRawCards(file.Items)
+		}
+	}
+	var legacy []rawFlashcard
+	if err := json.Unmarshal(clean, &legacy); err != nil {
+		return nil, fmt.Errorf("parse flashcards.json: %w", err)
+	}
+	return normalizeRawCards(legacy)
+}
+
+func stripJSONFence(text string) string {
+	if !strings.HasPrefix(text, "```") {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	if len(lines) < 2 {
+		return text
+	}
+	start := 1
+	end := len(lines)
+	if strings.HasPrefix(strings.TrimSpace(lines[end-1]), "```") {
+		end--
+	}
+	return strings.TrimSpace(strings.Join(lines[start:end], "\n"))
+}
+
+func normalizeRawCards(raw []rawFlashcard) ([]Flashcard, error) {
+	cards := make([]Flashcard, 0, len(raw))
+	for _, item := range raw {
+		front := firstNonEmpty(item.Front, item.Question, item.Prompt)
+		back := firstNonEmpty(item.Back, item.Answer, item.Response)
+		cards = append(cards, Flashcard{
+			ID:              item.ID,
+			Front:           front,
+			Back:            back,
+			Category:        item.Category,
+			SourceRefs:      item.SourceRefs,
+			GeneratedReason: item.GeneratedReason,
+			Zone:            item.Zone,
+			SourceID:        item.SourceID,
+		})
+	}
+	if err := validateFlashcards(cards); err != nil {
+		return nil, err
+	}
+	return cards, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func validateFlashcards(cards []Flashcard) error {
+	seen := map[string]bool{}
+	for i, card := range cards {
+		if strings.TrimSpace(card.ID) == "" {
+			return fmt.Errorf("flashcard %d missing id", i)
+		}
+		if seen[card.ID] {
+			return fmt.Errorf("duplicate flashcard id: %s", card.ID)
+		}
+		seen[card.ID] = true
+		if strings.TrimSpace(card.Front) == "" || strings.TrimSpace(card.Back) == "" {
+			return fmt.Errorf("flashcard %s requires front and back", card.ID)
+		}
+	}
+	return nil
 }
 
 // ReadProgress reads review progress for all cards.

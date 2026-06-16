@@ -45,6 +45,18 @@ type LaunchRequest struct {
 	ClaudeBin      string
 }
 
+const defaultPermissionMode = "auto"
+
+// NormalizePermissionMode keeps old clients working while making auto mode the
+// default for every agent invocation.
+func NormalizePermissionMode(mode string) string {
+	mode = strings.TrimSpace(mode)
+	if mode == "" {
+		return defaultPermissionMode
+	}
+	return mode
+}
+
 // RunResult is what the launcher returns. With TUI mode, it returns
 // immediately after spawning the wrapper — final result.md is not
 // captured here (frontend polls output.md instead).
@@ -160,16 +172,17 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	// run.json metadata (written immediately; exitCode is left 0 since
 	// we do not track it in TUI mode).
 	runMeta := map[string]any{
-		"sessionId":   req.Session.ID,
-		"agentId":     req.Agent.ID,
-		"projectSlug": req.ProjectSlug,
-		"zoneName":    req.ZoneName,
-		"exitCode":    0,
-		"promptMd":    filepath.Join(runDirRel, "prompt.md"),
-		"stdoutLog":   filepath.Join(runDirRel, "stdout.log"),
-		"stderrLog":   filepath.Join(runDirRel, "stderr.log"),
-		"mode":        "interactive-tui",
-		"startedAt":   time.Now().UTC(),
+		"sessionId":      req.Session.ID,
+		"agentId":        req.Agent.ID,
+		"projectSlug":    req.ProjectSlug,
+		"zoneName":       req.ZoneName,
+		"exitCode":       0,
+		"promptMd":       filepath.Join(runDirRel, "prompt.md"),
+		"stdoutLog":      filepath.Join(runDirRel, "stdout.log"),
+		"stderrLog":      filepath.Join(runDirRel, "stderr.log"),
+		"mode":           "interactive-tui",
+		"permissionMode": NormalizePermissionMode(req.PermissionMode),
+		"startedAt":      time.Now().UTC(),
 	}
 	metaJSON, _ := json.MarshalIndent(runMeta, "", "  ")
 	_ = os.WriteFile(filepath.Join(runDirAbs, "run.json"), metaJSON, 0o644)
@@ -196,22 +209,23 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 }
 
 // buildTUIWrapperScript returns the PowerShell command that:
-//   1. cd into the project root; logs the spawn env PATH (ground truth)
-//   2. reads prompt.md and resolves claude to a FULL path (Get-Command
-//      + ~/.local/bin + AppData fallbacks) — a bare 'claude' can silently
-//      fail to resolve in the ShellExecute child env; if unresolved it
-//      aborts with a clear on-screen reason instead of a silent stall
-//   3. prints a banner with project / agent / zone info
-//   4. launches claude WITH the prompt as the initial message (positional
-//      arg) — still interactive TUI mode (NOT -p), per LESSONS_LEARNED §1,
-//      so the learner does not have to paste the prompt manually
-//   5. on exit, prompts "press any key to close"
+//  1. cd into the project root; logs the spawn env PATH (ground truth)
+//  2. reads prompt.md and resolves claude to a FULL path (Get-Command
+//     + ~/.local/bin + AppData fallbacks) — a bare 'claude' can silently
+//     fail to resolve in the ShellExecute child env; if unresolved it
+//     aborts with a clear on-screen reason instead of a silent stall
+//  3. prints a banner with project / agent / zone info
+//  4. launches claude WITH the prompt as the initial message (positional
+//     arg) — still interactive TUI mode (NOT -p), per LESSONS_LEARNED §1,
+//     so the learner does not have to paste the prompt manually
+//  5. on exit, prompts "press any key to close"
 //
 // The claude launch runs under ErrorActionPreference='Stop' so a missing
 // binary / launch failure is a CAUGHT, logged terminating error — silent
 // failures are not acceptable for diagnosis. The clipboard is kept as a
 // silent fallback in case the arg is ever mangled for an edge-case prompt.
 func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req LaunchRequest) string {
+	permissionMode := NormalizePermissionMode(req.PermissionMode)
 	return strings.Join([]string{
 		`$ErrorActionPreference='Continue'`,
 		fmt.Sprintf(`Set-Location -LiteralPath '%s'`, projectRoot),
@@ -252,6 +266,7 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req Lau
 		// both bare names (PATH lookup) and a CLAUDE_BIN full path; the two
 		// Test-Path fallbacks cover the standard Windows install locations.
 		fmt.Sprintf(`$claudeExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $claudeExe = $cmd.Source }; if (-not $claudeExe -and (Test-Path "$env:USERPROFILE\.local\bin\claude.exe")) { $claudeExe = "$env:USERPROFILE\.local\bin\claude.exe" }; if (-not $claudeExe -and (Test-Path "$env:LOCALAPPDATA\Programs\claude\claude.exe")) { $claudeExe = "$env:LOCALAPPDATA\Programs\claude\claude.exe" }; Log-Err "resolved claudeExe=$claudeExe"`, req.ClaudeBin),
+		fmt.Sprintf(`$permissionMode = '%s'; Log-Err "permissionMode=$permissionMode"`, permissionMode),
 		// Silent clipboard insurance: if the auto-injected arg is ever
 		// mangled for an edge-case prompt, the learner can still paste.
 		`try { if ($promptText) { Set-Clipboard -Value $promptText } } catch { Log-Err "Set-Clipboard failed: $_" }`,
@@ -268,7 +283,7 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req Lau
 		// with LESSONS_LEARNED §1. Temporarily raise ErrorActionPreference
 		// to 'Stop' so a missing binary / launch failure becomes a CAUGHT,
 		// logged terminating error instead of the silent skip we had before.
-		`$ErrorActionPreference='Stop'; $code = 0; try { if ($promptText) { & $claudeExe $promptText } else { & $claudeExe }; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "claude exec failed: $_"; Write-Host "⚠️  Claude 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		`$ErrorActionPreference='Stop'; $code = 0; try { if ($promptText) { & $claudeExe --permission-mode $permissionMode $promptText } else { & $claudeExe --permission-mode $permissionMode }; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "claude exec failed: $_"; Write-Host "⚠️  Claude 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
 		`Write-Host ''`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`Write-Host " Claude 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,

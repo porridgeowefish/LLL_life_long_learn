@@ -24,12 +24,14 @@ var sessions = sessionstore.New()
 
 // invokeRequest is the body of POST /api/agents/{id}/invoke.
 type invokeRequest struct {
-	ProjectID      string   `json:"projectId"`
-	Zone           string   `json:"zone"`
-	Intent         string   `json:"intent"`
-	PermissionMode string   `json:"permissionMode,omitempty"`
-	SourceRefs     []string `json:"sourceRefs,omitempty"` // confusion IDs to inject
-	ParentPageID   string   `json:"parentPageId,omitempty"`
+	ProjectID             string   `json:"projectId"`
+	Zone                  string   `json:"zone"`
+	Intent                string   `json:"intent"`
+	PermissionMode        string   `json:"permissionMode,omitempty"`
+	SourceRefs            []string `json:"sourceRefs,omitempty"` // confusion IDs to inject
+	ParentPageID          string   `json:"parentPageId,omitempty"`
+	PracticeAttempt       int      `json:"practiceAttempt,omitempty"`
+	PracticeQuestionCount int      `json:"practiceQuestionCount,omitempty"`
 }
 
 // handleInvokeAgent orchestrates an agent invocation: validates, resolves
@@ -61,6 +63,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	intent := strings.TrimSpace(req.Intent)
+	permissionMode := claudelauncher.NormalizePermissionMode(req.PermissionMode)
 	exists, err := workspace.ProjectExists(req.ProjectID)
 	if err != nil || !exists {
 		httpx.Error(w, http.StatusNotFound, "project not found")
@@ -70,12 +73,14 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 
 	// Build the prompt package.
 	pkg, err := promptassembly.Build(promptassembly.Request{
-		ProjectSlug:  req.ProjectID,
-		ZoneName:     zoneName,
-		AgentID:      agent.ID,
-		Intent:       intent,
-		SourceRefs:   req.SourceRefs,
-		ParentPageID: strings.TrimSpace(req.ParentPageID),
+		ProjectSlug:           req.ProjectID,
+		ZoneName:              zoneName,
+		AgentID:               agent.ID,
+		Intent:                intent,
+		SourceRefs:            req.SourceRefs,
+		ParentPageID:          strings.TrimSpace(req.ParentPageID),
+		PracticeAttempt:       req.PracticeAttempt,
+		PracticeQuestionCount: req.PracticeQuestionCount,
 	}, agents)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())
@@ -119,7 +124,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 			ZoneName:       zoneName,
 			Agent:          agent,
 			PromptPackage:  pkg,
-			PermissionMode: req.PermissionMode,
+			PermissionMode: permissionMode,
 			Session:        sess,
 			Store:          sessions,
 			Events:         broadcaster,
@@ -222,6 +227,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "text is required")
 		return
 	}
+	permissionMode := claudelauncher.NormalizePermissionMode(req.PermissionMode)
 	agent, ok := agents.Get(sess.AgentID)
 	if !ok {
 		httpx.Error(w, http.StatusInternalServerError, "agent missing: "+sess.AgentID)
@@ -251,7 +257,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 			ZoneName:       workspace.ZoneName(sess.ZoneName),
 			Agent:          agent,
 			PromptPackage:  pkg,
-			PermissionMode: req.PermissionMode,
+			PermissionMode: permissionMode,
 			Session:        sess,
 			Store:          sessions,
 			Events:         broadcaster,

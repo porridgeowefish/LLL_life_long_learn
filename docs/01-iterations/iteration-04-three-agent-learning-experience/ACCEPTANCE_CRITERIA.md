@@ -4,7 +4,10 @@ Status: active
 Last reviewed: 2026-06-15
 
 ```text
-Intro charter asks 3-5 calibration questions and one application question
+all agent prompts prohibit ASCII/Unicode character diagrams and use Mermaid for diagrams
+Intro charter asks 3-5 calibration questions including one application question
+project.md creation fields are embedded in every generated prompt
+Intro does not repeat project motivation, self-rated level, target, or completion standard
 unknown answers never become claims of mastery
 intro/assessment.json matches schema version 1
 weak/missing prerequisite cards require confirmation before child creation
@@ -20,11 +23,25 @@ old output.md remains readable
 
 tasks support six declared types and 1-5 difficulty
 five or more generated questions cover all five difficulty levels
+generation and regeneration require an explicit question count
 answer-key is absent from task responses and blocked by file API
 objective checking locks the first answer and returns explanation
 subjective evaluation remains batch-only
+the learner may edit before one final submission; empty or duplicate final submissions are blocked
+in-progress Practice answers persist to disk draft storage during answering
+submitting preserves the full question set and answers and automatically starts background AI evaluation
+refreshing Practice restores the latest submitted attempt from disk
+refreshing Practice before submission restores matching disk draft answers
+AI evaluation shows an overall summary plus feedback and a suggested answer for each subjective task
+AI feedback is embedded in the corresponding question and never opens an Agent conversation
 
 growth awards completion, objective correctness, and subjective evaluation
 growth retries are idempotent
 progress is project-local and has no ranking or streak behavior
+
+Summary writes summary/flashcards.json and summary/review-pack.md
+flashcards use the versioned file protocol and legacy arrays remain readable
+cards test concepts, relationships, boundaries, misconceptions, and transfer
+at least 60 percent of cards come from Explain core concepts
+the Summary page provides a compact, keyboard-accessible flip-and-grade deck
 ```

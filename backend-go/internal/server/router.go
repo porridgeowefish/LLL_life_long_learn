@@ -75,10 +75,14 @@ func (s *Server) Handler() http.Handler {
 
 	// Practice
 	mux.HandleFunc("GET /api/projects/{id}/practice/tasks", s.handleGetPracticeTasks)
+	mux.HandleFunc("GET /api/projects/{id}/practice/draft", s.handleGetPracticeDraft)
+	mux.HandleFunc("PUT /api/projects/{id}/practice/draft", s.handlePutPracticeDraft)
 	mux.HandleFunc("POST /api/projects/{id}/practice/submit", s.handleSubmitPractice)
 	mux.HandleFunc("POST /api/projects/{id}/practice/attempts", s.handleCreatePracticeAttempt)
+	mux.HandleFunc("GET /api/projects/{id}/practice/attempts/latest", s.handleGetLatestPracticeAttempt)
 	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/objective/{taskId}/check", s.handleCheckObjective)
 	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/submit", s.handleSubmitPracticeAttempt)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/evaluation", s.handleRequestPracticeEvaluation)
 	mux.HandleFunc("GET /api/projects/{id}/practice/evaluation", s.handleGetPracticeEvaluation)
 	mux.HandleFunc("GET /api/projects/{id}/progress", s.handleGetProgress)
 

@@ -332,6 +332,7 @@ func detectGeneratedZones(root string) []ZoneName {
 		generated = append(generated, ZoneExtend)
 	}
 	if nonEmptyFile(filepath.Join(root, "summary", "review-pack.md")) ||
+		validFlashcardsFile(filepath.Join(root, "summary", "flashcards.json")) ||
 		nonEmptyFile(filepath.Join(root, "summary", "summary.md")) {
 		generated = append(generated, ZoneSummary)
 	}
@@ -350,6 +351,40 @@ func validJSONObject(path string) bool {
 	}
 	var value map[string]any
 	return json.Unmarshal(data, &value) == nil
+}
+
+func validFlashcardsFile(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
+		return false
+	}
+	data = []byte(stripJSONFence(strings.TrimSpace(strings.TrimPrefix(string(data), "\ufeff"))))
+	var versioned struct {
+		Cards      []json.RawMessage `json:"cards"`
+		Flashcards []json.RawMessage `json:"flashcards"`
+		Items      []json.RawMessage `json:"items"`
+	}
+	if json.Unmarshal(data, &versioned) == nil &&
+		(len(versioned.Cards) > 0 || len(versioned.Flashcards) > 0 || len(versioned.Items) > 0) {
+		return true
+	}
+	var legacy []json.RawMessage
+	return json.Unmarshal(data, &legacy) == nil && len(legacy) > 0
+}
+
+func stripJSONFence(text string) string {
+	if !strings.HasPrefix(text, "```") {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	if len(lines) < 2 {
+		return text
+	}
+	end := len(lines)
+	if strings.HasPrefix(strings.TrimSpace(lines[end-1]), "```") {
+		end--
+	}
+	return strings.TrimSpace(strings.Join(lines[1:end], "\n"))
 }
 
 func validExplainManifest(path string) bool {

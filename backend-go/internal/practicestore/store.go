@@ -91,16 +91,33 @@ type Attempt struct {
 	SubmittedAt      string                     `json:"submittedAt,omitempty"`
 }
 
+type DraftEntry struct {
+	Answer     json.RawMessage `json:"answer"`
+	SelfAssess int             `json:"selfAssess"`
+}
+
+type DraftFile struct {
+	SchemaVersion int                   `json:"schemaVersion"`
+	SetID         string                `json:"setId"`
+	GeneratedAt   string                `json:"generatedAt"`
+	TaskIDs       []string              `json:"taskIds"`
+	Drafts        map[string]DraftEntry `json:"drafts"`
+	Attempt       int                   `json:"attempt,omitempty"`
+	UpdatedAt     string                `json:"updatedAt"`
+}
+
 type EvaluationResult struct {
-	TaskID   string `json:"taskId"`
-	Score    int    `json:"score"`
-	Feedback string `json:"feedback"`
-	Evidence string `json:"evidence"`
-	Passed   bool   `json:"passed"`
+	TaskID          string `json:"taskId"`
+	Score           int    `json:"score"`
+	Feedback        string `json:"feedback"`
+	SuggestedAnswer string `json:"suggestedAnswer,omitempty"`
+	Evidence        string `json:"evidence"`
+	Passed          bool   `json:"passed"`
 }
 
 type Evaluation struct {
 	Attempt      int                `json:"attempt"`
+	Summary      string             `json:"summary,omitempty"`
 	Results      []EvaluationResult `json:"results"`
 	OverallScore float64            `json:"overallScore"`
 	GeneratedAt  string             `json:"generatedAt"`
@@ -168,6 +185,48 @@ func (s *Store) WriteTasks(tf *TasksFile) error {
 	return workspace.AtomicWriteFile(filepath.Join(s.practiceDir(), "tasks.json"), raw, 0o644)
 }
 
+func (s *Store) ReadDraft() (*DraftFile, error) {
+	raw, err := os.ReadFile(filepath.Join(s.practiceDir(), "draft.json"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var draft DraftFile
+	if err := json.Unmarshal(raw, &draft); err != nil {
+		return nil, fmt.Errorf("parse draft.json: %w", err)
+	}
+	if draft.SchemaVersion == 0 {
+		draft.SchemaVersion = 1
+	}
+	if draft.Drafts == nil {
+		draft.Drafts = map[string]DraftEntry{}
+	}
+	return &draft, nil
+}
+
+func (s *Store) WriteDraft(draft *DraftFile) error {
+	if draft == nil {
+		return errors.New("draft is nil")
+	}
+	if err := os.MkdirAll(s.practiceDir(), 0o755); err != nil {
+		return err
+	}
+	if draft.SchemaVersion == 0 {
+		draft.SchemaVersion = 1
+	}
+	if draft.Drafts == nil {
+		draft.Drafts = map[string]DraftEntry{}
+	}
+	draft.UpdatedAt = NowISO()
+	raw, err := json.MarshalIndent(draft, "", "  ")
+	if err != nil {
+		return err
+	}
+	return workspace.AtomicWriteFile(filepath.Join(s.practiceDir(), "draft.json"), raw, 0o644)
+}
+
 func (s *Store) ReadAnswerKey() (*AnswerKeyFile, error) {
 	raw, err := os.ReadFile(filepath.Join(s.practiceDir(), "answer-key.json"))
 	if err != nil {
@@ -219,6 +278,36 @@ func (s *Store) ReadAttempt(attempt int) (*Attempt, error) {
 		out.ObjectiveResults = map[string]ObjectiveResult{}
 	}
 	return &out, nil
+}
+
+func (s *Store) ReadLatestSubmittedAttempt() (*Attempt, error) {
+	for attemptID := s.NextAttempt() - 1; attemptID >= 1; attemptID-- {
+		attempt, err := s.ReadAttempt(attemptID)
+		if err != nil {
+			continue
+		}
+		if attempt.Status == "submitted" && attemptHasResponses(attempt) {
+			return attempt, nil
+		}
+	}
+	return nil, os.ErrNotExist
+}
+
+func attemptHasResponses(attempt *Attempt) bool {
+	if len(attempt.ObjectiveResults) > 0 {
+		return true
+	}
+	for _, submission := range attempt.Submissions {
+		if len(bytes.TrimSpace(submission.Answer)) == 0 {
+			continue
+		}
+		if string(bytes.TrimSpace(submission.Answer)) != `""` &&
+			string(bytes.TrimSpace(submission.Answer)) != "null" &&
+			string(bytes.TrimSpace(submission.Answer)) != "[]" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Store) WriteAttempt(attempt *Attempt) error {
@@ -371,8 +460,14 @@ func (s *Store) WriteEvaluation(ev *Evaluation) error {
 	}
 	var md strings.Builder
 	fmt.Fprintf(&md, "# 练习评估（第 %d 次）\n\n- 总分：%.1f / 5\n- 时间：%s\n\n", ev.Attempt, ev.OverallScore, ev.GeneratedAt)
+	if ev.Summary != "" {
+		fmt.Fprintf(&md, "## 总体反馈\n\n%s\n\n", ev.Summary)
+	}
 	for _, r := range ev.Results {
 		fmt.Fprintf(&md, "## 任务 %s\n\n- 得分：%d / 5\n- 反馈：%s\n\n", r.TaskID, r.Score, r.Feedback)
+		if r.SuggestedAnswer != "" {
+			fmt.Fprintf(&md, "### 参考回答\n\n%s\n\n", r.SuggestedAnswer)
+		}
 		if r.Evidence != "" {
 			fmt.Fprintf(&md, "> %s\n\n", r.Evidence)
 		}

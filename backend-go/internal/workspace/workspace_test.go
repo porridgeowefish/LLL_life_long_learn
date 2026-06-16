@@ -342,7 +342,7 @@ func TestReadProjectStateDetectsGeneratedZones(t *testing.T) {
 		"explain/manifest.json":    `{"pages":[{"id":"p001"}]}`,
 		"practice/tasks.json":      `{"tasks":[{"id":"q1"}]}`,
 		"extend/relation-notes.md": "related topic",
-		"summary/review-pack.md":   "review",
+		"summary/flashcards.json":  `{"version":1,"cards":[{"id":"fc-1"}]}`,
 	}
 	for rel, content := range files {
 		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
@@ -361,5 +361,28 @@ func TestReadProjectStateDetectsGeneratedZones(t *testing.T) {
 		if state.GeneratedZones[i] != zone {
 			t.Fatalf("zone %d: expected %s, got %s", i, zone, state.GeneratedZones[i])
 		}
+	}
+}
+
+func TestReadProjectStateDetectsFlashcardVariants(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+	if err := CreateProjectSkeleton("flashcard-variants", "Flashcard Variants", ""); err != nil {
+		t.Fatal(err)
+	}
+	root, err := ProjectRootForSlug("flashcard-variants")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(root, "summary", "flashcards.json")
+	if err := os.WriteFile(path, []byte("```json\n{\"flashcards\":[{\"id\":\"fc-1\"}]}\n```"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	state, err := ReadProjectState("flashcard-variants")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.GeneratedZones) != 1 || state.GeneratedZones[0] != ZoneSummary {
+		t.Fatalf("expected Summary generated from flashcard variant, got %v", state.GeneratedZones)
 	}
 }

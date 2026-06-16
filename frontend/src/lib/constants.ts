@@ -35,6 +35,7 @@ export const STORAGE_KEYS = {
 // Permission modes for Claude CLI (see backend-go/internal/claudelauncher).
 export const PERMISSION_MODES = {
   default: 'default',
+  auto: 'auto',
   acceptEdits: 'acceptEdits',
   bypassPermissions: 'bypassPermissions',
 } as const;

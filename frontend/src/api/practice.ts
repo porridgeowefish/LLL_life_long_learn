@@ -42,16 +42,43 @@ export interface ObjectiveResult {
   growthDelta: number;
 }
 
+export interface PracticeAttempt {
+  attempt: number;
+  setId: string;
+  status: 'answering' | 'submitted';
+  objectiveResults: Record<string, ObjectiveResult>;
+  submissions?: Submission[];
+  createdAt: string;
+  submittedAt?: string;
+}
+
+export interface PracticeDraftEntry {
+  answer: PracticeAnswer;
+  selfAssess: number;
+}
+
+export interface PracticeDraftFile {
+  schemaVersion?: number;
+  setId: string;
+  generatedAt: string;
+  taskIds: string[];
+  drafts: Record<string, PracticeDraftEntry>;
+  attempt?: number;
+  updatedAt?: string;
+}
+
 export interface EvaluationResult {
   taskId: string;
   score: number;
   feedback: string;
+  suggestedAnswer?: string;
   evidence: string;
   passed: boolean;
 }
 
 export interface Evaluation {
   attempt: number;
+  summary?: string;
   results: EvaluationResult[];
   overallScore: number;
   generatedAt: string;
@@ -80,6 +107,26 @@ export function usePracticeTasks(
   });
 }
 
+export function usePracticeDraft(projectSlug: string | undefined) {
+  return useQuery({
+    queryKey: ['practice', 'draft', projectSlug],
+    enabled: !!projectSlug,
+    queryFn: async () => {
+      const res = await http.get<{ draft: PracticeDraftFile | null }>(
+        `/api/projects/${encodeURIComponent(projectSlug!)}/practice/draft`,
+      );
+      return res.draft;
+    },
+  });
+}
+
+export function savePracticeDraftFile(projectSlug: string, draft: PracticeDraftFile) {
+  return http.put<{ draft: PracticeDraftFile }>(
+    `/api/projects/${encodeURIComponent(projectSlug)}/practice/draft`,
+    draft,
+  );
+}
+
 export function useCreatePracticeAttempt() {
   return useMutation({
     mutationFn: (projectSlug: string) =>
@@ -87,6 +134,20 @@ export function useCreatePracticeAttempt() {
         `/api/projects/${encodeURIComponent(projectSlug)}/practice/attempts`,
         {},
       ),
+  });
+}
+
+export function useLatestPracticeAttempt(projectSlug: string | undefined) {
+  return useQuery({
+    queryKey: ['practice', 'attempt', 'latest', projectSlug],
+    enabled: !!projectSlug,
+    retry: false,
+    queryFn: async () => {
+      const res = await http.get<{ attempt: PracticeAttempt }>(
+        `/api/projects/${encodeURIComponent(projectSlug!)}/practice/attempts/latest`,
+      );
+      return res.attempt;
+    },
   });
 }
 
@@ -110,6 +171,7 @@ export function useCheckObjective() {
       ),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['progress', vars.projectSlug] });
+      qc.invalidateQueries({ queryKey: ['practice', 'attempt', 'latest', vars.projectSlug] });
     },
   });
 }
@@ -136,12 +198,22 @@ export function useSubmitPracticeAttempt() {
   });
 }
 
+export function useRequestPracticeEvaluation() {
+  return useMutation({
+    mutationFn: ({ projectSlug, attempt }: { projectSlug: string; attempt: number }) =>
+      http.post<{ status: 'queued' | 'running' | 'complete'; attempt: number }>(
+        `/api/projects/${encodeURIComponent(projectSlug)}/practice/attempts/${attempt}/evaluation`,
+        {},
+      ),
+  });
+}
+
 export function usePracticeEvaluation(projectSlug: string | undefined, attempt: number) {
   return useQuery({
     queryKey: ['practice', 'evaluation', projectSlug, attempt],
     enabled: !!projectSlug && attempt > 0,
     retry: false,
-    refetchInterval: 5000,
+    refetchInterval: (query) => query.state.data ? false : 3000,
     queryFn: async () => {
       const res = await http.get<{ evaluation: Evaluation }>(
         `/api/projects/${encodeURIComponent(projectSlug!)}/practice/evaluation?attempt=${attempt}`,

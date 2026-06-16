@@ -49,7 +49,7 @@ export function PracticeProgress({
             key={task.id}
             type="button"
             className={clsx(s.cell, s[state], locked && s.locked)}
-            onClick={() => !locked && onJump(i)}
+            onClick={() => onJump(i)}
             title={`第 ${i + 1} 题`}
             aria-label={`第 ${i + 1} 题，状态 ${state}`}
             aria-current={i === currentIndex ? 'true' : undefined}

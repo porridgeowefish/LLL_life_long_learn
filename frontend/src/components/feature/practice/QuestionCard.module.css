@@ -166,6 +166,30 @@
   white-space: pre-wrap;
 }
 
+.feedbackBody p {
+  margin: 4px 0 12px;
+}
+
+.suggestedAnswer {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  white-space: normal;
+}
+
+.suggestedAnswer :global(p) {
+  margin: 0.35em 0;
+}
+
+.suggestedAnswer :global(pre) {
+  overflow-x: auto;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--bg);
+}
+
 .correct {
   border-left-color: var(--accent);
 }

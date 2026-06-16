@@ -52,6 +52,7 @@ export function QuestionCard({
   feedback,
 }: QuestionCardProps) {
   const { html } = useMarkdown(task.question);
+  const { html: suggestedAnswerHtml } = useMarkdown(feedback?.suggestedAnswer ?? '');
   const tag = TYPE_TAG[task.type] ?? TYPE_TAG.essay;
   const objective = isObjectiveTask(task);
   const answerLocked = readonly || !!objectiveResult;
@@ -126,7 +127,19 @@ export function QuestionCard({
       {feedback && (
         <div className={s.feedback}>
           <div className={s.feedbackHead}>AI 评估 <strong>{feedback.score}/5</strong></div>
-          <div className={s.feedbackBody}>{feedback.feedback}</div>
+          <div className={s.feedbackBody}>
+            <strong>点评</strong>
+            <p>{feedback.feedback}</p>
+            {feedback.suggestedAnswer && (
+              <>
+                <strong>参考回答</strong>
+                <div
+                  className={s.suggestedAnswer}
+                  dangerouslySetInnerHTML={{ __html: suggestedAnswerHtml }}
+                />
+              </>
+            )}
+          </div>
         </div>
       )}
     </Card>

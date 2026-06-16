@@ -54,6 +54,7 @@ describe('AgentInvokePanel', () => {
         projectId: 'demo',
         zone: 'Intro',
         intent: undefined,
+        permissionMode: 'auto',
       }),
     });
     expect(setActiveSession).toHaveBeenCalledWith('sess-1');

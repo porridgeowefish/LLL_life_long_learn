@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 
@@ -126,5 +127,128 @@ func TestCreateAttemptAllocatesUniqueNumbersConcurrently(t *testing.T) {
 	}
 	if len(seen) != count {
 		t.Fatalf("created %d attempts, want %d", len(seen), count)
+	}
+}
+
+func TestDraftRoundTrip(t *testing.T) {
+	store, cleanup := setupPracticeStore(t)
+	defer cleanup()
+
+	draft := &DraftFile{
+		SetID:       "set-1",
+		GeneratedAt: "2026-06-15T12:00:00Z",
+		TaskIDs:     []string{"q1", "q2"},
+		Drafts: map[string]DraftEntry{
+			"q1": {Answer: json.RawMessage(`"learner answer"`), SelfAssess: 4},
+		},
+		Attempt: 3,
+	}
+	if err := store.WriteDraft(draft); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := store.ReadDraft()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored == nil {
+		t.Fatal("draft should round-trip")
+	}
+	if restored.SchemaVersion != 1 || restored.UpdatedAt == "" {
+		t.Fatalf("draft metadata not populated: %#v", restored)
+	}
+	if got := string(restored.Drafts["q1"].Answer); got != `"learner answer"` {
+		t.Fatalf("restored answer = %s", got)
+	}
+	if restored.Drafts["q1"].SelfAssess != 4 || restored.Attempt != 3 {
+		t.Fatalf("restored draft fields = %#v", restored)
+	}
+}
+
+func TestLatestAttemptAndEvaluationFeedbackArtifacts(t *testing.T) {
+	store, cleanup := setupPracticeStore(t)
+	defer cleanup()
+
+	first, err := store.CreateAttempt("set-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.CreateAttempt("set-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SubmitAttempt(second.Attempt, []Submission{{
+		TaskID: "q4", Answer: json.RawMessage(`"learner answer"`), SelfAssess: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.CreateAttempt("set-1"); err != nil {
+		t.Fatal(err)
+	}
+	latest, err := store.ReadLatestSubmittedAttempt()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Attempt != second.Attempt || latest.Status != "submitted" {
+		t.Fatalf("latest attempt = %#v, first=%d second=%d", latest, first.Attempt, second.Attempt)
+	}
+
+	ev := &Evaluation{
+		Attempt: second.Attempt,
+		Summary: "概念基础稳定，但迁移时遗漏边界条件。",
+		Results: []EvaluationResult{{
+			TaskID:          "q4",
+			Score:           3,
+			Feedback:        "方向正确，需要补充状态转换条件。",
+			SuggestedAnswer: "先定义 token，再给出状态转换与接受状态。",
+			Evidence:        "提交中未说明接受状态。",
+			Passed:          true,
+		}},
+		OverallScore: 3,
+		GeneratedAt:  NowISO(),
+	}
+	if err := store.WriteEvaluation(ev); err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(store.practiceDir(), "evaluations", "2.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	md := string(raw)
+	for _, fragment := range []string{"总体反馈", ev.Summary, "参考回答", ev.Results[0].SuggestedAnswer} {
+		if !strings.Contains(md, fragment) {
+			t.Errorf("evaluation markdown missing %q:\n%s", fragment, md)
+		}
+	}
+}
+
+func TestLatestSubmittedAttemptSkipsEmptySubmission(t *testing.T) {
+	store, cleanup := setupPracticeStore(t)
+	defer cleanup()
+
+	meaningful, err := store.CreateAttempt("set-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SubmitAttempt(meaningful.Attempt, []Submission{{
+		TaskID: "q1", Answer: json.RawMessage(`"a real answer"`), SelfAssess: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	empty, err := store.CreateAttempt("set-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SubmitAttempt(empty.Attempt, []Submission{{
+		TaskID: "q1", Answer: json.RawMessage(`""`), SelfAssess: 0,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	latest, err := store.ReadLatestSubmittedAttempt()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if latest.Attempt != meaningful.Attempt {
+		t.Fatalf("latest meaningful attempt = %d, want %d", latest.Attempt, meaningful.Attempt)
 	}
 }

@@ -145,6 +145,276 @@ func TestBuild_AllowsEmptyIntent(t *testing.T) {
 	}
 }
 
+func TestBuild_IncludesProjectCreationFields(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	input := workspace.ProjectInput{
+		Why:      "为了通过编译原理考试",
+		Current:  "了解正则表达式",
+		Target:   "能独立完成词法分析",
+		Standard: "能把正则表达式转换为有限自动机",
+	}
+	if err := workspace.CreateProjectSkeletonWithInput("lexer", "词法分析", "", input); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "intro", []workspace.ZoneName{workspace.ZoneIntro})
+
+	pkg, err := Build(Request{
+		ProjectSlug: "lexer",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	checks := []string{
+		"# Project Brief",
+		"为了通过编译原理考试",
+		"了解正则表达式",
+		"能独立完成词法分析",
+		"能把正则表达式转换为有限自动机",
+		"# Intro Calibration Boundary",
+		"do not ask the learner to repeat them",
+	}
+	for _, check := range checks {
+		if !strings.Contains(pkg.PromptMd, check) {
+			t.Errorf("prompt missing project context %q\n--- prompt ---\n%s", check, pkg.PromptMd)
+		}
+	}
+	if pkg.PackageMeta.ProjectFile == "" || !strings.HasSuffix(pkg.PackageMeta.ProjectFile, "project.md") {
+		t.Errorf("ProjectFile = %q, want project.md path", pkg.PackageMeta.ProjectFile)
+	}
+}
+
+func TestBuild_AllowsLegacyProjectWithoutProjectBrief(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("legacy", "Legacy", ""); err != nil {
+		t.Fatal(err)
+	}
+	projectRoot, err := workspace.ProjectRootForSlug("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(projectRoot, "project.md")); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "intro", []workspace.ZoneName{workspace.ZoneIntro})
+
+	pkg, err := Build(Request{
+		ProjectSlug: "legacy",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build should allow a legacy project without project.md: %v", err)
+	}
+	if !strings.Contains(pkg.PromptMd, "project.md is not present") {
+		t.Errorf("missing legacy project fallback:\n%s", pkg.PromptMd)
+	}
+}
+
+func TestBuild_ProductionIntroPromptDoesNotRepeatProjectCreationInterview(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeletonWithInput("test", "Test", "", workspace.ProjectInput{
+		Why:      "工作需要",
+		Current:  "了解概念",
+		Target:   "能独立应用",
+		Standard: "完成一个可运行案例",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load production registry: %v", err)
+	}
+
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	required := []string{
+		"创建项目时填写的学习动机、当前水平、目标水平和完成标准均视为已回答，不得重复询问",
+		"只覆盖该主题的术语识别、因果理解、前置知识和简单应用",
+		"不重复询问 `Project Brief` 中已有的项目创建字段",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("production intro prompt missing contract %q", fragment)
+		}
+	}
+	if strings.Contains(pkg.PromptMd, "覆盖术语识别、因果理解、简单应用和学习目标") {
+		t.Errorf("production intro prompt still asks for the already-known learning goal")
+	}
+}
+
+func TestBuild_AllProductionAgentsForbidTextCharacterDiagrams(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load production registry: %v", err)
+	}
+
+	const prohibition = "Never draw diagrams with ASCII or Unicode text characters"
+	const replacement = "Use a fenced Mermaid block for every diagram."
+	for _, agent := range reg.List() {
+		if len(agent.AllowedZones) == 0 {
+			t.Fatalf("agent %s has no allowed zones", agent.ID)
+		}
+		pkg, err := Build(Request{
+			ProjectSlug: "test",
+			ZoneName:    agent.AllowedZones[0],
+			AgentID:     agent.ID,
+		}, reg)
+		if err != nil {
+			t.Fatalf("Build agent %s: %v", agent.ID, err)
+		}
+		if !strings.Contains(pkg.PromptMd, prohibition) {
+			t.Errorf("agent %s prompt missing text-diagram prohibition", agent.ID)
+		}
+		if !strings.Contains(pkg.PromptMd, replacement) {
+			t.Errorf("agent %s prompt missing Mermaid replacement rule", agent.ID)
+		}
+	}
+}
+
+func TestBuild_PracticeEvaluationUsesAttemptSpecificContract(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "practice", []workspace.ZoneName{workspace.ZonePractice})
+
+	pkg, err := Build(Request{
+		ProjectSlug:     "test",
+		ZoneName:        workspace.ZonePractice,
+		AgentID:         "practice",
+		PracticeAttempt: 3,
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	required := []string{
+		"# Practice Evaluation Artifact Contract",
+		"practice/attempts/3.json",
+		"practice/submissions/3.json",
+		"practice/evaluations/3.json",
+		"`suggestedAnswer`",
+		"`summary`",
+		"Do not generate or overwrite `practice/tasks.json`",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("evaluation prompt missing %q\n%s", fragment, pkg.PromptMd)
+		}
+	}
+	if pkg.PackageMeta.PracticeAttempt != 3 {
+		t.Errorf("PracticeAttempt = %d, want 3", pkg.PackageMeta.PracticeAttempt)
+	}
+	if len(pkg.PackageMeta.OutputTargets) != 2 ||
+		pkg.PackageMeta.OutputTargets[0].Filename != "evaluations/3.json" {
+		t.Errorf("unexpected evaluation output targets: %#v", pkg.PackageMeta.OutputTargets)
+	}
+}
+
+func TestBuild_ProductionSummaryPromptRequiresStructuredFlashcards(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	pkg, err := Build(Request{
+		ProjectSlug: "test",
+		ZoneName:    workspace.ZoneSummary,
+		AgentID:     "summary",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	for _, fragment := range []string{
+		"summary/flashcards.json",
+		"前端闪卡的唯一事实源",
+		"卡片必须贴近概念和核心理解",
+		`"category"`,
+		`"sourceRefs"`,
+	} {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("summary prompt missing %q", fragment)
+		}
+	}
+	if len(pkg.PackageMeta.OutputTargets) != 2 {
+		t.Fatalf("summary output targets = %#v", pkg.PackageMeta.OutputTargets)
+	}
+}
+
+func TestBuild_PracticeGenerationUsesExactQuestionCount(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load registry: %v", err)
+	}
+	pkg, err := Build(Request{
+		ProjectSlug:           "test",
+		ZoneName:              workspace.ZonePractice,
+		AgentID:               "practice",
+		PracticeQuestionCount: 7,
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if !strings.Contains(pkg.PromptMd, "Generate exactly 7 questions") {
+		t.Fatalf("prompt missing exact question count:\n%s", pkg.PromptMd)
+	}
+	if pkg.PackageMeta.PracticeQuestionCount != 7 {
+		t.Fatalf("package question count = %d", pkg.PackageMeta.PracticeQuestionCount)
+	}
+}
+
 // writeTestAgent adds an in-memory agent to the registry by writing to a
 // temp dir and reloading.
 func writeTestAgent(t *testing.T, reg *agentregistry.Registry, id string, zones []workspace.ZoneName) {

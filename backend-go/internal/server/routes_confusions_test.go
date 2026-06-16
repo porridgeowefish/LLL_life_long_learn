@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	"github.com/xmz14/lll/backend-go/internal/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -180,6 +181,43 @@ func TestPracticeSubmitAndGetTasks(t *testing.T) {
 	}
 	if submitRes.Saved != 1 {
 		t.Fatalf("expected saved=1, got %d", submitRes.Saved)
+	}
+}
+
+func TestPracticeEvaluationRequestReturnsExistingResultWithoutLaunchingAgent(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	store, err := practicestore.New("testproj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempt, err := store.CreateAttempt("set-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SubmitAttempt(attempt.Attempt, []practicestore.Submission{{
+		TaskID: "q1", Answer: json.RawMessage(`"answer"`), SelfAssess: 3,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.WriteEvaluation(&practicestore.Evaluation{
+		Attempt: attempt.Attempt, Summary: "done", OverallScore: 4,
+		GeneratedAt: practicestore.NowISO(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/projects/testproj/practice/attempts/1/evaluation", strings.NewReader(`{}`))
+	req.SetPathValue("id", "testproj")
+	req.SetPathValue("attempt", "1")
+	w := httptest.NewRecorder()
+	srv.handleRequestPracticeEvaluation(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("request existing evaluation: status %d, body %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `"status":"complete"`) {
+		t.Fatalf("unexpected response: %s", w.Body.String())
 	}
 }
 

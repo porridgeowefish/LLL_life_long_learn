@@ -10,8 +10,11 @@ export interface Flashcard {
   id: string;
   front: string;
   back: string;
-  zone: string;
-  sourceId: string;
+  category?: 'concept' | 'relationship' | 'boundary' | 'misconception' | 'transfer' | string;
+  sourceRefs?: string[];
+  generatedReason?: string;
+  zone?: string;
+  sourceId?: string;
 }
 
 export interface CardProgress {

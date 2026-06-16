@@ -20,8 +20,8 @@ interface AgentInvokePanelProps {
 // header (top of the main column) for zones without their own entry
 // (Intro/Explain/Extend/Summary). Practice uses its own GenerationEntry.
 // Layout (left to right): agent select | optional guidance toggle/input | invoke button.
-// Permission mode is intentionally NOT exposed — the runtime default
-// (acceptEdits) is what 99% of learning sessions want.
+// Permission mode is intentionally not exposed; agent launches use Claude auto
+// mode by default.
 export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInvokePanelProps) {
   const { data: agentsData } = useAgents();
   const invoke = useInvokeAgent();
@@ -54,7 +54,7 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
         projectId: slug,
         zone,
         intent: intent.trim() || undefined,
-        permissionMode: PERMISSION_MODES.acceptEdits,
+        permissionMode: PERMISSION_MODES.auto,
         sourceRefs,
       },
     });

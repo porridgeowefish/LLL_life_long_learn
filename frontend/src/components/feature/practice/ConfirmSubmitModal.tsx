@@ -1,7 +1,7 @@
 // ConfirmSubmitModal — P-07 pre-submit confirmation.
 // Summarises: total questions, unanswered (warn, allows partial), and
-// self-assess gaps (hard block — disables submit until every answered
-// question is self-assessed, since self-assessment precedes AI evaluation).
+// unanswered questions are blocked so accidental empty attempts cannot replace
+// the learner's last meaningful submission.
 
 import clsx from 'clsx';
 
@@ -40,14 +40,14 @@ export function ConfirmSubmitModal({
       missingAssess++;
     }
   }
-  const blocked = missingAssess > 0;
+  const blocked = missingAssess > 0 || unanswered > 0;
 
   return (
     <Modal
       open={open}
       onOpenChange={onOpenChange}
       title="确认提交"
-      description="提交后将由练习智能体整批评估，形成新的一次 attempt。"
+      description="提交后保留全部题目与答案，并在后台生成主观题反馈。"
       size="md"
       footer={
         <>
@@ -55,7 +55,7 @@ export function ConfirmSubmitModal({
             返回修改
           </Button>
           <Button variant="primary" onClick={onConfirm} disabled={blocked} loading={submitting}>
-            {blocked ? '请先完成自评' : unanswered > 0 ? `仍要提交（${unanswered} 题为空）` : '确认提交'}
+            {unanswered > 0 ? '请先完成全部题目' : blocked ? '请先完成自评' : '确认提交'}
           </Button>
         </>
       }
@@ -67,7 +67,7 @@ export function ConfirmSubmitModal({
         </li>
         <li className={clsx(s.check, unanswered === 0 && s.checkOk)}>
           <span className={s.checkIcon}>{unanswered === 0 ? '✅' : '⚠️'}</span>
-          {unanswered === 0 ? '所有题已作答' : `${unanswered} 题未作答（允许部分提交）`}
+          {unanswered === 0 ? '所有题已作答' : `${unanswered} 题未作答（提交前必须完成）`}
         </li>
         <li className={clsx(s.check, missingAssess === 0 && s.checkOk)}>
           <span className={s.checkIcon}>{missingAssess === 0 ? '✅' : '⏳'}</span>

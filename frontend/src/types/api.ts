@@ -65,6 +65,8 @@ export interface InvokeAgentRequest {
   permissionMode?: string;
   sourceRefs?: string[];
   parentPageId?: string;
+  practiceAttempt?: number;
+  practiceQuestionCount?: number;
 }
 
 export interface FollowUpRequest {

@@ -22,4 +22,7 @@ Last reviewed: 2026-06-14
 - As a learner, I want difficulty to rise from one to five stars and question types to rise from recognition to transfer.
 - As a learner, I want objective answers checked immediately with an explanation.
 - As a learner, I want subjective answers evaluated only after batch submission.
+- As a learner, I want to choose the exact number of questions before generating or regenerating a set.
+- As a learner, I want to edit answers freely before one final submission, then keep the submitted questions and answers visible after refresh.
+- As a learner, I want AI feedback to run automatically in the background and appear inside each question, without opening another agent conversation.
 - As a learner, I want visible project-local growth tied to completion, correctness, and difficulty.
