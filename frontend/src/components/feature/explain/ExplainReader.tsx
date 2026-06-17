@@ -127,7 +127,9 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
         <ExplainPage projectSlug={projectSlug} file={current.file} />
       </main>
 
-      {pages.length > 0 && <ExplainInfographic projectSlug={projectSlug} />}
+      {pages.length > 0 && (
+        <ExplainInfographic projectSlug={projectSlug} visible={currentIndex === pages.length - 1} />
+      )}
     </div>
   );
 }

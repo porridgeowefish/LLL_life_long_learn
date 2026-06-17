@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
@@ -83,5 +83,29 @@ describe('ExplainInfographic — SSE-driven invalidation', () => {
     // Give any would-be refetch a chance to fire, then assert it did not.
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mocks.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('regenerates with force=1 only after confirming in the modal', async () => {
+    render(withProviders(<ExplainInfographic projectSlug="p1" />));
+
+    // Complete state renders without auto-kicking (no POST yet).
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1));
+    expect(mocks.post).not.toHaveBeenCalled();
+
+    // The regenerate button is available even after a successful generation.
+    const regenerate = await screen.findByRole('button', { name: '重新生成' });
+    await act(async () => {
+      fireEvent.click(regenerate);
+    });
+
+    // Confirming the modal must POST with ?force=1 (bypasses the backend's
+    // "already complete" early-return so the pipeline overwrites the PNG).
+    const confirm = await screen.findByRole('button', { name: '确认重新生成' });
+    await act(async () => {
+      fireEvent.click(confirm);
+    });
+
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(1));
+    expect(mocks.post.mock.calls[0][0]).toContain('force=1');
   });
 });

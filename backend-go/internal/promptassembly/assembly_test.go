@@ -578,7 +578,7 @@ func TestBuild_ExplainIncludesTutorialArtifactContract(t *testing.T) {
 		"可独立阅读的教程",
 		"不使用“你”“我们”等对话人称",
 		"第一性原理不得成为独立页面、章节、标题或逐步推导",
-		"只能融入最后一页的“核心观点”",
+		"只能融入最后一页“批判性思维总结”的“核心观点与视角”维度",
 		"不得让每一页机械重复同一组栏目",
 		"Silently use predecessor files",
 	}

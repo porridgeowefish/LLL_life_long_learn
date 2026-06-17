@@ -12,6 +12,34 @@
   display: block;
 }
 
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.regenerateButton {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+
+.regenerateButton:hover {
+  border-color: var(--muted);
+  color: var(--fg);
+}
+
+.confirmNote {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
 .skeleton {
   padding: 18px;
   border-radius: 8px;

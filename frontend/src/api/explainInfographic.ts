@@ -8,6 +8,13 @@ export interface InfographicState {
   status: InfographicStatus;
   url?: string;
   error?: string;
+  updatedAt?: string;
+}
+
+export interface RequestInfographicArgs {
+  projectSlug: string;
+  /** force=true bypasses the backend's "already complete" check and regenerates. */
+  force?: boolean;
 }
 
 export function useExplainInfographic(projectSlug: string | undefined) {
@@ -31,11 +38,13 @@ export function useExplainInfographic(projectSlug: string | undefined) {
 export function useRequestExplainInfographic() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (projectSlug: string) =>
-      http.post<InfographicState>(
-        `/api/projects/${encodeURIComponent(projectSlug)}/explain/infographic`,
-      ),
-    onSuccess: (_data, projectSlug) => {
+    mutationFn: ({ projectSlug, force }: RequestInfographicArgs) => {
+      const url =
+        `/api/projects/${encodeURIComponent(projectSlug)}/explain/infographic` +
+        (force ? '?force=1' : '');
+      return http.post<InfographicState>(url);
+    },
+    onSuccess: (_data, { projectSlug }) => {
       qc.invalidateQueries({ queryKey: ['explain', 'infographic', projectSlug] });
     },
   });

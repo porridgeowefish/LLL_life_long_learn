@@ -116,8 +116,9 @@ func (s *Server) handleGetExplainInfographic(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
-			"status": state.Status,
-			"url":    state.URL,
+			"status":    state.Status,
+			"url":       state.URL,
+			"updatedAt": state.UpdatedAt,
 		})
 		return
 	}
@@ -150,16 +151,23 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Check if already complete
-	state, exists, _ := readInfographicState(slug)
-	if exists && state.Status == "complete" {
-		pngPath := infographicPNGPath(slug)
-		if _, err := os.Stat(pngPath); err == nil {
-			httpx.WriteJSON(w, http.StatusOK, map[string]any{
-				"status": state.Status,
-				"url":    state.URL,
-			})
-			return
+	// force=1 = explicit user-requested regeneration: bypass the "already
+	// complete" early-return so the pipeline overwrites the existing PNG.
+	force := r.URL.Query().Get("force") == "1"
+
+	// Check if already complete (skip when force-regenerating)
+	if !force {
+		state, exists, _ := readInfographicState(slug)
+		if exists && state.Status == "complete" {
+			pngPath := infographicPNGPath(slug)
+			if _, err := os.Stat(pngPath); err == nil {
+				httpx.WriteJSON(w, http.StatusOK, map[string]any{
+					"status":    state.Status,
+					"url":       state.URL,
+					"updatedAt": state.UpdatedAt,
+				})
+				return
+			}
 		}
 	}
 
@@ -280,7 +288,7 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 		crafted = string(runes[:4000])
 	}
 
-	finalPrompt := "清晰明了的手绘信息图，" + crafted
+	finalPrompt := "高质量、清晰明了的手绘信息图，" + crafted
 
 	// STAGE B: Generate the image
 	scriptAbs := filepath.Join(paths.WORKSPACE, "scripts", "gen_infographic.py")
@@ -338,14 +346,19 @@ func buildCrafterPrompt(slug, runDirRel string) string {
 	return fmt.Sprintf(`你是一个图像提示词提炼助手。当前工作目录是学习项目根目录。
 
 任务：
-1. 读取 explain/manifest.json，得到主题标题与全部页面列表。
-2. 依次读取 manifest 中 pages[].file 指向的每个文件（位于 explain/ 下，例如 explain/pages/001-overview.md）。注意 explain/output.md 只是兼容占位，真正讲解内容在 pages/ 里。
-3. 把整个主题蒸馏成"一张清晰明了的手绘风格信息图"的图像生成提示词：突出核心结构与关键概念之间的关系（节点、流程、层级、对比），而不是装饰性细节；目标是让人看一眼这张图就能抓住主题主线。
+1. 读取 explain/manifest.json，得到主题标题与全部页面列表（按 order 排序）。
+2. 以"最后一页"（order 最大的页面，通常是批判性思维总结页）为主要信息源；如需补充上下文，再读 1-2 页正文。explain/output.md 只是兼容占位，真正内容在 pages/ 里。
+3. 把主题的"批判性思维精华"蒸馏成一份简洁的信息图内容说明，供图像模型生成一张清晰简洁的手绘信息图：
+   - 只挑选最承重的概念、关系与结论；详略得当，绝不把所有细节都塞进一张图。
+   - 写清"这张图要让读者一眼抓住什么主线、关键节点之间是什么关系"（因果、层级、对比、流程先后、反馈闭环、整体—部分等）。
+   - 用简洁的自然语言陈述要点本身，不堆装饰性细节。
+   - 不要规定画面布局或构图——不要写"上图/下图""左侧/右侧""用箭头从X指向Y""分成几栏"等空间或排版指令；画面由图像模型自行设计。
+   - 不要写风格或媒介描述（如"手绘""马克笔""白板"）；整体风格由系统统一指定。
 
 输出契约（严格遵守）：
 - 只把"最终提示词文本"写入文件：%s/image-prompt.txt
 - 文件内容只能是提示词本身：不要前言、解释、markdown 代码围栏或多余空行。
-- 提示词不超过 500 字。
+- 提示词不超过 400 字。
 - 不要修改其它任何文件。
 `, runDirRel)
 }
