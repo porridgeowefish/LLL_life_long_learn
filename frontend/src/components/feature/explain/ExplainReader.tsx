@@ -91,24 +91,27 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
               }
             }}
           >
-            {pages.map((page) => (
-              <button
-                key={page.id}
-                ref={(node) => {
-                  if (node) pageTabRefs.current.set(page.id, node);
-                  else pageTabRefs.current.delete(page.id);
-                }}
-                type="button"
-                role="tab"
-                aria-selected={page.id === current.id}
-                className={`${s.tocItem} ${page.id === current.id ? s.active : ''}`}
-                onClick={() => setPageID(page.id)}
-              >
-                <span className={s.pageNode}>{page.order}</span>
-                <span className={s.pageTitle}>{page.title}</span>
-                {page.kind === 'followup' && <small>追问</small>}
-              </button>
-            ))}
+            {pages.map((page) => {
+              const label = page.kind === 'followup' ? `${page.title}（追问）` : page.title;
+              return (
+                <button
+                  key={page.id}
+                  ref={(node) => {
+                    if (node) pageTabRefs.current.set(page.id, node);
+                    else pageTabRefs.current.delete(page.id);
+                  }}
+                  type="button"
+                  role="tab"
+                  aria-selected={page.id === current.id}
+                  title={label}
+                  aria-label={label}
+                  className={`${s.tocItem} ${page.id === current.id ? s.active : ''} ${page.kind === 'followup' ? s.followup : ''}`}
+                  onClick={() => setPageID(page.id)}
+                >
+                  <span className={s.pageNode}>{page.order}</span>
+                </button>
+              );
+            })}
           </div>
 
           <button
@@ -124,7 +127,11 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
       </header>
 
       <main className={s.reader}>
-        <ExplainPage projectSlug={projectSlug} file={current.file} />
+        <ExplainPage
+          projectSlug={projectSlug}
+          file={current.file}
+          isSummary={currentIndex === pages.length - 1}
+        />
       </main>
 
       {pages.length > 0 && (
@@ -134,7 +141,15 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
   );
 }
 
-function ExplainPage({ projectSlug, file }: { projectSlug: string; file: string }) {
+function ExplainPage({
+  projectSlug,
+  file,
+  isSummary,
+}: {
+  projectSlug: string;
+  file: string;
+  isSummary?: boolean;
+}) {
   const page = useExplainPage(projectSlug, file);
   const { html, mermaid } = useMarkdown(page.data ?? '');
   const hostRef = useRef<HTMLElement>(null);
@@ -186,7 +201,7 @@ function ExplainPage({ projectSlug, file }: { projectSlug: string; file: string 
 
   return (
     <article
-      className={s.page}
+      className={isSummary ? `${s.page} ${s.summary}` : s.page}
       ref={hostRef}
       onMouseUp={() => {
         const selected = window.getSelection();
@@ -212,7 +227,7 @@ function ExplainPage({ projectSlug, file }: { projectSlug: string; file: string 
         });
       }}
     >
-      <code>{file}</code>
+      {!isSummary && <code>{file}</code>}
       <div
         ref={markdownRef}
         className={s.markdown}

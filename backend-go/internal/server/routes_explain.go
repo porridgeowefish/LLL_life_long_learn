@@ -50,6 +50,95 @@ func infographicPNGPath(slug string) string {
 	return filepath.Join(root, "explain", infographicPNG)
 }
 
+// isPNGFile reports whether the file at path starts with the PNG signature.
+// Used to reject gateway error pages (HTML/JSON) that get mis-saved as
+// infographic.png — without this the pipeline would mark a broken download
+// as "complete" and the frontend would render a non-image as <img>.
+func isPNGFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var head [8]byte
+	n, err := f.Read(head[:])
+	if err != nil || n < 8 {
+		return false
+	}
+	// PNG signature: 89 50 4E 47 0D 0A 1A 0A
+	return string(head[:]) == "\x89PNG\r\n\x1a\n"
+}
+
+// imageProvider is one image-generation gateway to attempt.
+type imageProvider struct {
+	name    string // "primary" | "backup" — used in diagnostics
+	apiKey  string
+	baseURL string
+	model   string
+}
+
+// generateImageWithProviders runs the Python image script against each provider
+// in order until one yields a valid PNG, then returns nil. It returns the last
+// provider's error if every provider failed (or none were configured).
+func generateImageWithProviders(ctx context.Context, root, finalPrompt, pngAbs, pythonBin string, providers []imageProvider) error {
+	scriptAbs := filepath.Join(paths.WORKSPACE, "scripts", "gen_infographic.py")
+	if paths.WORKSPACE == "" {
+		scriptAbs = filepath.Join(paths.PROJECT_ROOT, "scripts", "gen_infographic.py")
+	}
+
+	var lastErr error
+	for _, p := range providers {
+		if p.apiKey == "" || p.baseURL == "" {
+			continue
+		}
+		if err := runImageScript(ctx, root, scriptAbs, finalPrompt, pngAbs, pythonBin, p); err == nil {
+			return nil
+		} else {
+			lastErr = fmt.Errorf("%s provider: %s", p.name, err.Error())
+			fmt.Println("infographic:", lastErr.Error(), "- trying next provider if any")
+		}
+	}
+	return lastErr
+}
+
+// runImageScript invokes gen_infographic.py once with the given provider's
+// credentials and validates the output is a real PNG (rejects gateway error
+// pages that get mis-saved as .png).
+func runImageScript(ctx context.Context, root, scriptAbs, finalPrompt, pngAbs, pythonBin string, p imageProvider) error {
+	ctx2, cancel := context.WithTimeout(ctx, 3*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx2, pythonBin, scriptAbs, finalPrompt, pngAbs)
+	cmd.Dir = root
+	cmd.Env = append(os.Environ(),
+		"IMAGE_API_KEY="+p.apiKey,
+		"IMAGE_BASE_URL="+p.baseURL,
+		"IMAGE_MODEL="+p.model,
+	)
+
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
+
+	if err := cmd.Run(); err != nil {
+		stderr := stderrBuf.String()
+		if len(stderr) > 500 {
+			stderr = stderr[:500] + "..."
+		}
+		if stderr == "" {
+			return fmt.Errorf("image request failed: %v", err)
+		}
+		return fmt.Errorf("image request failed: %v: %s", err, stderr)
+	}
+	if _, err := os.Stat(pngAbs); err != nil {
+		return fmt.Errorf("script exited but png missing")
+	}
+	if !isPNGFile(pngAbs) {
+		os.Remove(pngAbs)
+		return fmt.Errorf("returned a non-image response (likely an error page)")
+	}
+	return nil
+}
+
 // readInfographicState reads the infographic state from disk.
 func readInfographicState(slug string) (infographicState, bool, error) {
 	path := infographicStatePath(slug)
@@ -115,6 +204,18 @@ func (s *Server) handleGetExplainInfographic(w http.ResponseWriter, r *http.Requ
 			httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "missing"})
 			return
 		}
+		if !isPNGFile(pngPath) {
+			// Self-heal: a previously "complete" file is actually a gateway
+			// error page (HTML/JSON), not an image. Report failed so the UI
+			// shows a retry instead of a broken <img>. (Read-only: we don't
+			// rewrite the state file here; the failed-retry button uses
+			// force=1, which bypasses the on-disk "complete" early-return.)
+			httpx.WriteJSON(w, http.StatusOK, map[string]any{
+				"status": "failed",
+				"error":  "已生成的文件不是有效图片，图片服务可能返回了错误页，请重新生成",
+			})
+			return
+		}
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{
 			"status":    state.Status,
 			"url":       state.URL,
@@ -176,7 +277,7 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
 		return
 	}
-	if s.ImageConfig == nil || s.ImageConfig.ImageAPIKey == "" || !s.ImageAvailable {
+	if s.ImageConfig == nil || !s.ImageConfig.HasImageProvider() || !s.ImageAvailable {
 		httpx.Error(w, http.StatusServiceUnavailable, "infographic generation not configured")
 		return
 	}
@@ -245,8 +346,20 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 	runningState.UpdatedAt = time.Now().UTC()
 	writeInfographicState(slug, runningState)
 
-	// Launch headless Claude to craft prompt
-	err = claudelauncher.LaunchHeadless(ctx, slug, "infographic-crafter", s.ClaudeBin, cfg.ImagePromptModel, pkg)
+	// Launch headless Claude to craft the prompt. The LLM gateway can return
+	// transient 529 "model overloaded, try again" errors, so retry a few times
+	// with a short backoff before giving up. (ctx here is context.Background,
+	// so a plain Sleep between attempts is safe.)
+	for attempt := 1; attempt <= 3; attempt++ {
+		err = claudelauncher.LaunchHeadless(ctx, slug, "infographic-crafter", s.ClaudeBin, cfg.ImagePromptModel, pkg)
+		if err == nil {
+			break
+		}
+		fmt.Printf("infographic: stage A attempt %d/3 failed: %v\n", attempt, err)
+		if attempt < 3 {
+			time.Sleep(20 * time.Second)
+		}
+	}
 	if err != nil {
 		writeFailedState(slug, "stage A failed: "+err.Error())
 		return
@@ -290,39 +403,30 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 
 	finalPrompt := "高质量、清晰明了的手绘信息图，" + crafted
 
-	// STAGE B: Generate the image
-	scriptAbs := filepath.Join(paths.WORKSPACE, "scripts", "gen_infographic.py")
-	if paths.WORKSPACE == "" {
-		scriptAbs = filepath.Join(paths.PROJECT_ROOT, "scripts", "gen_infographic.py")
-	}
+	// STAGE B: Generate the image. Try the primary provider first, then any
+	// configured backup provider, stopping at the first valid PNG.
 	pngAbs := infographicPNGPath(slug)
-
-	ctx2, cancel := context.WithTimeout(ctx, 3*time.Minute)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx2, cfg.PythonBin, scriptAbs, finalPrompt, pngAbs)
-	cmd.Dir = root
-	cmd.Env = append(os.Environ(),
-		"IMAGE_API_KEY="+cfg.ImageAPIKey,
-		"IMAGE_BASE_URL="+cfg.ImageBaseURL,
-		"IMAGE_MODEL="+cfg.ImageModel,
-	)
-
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = &stderrBuf
-
-	if err := cmd.Run(); err != nil {
-		stderr := stderrBuf.String()
-		if len(stderr) > 500 {
-			stderr = stderr[:500] + "..."
+	providers := []imageProvider{{
+		name:    "primary",
+		apiKey:  cfg.ImageAPIKey,
+		baseURL: cfg.ImageBaseURL,
+		model:   cfg.ImageModel,
+	}}
+	if cfg.ImageBackupAPIKey != "" && cfg.ImageBackupBaseURL != "" {
+		backupModel := cfg.ImageBackupModel
+		if backupModel == "" {
+			backupModel = "gpt-image-2"
 		}
-		writeFailedState(slug, "stage B failed: "+err.Error()+": "+stderr)
-		return
+		providers = append(providers, imageProvider{
+			name:    "backup",
+			apiKey:  cfg.ImageBackupAPIKey,
+			baseURL: cfg.ImageBackupBaseURL,
+			model:   backupModel,
+		})
 	}
 
-	// Verify PNG exists
-	if _, err := os.Stat(pngAbs); err != nil {
-		writeFailedState(slug, "script exited but png missing")
+	if err := generateImageWithProviders(ctx, root, finalPrompt, pngAbs, cfg.PythonBin, providers); err != nil {
+		writeFailedState(slug, "stage B failed: "+err.Error())
 		return
 	}
 

@@ -68,7 +68,7 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
           </div>
 
           <div className={s.grid}>
-            {assessment.data.prerequisites.map((item, index) => (
+            {assessment.data.prerequisites?.map((item, index) => (
               <article key={item.id} className={`${s.card} ${s[item.status]}`}>
                 <div className={s.cardLead}>
                   <span className={s.index}>{String(index + 1).padStart(2, '0')}</span>

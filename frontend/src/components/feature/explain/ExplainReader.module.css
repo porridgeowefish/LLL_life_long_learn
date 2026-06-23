@@ -3,7 +3,7 @@
 }
 
 .toc {
-  padding: 18px 24px 16px;
+  padding: 12px 20px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
 }
@@ -11,15 +11,15 @@
 .tocTitle {
   font-family: 'Lora', Georgia, serif;
   font-weight: 600;
-  margin-bottom: 14px;
-  font-size: 1.05rem;
+  margin-bottom: 8px;
+  font-size: 1.02rem;
 }
 
 .tocNavigation {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .tocScroller {
@@ -37,8 +37,8 @@
 }
 
 .slideButton {
-  width: 34px;
-  height: 34px;
+  width: 28px;
+  height: 28px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
@@ -62,29 +62,24 @@
 
 .tocItem {
   flex: 0 0 auto;
-  min-width: 170px;
-  max-width: 230px;
+  width: 30px;
+  height: 30px;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr);
-  gap: 9px;
-  align-items: center;
+  place-items: center;
   border: 0;
   background: transparent;
-  color: var(--muted);
-  padding: 5px 8px;
-  border-radius: var(--radius);
-  text-align: left;
-  font-size: 0.82rem;
+  padding: 0;
+  border-radius: 50%;
+  cursor: pointer;
 }
 
-.tocItem:hover {
-  background: rgba(124, 154, 114, 0.09);
-  color: var(--fg);
+.tocItem:hover .pageNode {
+  border-color: var(--accent2);
 }
 
 .pageNode {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
@@ -92,6 +87,7 @@
   background: var(--card);
   color: var(--muted);
   font-weight: 600;
+  font-size: 0.78rem;
   transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
@@ -105,14 +101,8 @@
   color: #fff;
 }
 
-.pageTitle {
-  line-height: 1.35;
-}
-
-.tocItem small {
-  grid-column: 2;
-  margin-top: -6px;
-  color: var(--orange);
+.tocItem.followup .pageNode {
+  border-color: var(--orange);
 }
 
 .reader {
@@ -205,6 +195,53 @@
   border-radius: 6px;
 }
 
+/* ---------- Summary (last) page: 8-dimension critical-thinking recap ----------
+   Editorial treatment, no card grid. CSS counters auto-number each `##`
+   dimension (01..08) so the layout adapts to however many sections the
+   explain agent emits. Works on top of the generic markdown render, so
+   math / mermaid / confusion highlights all still function. */
+.summary .markdown {
+  counter-reset: ctDimension;
+}
+
+.summary .markdown :global(h1) {
+  font-size: 1.9rem;
+  line-height: 1.3;
+  margin: 0.1em 0 0.8em;
+  padding-left: 0.7em;
+  border-left: 3px solid var(--accent);
+}
+
+.summary .markdown :global(h2) {
+  counter-increment: ctDimension;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 0.7em;
+  margin: 2.4em 0 0.6em;
+  padding-top: 1.6em;
+  border-top: 1px solid var(--border);
+  font-size: 1.22rem;
+}
+
+.summary .markdown :global(h2)::before {
+  content: counter(ctDimension, decimal-leading-zero);
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-family: 'Lora', Georgia, serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.05em;
+}
+
+.summary .markdown :global(h2):first-of-type {
+  margin-top: 2em;
+}
+
+.summary .markdown :global(p) {
+  margin: 0.7em 0;
+}
+
 .loading {
   padding: 28px;
   color: var(--muted);
@@ -216,17 +253,13 @@
   }
 
   .tocNavigation {
-    grid-template-columns: 30px minmax(0, 1fr) 30px;
+    grid-template-columns: 26px minmax(0, 1fr) 26px;
     gap: 6px;
   }
 
   .slideButton {
-    width: 30px;
-    height: 30px;
-  }
-
-  .tocItem {
-    min-width: 150px;
+    width: 26px;
+    height: 26px;
   }
 
   .reader {

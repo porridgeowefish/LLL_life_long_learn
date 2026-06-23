@@ -81,6 +81,7 @@ export function ExplainInfographic({ projectSlug, visible = true }: ExplainInfog
     return (
       <div className={s.container}>
         <img src={src} alt="主题信息图" className={s.image} />
+        <p className={s.caption}>主题信息图 · 简化形态</p>
         <div className={s.actions}>
           <button
             type="button"
@@ -131,7 +132,7 @@ export function ExplainInfographic({ projectSlug, visible = true }: ExplainInfog
           <button
             type="button"
             className={s.retryButton}
-            onClick={() => kick.mutate({ projectSlug })}
+            onClick={() => kick.mutate({ projectSlug, force: true })}
             disabled={kick.isPending}
           >
             {kick.isPending ? '生成中…' : '重试'}

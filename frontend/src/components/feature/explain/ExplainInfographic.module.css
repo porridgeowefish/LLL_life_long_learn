@@ -12,6 +12,13 @@
   display: block;
 }
 
+.caption {
+  margin: 10px 0 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .actions {
   display: flex;
   justify-content: center;

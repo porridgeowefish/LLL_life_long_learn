@@ -17,6 +17,19 @@ type Config struct {
 	ImageModel       string `json:"imageModel"`       // gpt-image-2
 	ImagePromptModel string `json:"imagePromptModel"` // opus (Stage A high-level model)
 	PythonBin        string `json:"pythonBin"`        // python | python3
+
+	// Backup image provider — tried only when the primary request fails or
+	// returns a non-image (e.g. an error page). Optional; omit to disable.
+	ImageBackupAPIKey  string `json:"imageBackupApiKey"`
+	ImageBackupBaseURL string `json:"imageBackupBaseURL"` // e.g. https://api.ohmygpt.com/v1
+	ImageBackupModel   string `json:"imageBackupModel"`   // gpt-image-2
+}
+
+// HasImageProvider reports whether at least one image provider (primary or
+// backup) is configured with both an API key and a base URL.
+func (c *Config) HasImageProvider() bool {
+	return (c.ImageAPIKey != "" && c.ImageBaseURL != "") ||
+		(c.ImageBackupAPIKey != "" && c.ImageBackupBaseURL != "")
 }
 
 // Load reads the config file from <workspace>/config.local.json.
@@ -45,5 +58,8 @@ func Load() (*Config, error) {
 	cfg.ImageModel = strings.TrimSpace(cfg.ImageModel)
 	cfg.ImagePromptModel = strings.TrimSpace(cfg.ImagePromptModel)
 	cfg.PythonBin = strings.TrimSpace(cfg.PythonBin)
+	cfg.ImageBackupAPIKey = strings.TrimSpace(cfg.ImageBackupAPIKey)
+	cfg.ImageBackupBaseURL = strings.TrimSpace(cfg.ImageBackupBaseURL)
+	cfg.ImageBackupModel = strings.TrimSpace(cfg.ImageBackupModel)
 	return &cfg, nil
 }
