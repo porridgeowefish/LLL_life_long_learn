@@ -12,12 +12,14 @@ interface UiState {
   summaryPanelCollapsed: boolean;
   drawerOpen: boolean;
   createProjectModalOpen: boolean;
+  collapsedFolderIds: string[];
   setSidebarCollapsed: (v: boolean) => void;
   setSummaryPanelCollapsed: (v: boolean) => void;
   setDrawerOpen: (v: boolean) => void;
   toggleDrawer: () => void;
   openCreateProjectModal: () => void;
   closeCreateProjectModal: () => void;
+  toggleFolderCollapsed: (id: string) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -27,12 +29,19 @@ export const useUiStore = create<UiState>()(
       summaryPanelCollapsed: false,
       drawerOpen: false,
       createProjectModalOpen: false,
+      collapsedFolderIds: [],
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
       setSummaryPanelCollapsed: (v) => set({ summaryPanelCollapsed: v }),
       setDrawerOpen: (v) => set({ drawerOpen: v }),
       toggleDrawer: () => set((s) => ({ drawerOpen: !s.drawerOpen })),
       openCreateProjectModal: () => set({ createProjectModalOpen: true }),
       closeCreateProjectModal: () => set({ createProjectModalOpen: false }),
+      toggleFolderCollapsed: (id) =>
+        set((s) => ({
+          collapsedFolderIds: s.collapsedFolderIds.includes(id)
+            ? s.collapsedFolderIds.filter((x) => x !== id)
+            : [...s.collapsedFolderIds, id],
+        })),
     }),
     {
       name: STORAGE_KEYS.uiSidebarCollapsed,
@@ -41,6 +50,7 @@ export const useUiStore = create<UiState>()(
       partialize: (s) => ({
         sidebarCollapsed: s.sidebarCollapsed,
         summaryPanelCollapsed: s.summaryPanelCollapsed,
+        collapsedFolderIds: s.collapsedFolderIds,
       }),
     },
   ),

@@ -10,13 +10,17 @@ import { Button } from '@/components/primitive/Button';
 import s from './CreateProjectModal.module.css';
 
 // Form schema — title + why are required, current/target default to endpoints.
-const LEVELS = ['未接触', '了解概念', '动手做过', '能独立完成'] as const;
+// "当前水平" describes exposure (where the learner is now); "目标水平" describes
+// mastery (where they want to land). Two distinct ladders — previously shared,
+// which made the two selectors render identical options.
+const CURRENT_LEVELS = ['未接触', '了解概念', '动手做过', '能独立完成'] as const;
+const TARGET_LEVELS = ['看懂原理', '能上手用起来', '能独立解决问题', '融会贯通·能教别人'] as const;
 
 const schema = z.object({
   title: z.string().trim().min(1, '请填写项目标题'),
   why: z.string().trim().min(1, '请填写"为什么学这个"'),
-  current: z.enum(LEVELS).default('未接触'),
-  target: z.enum(LEVELS).default('能独立完成'),
+  current: z.enum(CURRENT_LEVELS).default('未接触'),
+  target: z.enum(TARGET_LEVELS).default('融会贯通·能教别人'),
   standard: z.string().trim().optional().default(''),
 });
 
@@ -41,7 +45,7 @@ export function CreateProjectModal({ open, onOpenChange, onCreated }: CreateProj
       title: '',
       why: '',
       current: '未接触',
-      target: '能独立完成',
+      target: '融会贯通·能教别人',
       standard: '',
     },
   });
@@ -99,7 +103,7 @@ export function CreateProjectModal({ open, onOpenChange, onCreated }: CreateProj
           <div className={s.field}>
             <label>当前水平</label>
             <div className={s.radioRow}>
-              {LEVELS.map((lvl) => (
+              {CURRENT_LEVELS.map((lvl) => (
                 <label key={lvl} className={s.radio}>
                   <input type="radio" value={lvl} {...register('current')} />
                   <span>{lvl}</span>
@@ -113,7 +117,7 @@ export function CreateProjectModal({ open, onOpenChange, onCreated }: CreateProj
           <div className={s.field}>
             <label>目标水平</label>
             <div className={s.radioRow}>
-              {LEVELS.map((lvl) => (
+              {TARGET_LEVELS.map((lvl) => (
                 <label key={lvl} className={s.radio}>
                   <input type="radio" value={lvl} {...register('target')} />
                   <span>{lvl}</span>

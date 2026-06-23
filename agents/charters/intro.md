@@ -54,7 +54,7 @@
       "projectDraft": {
         "title": "独立学习项目标题",
         "current": "未接触",
-        "target": "了解概念",
+        "target": "能上手用起来",
         "why": "作为当前主题的前置知识",
         "standard": "可观察的完成标准"
       }

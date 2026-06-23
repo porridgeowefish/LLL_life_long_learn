@@ -101,6 +101,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/projects/{id}/confusions/{confusionId}", s.handleUpdateConfusion)
 	mux.HandleFunc("DELETE /api/projects/{id}/confusions/{confusionId}", s.handleDeleteConfusion)
 
+	// Project folders (workspace-global virtual grouping of projects)
+	mux.HandleFunc("GET /api/folders", s.handleGetFolders)
+	mux.HandleFunc("PUT /api/folders", s.handlePutFolders)
+
 	// Practice
 	mux.HandleFunc("GET /api/projects/{id}/practice/tasks", s.handleGetPracticeTasks)
 	mux.HandleFunc("GET /api/projects/{id}/practice/draft", s.handleGetPracticeDraft)

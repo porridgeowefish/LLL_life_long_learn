@@ -41,4 +41,8 @@ export const qk = {
     detail: (projectSlug: string, id: string) =>
       ['confusions', projectSlug, id] as const,
   },
+
+  folders: {
+    all: () => ['folders'] as const,
+  },
 } as const;

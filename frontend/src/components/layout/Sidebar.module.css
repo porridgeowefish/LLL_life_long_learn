@@ -44,6 +44,13 @@
   font-weight: 600;
 }
 
+.sectionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 4px;
+}
+
 .link {
   display: flex;
   align-items: center;
@@ -80,4 +87,218 @@
   font-style: italic;
   padding: 4px 8px;
   line-height: 1.6;
+}
+
+.saving {
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-style: italic;
+  padding: 2px 8px;
+}
+
+.saveError {
+  font-size: 0.68rem;
+  color: var(--orange);
+  background: rgba(232, 148, 90, 0.1);
+  border: 1px solid rgba(232, 148, 90, 0.3);
+  padding: 5px 8px;
+  border-radius: 5px;
+  margin: 4px 0;
+  line-height: 1.45;
+}
+
+/* ---------- Folders ---------- */
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.iconBtn:hover {
+  background: rgba(124, 154, 114, 0.14);
+  color: var(--fg);
+}
+
+.folder {
+  margin: 1px 0;
+}
+
+.folderHeader {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  border-radius: 5px;
+}
+
+.chevronBtn {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chevronClosed {
+  transform: rotate(-90deg);
+}
+
+.folderName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 4px 2px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.folderNameText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  font-size: 0.6rem;
+  color: var(--muted);
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.folderInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.74rem;
+  font-family: inherit;
+  padding: 3px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--card);
+  color: var(--fg);
+  outline: none;
+}
+
+.createInput {
+  width: 100%;
+  margin: 3px 0;
+}
+
+.folderBody {
+  padding-left: 14px;
+}
+
+.subSection {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  padding: 10px 4px 2px;
+  font-weight: 600;
+}
+
+/* ---------- Project row + move menu ---------- */
+
+.projectRow {
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+}
+
+.projectRow .link {
+  flex: 1;
+  min-width: 0;
+}
+
+.menuWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.menuBtn {
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.projectRow:hover .menuBtn,
+.menuBtnOpen {
+  display: grid;
+}
+
+.menuBtn:hover {
+  background: rgba(124, 154, 114, 0.14);
+  color: var(--fg);
+}
+
+/* Full-screen click-catcher so clicking anywhere closes the open menu. */
+.menuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+}
+
+.menu {
+  position: fixed;
+  z-index: 21;
+  min-width: 150px;
+  max-width: 220px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+}
+
+.menu button {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 5px 8px;
+  font-size: 0.74rem;
+  color: var(--fg);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu button:hover {
+  background: rgba(124, 154, 114, 0.12);
+}
+
+.menuActive {
+  color: var(--accent2);
+  font-weight: 600;
 }
