@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useHealth } from '@/api/health';
@@ -28,6 +29,7 @@ export function HomePage() {
 
   const projects = projectsData?.projects ?? [];
   const stats = health?.stats;
+  const runtime = health?.agentRuntime?.runtime;
 
   return (
     <div className={s.host}>
@@ -43,6 +45,8 @@ export function HomePage() {
             新建项目
           </Button>
         </header>
+
+        <OnboardingBanner runtimeName={runtime?.name} runtimeReady={runtime?.available ?? false} />
 
         {/* Stats hero */}
         <section className={s.statsRow}>
@@ -132,6 +136,46 @@ export function HomePage() {
         onCreated={(slug) => navigate(`/project/${slug}`)}
       />
     </div>
+  );
+}
+
+interface OnboardingBannerProps {
+  runtimeName?: string;
+  runtimeReady: boolean;
+}
+
+function OnboardingBanner({ runtimeName, runtimeReady }: OnboardingBannerProps) {
+  const [dismissed, setDismissed] = useState(() => localStorage.getItem('lll-onboarding-dismissed') === '1');
+  if (dismissed) return null;
+  return (
+    <section className={s.onboarding}>
+      <div className={s.onboardingHead}>
+        <span className={s.onboardingIcon}>
+          <img src="/img/lychee-teacher.png" alt="" aria-hidden="true" />
+        </span>
+        <div>
+          <h2>开始之前</h2>
+          <p>
+            当前运行时：{runtimeName ?? 'Agent CLI'} · {runtimeReady ? '已就绪' : '未就绪，先去统一配置确认安装'}
+          </p>
+        </div>
+      </div>
+      <div className={s.onboardingSteps}>
+        <span>1. 在统一配置选择 CLI</span>
+        <span>2. 创建学习项目</span>
+        <span>3. 进入项目调用学习 Agent</span>
+      </div>
+      <Button
+        variant="outline"
+        iconLeft={<Icon name="x" size={13} />}
+        onClick={() => {
+          localStorage.setItem('lll-onboarding-dismissed', '1');
+          setDismissed(true);
+        }}
+      >
+        知道了
+      </Button>
+    </section>
   );
 }
 

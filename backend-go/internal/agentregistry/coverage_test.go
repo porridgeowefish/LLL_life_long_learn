@@ -184,7 +184,7 @@ func TestIteration04CharterContracts(t *testing.T) {
 		t.Fatalf("registry load: %v", err)
 	}
 	checks := map[string][]string{
-		"intro": {"3-5 个短校准问题", "intro/assessment.json", "不得无证据"},
+		"intro": {"3-5 个短校准问题", "intro/survey.json", "intro/assessment.json", "不得无证据"},
 		"explain": {
 			"研究目的",
 			"explain/manifest.json",

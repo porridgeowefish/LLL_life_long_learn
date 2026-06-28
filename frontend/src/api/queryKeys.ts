@@ -8,6 +8,9 @@
 
 export const qk = {
   health: () => ['health'] as const,
+  settings: {
+    agentRuntime: () => ['settings', 'agent-runtime'] as const,
+  },
 
   projects: {
     all: () => ['projects'] as const,

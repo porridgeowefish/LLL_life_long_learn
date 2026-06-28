@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { http } from './client';
 import { qk } from './queryKeys';
@@ -30,6 +30,19 @@ export interface IntroAssessment {
   prerequisites: PrerequisiteAssessment[];
 }
 
+export interface IntroSurveyQuestion {
+  id: string;
+  label: string;
+  prompt: string;
+  answer?: string;
+}
+
+export interface IntroSurvey {
+  schemaVersion: number;
+  updatedAt: string;
+  questions: IntroSurveyQuestion[];
+}
+
 export interface ExplainPageEntry {
   id: string;
   title: string;
@@ -55,6 +68,44 @@ export function useIntroAssessment(projectSlug: string) {
       http.get<IntroAssessment>(
         `/files/projects/${encodeURIComponent(projectSlug)}/intro/assessment.json`,
       ),
+  });
+}
+
+export function useIntroSurvey(projectSlug: string) {
+  return useQuery({
+    queryKey: qk.files.raw(projectSlug, 'intro/survey.json'),
+    retry: false,
+    queryFn: () =>
+      http.get<IntroSurvey>(
+        `/files/projects/${encodeURIComponent(projectSlug)}/intro/survey.json`,
+      ),
+  });
+}
+
+export function useIntroOutput(projectSlug: string) {
+  return useQuery({
+    queryKey: qk.files.raw(projectSlug, 'intro/output.md'),
+    retry: false,
+    queryFn: () =>
+      http.get<string>(
+        `/files/projects/${encodeURIComponent(projectSlug)}/intro/output.md`,
+        { rawText: true },
+      ),
+  });
+}
+
+export function useSaveIntroSurvey(projectSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (survey: IntroSurvey) =>
+      http.post<{ ok: boolean; bytes: number }>(
+        `/files/projects/${encodeURIComponent(projectSlug)}/intro/survey.json`,
+        JSON.stringify(survey, null, 2),
+        { headers: { 'Content-Type': 'application/json' } },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.files.raw(projectSlug, 'intro/survey.json') });
+    },
   });
 }
 

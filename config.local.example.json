@@ -1,5 +1,13 @@
 {
-  "__comment": "Copy this file to config.local.json and fill in imageApiKey. Run: pip install openai. pythonBin may be 'python' or 'python3'. imagePromptModel is the high-level model (e.g. 'opus') used by the prompt-crafting subagent. imageBackup* are an optional fallback image provider, tried only when the primary request fails or returns a non-image.",
+  "__comment": "Copy this file to config.local.json and fill in imageApiKey if you use image generation. agentRuntime selects the external Agent CLI only; model/account/auth stay inside that CLI.",
+  "agentRuntime": "claude",
+  "agentRuntimeBins": {
+    "claude": "claude",
+    "workbuddy": "workbuddy",
+    "hermes": "hermes",
+    "codex": "codex",
+    "trae": "trae-cli"
+  },
   "imageApiKey": "sk-...",
   "imageBaseURL": "http://69.5.20.196:8080",
   "imageModel": "gpt-image-2",

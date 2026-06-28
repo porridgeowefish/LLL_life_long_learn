@@ -131,6 +131,26 @@ export interface HealthStats {
   activeSessions: number;
 }
 
+export type AgentRuntimeID = 'claude' | 'workbuddy' | 'hermes' | 'codex' | 'trae';
+
+export interface AgentRuntimeProvider {
+  id: AgentRuntimeID;
+  name: string;
+  description: string;
+  defaultBin: string;
+  binEnv: string;
+  promptDelivery: 'arg' | 'clipboard';
+  supportsHeadless: boolean;
+  bin: string;
+  available: boolean;
+}
+
+export interface AgentRuntimeHealth {
+  selected: AgentRuntimeID;
+  runtime: AgentRuntimeProvider;
+  providers: AgentRuntimeProvider[];
+}
+
 export interface HealthResponse {
   ok: boolean;
   workspace: string;
@@ -138,5 +158,6 @@ export interface HealthResponse {
     bin: string;
     available: boolean;
   };
+  agentRuntime?: AgentRuntimeHealth;
   stats: HealthStats;
 }

@@ -20,7 +20,7 @@ Extend and Summary remain unchanged. Agent IDs and zone IDs remain stable.
 ## Included
 
 ```text
-intro/output.md + intro/assessment.json
+intro/survey.json + intro/output.md + intro/assessment.json
 confirmed creation of prerequisite child projects
 explain/manifest.json + explain/pages/*.md
 follow-up pages linked by parentPageId

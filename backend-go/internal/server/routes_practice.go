@@ -354,7 +354,8 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": "complete", "attempt": attemptID})
 		return
 	}
-	if !s.ClaudeAvailable {
+	runtime, _ := s.runtimeSnapshot()
+	if !runtime.Available || !runtime.SupportsHeadless {
 		httpx.Error(w, http.StatusServiceUnavailable, "AI evaluation is unavailable")
 		return
 	}
@@ -382,7 +383,7 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 	}
 	go func() {
 		defer practiceEvaluationJobs.Delete(jobKey)
-		_ = claudelauncher.LaunchHeadless(context.Background(), slug, agent.ID, s.ClaudeBin, "", pkg)
+		_ = claudelauncher.LaunchHeadless(context.Background(), slug, agent.ID, s.ClaudeBin, "", pkg, &runtime)
 	}()
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "queued", "attempt": attemptID})
 }

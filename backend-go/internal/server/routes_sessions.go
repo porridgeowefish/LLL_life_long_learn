@@ -39,8 +39,9 @@ type invokeRequest struct {
 // The Claude process runs in a background goroutine; this handler returns
 // 201 with the session as soon as the process is spawned.
 func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
-	if !s.ClaudeAvailable {
-		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
+	runtime, _ := s.runtimeSnapshot()
+	if !runtime.Available {
+		httpx.Error(w, http.StatusServiceUnavailable, string(runtime.ID)+" binary not available")
 		return
 	}
 	agentID := r.PathValue("id")
@@ -129,6 +130,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 			Store:          sessions,
 			Events:         broadcaster,
 			ClaudeBin:      s.ClaudeBin,
+			Runtime:        &runtime,
 		})
 		if launchErr != nil {
 			os.WriteFile(filepath.Join(
@@ -207,8 +209,9 @@ type followupRequest struct {
 // handleFollowUp appends a follow-up turn to an existing session by re-launching
 // Claude with prior result.md paths as context.
 func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
-	if !s.ClaudeAvailable {
-		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
+	runtime, _ := s.runtimeSnapshot()
+	if !runtime.Available {
+		httpx.Error(w, http.StatusServiceUnavailable, string(runtime.ID)+" binary not available")
 		return
 	}
 	id := r.PathValue("id")
@@ -262,6 +265,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 			Store:          sessions,
 			Events:         broadcaster,
 			ClaudeBin:      s.ClaudeBin,
+			Runtime:        &runtime,
 		})
 	}()
 

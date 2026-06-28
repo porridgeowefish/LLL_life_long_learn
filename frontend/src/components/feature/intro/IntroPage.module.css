@@ -3,6 +3,109 @@
   flex-direction: column;
 }
 
+.survey {
+  margin: 0 24px 28px;
+  padding: 18px 0 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.surveyHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.surveyActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+
+.progressText {
+  color: var(--muted);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.questionList {
+  display: grid;
+  gap: 10px;
+}
+
+.questionCard {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--card) 88%, white);
+}
+
+.questionIndex {
+  color: var(--accent2);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  line-height: 1.7;
+}
+
+.questionBody {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.questionBody strong {
+  color: var(--fg);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.questionBody > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.questionBody textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, var(--accent2));
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+
+.questionBody textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent2) 24%, transparent);
+  border-color: var(--accent2);
+}
+
+.surveyFoot {
+  min-height: 20px;
+  margin-top: 10px;
+  font-size: 0.76rem;
+}
+
+.successText {
+  color: var(--accent2);
+  font-weight: 700;
+}
+
+.errorText {
+  color: var(--pink);
+  font-weight: 700;
+}
+
 .assessment {
   margin: 0 24px 28px;
   padding-top: 22px;
@@ -262,6 +365,24 @@
 }
 
 @media (max-width: 720px) {
+  .survey {
+    margin-inline: 16px;
+  }
+
+  .surveyHead {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .surveyActions {
+    justify-content: flex-start;
+  }
+
+  .questionCard {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
   .assessment {
     margin-inline: 16px;
   }

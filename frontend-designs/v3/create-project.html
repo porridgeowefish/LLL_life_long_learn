@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>新建项目 · LLL</title>
+<link rel="stylesheet" href="css/base.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+.cp-page{padding:32px 48px 100px;max-width:780px;margin:0 auto}
+.cp-page h1{font-family:var(--font-serif);font-size:1.7rem;font-weight:900;margin-bottom:4px}
+.cp-page .lede{color:var(--muted-2);font-size:.88rem;margin-bottom:26px}
+
+.field{margin-bottom:22px}
+.field-label{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600;margin-bottom:8px}
+.field-label .req{color:var(--orange);font-size:.7rem}
+.field-hint{font-size:.7rem;color:var(--muted);margin-top:5px;line-height:1.5}
+
+.cp-input{
+  width:100%;padding:11px 14px;font-size:.95rem;
+  border:1px solid var(--border);border-radius:8px;background:var(--card);
+  transition:all .15s;
+}
+.cp-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.cp-textarea{
+  width:100%;padding:11px 14px;font-size:.92rem;
+  border:1px solid var(--border);border-radius:8px;background:var(--card);
+  min-height:60px;max-height:120px;resize:vertical;font-family:inherit;
+}
+.cp-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+/* icon grid 选择 */
+.icon-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.icon-grid label{
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+  padding:14px 8px;background:var(--card);border:2px solid var(--border);
+  border-radius:8px;cursor:pointer;transition:all .12s;text-align:center;
+}
+.icon-grid label:hover{border-color:var(--accent)}
+.icon-grid input{display:none}
+.icon-grid label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.icon-grid .icon{font-size:1.6rem}
+.icon-grid .name{font-size:.74rem;font-weight:600}
+.icon-grid .desc{font-size:.62rem;color:var(--muted);line-height:1.4}
+
+/* 模板/起点 卡片 */
+.card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.card-grid label{
+  display:flex;flex-direction:column;gap:4px;
+  padding:12px 14px;background:var(--card);border:2px solid var(--border);
+  border-radius:8px;cursor:pointer;transition:all .12s;
+}
+.card-grid label:hover{border-color:var(--accent)}
+.card-grid input{display:none}
+.card-grid label:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.card-grid .head{display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:600}
+.card-grid .head .ico{font-size:1.1rem}
+.card-grid .desc{font-size:.66rem;color:var(--muted);line-height:1.45}
+
+/* 难度选择 */
+.diff-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.diff-grid label{
+  padding:10px;background:var(--card);border:2px solid var(--border);
+  border-radius:6px;cursor:pointer;text-align:center;
+  font-size:.78rem;transition:all .12s;
+}
+.diff-grid input{display:none}
+.diff-grid label:has(input:checked){border-color:var(--accent);background:var(--accent-soft);color:var(--accent);font-weight:600}
+
+/* 吸底大按钮 */
+.cp-submit{
+  display:flex;justify-content:space-between;align-items:center;
+  position:sticky;bottom:0;left:0;right:0;
+  background:var(--card);border-top:1px solid var(--border);
+  padding:14px 48px;margin:30px -48px -100px;
+  box-shadow:0 -2px 12px rgba(61,50,41,.06);
+}
+.cp-submit .summary{font-size:.78rem;color:var(--muted-2);line-height:1.5}
+.cp-submit .summary strong{color:var(--fg);font-family:var(--font-mono);font-size:.74rem}
+.cp-actions{display:flex;gap:8px}
+.cp-btn{
+  padding:13px 30px;border-radius:8px;font-size:.92rem;font-weight:700;
+  text-decoration:none;transition:all .15s;
+}
+.cp-btn.primary{background:var(--orange);color:#fff;box-shadow:0 6px 18px rgba(232,148,90,.35)}
+.cp-btn.primary:hover{background:#d4824a;color:#fff;transform:translateY(-1px);text-decoration:none}
+.cp-btn.ghost{background:transparent;color:var(--muted)}
+.cp-btn.ghost:hover{color:var(--fg);text-decoration:none}
+
+.slug-line{
+  display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);
+  font-size:.7rem;color:var(--accent-2);background:var(--accent-soft);
+  padding:3px 10px;border-radius:4px;margin-left:8px;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="topbar-logo">Life<span class="accent">Long</span>Learn</a>
+  <div class="topbar-sep"></div>
+  <div class="topbar-nav">
+    <a href="index.html">总览</a>
+    <a href="project.html">项目</a>
+    <a href="agents.html">智能体</a>
+    <a href="memory.html">记忆</a>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-actions">
+    <div class="topbar-status">
+      <span><span class="dot"></span>本地在线</span>
+      <span class="path">D:\2_Study\LLL\projects\</span>
+    </div>
+  </div>
+</div>
+
+<main class="main">
+  <div class="cp-page">
+
+    <h1>新建项目</h1>
+    <p class="lede">3 秒创建一个学习项目。其他元数据可以学到一半再补。</p>
+
+    <!-- ① 主题（必填，唯一必填项） -->
+    <div class="field">
+      <label class="field-label">学习主题 <span class="req">*必填</span></label>
+      <input type="text" class="cp-input" id="topicInput" placeholder="例如：Rust 所有权" value="Rust 所有权">
+      <div class="slug-line">projects/<strong id="slugPreview">rust-ownership</strong>/</div>
+    </div>
+
+    <!-- ② 分类（icon grid 选择） -->
+    <div class="field">
+      <label class="field-label">分类</label>
+      <div class="icon-grid">
+        <label>
+          <input type="radio" name="cat" value="lang" checked>
+          <div class="icon">💻</div>
+          <div class="name">编程语言</div>
+          <div class="desc">语法/特性/范式</div>
+        </label>
+        <label>
+          <input type="radio" name="cat" value="framework">
+          <div class="icon">⚙️</div>
+          <div class="name">框架/库</div>
+          <div class="desc">React / PyTorch 等</div>
+        </label>
+        <label>
+          <input type="radio" name="cat" value="theory">
+          <div class="icon">📐</div>
+          <div class="name">理论学科</div>
+          <div class="desc">算法/数学/系统</div>
+        </label>
+        <label>
+          <input type="radio" name="cat" value="project">
+          <div class="icon">🛠</div>
+          <div class="name">实战项目</div>
+          <div class="desc">边做边学</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- ③ 模板（卡片选择，全选可选） -->
+    <div class="field">
+      <label class="field-label">模板</label>
+      <div class="card-grid">
+        <label>
+          <input type="radio" name="tpl" value="blank" checked>
+          <div class="head"><span class="ico">⬜</span>空白</div>
+          <div class="desc">从零开始，自己定义五阶段</div>
+        </label>
+        <label>
+          <input type="radio" name="tpl" value="lang">
+          <div class="head"><span class="ico">💻</span>语言学习</div>
+          <div class="desc">预填语法/特性/陷阱的 brief 框架</div>
+        </label>
+        <label>
+          <input type="radio" name="tpl" value="deep">
+          <div class="head"><span class="ico">🔬</span>深度理论</div>
+          <div class="desc">强调概念图、对比、关系梳理</div>
+        </label>
+        <label>
+          <input type="radio" name="tpl" value="hands-on">
+          <div class="head"><span class="ico">🛠</span>实战驱动</div>
+          <div class="desc">先做项目再补理论</div>
+        </label>
+        <label>
+          <input type="radio" name="tpl" value="exam">
+          <div class="head"><span class="ico">📝</span>考试备考</div>
+          <div class="desc">真题+错题+复盘</div>
+        </label>
+        <label>
+          <input type="radio" name="tpl" value="review">
+          <div class="head"><span class="ico">🔁</span>查漏补缺</div>
+          <div class="desc">已有基础，复习为主</div>
+        </label>
+      </div>
+    </div>
+
+    <!-- ④ 难度（按钮选择） -->
+    <div class="field">
+      <label class="field-label">起始难度</label>
+      <div class="diff-grid">
+        <label><input type="radio" name="diff" value="easy">入门</label>
+        <label><input type="radio" name="diff" value="normal" checked>常规</label>
+        <label><input type="radio" name="diff" value="hard">挑战</label>
+        <label><input type="radio" name="diff" value="expert">硬核</label>
+      </div>
+      <div class="field-hint">练习智能体会按这个难度校准题目</div>
+    </div>
+
+    <!-- ⑤ 起点阶段（按钮选择） -->
+    <div class="field">
+      <label class="field-label">起点阶段</label>
+      <div class="diff-grid">
+        <label><input type="radio" name="zone" value="intro" checked>🌱 引入</label>
+        <label><input type="radio" name="zone" value="explain">📖 直接讲解</label>
+        <label><input type="radio" name="zone" value="practice">✏️ 直接练习</label>
+        <label><input type="radio" name="zone" value="summary">📝 仅做总结</label>
+      </div>
+      <div class="field-hint">已懂基础可跳过引入</div>
+    </div>
+
+    <!-- ⑥ 备注（可选 textarea，不要 MD 编辑器） -->
+    <div class="field">
+      <label class="field-label">备注（可选）</label>
+      <textarea class="cp-textarea" placeholder="为什么学这个 / 截止时间 / 任何想说的，普通文字即可"></textarea>
+      <div class="field-hint">可以完全留空。学到一半再补也来得及。</div>
+    </div>
+
+    <!-- 吸底提交 -->
+    <div class="cp-submit">
+      <div class="summary">
+        将创建到 <strong>projects/rust-ownership/</strong>，起点阶段 <strong>🌱 引入</strong>
+      </div>
+      <div class="cp-actions">
+        <a href="index.html" class="cp-btn ghost">取消</a>
+        <a href="project.html" class="cp-btn primary">创建项目 →</a>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// slug 实时预览
+(function(){
+  var topic = document.getElementById('topicInput');
+  var slug = document.getElementById('slugPreview');
+  function update(){
+    var s = (topic.value || '').toLowerCase()
+      .replace(/[^\w一-龥\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .slice(0, 40) || 'new-project';
+    slug.textContent = s;
+  }
+  topic.addEventListener('input', update);
+})();
+</script>
+
+</body>
+</html>

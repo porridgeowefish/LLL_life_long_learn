@@ -22,6 +22,7 @@ const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> 
   { to: '/', label: '学习总览', icon: 'zap' },
   { to: '/agents', label: '智能体管理', icon: 'bot' },
   { to: '/memory', label: '记忆系统', icon: 'brain' },
+  { to: '/settings', label: '统一配置', icon: 'terminal' },
 ];
 
 export function Sidebar() {

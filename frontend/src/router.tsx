@@ -10,6 +10,7 @@ const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m
 const ProjectPage = lazy(() => import('./pages/ProjectPage').then((m) => ({ default: m.ProjectPage })));
 const AgentsPage = lazy(() => import('./pages/AgentsPage').then((m) => ({ default: m.AgentsPage })));
 const MemoryPage = lazy(() => import('./pages/MemoryPage').then((m) => ({ default: m.MemoryPage })));
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 
 function PageFallback() {
   return <div style={{ padding: 24, color: 'var(--muted)' }}>加载中…</div>;
@@ -41,6 +42,10 @@ export const routes: RouteObject[] = [
       {
         path: 'memory',
         element: withShell(<MemoryPage />),
+      },
+      {
+        path: 'settings',
+        element: withShell(<SettingsPage />),
       },
       {
         path: '*',

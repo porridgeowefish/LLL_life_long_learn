@@ -179,7 +179,9 @@ func TestBuild_IncludesProjectCreationFields(t *testing.T) {
 		"能独立完成词法分析",
 		"能把正则表达式转换为有限自动机",
 		"# Intro Calibration Boundary",
+		"# Intro Survey State",
 		"do not ask the learner to repeat them",
+		"do not ask the learner to answer calibration questions in the CLI/TUI",
 	}
 	for _, check := range checks {
 		if !strings.Contains(pkg.PromptMd, check) {
@@ -254,6 +256,7 @@ func TestBuild_ProductionIntroPromptDoesNotRepeatProjectCreationInterview(t *tes
 	required := []string{
 		"创建项目时填写的学习动机、当前水平、目标水平和完成标准均视为已回答，不得重复询问",
 		"只覆盖该主题的术语识别、因果理解、前置知识和简单应用",
+		"不得把校准题作为命令行问题抛给学习者",
 		"不重复询问 `Project Brief` 中已有的项目创建字段",
 	}
 	for _, fragment := range required {
@@ -263,6 +266,52 @@ func TestBuild_ProductionIntroPromptDoesNotRepeatProjectCreationInterview(t *tes
 	}
 	if strings.Contains(pkg.PromptMd, "覆盖术语识别、因果理解、简单应用和学习目标") {
 		t.Errorf("production intro prompt still asks for the already-known learning goal")
+	}
+}
+
+func TestBuild_ProductionIntroPromptEmbedsSavedSurveyAnswers(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeletonWithInput("agent", "Agent", "", workspace.ProjectInput{
+		Why:      "设计业务智能体",
+		Current:  "了解一点 LLM",
+		Target:   "能设计垂直 Agent",
+		Standard: "完成一个客服 Agent 方案",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	root, err := workspace.ProjectRootForSlug("agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	survey := `{"schemaVersion":1,"questions":[{"id":"tools","label":"工具","prompt":"配哪些工具？","answer":"知识库检索和工单查询"}]}`
+	if err := os.WriteFile(filepath.Join(root, "intro", "survey.json"), []byte(survey), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load production registry: %v", err)
+	}
+	pkg, err := Build(Request{
+		ProjectSlug: "agent",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	for _, fragment := range []string{
+		"# Intro Survey State",
+		"知识库检索和工单查询",
+		"treat them as the learner's calibration evidence",
+	} {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("prompt missing saved survey fragment %q\n--- prompt ---\n%s", fragment, pkg.PromptMd)
+		}
 	}
 }
 

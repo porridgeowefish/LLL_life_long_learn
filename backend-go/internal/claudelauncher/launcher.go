@@ -1,7 +1,6 @@
 // Package claudelauncher spawns the real Claude Code CLI in TRUE
-// interactive TUI mode (no -p), so the learner gets exactly the
-// experience of typing `claude` in PowerShell — full chat UI, follow-up
-// questions, slash commands, ANSI colours, the works.
+// interactive TUI mode by default. It now also supports selected compatible
+// agent CLIs through backend-go/internal/agentruntime.
 //
 // Trade-off accepted: with TUI mode we lose programmatic stdout capture.
 // LLL no longer parses Claude's output stream. Instead, the frontend
@@ -22,6 +21,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -43,6 +43,7 @@ type LaunchRequest struct {
 	Store          *sessionstore.Store
 	Events         EventEmitter
 	ClaudeBin      string
+	Runtime        *agentruntime.Runtime
 }
 
 const defaultPermissionMode = "auto"
@@ -71,7 +72,7 @@ type RunResult struct {
 	PackageJSONPath string
 }
 
-// Launch spawns Claude in an interactive TUI PowerShell window.
+// Launch spawns the selected agent runtime in an interactive PowerShell window.
 // The function returns immediately after the wrapper is started — it does
 // NOT wait for Claude to exit. The user closes the window when done.
 func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
@@ -124,11 +125,12 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 		})
 	}
 
-	// Build the PowerShell wrapper script. CRITICAL: we run `claude`
-	// WITHOUT -p so it launches the real TUI chat UI — the learner can
-	// type messages, follow up, use slash commands. We pre-load the
-	// assembled prompt onto the clipboard so a single Ctrl+V + Enter
-	// kicks the conversation off.
+	runtime := selectedRuntime(req)
+
+	// Build the PowerShell wrapper script. For runtimes that support an
+	// initial prompt argument, LLL passes the prompt directly. For runtimes
+	// whose interactive prompt contract is not stable, LLL preloads the
+	// assembled prompt onto the clipboard and opens the real CLI surface.
 	psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stdoutPath, req)
 
 	// 写 wrapper 脚本到 runDir/wrapper.ps1，用 -File 启动 —— 规避 -Command
@@ -181,6 +183,8 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 		"stdoutLog":      filepath.Join(runDirRel, "stdout.log"),
 		"stderrLog":      filepath.Join(runDirRel, "stderr.log"),
 		"mode":           "interactive-tui",
+		"runtimeId":      runtime.ID,
+		"runtimeBin":     runtime.Bin,
 		"permissionMode": NormalizePermissionMode(req.PermissionMode),
 		"startedAt":      time.Now().UTC(),
 	}
@@ -226,6 +230,12 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 // silent fallback in case the arg is ever mangled for an edge-case prompt.
 func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req LaunchRequest) string {
 	permissionMode := NormalizePermissionMode(req.PermissionMode)
+	runtime := selectedRuntime(req)
+	execLine := interactiveExecLine(runtime, projectRoot)
+	promptNotice := "初始 prompt 会自动带入（无需手动粘贴）。"
+	if runtime.PromptDelivery == agentruntime.PromptClipboard {
+		promptNotice = "已把初始 prompt 放入剪贴板；进入 CLI 后按 Ctrl+V 再回车。"
+	}
 	return strings.Join([]string{
 		`$ErrorActionPreference='Continue'`,
 		fmt.Sprintf(`Set-Location -LiteralPath '%s'`, projectRoot),
@@ -239,8 +249,8 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req Lau
 		// 'claude' resolution failure can be diagnosed post-hoc.
 		`Log-Err "spawn env PATH=$env:PATH"`,
 		`Write-Host '=============================================' -ForegroundColor Cyan`,
-		fmt.Sprintf(`Write-Host ' LLL 项目: %s  |  Agent: %s %s  |  Zone: %s ' -ForegroundColor Cyan`,
-			req.ProjectSlug, req.Agent.Icon, req.Agent.Name, req.ZoneName),
+		fmt.Sprintf(`Write-Host ' LLL 项目: %s  |  Agent: %s %s  |  Runtime: %s  |  Zone: %s ' -ForegroundColor Cyan`,
+			req.ProjectSlug, req.Agent.Icon, req.Agent.Name, runtime.Name, req.ZoneName),
 		`Write-Host '=============================================' -ForegroundColor Cyan`,
 		`Write-Host ''`,
 		// Read prompt.md (the assembled prompt). Guarded so a missing file
@@ -258,37 +268,60 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req Lau
 		// meaning, and matches the charter's 全中文 mandate. Backticks (code
 		// spans) are NOT a breaker — only U+0022 is. See LESSONS_LEARNED §13.
 		`$promptText = $promptText -replace [char]34, [char]0x201C`,
-		// Resolve claude to a FULL path. A bare 'claude' can silently fail
+		// Resolve the selected runtime to a FULL path. A bare binary can silently fail
 		// to resolve in the ShellExecute child env (which may differ from
 		// the backend's probe env), and under ErrorActionPreference=Continue
 		// that failure is non-terminating — not caught, not logged — so the
 		// window stalls at the banner with no Claude TUI. Get-Command honors
 		// both bare names (PATH lookup) and a CLAUDE_BIN full path; the two
 		// Test-Path fallbacks cover the standard Windows install locations.
-		fmt.Sprintf(`$claudeExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $claudeExe = $cmd.Source }; if (-not $claudeExe -and (Test-Path "$env:USERPROFILE\.local\bin\claude.exe")) { $claudeExe = "$env:USERPROFILE\.local\bin\claude.exe" }; if (-not $claudeExe -and (Test-Path "$env:LOCALAPPDATA\Programs\claude\claude.exe")) { $claudeExe = "$env:LOCALAPPDATA\Programs\claude\claude.exe" }; Log-Err "resolved claudeExe=$claudeExe"`, req.ClaudeBin),
+		fmt.Sprintf(`$agentExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $agentExe = $cmd.Source }; Log-Err "resolved runtime=%s agentExe=$agentExe"`, runtime.Bin, runtime.ID),
 		fmt.Sprintf(`$permissionMode = '%s'; Log-Err "permissionMode=$permissionMode"`, permissionMode),
 		// Silent clipboard insurance: if the auto-injected arg is ever
 		// mangled for an edge-case prompt, the learner can still paste.
 		`try { if ($promptText) { Set-Clipboard -Value $promptText } } catch { Log-Err "Set-Clipboard failed: $_" }`,
-		`Write-Host '即将启动 Claude TUI，初始 prompt 会自动带入（无需手动粘贴）。' -ForegroundColor Green`,
-		`Write-Host '启动后可直接对话、追问、使用 /help 等。' -ForegroundColor DarkGray`,
+		fmt.Sprintf(`Write-Host '即将启动 %s，%s' -ForegroundColor Green`, runtime.Name, promptNotice),
+		`Write-Host '模型、账号、密钥等配置由所选 CLI 自己管理，LLL 只负责选择运行时和组织项目上下文。' -ForegroundColor DarkGray`,
 		`Write-Host ''`,
-		// If claude could not be resolved anywhere, stop with a clear reason
+		// If the runtime could not be resolved anywhere, stop with a clear reason
 		// instead of the previous silent fall-through to "Claude 已退出".
-		`if (-not $claudeExe) { Log-Err "claude NOT FOUND on PATH or ~/.local/bin or ~/AppData/Local/Programs/claude"; Write-Host "⚠️  找不到 claude.exe。请确认 claude 已安装，或为后端设置 CLAUDE_BIN 指向 claude.exe 全路径。" -ForegroundColor Red; Write-Host "    （诊断：本窗口 PATH 与 claude 解析结果已写入 stdout.log）" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown'); exit 1 }`,
-		`Write-Host '正在启动 Claude TUI...' -ForegroundColor Cyan`,
+		fmt.Sprintf(`if (-not $agentExe) { Log-Err "%s NOT FOUND"; Write-Host "⚠️  找不到 %s。请确认已安装，或设置 %s 指向可执行文件全路径。" -ForegroundColor Red; Write-Host "    （诊断：本窗口 PATH 与解析结果已写入 stdout.log）" -ForegroundColor DarkGray; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown'); exit 1 }`, runtime.DefaultBin, runtime.DefaultBin, runtime.BinEnv),
+		fmt.Sprintf(`Write-Host '正在启动 %s...' -ForegroundColor Cyan`, runtime.Name),
 		`Write-Host ''`,
-		// Launch Claude WITH the prompt as the initial message (positional
-		// arg). This is still interactive TUI mode (NOT -p), so it complies
-		// with LESSONS_LEARNED §1. Temporarily raise ErrorActionPreference
+		// Launch the selected runtime. Temporarily raise ErrorActionPreference
 		// to 'Stop' so a missing binary / launch failure becomes a CAUGHT,
 		// logged terminating error instead of the silent skip we had before.
-		`$ErrorActionPreference='Stop'; $code = 0; try { if ($promptText) { & $claudeExe --permission-mode $permissionMode $promptText } else { & $claudeExe --permission-mode $permissionMode }; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "claude exec failed: $_"; Write-Host "⚠️  Claude 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		`$ErrorActionPreference='Stop'; $code = 0; try { ` + execLine + `; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "runtime exec failed: $_"; Write-Host "⚠️  Agent CLI 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
 		`Write-Host ''`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
-		`Write-Host " Claude 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
+		`Write-Host " Agent CLI 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`,
 		`exit $code`,
 	}, "; ")
+}
+
+func selectedRuntime(req LaunchRequest) agentruntime.Runtime {
+	if req.Runtime != nil {
+		return *req.Runtime
+	}
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeClaude)
+	bin := req.ClaudeBin
+	if bin == "" {
+		bin = def.DefaultBin
+	}
+	return agentruntime.Runtime{Definition: def, Bin: bin, Available: true}
+}
+
+func interactiveExecLine(rt agentruntime.Runtime, projectRoot string) string {
+	switch rt.ID {
+	case agentruntime.RuntimeClaude:
+		return "if ($promptText) { & $agentExe --permission-mode $permissionMode $promptText } else { & $agentExe --permission-mode $permissionMode }"
+	case agentruntime.RuntimeCodex:
+		return "if ($promptText) { & $agentExe $promptText } else { & $agentExe }"
+	case agentruntime.RuntimeTrae:
+		return fmt.Sprintf("if ($promptText) { & $agentExe run $promptText --working-dir '%s' } else { & $agentExe interactive }", projectRoot)
+	default:
+		return "& $agentExe"
+	}
 }

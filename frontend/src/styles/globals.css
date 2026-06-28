@@ -11,6 +11,14 @@
 
 html {
   font-size: 15px;
+  /* Render at 125% so the intended scale is reached at 100% browser zoom
+     (instead of the user having to zoom to 125% manually). The design mixes
+     rem (typography) and px (layout/spacing), so only a uniform root zoom
+     scales text and containers together — bumping font-size alone would
+     overflow the px-based fixed-height cards/textareas. Must live on <html>
+     (the root), not <body> or #root: only root-level zoom keeps vh-based
+     heights and fixed/sticky elements (modals, sidebar) correct. */
+  zoom: 1.25;
 }
 
 body {

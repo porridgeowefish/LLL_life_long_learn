@@ -15,6 +15,7 @@ const NAV_ITEMS: readonly NavItem[] = [
   { to: '/project', label: '项目' },
   { to: '/agents', label: '智能体' },
   { to: '/memory', label: '记忆' },
+  { to: '/settings', label: '配置' },
 ];
 
 export function Topbar() {

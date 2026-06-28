@@ -1,0 +1,1450 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLL Workbench Alignment Review</title>
+  <style>
+    :root {
+      --paper: #f7f1e8;
+      --paper-strong: #efe3cf;
+      --ink: #172033;
+      --muted: #5f6b7c;
+      --line: #d7c7ad;
+      --accent: #b54b2d;
+      --accent-soft: #f8dfd3;
+      --forest: #1f5c4a;
+      --olive: #738d42;
+      --sun: #d28f26;
+      --sky: #2f6f93;
+      --panel: rgba(255,255,255,.72);
+      --shadow: 0 18px 38px rgba(23, 32, 51, .11);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Georgia, "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+      background:
+        radial-gradient(circle at top left, rgba(181, 75, 45, .16), transparent 34%),
+        radial-gradient(circle at bottom right, rgba(31, 92, 74, .14), transparent 32%),
+        linear-gradient(180deg, #f5efe6 0%, #eadfcf 100%);
+    }
+
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+    }
+
+    .rail {
+      border-right: 1px solid rgba(215, 199, 173, .9);
+      background: rgba(249, 244, 236, .88);
+      backdrop-filter: blur(10px);
+      padding: 28px 22px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    .brand h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+      line-height: 1.08;
+    }
+
+    .brand p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .meta {
+      display: grid;
+      gap: 10px;
+    }
+
+    .meta-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px 15px;
+      background: rgba(255,255,255,.55);
+    }
+
+    .meta-card strong {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .meta-card span {
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .page-nav {
+      display: grid;
+      gap: 9px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .page-link {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      border-radius: 16px;
+      padding: 13px 14px;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .page-link:hover,
+    .page-link.active {
+      border-color: var(--line);
+      background: rgba(255,255,255,.72);
+      box-shadow: var(--shadow);
+      transform: translateY(-1px);
+    }
+
+    .page-link small {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 4px;
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .page-link strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    .page-link span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 28px;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 18px;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 20px;
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 22px;
+      background: rgba(255,255,255,.58);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .toolbar strong {
+      display: block;
+      font-size: 20px;
+      margin-bottom: 4px;
+    }
+
+    .toolbar span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .toolbar button {
+      min-height: 42px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.72);
+      color: var(--ink);
+      padding: 0 16px;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    .toolbar button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+    }
+
+    .deck {
+      position: relative;
+      min-height: 0;
+    }
+
+    .page {
+      display: none;
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 28px;
+      padding: 28px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.78), rgba(252,248,241,.9)),
+        repeating-linear-gradient(
+          0deg,
+          rgba(215, 199, 173, .12) 0,
+          rgba(215, 199, 173, .12) 1px,
+          transparent 1px,
+          transparent 28px
+        );
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+      min-height: calc(100vh - 230px);
+    }
+
+    .page.active { display: block; }
+
+    .page-head {
+      margin-bottom: 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .page-head h2 {
+      margin: 0 0 10px;
+      font-size: 34px;
+      line-height: 1.08;
+    }
+
+    .page-head p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.75;
+      font-size: 16px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .grid-2,
+    .grid-3 {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    .card {
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 22px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    .card h3 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+
+    .card p,
+    .card li,
+    .card td,
+    .card th {
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    .tree,
+    .timeline,
+    .flow {
+      display: grid;
+      gap: 12px;
+    }
+
+    .tree-item,
+    .timeline-item,
+    .flow-step,
+    .agent-item {
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 18px;
+      padding: 14px 15px;
+      background: rgba(255,255,255,.62);
+    }
+
+    .tree-item strong,
+    .timeline-item strong,
+    .flow-step strong,
+    .agent-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 16px;
+    }
+
+    .tree-item span,
+    .timeline-item span,
+    .flow-step span,
+    .agent-item span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .tree-item.child { margin-left: 24px; }
+    .tree-item.grandchild { margin-left: 48px; }
+
+    .workbench-mock {
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1.7fr) 300px;
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .mock-pane {
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 22px;
+      background: rgba(255,255,255,.62);
+      padding: 16px;
+      min-height: 420px;
+    }
+
+    .mock-pane h4 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .mock-pane p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .pane-section {
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 16px;
+      background: rgba(255,255,255,.7);
+      padding: 12px 13px;
+      margin-top: 12px;
+    }
+
+    .pane-section strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .pane-section span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .mock-main {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,.88), rgba(249,244,236,.92)),
+        repeating-linear-gradient(
+          0deg,
+          rgba(215, 199, 173, .12) 0,
+          rgba(215, 199, 173, .12) 1px,
+          transparent 1px,
+          transparent 28px
+        );
+    }
+
+    .mock-main .hero-note {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(181, 75, 45, .08);
+      border: 1px solid rgba(181, 75, 45, .18);
+      margin-top: 14px;
+    }
+
+    .mock-main .hero-note strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 17px;
+    }
+
+    .mock-main .hero-note span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .agent-rail-note {
+      border-left: 4px solid var(--forest);
+    }
+
+    .zone-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .zone {
+      border-radius: 20px;
+      padding: 16px 14px;
+      color: #fff;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .zone h3 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+
+    .zone p {
+      margin: 0;
+      color: rgba(255,255,255,.88);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .zone ul {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      color: rgba(255,255,255,.94);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .intro { background: linear-gradient(180deg, #b54b2d, #904126); }
+    .explain { background: linear-gradient(180deg, #2f6f93, #245870); }
+    .practice { background: linear-gradient(180deg, #1f5c4a, #18493b); }
+    .extend { background: linear-gradient(180deg, #6f5a93, #56456f); }
+    .summary { background: linear-gradient(180deg, #738d42, #5d7235); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      border: 1px solid rgba(215, 199, 173, .95);
+      padding: 11px 12px;
+      text-align: left;
+      vertical-align: top;
+      background: rgba(255,255,255,.46);
+    }
+
+    th {
+      background: rgba(239, 227, 207, .7);
+      font-size: 13px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    code,
+    pre {
+      font-family: "Cascadia Mono", Consolas, monospace;
+    }
+
+    code {
+      background: rgba(239, 227, 207, .72);
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: .92em;
+    }
+
+    pre {
+      margin: 0;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid rgba(215, 199, 173, .95);
+      background: #201a15;
+      color: #f4e9d8;
+      overflow: auto;
+      line-height: 1.6;
+      font-size: 13px;
+    }
+
+    .timeline-item.user {
+      border-left: 5px solid var(--accent);
+    }
+
+    .timeline-item.assistant {
+      border-left: 5px solid var(--sky);
+    }
+
+    .timeline-item.panel {
+      border-left: 5px solid var(--forest);
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border: 1px solid rgba(215, 199, 173, .95);
+      border-radius: 20px;
+      background: rgba(255,255,255,.52);
+      box-shadow: var(--shadow);
+      padding: 14px 18px;
+    }
+
+    .footer span {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .footer .dots {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(95, 107, 124, .28);
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    .dot.active {
+      background: var(--accent);
+    }
+
+    @media (max-width: 1280px) {
+      .app { grid-template-columns: 1fr; }
+      .rail {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .zone-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 860px) {
+      .main { padding: 16px; }
+      .page { padding: 20px; min-height: auto; }
+      .grid-2, .grid-3, .zone-strip, .workbench-mock { grid-template-columns: 1fr; }
+      .toolbar, .page-head, .footer {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .toolbar-actions,
+      .footer .dots { justify-content: flex-start; }
+      .page-head h2 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="brand">
+        <p class="eyebrow">LLL Alignment Deck</p>
+        <h1>本地学习工作台设计对齐稿</h1>
+        <p>这份 HTML 不负责实现，它负责把“产品想法、交互行为、数据结构、Agent 动作”对齐到同一张桌子上。</p>
+      </div>
+
+      <div class="meta">
+        <div class="meta-card">
+          <strong>当前目标</strong>
+          <span>在落地之前，先对齐项目形态、翻页叙事、追问机制、多 Agent 行为和记忆增长模型。</span>
+        </div>
+        <div class="meta-card">
+          <strong>阅读方式</strong>
+          <span>点击左侧页签，或使用键盘 <code>←</code> <code>→</code> 翻页。建议从第 1 页顺序读。</span>
+        </div>
+      </div>
+
+      <nav class="page-nav" id="pageNav">
+        <button class="page-link active" data-page="0">
+          <small>Page 1</small>
+          <strong>产品总图</strong>
+          <span>先统一它到底是什么，不是什么。</span>
+        </button>
+        <button class="page-link" data-page="1">
+          <small>Page 2</small>
+          <strong>项目树</strong>
+          <span>一个学习任务为什么应该是一个项目文件夹。</span>
+        </button>
+        <button class="page-link" data-page="2">
+          <small>Page 3</small>
+          <strong>五段式流程</strong>
+          <span>Intro / Explain / Practice / Extend / Summary 的固定骨架。</span>
+        </button>
+        <button class="page-link" data-page="3">
+          <small>Page 4</small>
+          <strong>Claude 直连</strong>
+          <span>点击 Agent 后，真实发生什么。</span>
+        </button>
+        <button class="page-link" data-page="4">
+          <small>Page 5</small>
+          <strong>追问机制</strong>
+          <span>用户如何在 Claude Code 中继续追问，而且面板只追加不覆盖。</span>
+        </button>
+        <button class="page-link" data-page="5">
+          <small>Page 6</small>
+          <strong>多 Agent 面板</strong>
+          <span>Agent 身份、输入、输出、前驱节点和面板可视化。</span>
+        </button>
+        <button class="page-link" data-page="6">
+          <small>Page 7</small>
+          <strong>记忆系统</strong>
+          <span>项目记忆和用户长期记忆如何增长。</span>
+        </button>
+        <button class="page-link" data-page="7">
+          <small>Page 8</small>
+          <strong>对齐清单</strong>
+          <span>实施前需要确认的最终决策点。</span>
+        </button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="toolbar">
+        <div>
+          <strong id="toolbarTitle">Page 1 · 产品总图</strong>
+          <span id="toolbarDesc">先统一 LLL 的本体：它不是聊天页，也不是云产品，而是本地学习工作台。</span>
+        </div>
+        <div class="toolbar-actions">
+          <button id="prevBtn">上一页</button>
+          <button class="primary" id="nextBtn">下一页</button>
+        </div>
+      </section>
+
+      <section class="deck">
+        <article class="page active" data-title="Page 1 · 产品总图" data-desc="先统一 LLL 的本体：它不是聊天页，也不是云产品，而是本地学习工作台。">
+          <div class="page-head">
+            <div>
+              <h2>LLL 的本体先对齐清楚</h2>
+              <p>LLL 不应该继续被理解成“任务面板”或“网页版 Claude”。它更接近一个运行在本地电脑上的学习工作台：真实执行发生在 Claude Code 终端，LLL 负责项目组织、过程观察、结果整理、记忆积累和 Agent 调度。</p>
+            </div>
+            <span class="pill">Local Workbench, Not SaaS</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="card">
+              <h3>它是什么</h3>
+              <div class="stack">
+                <div class="flow-step">
+                  <strong>本地学习工作台</strong>
+                  <span>用户在本机配置好 Claude Code 后即可使用，不依赖云部署。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>项目制学习容器</strong>
+                  <span>一个主题是一个项目，允许继续拆出子项目递归深挖。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Agent 编排与记忆系统</strong>
+                  <span>Agent 不是抽象概念，而是面板里可见、可调用、可追溯的岗位。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>它不是什么</h3>
+              <div class="stack">
+                <div class="flow-step">
+                  <strong>不是云端 SaaS</strong>
+                  <span>没有账号体系、团队协作、远程权限和多租户这些主线。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>不是聊天容器</strong>
+                  <span>聊天只是会话形态之一，真正的核心单位是学习项目。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>不是假终端</strong>
+                  <span>LLL 不能遮蔽 Claude Code 的真实过程，用户就是要看到它。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>成功标准</h3>
+              <div class="stack">
+                <div class="flow-step">
+                  <strong>用户第二次还愿意回来</strong>
+                  <span>不是一次能跑通，而是主题能持续积累。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>学习轨迹可回看</strong>
+                  <span>能看到项目树、追问历史、练习产物、总结演化和记忆变化。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Agent 是真岗位</strong>
+                  <span>每个 Agent 有固定职责、前驱输入、目标文件和行为规则。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>主面板尽可能大</strong>
+                  <span>学习阅读、编辑和思考区应当成为绝对主视觉，Agent 面板只做辅助支持。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>一句话版本</h3>
+            <p>LLL = <code>本地项目树</code> + <code>真实 Claude Code 终端</code> + <code>五段式学习流</code> + <code>可视化 Agent 面板</code> + <code>持续增长的学习记忆</code>。</p>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 2 · 项目树" data-desc="一个学习任务为什么应该是一个项目文件夹，以及子项目如何递归。">
+          <div class="page-head">
+            <div>
+              <h2>一个学习任务就是一个项目文件夹</h2>
+              <p>为了支持知识组织、继续追问、专题拆分、Agent 协作和记忆沉淀，LLL 的基本单位不应该是“单次请求”，而应该是“项目”。项目天然支持树状结构，所以非常适合你的学习方式。</p>
+            </div>
+            <span class="pill">Folder-First</span>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>侧栏应展示什么</h3>
+              <div class="tree">
+                <div class="tree-item">
+                  <strong>推荐系统</strong>
+                  <span>父项目，负责主题总图、总目标、总记忆和最终总总结。</span>
+                </div>
+                <div class="tree-item child">
+                  <strong>Intro / Explain / Practice / Extend / Summary</strong>
+                  <span>固定五段式板块，任何项目都具备。</span>
+                </div>
+                <div class="tree-item child">
+                  <strong>Subprojects</strong>
+                  <span>专题深挖入口。</span>
+                </div>
+                <div class="tree-item grandchild">
+                  <strong>用户协同过滤</strong>
+                  <span>这是一个完整子项目，不是父项目里的一个零散页面。</span>
+                </div>
+                <div class="tree-item grandchild">
+                  <strong>图推荐 / 排序学习 / 冷启动</strong>
+                  <span>未来都能继续递归挂在父项目下。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>为什么项目树比聊天列表更合适</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>聊天列表</th>
+                    <th>项目树</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>按会话组织，知识容易散</td>
+                    <td>按主题和子主题组织，天然支持长期学习</td>
+                  </tr>
+                  <tr>
+                    <td>不适合挂练习和总结</td>
+                    <td>每个板块都能承载练习、图谱、反思、总结</td>
+                  </tr>
+                  <tr>
+                    <td>追问历史容易和最终知识混在一起</td>
+                    <td>会话层与知识层可以分开保存</td>
+                  </tr>
+                  <tr>
+                    <td>Agent 很难知道上下文边界</td>
+                    <td>Agent 可以直接围绕项目文件路径读取和写入</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>推荐的目录骨架</h3>
+            <pre>projects/
+  recommender-systems/
+    project.md
+    memory/
+      project-memory.md
+    intro/
+    explain/
+    practice/
+    extend/
+    summary/
+    runs/
+    assets/
+    subprojects/
+      user-collaborative-filtering/
+        project.md
+        memory/
+        intro/
+        explain/
+        practice/
+        extend/
+        summary/</pre>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 3 · 五段式流程" data-desc="Intro / Explain / Practice / Extend / Summary 如何成为固定学习骨架。">
+          <div class="page-head">
+            <div>
+              <h2>五段式不是 UI 标签，而是学习骨架</h2>
+              <p>这五个区不是随便摆一排 tab。它们应该是每个项目都继承的固定结构，用来约束 Agent 行为、文件输出、前驱依赖和用户预期。</p>
+            </div>
+            <span class="pill">Fixed Learning Zones</span>
+          </div>
+
+          <div class="zone-strip">
+            <section class="zone intro">
+              <div>
+                <h3>Intro</h3>
+                <p>负责勾起兴趣、建立问题意识、连接已有知识，不讲太满。</p>
+              </div>
+              <ul>
+                <li>为什么值得学</li>
+                <li>它解决什么问题</li>
+                <li>3 个带钩子的进入问题</li>
+              </ul>
+            </section>
+            <section class="zone explain">
+              <div>
+                <h3>Explain</h3>
+                <p>结构化讲解区，最适合 MECE + 第一性原理驱动的知识拆解和关系图谱。</p>
+              </div>
+              <ul>
+                <li>MECE 拆解</li>
+                <li>概念关系图</li>
+                <li>误区与边界</li>
+              </ul>
+            </section>
+            <section class="zone practice">
+              <div>
+                <h3>Practice</h3>
+                <p>通过受约束任务逼出产出，强调少量 AI 或不借助 AI。</p>
+              </div>
+              <ul>
+                <li>任务单</li>
+                <li>提交物</li>
+                <li>复盘与反思</li>
+              </ul>
+            </section>
+            <section class="zone extend">
+              <div>
+                <h3>Extend</h3>
+                <p>高维思考区，只给关系脚手架，不直接给最终答案。</p>
+              </div>
+              <ul>
+                <li>因果关系</li>
+                <li>结构组成关系</li>
+                <li>优先级关系 / 同构关系</li>
+              </ul>
+            </section>
+            <section class="zone summary">
+              <div>
+                <h3>Summary</h3>
+                <p>用户主导的可编辑总结区，必须可持续改写，不能被一次运行覆盖。</p>
+              </div>
+              <ul>
+                <li>真正学会了什么</li>
+                <li>还没吃透什么</li>
+                <li>下一步学什么</li>
+              </ul>
+            </section>
+          </div>
+
+          <div class="grid-2" style="margin-top:16px;">
+            <div class="card">
+              <h3>默认前驱关系</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>Intro → Explain</strong>
+                  <span>Explain 需要继承 Intro 的问题意识和动机。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Explain → Practice</strong>
+                  <span>Practice 任务依赖已建立的结构化理解。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Explain + Practice → Extend</strong>
+                  <span>只有当你既理解又做过，Extend 才有高维度意义。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>全部板块 → Summary</strong>
+                  <span>Summary 是汇总层，不是即时生成层。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>产品约束</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>Practice Agent 不能抢做作业</strong>
+                  <span>它设计任务、限制条件、评价标准，但默认不代替你完成练习。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Extend Agent 不能把答案直接端上来</strong>
+                  <span>它要引导你自己构建关系认知，而不是直接输出高层结论。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Summary 不能被会话原文覆盖</strong>
+                  <span>会话内容可以提炼进 Summary，但不能直接等于 Summary。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 4 · Claude 直连" data-desc="调用 Agent 后，应该直接拉起真实 Claude Code 终端，并自动注入上下文。">
+          <div class="page-head">
+            <div>
+              <h2>点击 Agent 后，真实发生什么</h2>
+              <p>这里是最关键的设计决定之一：LLL 不应该在网页里模拟“AI 正在执行”，而是应该直接拉起一个真实 Claude Code 终端，让用户看到原始执行过程，同时把输出结构化回流到面板。</p>
+            </div>
+            <span class="pill">Real Terminal, Real Trace</span>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>调用链条</h3>
+              <div class="timeline">
+                <div class="timeline-item user">
+                  <strong>1. 用户选择 Agent</strong>
+                  <span>例如在“Explain”板块点击 <code>Explain Agent</code>。</span>
+                </div>
+                <div class="timeline-item panel">
+                  <strong>2. LLL 解析前驱节点</strong>
+                  <span>收集 <code>intro/output.md</code>、项目记忆、当前项目信息和本次目标。</span>
+                </div>
+                <div class="timeline-item panel">
+                  <strong>3. LLL 构建提示词</strong>
+                  <span>提示词里包含 Agent 身份、前驱文件路径、行为准则、输出规范、目标文件路径。</span>
+                </div>
+                <div class="timeline-item assistant">
+                  <strong>4. 真实 Claude Code 终端被拉起</strong>
+                  <span>自动把准备好的提示词送进去，用户能直接看到 CLI 反馈。</span>
+                </div>
+                <div class="timeline-item panel">
+                  <strong>5. 输出回流到面板</strong>
+                  <span>原始终端输出进入 runs，会话结果进入当前板块文件，整理后内容展示在右侧阅读面板。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>提示词拼装应该包含什么</h3>
+              <pre>Agent: Explain Agent
+Project: recommender-systems / user-collaborative-filtering
+Zone: Explain
+
+Predecessor files:
+- projects/.../project.md
+- projects/.../memory/project-memory.md
+- projects/.../intro/output.md
+
+Behavior rules:
+- use MECE + first-principles structured explanation
+- produce concept relations and misconception boundaries
+- do not overwrite summary files
+
+Output targets:
+- explain/output.md
+- explain/map.mmd
+- runs/<session-id>/result.md</pre>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>为什么不能做成“隐藏执行”</h3>
+            <p>因为你的核心体验之一，就是学习过程中能够看到 Claude Code 的真实反馈。这个过程本身既能提供透明度，也能帮助用户感知 Agent 的思考方式、读文件范围、失败原因和修改轨迹。LLL 的职责不是遮掉这个过程，而是把这个过程组织得更好。</p>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 5 · 追问机制" data-desc="用户如何在 Claude Code 中追问问题，以及为什么面板必须只追加不覆盖。">
+          <div class="page-head">
+            <div>
+              <h2>追问机制必须是追加式时间线</h2>
+              <p>如果用户已经在 Claude Code 终端里聊起来了，那么继续追问是自然行为。LLL 不能把后续回复覆盖掉前面的内容，而应该把它们作为同一 Session 下的新 Turn 追加进历史时间线。</p>
+            </div>
+            <span class="pill">Append-Only Session</span>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>面板应该如何显示</h3>
+              <div class="timeline">
+                <div class="timeline-item user">
+                  <strong>Turn 01 · 用户</strong>
+                  <span>“先用适合入门者的方式解释用户协同过滤是什么。”</span>
+                </div>
+                <div class="timeline-item assistant">
+                  <strong>Turn 01 · Claude</strong>
+                  <span>结构化回复，并引用当前项目中的 Intro 前驱节点。</span>
+                </div>
+                <div class="timeline-item user">
+                  <strong>Turn 02 · 用户追问</strong>
+                  <span>“那它和基于内容推荐最本质的区别是什么？不要直接给答案，给我比较框架。”</span>
+                </div>
+                <div class="timeline-item assistant">
+                  <strong>Turn 02 · Claude</strong>
+                  <span>继续回复，并被追加到历史下方，不覆盖 Turn 01。</span>
+                </div>
+                <div class="timeline-item panel">
+                  <strong>面板整理动作</strong>
+                  <span>用户可以把 Turn 02 的部分内容提炼进 <code>extend/relation-notes.md</code>，但会话原文依然保留。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>设计规则</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>规则 1</strong>
+                  <span>一个被拉起的 Claude 会话就是一个 Session。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>规则 2</strong>
+                  <span>每次用户输入算一个 user turn，每次 Claude 一轮完整回复算一个 assistant turn。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>规则 3</strong>
+                  <span>面板展示按时间追加，不允许“用最新结果替换整个会话结果”。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>规则 4</strong>
+                  <span>项目知识文件与追问原文分层保存：原文进 runs，会话提炼进项目板块。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>推荐的会话文件结构</h3>
+            <pre>runs/
+  2026-06-08-explain-agent-session-01/
+    session.json
+    transcript.ndjson
+    turns/
+      001-user.md
+      001-assistant.md
+      002-user.md
+      002-assistant.md
+    artifacts/
+      explain-output.md
+      extend-prompts.md</pre>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 6 · 多 Agent 面板" data-desc="Agent 应该如何带着身份出现，如何读前驱文件，如何写目标文件。">
+          <div class="page-head">
+            <div>
+              <h2>多 Agent 不该像魔法，而该像岗位</h2>
+              <p>Agent 不应该只是“再来一个模型按钮”。对 LLL 来说，更合理的方式是把 Agent 设计成项目中的角色岗位：有身份、有准则、有能做和不能做的事，有明确读写文件路径。但在视觉层面，Agent 面板应当始终让位于学习主面板。</p>
+            </div>
+            <span class="pill">Main Learning Panel First</span>
+          </div>
+
+          <div class="card">
+            <h3>推荐的工作台比例</h3>
+            <div class="workbench-mock">
+              <section class="mock-pane">
+                <h4>项目树</h4>
+                <p>保持窄而稳定，只负责导航，不争夺阅读注意力。</p>
+                <div class="pane-section">
+                  <strong>推荐系统</strong>
+                  <span>项目总览、板块导航、子项目入口。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>用户协同过滤</strong>
+                  <span>当前专题子项目。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>五段式板块</strong>
+                  <span>Intro / Explain / Practice / Extend / Summary。</span>
+                </div>
+              </section>
+
+              <section class="mock-pane mock-main">
+                <h4>学习主面板</h4>
+                <p>这是工作台的绝对主角。阅读、编辑、思考、比较、批注都应该优先发生在这里。</p>
+                <div class="hero-note">
+                  <strong>为什么这里必须最大</strong>
+                  <span>因为用户真正花时间的是看内容、做练习、写总结、建关系，而不是盯着 Agent 控制器。Agent 再强，也只是辅助学习的执行轨道。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>上半区</strong>
+                  <span>当前板块内容，例如 Explain 的结构化讲解、Practice 的任务单、Summary 的可编辑总结。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>下半区</strong>
+                  <span>会话时间线、追问历史、从 Turn 提炼到项目文件的内容对照。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>核心交互</strong>
+                  <span>高亮前驱节点、局部批注、把当前回复提炼进指定文件、直接编辑 Summary。</span>
+                </div>
+              </section>
+
+              <section class="mock-pane">
+                <h4>Agent 侧轨</h4>
+                <p>应当做成辅助轨道、可折叠侧栏或临时展开面板，而不是主阅读区。</p>
+                <div class="pane-section agent-rail-note">
+                  <strong>身份与规则</strong>
+                  <span>当前 Agent、行为边界、输入文件、目标文件。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>动作按钮</strong>
+                  <span>启动 Claude Code、继续追问、提炼进板块文件、更新记忆。</span>
+                </div>
+                <div class="pane-section">
+                  <strong>建议形态</strong>
+                  <span>默认收起或窄栏显示，需要时展开，避免长期压缩学习内容宽度。</span>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <div class="grid-2" style="margin-top:16px;">
+            <div class="card">
+              <h3>Agent 面板应该承载什么</h3>
+              <div class="stack">
+                <div class="agent-item">
+                  <strong>身份</strong>
+                  <span>例如 Explain Agent、Practice Agent、Memory Agent。</span>
+                </div>
+                <div class="agent-item">
+                  <strong>当前板块</strong>
+                  <span>Agent 当前服务 Intro、Explain、Practice、Extend 或 Summary。</span>
+                </div>
+                <div class="agent-item">
+                  <strong>前驱文件</strong>
+                  <span>清楚显示本次会读哪些路径，而不是暗箱操作。</span>
+                </div>
+                <div class="agent-item">
+                  <strong>动作与产物</strong>
+                  <span>启动终端、继续追问、写入目标文件、回流面板。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>Agent 面板不应该承载什么</h3>
+              <div class="stack">
+                <div class="agent-item">
+                  <strong>不应抢占版心</strong>
+                  <span>如果 Agent 区域长期和学习区等宽，学习体验会被控制逻辑稀释。</span>
+                </div>
+                <div class="agent-item">
+                  <strong>不应成为主叙事区</strong>
+                  <span>主叙事应该是知识内容、练习任务、关系笔记和总结，而不是按钮和状态。</span>
+                </div>
+                <div class="agent-item">
+                  <strong>不应长期常驻细节噪音</strong>
+                  <span>过多状态、日志和参数会打断学习沉浸感，应该按需展开。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>建议的 Agent 岗位</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>主要职责</th>
+                  <th>默认行为边界</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Intro Agent</td>
+                  <td>勾起兴趣、建立问题意识、连接已有知识</td>
+                  <td>不直接进入大段讲解</td>
+                </tr>
+                <tr>
+                  <td>Explain Agent</td>
+                  <td>用 MECE + 第一性原理方法结构化解释知识</td>
+                  <td>不覆盖 Summary</td>
+                </tr>
+                <tr>
+                  <td>Practice Agent</td>
+                  <td>设计少 AI 或无 AI 的任务和标准</td>
+                  <td>默认不替用户完成练习</td>
+                </tr>
+                <tr>
+                  <td>Extend Agent</td>
+                  <td>提出高维关系问题和思考框架</td>
+                  <td>默认不直接给终局答案</td>
+                </tr>
+                <tr>
+                  <td>Summary Agent</td>
+                  <td>辅助整理总结、列出可编辑纲要</td>
+                  <td>不能替代用户最终主导权</td>
+                </tr>
+                <tr>
+                  <td>Memory Agent</td>
+                  <td>更新项目记忆和用户长期记忆</td>
+                  <td>不能静默篡改学习事实</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 7 · 记忆系统" data-desc="用户长期记忆和项目记忆应如何分层，并如何反哺 Agent 输出。">
+          <div class="page-head">
+            <div>
+              <h2>记忆系统要增长，但不能偷偷接管你</h2>
+              <p>记忆系统不是把过去所有内容机械堆起来，而是逐渐更懂这个用户怎么学、哪里卡住、哪些解释有效、哪些任务太简单或太难。它的价值是个性化，不是替代用户判断。</p>
+            </div>
+            <span class="pill">Learner Memory, Not Hidden Bias</span>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>两层记忆结构</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>全局记忆</strong>
+                  <span>记录学习目标、惯用学习方式、偏好表达风格、长期能力变化。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>项目记忆</strong>
+                  <span>记录在当前主题下已经会什么、总混什么、哪些例子最有效、下一步最该补哪块。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>记忆如何反哺系统</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>调提示词</strong>
+                  <span>Explain Agent 会知道这位用户更适合先看类比还是先看结构。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>调练习难度</strong>
+                  <span>Practice Agent 会减少无效重复，调整任务强度。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>调 Extend 提问方式</strong>
+                  <span>如果用户已经习惯因果思考，系统就可以多给同构关系提示。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>最小记忆示意</h3>
+            <pre>memory/
+  learner-profile.md
+  learner-state.json
+
+projects/.../memory/
+  project-memory.md
+  project-state.json
+
+learner-state.json
+{
+  "preferred_explanation_style": ["analogy-first", "structure-second"],
+  "ai_usage_preference": "practice-should-be-constrained",
+  "recurring_gaps": ["high-level relation building"],
+  "current_focus_topics": ["recommender systems"]
+}</pre>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>关键约束</h3>
+            <p>记忆系统只能帮助 Agent 更贴近用户，不能在用户不知情的情况下静默改变项目结论、Summary 事实或练习完成判定。换句话说，记忆负责“更懂你”，不负责“替你做主”。</p>
+          </div>
+        </article>
+
+        <article class="page" data-title="Page 8 · 对齐清单" data-desc="如果这些点都确认，才进入真实实现。">
+          <div class="page-head">
+            <div>
+              <h2>落地前的最终对齐清单</h2>
+              <p>这一页不是新想法，而是把前面所有页收束成可以决策的清单。只要这些点对齐，后面就可以比较稳地切进实现和迭代切片。</p>
+            </div>
+            <span class="pill">Implementation Gate</span>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <h3>我们已经基本对齐的点</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>项目是文件夹，不是聊天</strong>
+                  <span>父项目和子项目都用同一骨架。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>五段式是固定结构</strong>
+                  <span>每个项目都必须有 Intro / Explain / Practice / Extend / Summary。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Agent 启动真实 Claude Code 终端</strong>
+                  <span>不是网页里的假执行过程。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>追问必须追加，不覆盖</strong>
+                  <span>会话层与知识层分离。</span>
+                </div>
+                <div class="flow-step">
+                  <strong>记忆系统分层</strong>
+                  <span>有全局记忆，也有项目记忆。</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>实施前还要确认的点</h3>
+              <div class="flow">
+                <div class="flow-step">
+                  <strong>终端接管方式</strong>
+                  <span>是 PTY 挂载到本地窗口，还是先以系统终端窗口为主、面板只做追踪？</span>
+                </div>
+                <div class="flow-step">
+                  <strong>Summary 编辑策略</strong>
+                  <span>是原地编辑 Markdown，还是双栏“原文 / 整理稿”模式？</span>
+                </div>
+                <div class="flow-step">
+                  <strong>会话恢复规则</strong>
+                  <span>终端关闭后，再追问是恢复同一 Session，还是新建 Session 并挂到同一板块？</span>
+                </div>
+                <div class="flow-step">
+                  <strong>记忆更新时间点</strong>
+                  <span>每次 Agent 运行后都更新，还是只有在用户确认后才写入记忆？</span>
+                </div>
+                <div class="flow-step">
+                  <strong>第一期最小实现范围</strong>
+                  <span>建议只先做单项目、单终端会话、Explain/Practice 两个 Agent 和追加式 Session。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px;">
+            <h3>推荐的第一期切片</h3>
+            <p>如果你要我建议一个最稳的第一刀，我会推荐：先做项目树、Explain Agent 终端直连、追加式 Session 历史和可编辑 Summary。因为这四个一旦成立，整个工作台的主框架就开始成型了，后面的 Practice / Extend / Memory 都能顺着挂上去。</p>
+          </div>
+        </article>
+      </section>
+
+      <footer class="footer">
+        <span>这份稿子的作用是“实现前对齐”。如果方向继续稳定，下一步就把它下沉成 iteration 文档和前端实现切片。</span>
+        <div class="dots" id="dots"></div>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const pages = [...document.querySelectorAll(".page")];
+    const pageLinks = [...document.querySelectorAll(".page-link")];
+    const toolbarTitle = document.querySelector("#toolbarTitle");
+    const toolbarDesc = document.querySelector("#toolbarDesc");
+    const prevBtn = document.querySelector("#prevBtn");
+    const nextBtn = document.querySelector("#nextBtn");
+    const dots = document.querySelector("#dots");
+    let current = 0;
+
+    pages.forEach((_, index) => {
+      const dot = document.createElement("button");
+      dot.className = "dot" + (index === 0 ? " active" : "");
+      dot.type = "button";
+      dot.setAttribute("aria-label", `Jump to page ${index + 1}`);
+      dot.dataset.page = index;
+      dots.append(dot);
+    });
+
+    function renderPage(index) {
+      current = Math.max(0, Math.min(index, pages.length - 1));
+      pages.forEach((page, i) => page.classList.toggle("active", i === current));
+      pageLinks.forEach((link, i) => link.classList.toggle("active", i === current));
+      [...dots.children].forEach((dot, i) => dot.classList.toggle("active", i === current));
+      toolbarTitle.textContent = pages[current].dataset.title;
+      toolbarDesc.textContent = pages[current].dataset.desc;
+      prevBtn.disabled = current === 0;
+      nextBtn.disabled = current === pages.length - 1;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    pageLinks.forEach(link => {
+      link.addEventListener("click", () => renderPage(Number(link.dataset.page)));
+    });
+
+    dots.addEventListener("click", event => {
+      const button = event.target.closest(".dot");
+      if (!button) return;
+      renderPage(Number(button.dataset.page));
+    });
+
+    prevBtn.addEventListener("click", () => renderPage(current - 1));
+    nextBtn.addEventListener("click", () => renderPage(current + 1));
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "ArrowLeft") renderPage(current - 1);
+      if (event.key === "ArrowRight") renderPage(current + 1);
+    });
+  </script>
+</body>
+</html>

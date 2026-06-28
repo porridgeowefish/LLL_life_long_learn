@@ -24,18 +24,18 @@ var infographicJobs sync.Map
 
 const (
 	infographicStateFile  = "infographic-state.json"
-	infographicPNG       = "infographic.png"
+	infographicPNG        = "infographic.png"
 	infographicPromptFile = "image-prompt.txt"
 )
 
 // infographicState tracks the async infographic generation pipeline.
 type infographicState struct {
-	Status      string    `json:"status"` // pending, running, complete, failed, missing
-	URL         string    `json:"url,omitempty"`
-	Error       string    `json:"error,omitempty"`
-	PromptRunDir string   `json:"promptRunDir,omitempty"`
-	StartedAt   time.Time `json:"startedAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	Status       string    `json:"status"` // pending, running, complete, failed, missing
+	URL          string    `json:"url,omitempty"`
+	Error        string    `json:"error,omitempty"`
+	PromptRunDir string    `json:"promptRunDir,omitempty"`
+	StartedAt    time.Time `json:"startedAt"`
+	UpdatedAt    time.Time `json:"updatedAt"`
 }
 
 // infographicStatePath returns the absolute path to the infographic state file.
@@ -273,8 +273,9 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 	}
 
 	// Check availability
-	if !s.ClaudeAvailable {
-		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
+	runtime, _ := s.runtimeSnapshot()
+	if !runtime.Available || !runtime.SupportsHeadless {
+		httpx.Error(w, http.StatusServiceUnavailable, "selected agent runtime cannot run background infographic planning")
 		return
 	}
 	if s.ImageConfig == nil || !s.ImageConfig.HasImageProvider() || !s.ImageAvailable {
@@ -313,6 +314,7 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 
 // runInfographicPipeline executes the two-stage infographic generation.
 func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
+	runtime, _ := s.runtimeSnapshot()
 	cfg := s.ImageConfig
 	root, err := workspace.ProjectRootForSlug(slug)
 	if err != nil {
@@ -351,7 +353,7 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 	// with a short backoff before giving up. (ctx here is context.Background,
 	// so a plain Sleep between attempts is safe.)
 	for attempt := 1; attempt <= 3; attempt++ {
-		err = claudelauncher.LaunchHeadless(ctx, slug, "infographic-crafter", s.ClaudeBin, cfg.ImagePromptModel, pkg)
+		err = claudelauncher.LaunchHeadless(ctx, slug, "infographic-crafter", s.ClaudeBin, cfg.ImagePromptModel, pkg, &runtime)
 		if err == nil {
 			break
 		}
@@ -432,11 +434,11 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 
 	// Write complete state
 	completeState := infographicState{
-		Status:      "complete",
-		URL:         "/files/projects/" + slug + "/explain/" + infographicPNG,
+		Status:       "complete",
+		URL:          "/files/projects/" + slug + "/explain/" + infographicPNG,
 		PromptRunDir: runDirRel,
-		StartedAt:   runningState.StartedAt,
-		UpdatedAt:   time.Now().UTC(),
+		StartedAt:    runningState.StartedAt,
+		UpdatedAt:    time.Now().UTC(),
 	}
 	if err := writeInfographicState(slug, completeState); err != nil {
 		fmt.Println("infographic: failed to write complete state:", err)

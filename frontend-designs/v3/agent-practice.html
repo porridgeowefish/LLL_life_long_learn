@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>练习 · Rust 所有权 · LLL</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/md-editor.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+.practice-stage{padding:30px 56px 130px;max-width:980px;margin:0 auto}
+
+.q-progress{
+  display:flex;gap:5px;align-items:center;margin-bottom:22px;
+  padding:14px 16px;background:var(--card);border:1px solid var(--border);
+  border-radius:10px;flex-wrap:wrap;
+}
+.q-step{
+  display:flex;align-items:center;gap:6px;padding:7px 12px;
+  border-radius:18px;font-size:.78rem;font-weight:600;
+  border:1px solid var(--border);background:var(--card-2);color:var(--muted);
+  cursor:pointer;transition:all .15s;
+}
+.q-step:hover{border-color:var(--accent)}
+.q-step.active{background:var(--orange-soft);color:var(--orange);border-color:var(--orange)}
+.q-step.done{background:var(--accent);color:#fff;border-color:var(--accent)}
+.q-step .q-num{
+  width:20px;height:20px;border-radius:50%;background:var(--card);
+  border:1px solid var(--border);font-size:.62rem;font-weight:700;
+  display:inline-flex;align-items:center;justify-content:center;color:var(--muted);
+}
+.q-step.active .q-num{background:var(--orange);color:#fff;border-color:var(--orange)}
+.q-step.done .q-num{background:#fff;color:var(--accent);border-color:#fff}
+.q-step .star{color:var(--orange);font-size:.7rem;margin-left:3px}
+.q-arrow{color:var(--border-strong);font-size:.65rem}
+
+.q-actions{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:10px 14px;background:var(--card-2);
+  border-radius:8px;font-size:.74rem;margin-bottom:14px;
+}
+
+.criteria-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:14px 18px;margin:14px 0 20px;
+}
+.criteria-card h5{
+  font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;
+  color:var(--muted);margin-bottom:10px;font-weight:600;
+}
+.criteria-card ul{padding-left:1.2em;font-size:.8rem;line-height:1.75;color:var(--muted-2)}
+
+.self-eval-block{
+  margin-top:20px;padding:20px 22px;background:var(--card);
+  border:2px solid var(--orange);border-radius:12px;
+}
+.eval-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:8px 0;border-bottom:1px solid var(--border);font-size:.84rem;
+}
+.eval-row:last-of-type{border-bottom:none}
+.eval-row .label{color:var(--fg)}
+.eval-row .star{color:var(--border-strong);font-size:1rem;cursor:pointer;margin-left:3px}
+.eval-row .star.on{color:var(--orange)}
+
+.submit-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(135deg,var(--orange-soft) 0%,var(--accent-soft) 100%);
+  border-top:2px solid var(--orange);
+  padding:14px 28px;display:flex;justify-content:space-between;align-items:center;
+  gap:14px;z-index:60;box-shadow:0 -4px 12px rgba(232,148,90,.10);
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="topbar-logo">Life<span class="accent">Long</span>Learn</a>
+  <div class="topbar-sep"></div>
+  <div class="topbar-nav">
+    <a href="index.html">总览</a>
+    <a href="project.html" class="active">项目</a>
+    <a href="agents.html">智能体</a>
+    <a href="memory.html">记忆</a>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-actions">
+    <div class="topbar-status">
+      <span><span class="dot-status dot-orange"></span>练习进行中</span>
+      <span class="path">projects/rust-ownership/practice/</span>
+    </div>
+  </div>
+</div>
+
+<div class="shell no-context">
+
+  <aside class="sidebar">
+    <div class="sidebar-title">项目浏览器</div>
+    <div class="sidebar-scroll">
+      <div class="tree-section">项目</div>
+      <a href="project.html" class="tree-item">Rust 所有权</a>
+
+      <div class="tree-section">学习阶段</div>
+      <a href="agent-intro.html" class="tree-item sub"><span class="icon">🌱</span>引入</a>
+      <a href="agent-explain.html" class="tree-item sub"><span class="icon">📖</span>讲解</a>
+      <a href="agent-practice.html" class="tree-item sub active"><span class="icon">✏️</span>练习</a>
+      <a href="agent-extend.html" class="tree-item sub"><span class="icon">🔗</span>拓展</a>
+      <a href="agent-summary.html" class="tree-item sub"><span class="icon">📝</span>总结</a>
+
+      <div class="tree-section">其他项目</div>
+      <a href="index.html" class="tree-item">推荐系统</a>
+      <a href="index.html" class="tree-item">图神经网络</a>
+    </div>
+  </aside>
+
+  <main>
+    <div class="practice-stage">
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;gap:14px">
+        <div>
+          <h1 style="font-family:var(--font-serif);font-size:1.8rem;font-weight:900">练习 · 5 道</h1>
+          <p class="text-sm text-muted" style="margin-top:6px">
+            练习智能体 · 难度递增 · 14:22 生成 · 写入 <code>practice/tasks.md</code>
+          </p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm">重新生成</button>
+          <button class="btn btn-ghost btn-sm">查看 prompt</button>
+        </div>
+      </div>
+
+      <div class="q-progress">
+        <div class="q-step done"><span class="q-num">✓</span><span>1</span><span class="star">★</span></div>
+        <span class="q-arrow">→</span>
+        <div class="q-step active"><span class="q-num">2</span><span>修复可变引用冲突</span><span class="star">★★</span></div>
+        <span class="q-arrow">→</span>
+        <div class="q-step"><span class="q-num">3</span><span class="star">★★★</span></div>
+        <span class="q-arrow">→</span>
+        <div class="q-step"><span class="q-num">4</span><span class="star">★★★</span></div>
+        <span class="q-arrow">→</span>
+        <div class="q-step"><span class="q-num">5</span><span class="star">★★★★</span></div>
+      </div>
+
+      <h2 style="font-family:var(--font-serif);font-size:1.4rem;font-weight:700;margin-bottom:6px">第 2 题 · 修复可变引用冲突</h2>
+      <p class="text-sm text-muted" style="margin-bottom:14px">用 Markdown + 代码块作答 · 自动保存到 <code>practice/submissions/02.md</code></p>
+
+      <div style="position:relative;margin-bottom:18px">
+        <div style="background:var(--code-bg);color:var(--code-fg);padding:14px 18px;border-radius:8px;font-family:var(--font-mono);font-size:.84rem;line-height:1.65">
+<span style="color:var(--muted)">// 找出以下代码的所有权 bug 并修复</span>
+
+<span style="color:#ff79c6">fn</span> <span style="color:#50fa7b">main</span>() {
+    <span style="color:#ff79c6">let mut</span> s = <span style="color:#50fa7b">String</span>::from(<span style="color:#f1fa8c">"hi"</span>);
+    <span style="color:#ff79c6">let</span> r1 = <span style="color:#ff79c6">&amp;mut</span> s;
+    <span style="color:#ff79c6">let</span> r2 = <span style="color:#ff79c6">&amp;mut</span> s;
+    <span style="color:#50fa7b">println!</span>(<span style="color:#f1fa8c">"{} {}"</span>, r1, r2);
+}
+        </div>
+      </div>
+
+      <div class="criteria-card">
+        <h5>评审标准</h5>
+        <ul>
+          <li>能指出违反的<strong>具体规则</strong>（哪条所有权/借用规则）</li>
+          <li>能口头复述借用规则的<strong>两个核心限制</strong></li>
+          <li>修复后<strong>零编译错误</strong></li>
+          <li>不引入 <code>.clone()</code> 这种逃避方案</li>
+        </ul>
+      </div>
+
+      <div class="q-actions">
+        <div class="text-muted">这道题有问题？随时反馈：</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm">反馈题目问题</button>
+          <button class="btn btn-outline btn-sm">求提示（不揭示答案）</button>
+          <button class="btn btn-outline btn-sm">跳过此题</button>
+        </div>
+      </div>
+
+      <!-- MD 编辑器：obsidian 单栏切换 -->
+      <div class="md-editor" id="answerEditor" style="min-height:280px">
+        <div class="md-toolbar">
+          <button class="md-btn"><span class="label">H2</span></button>
+          <button class="md-btn"><strong>B</strong></button>
+          <button class="md-btn"><em>I</em></button>
+          <div class="md-sep"></div>
+          <button class="md-btn">•</button>
+          <button class="md-btn">1.</button>
+          <button class="md-btn">❝</button>
+          <button class="md-btn"><span class="mono">&lt;/&gt;</span></button>
+          <button class="md-btn">🔗</button>
+          <div class="md-spacer"></div>
+          <div class="md-mode-toggle">
+            <button class="active" onclick="document.getElementById('answerEditor').classList.remove('show-preview');this.classList.add('active');this.nextElementSibling.classList.remove('active')">编辑</button>
+            <button onclick="document.getElementById('answerEditor').classList.add('show-preview');this.classList.add('active');this.previousElementSibling.classList.remove('active')">预览</button>
+          </div>
+        </div>
+        <div class="md-edit-wrap">
+          <textarea class="md-textarea" spellcheck="false">## 问题诊断
+
+这段代码违反了 Rust 的**可变引用独占规则**：在同一作用域中，一个值只能有**一个可变引用**。
+
+> 这里同时存在 `r1` 和 `r2` 两个 `&amp;mut s`，编译器在第 4 行就会拒绝编译。
+
+## 修复方案
+
+```rust
+fn main() {
+    let mut s = String::from("hi");
+
+    // 方案 1：顺序使用，作用域隔离
+    {
+        let r1 = &amp;mut s;
+        println!("{}", r1);
+    } // r1 在这里离开作用域
+    {
+        let r2 = &amp;mut s;
+        println!("{}", r2);
+    }
+}
+```
+
+## 为什么这样修
+
+按借用规则，可变引用的**生命周期结束后**，新的可变引用才能诞生。</textarea>
+          <div class="md-preview">
+            <h2>问题诊断</h2>
+            <p>这段代码违反了 Rust 的<strong>可变引用独占规则</strong>：在同一作用域中，一个值只能有<strong>一个可变引用</strong>。</p>
+            <blockquote>这里同时存在 <code>r1</code> 和 <code>r2</code> 两个 <code>&amp;mut s</code>，编译器在第 4 行就会拒绝编译。</blockquote>
+            <h2>修复方案</h2>
+            <pre><code>fn main() {
+    let mut s = String::from("hi");
+
+    // 方案 1：顺序使用，作用域隔离
+    {
+        let r1 = &amp;mut s;
+        println!("{}", r1);
+    } // r1 在这里离开作用域
+    {
+        let r2 = &amp;mut s;
+        println!("{}", r2);
+    }
+}</code></pre>
+            <h2>为什么这样修</h2>
+            <p>按借用规则，可变引用的<strong>生命周期结束后</strong>，新的可变引用才能诞生。</p>
+          </div>
+        </div>
+        <div class="md-status">
+          <div class="left">
+            <span>218 字</span>
+            <span>3 段</span>
+            <span>自动保存</span>
+          </div>
+          <span class="save-state dirty">● 未提交</span>
+        </div>
+      </div>
+
+      <div class="self-eval-block">
+        <h4 style="font-size:.95rem;font-weight:700;color:var(--orange);margin-bottom:4px">提交前先自评（4 项）</h4>
+        <p class="text-xs text-muted" style="margin-bottom:12px">
+          自评诚实一点。提交后 AI 会对照你的自评打分，盲点会被暴露。
+        </p>
+        <div class="eval-row">
+          <span class="label">能否指出违反的具体规则</span>
+          <div>
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span>
+          </div>
+        </div>
+        <div class="eval-row">
+          <span class="label">能否口头复述两个核心限制</span>
+          <div>
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star">★</span><span class="star">★</span>
+          </div>
+        </div>
+        <div class="eval-row">
+          <span class="label">修复后零编译错误</span>
+          <div>
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+          </div>
+        </div>
+        <div class="eval-row">
+          <span class="label">不引入 .clone() 逃避方案</span>
+          <div>
+            <span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span><span class="star on">★</span>
+          </div>
+        </div>
+        <div style="margin-top:10px;padding:8px 12px;background:var(--accent-soft);border-radius:6px;font-size:.78rem;color:var(--accent-2)">
+          自评 19 / 20
+        </div>
+
+        <h5 style="font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:18px 0 6px;font-weight:600">反思（可选）</h5>
+        <textarea class="md-textarea" placeholder="这道题哪里让你卡住？哪些规则还需要回去看讲解？" style="font-family:var(--font-feature);font-size:.84rem;min-height:60px;padding:8px 12px"></textarea>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="submit-bar">
+  <div>
+    <div style="font-size:.95rem;font-weight:700;color:var(--orange)">准备好了吗？</div>
+    <div class="text-xs text-muted" style="margin-top:3px">
+      提交后 AI 会对照你的自评打分（自评 19/20）· 约束：不使用 <code>.clone()</code>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn btn-ghost btn-sm">保存草稿</button>
+    <button class="btn btn-primary btn-lg" style="background:var(--orange);padding:13px 26px;font-size:.96rem;box-shadow:0 6px 18px rgba(232,148,90,.35)">
+      提交答案 · 请求 AI 审批 →
+    </button>
+  </div>
+</div>
+
+</body>
+</html>

@@ -14,13 +14,14 @@ export function useConnectionState(): ConnectionState {
   const health = useHealth();
   const sseStatus = useConnectionStore((s) => s.status);
 
-  const claudeAvailable = health.data?.claude?.available ?? false;
+  const runtime = health.data?.agentRuntime?.runtime;
+  const claudeAvailable = runtime?.available ?? health.data?.claude?.available ?? false;
 
   if (health.isError) {
     return { label: '后端离线', color: 'var(--pink)', claudeAvailable: false };
   }
   if (!claudeAvailable) {
-    return { label: 'Claude 未就绪', color: 'var(--orange)', claudeAvailable: false };
+    return { label: `${runtime?.name ?? 'Agent CLI'} 未就绪`, color: 'var(--orange)', claudeAvailable: false };
   }
   if (sseStatus === 'reconnecting' || sseStatus === 'error') {
     return { label: '重连中', color: 'var(--orange)', claudeAvailable };
@@ -28,5 +29,5 @@ export function useConnectionState(): ConnectionState {
   if (sseStatus === 'connecting' || sseStatus === 'idle') {
     return { label: '连接中', color: 'var(--muted)', claudeAvailable };
   }
-  return { label: '在线', color: 'var(--accent)', claudeAvailable };
+  return { label: `${runtime?.name ?? 'Agent CLI'} 在线`, color: 'var(--accent)', claudeAvailable };
 }

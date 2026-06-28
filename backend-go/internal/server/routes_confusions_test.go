@@ -285,6 +285,7 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		{"memory/notes.md", true},
 		{"summary/report.md", true},
 		{"explain/notes.md", true},
+		{"intro/survey.json", true},
 		{"intro/output.md", false},
 		{"practice/tasks.md", false},
 	}

@@ -27,6 +27,7 @@ func main() {
 	fmt.Printf("  Agents:    %s\n", paths.AGENTS_ROOT)
 	fmt.Printf("  Frontend:  %s\n", paths.FRONTEND_ROOT)
 	fmt.Printf("  Claude:    %s (available=%t)\n", srv.ClaudeBin, srv.ClaudeAvailable)
+	fmt.Printf("  Runtime:   %s / %s (available=%t)\n", srv.Runtime.ID, srv.Runtime.Bin, srv.Runtime.Available)
 	fmt.Printf("Listening on http://localhost:%s\n", port)
 
 	httpServer := &http.Server{Addr: addr, Handler: srv.Handler()}

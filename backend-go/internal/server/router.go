@@ -8,8 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	"github.com/xmz14/lll/backend-go/internal/paths"
@@ -19,8 +21,11 @@ import (
 type Server struct {
 	ClaudeBin       string
 	ClaudeAvailable bool
+	Runtime         agentruntime.Runtime
+	RuntimeOptions  []agentruntime.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
+	mu              sync.RWMutex
 }
 
 // broadcaster is the package-global SSE event bus.
@@ -34,6 +39,12 @@ func New() *Server {
 		bin = env
 	}
 	available := probeClaude(bin, 3*time.Second)
+	runtimeCfg, err := agentruntime.Load()
+	if err != nil {
+		println("agent-runtime: load warning:", err.Error())
+	}
+	selectedRuntime := agentruntime.Resolve(runtimeCfg)
+	runtimeOptions := agentruntime.List(runtimeCfg)
 	if err := agents.Load(); err != nil {
 		println("agent-registry: load warning:", err.Error())
 	}
@@ -60,6 +71,8 @@ func New() *Server {
 	return &Server{
 		ClaudeBin:       bin,
 		ClaudeAvailable: available,
+		Runtime:         selectedRuntime,
+		RuntimeOptions:  runtimeOptions,
 		ImageConfig:     imgCfg,
 		ImageAvailable:  imgAvailable,
 	}
@@ -71,6 +84,8 @@ func (s *Server) Handler() http.Handler {
 
 	// Health
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("GET /api/settings/agent-runtime", s.handleGetAgentRuntimeSettings)
+	mux.HandleFunc("PUT /api/settings/agent-runtime", s.handlePutAgentRuntimeSettings)
 
 	// Projects
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
@@ -178,12 +193,18 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	projCount := len(cache.All())
 	sessCount, turnCount, activeCount := sessions.Stats()
+	rt, options := s.runtimeSnapshot()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"workspace": paths.WORKSPACE,
 		"claude": map[string]any{
 			"bin":       s.ClaudeBin,
 			"available": s.ClaudeAvailable,
+		},
+		"agentRuntime": map[string]any{
+			"selected":  rt.ID,
+			"runtime":   rt,
+			"providers": options,
 		},
 		"stats": map[string]any{
 			"projects":       projCount,
@@ -192,6 +213,14 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			"activeSessions": activeCount,
 		},
 	})
+}
+
+func (s *Server) runtimeSnapshot() (agentruntime.Runtime, []agentruntime.Runtime) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]agentruntime.Runtime, len(s.RuntimeOptions))
+	copy(out, s.RuntimeOptions)
+	return s.Runtime, out
 }
 
 // probeClaude runs `<bin> --version` with a timeout; returns true on success.

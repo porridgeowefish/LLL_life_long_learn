@@ -36,7 +36,7 @@ func TestTUIWrapperLaunchesClaudeInAutoMode(t *testing.T) {
 	if !strings.Contains(script, "$permissionMode = 'auto'") {
 		t.Fatalf("wrapper did not set auto permission mode:\n%s", script)
 	}
-	if !strings.Contains(script, "& $claudeExe --permission-mode $permissionMode $promptText") {
+	if !strings.Contains(script, "& $agentExe --permission-mode $permissionMode $promptText") {
 		t.Fatalf("wrapper did not pass permission mode to claude:\n%s", script)
 	}
 }

@@ -5,7 +5,8 @@ Last reviewed: 2026-06-15
 
 ```text
 all agent prompts prohibit ASCII/Unicode character diagrams and use Mermaid for diagrams
-Intro charter asks 3-5 calibration questions including one application question
+Intro first writes 3-5 calibration questions including one application question to intro/survey.json
+Intro calibration questions are answered in the rendered frontend page, not in the CLI/TUI
 project.md creation fields are embedded in every generated prompt
 Intro does not repeat project motivation, self-rated level, target, or completion standard
 unknown answers never become claims of mastery

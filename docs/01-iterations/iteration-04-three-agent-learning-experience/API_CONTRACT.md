@@ -24,6 +24,56 @@ The child is addressable through `/api/projects/{childSlug}`.
 
 ## Agent Invoke
 
+LLL now separates the visible learning agent role from the external CLI
+runtime that executes it. Users choose the runtime globally; individual
+agent invocations keep using the same learning-agent IDs.
+
+```text
+GET /api/settings/agent-runtime
+PUT /api/settings/agent-runtime
+```
+
+The settings response is:
+
+```json
+{
+  "selected": "codex",
+  "runtime": {
+    "id": "codex",
+    "name": "Codex CLI",
+    "bin": "codex",
+    "available": true,
+    "supportsHeadless": true,
+    "promptDelivery": "arg"
+  },
+  "providers": []
+}
+```
+
+Supported runtime IDs:
+
+```text
+claude
+workbuddy
+hermes
+codex
+trae
+```
+
+`PUT /api/settings/agent-runtime` accepts only:
+
+```json
+{"selected":"codex"}
+```
+
+Model, account, auth, and provider-specific parameters are intentionally not
+part of this API. They remain owned by the selected CLI. The backend persists
+the chosen runtime in `config.local.json` as `agentRuntime` while preserving
+other local config fields.
+
+`GET /api/health` includes `agentRuntime` with the selected provider and probe
+status. The legacy `claude` field remains for compatibility.
+
 `POST /api/agents/{id}/invoke` adds optional:
 
 ```json
@@ -159,6 +209,37 @@ Grade request:
 ## File Privacy
 
 `GET /files/projects/{id}/practice/answer-key.json` returns `403`.
+
+## Intro Survey
+
+The Intro module uses `intro/survey.json` as the reusable calibration-page
+protocol. The Intro Agent creates the topic-specific questions first; the
+frontend renders them as a page, then persists learner answers back to the same
+file.
+
+```text
+GET  /files/projects/{id}/intro/survey.json
+POST /files/projects/{id}/intro/survey.json
+```
+
+`POST` writes only this single Intro survey file. Generated final artifacts
+such as `intro/output.md` and `intro/assessment.json` remain agent-owned and
+are not editable through the generic file endpoint.
+
+The JSON shape is:
+
+```json
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-06-15T12:00:00Z",
+  "questions": [{
+    "id": "terms",
+    "label": "边界：术语",
+    "prompt": "Agent 常被概括成...",
+    "answer": "..."
+  }]
+}
+```
 
 ## Explain Summaries
 

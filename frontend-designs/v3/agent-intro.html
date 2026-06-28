@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>引入 · Rust 所有权 · LLL</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/md-editor.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:wght@700;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+.intro-stage{padding:36px 56px 130px;max-width:920px;margin:0 auto}
+
+.intro-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:12px;padding:24px 28px;margin-bottom:18px;
+}
+.intro-card h3{
+  font-size:.78rem;font-weight:600;color:var(--accent);
+  text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;
+}
+
+.story-card{
+  background:linear-gradient(135deg,var(--accent-soft) 0%,var(--card) 100%);
+  border:1px solid var(--accent);
+}
+.story-card h1{
+  font-family:var(--font-serif);font-size:1.7rem;font-weight:900;
+  line-height:1.3;margin-bottom:14px;
+}
+.story-card .lead{
+  font-size:1rem;line-height:1.85;color:var(--fg);
+}
+
+.chip-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.chip{
+  padding:8px 14px;border:2px solid var(--border);border-radius:18px;
+  font-size:.82rem;cursor:pointer;background:var(--card);transition:all .15s;
+}
+.chip:hover{border-color:var(--accent)}
+.chip.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.qa-block{margin-top:14px}
+.qa-q{
+  font-size:.92rem;font-weight:600;margin-bottom:8px;line-height:1.6;
+}
+.qa-textarea{
+  width:100%;padding:11px 14px;font-size:.9rem;
+  border:1px solid var(--border);border-radius:8px;background:var(--card);
+  min-height:90px;resize:vertical;font-family:inherit;
+}
+.qa-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+.prior-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
+.prior-grid label{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--card);border:1px solid var(--border);border-radius:6px;
+  font-size:.82rem;cursor:pointer;transition:all .15s;
+}
+.prior-grid label:hover{border-color:var(--accent)}
+.prior-grid input{margin:0}
+
+.cta-bar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(180deg,var(--card) 0%,var(--accent-soft) 100%);
+  border-top:2px solid var(--accent);
+  padding:14px 28px;display:flex;justify-content:space-between;align-items:center;
+  gap:14px;z-index:60;box-shadow:0 -4px 12px rgba(124,154,114,.10);
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <a href="index.html" class="topbar-logo">Life<span class="accent">Long</span>Learn</a>
+  <div class="topbar-sep"></div>
+  <div class="topbar-nav">
+    <a href="index.html">总览</a>
+    <a href="project.html" class="active">项目</a>
+    <a href="agents.html">智能体</a>
+    <a href="memory.html">记忆</a>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-actions">
+    <div class="topbar-status">
+      <span><span class="dot-status dot-green"></span>已完成</span>
+      <span class="path">projects/rust-ownership/intro/output.md</span>
+    </div>
+  </div>
+</div>
+
+<div class="shell no-context">
+
+  <!-- 左侧栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-title">项目浏览器</div>
+    <div class="sidebar-scroll">
+      <div class="tree-section">项目</div>
+      <a href="project.html" class="tree-item">Rust 所有权</a>
+
+      <div class="tree-section">学习阶段</div>
+      <a href="agent-intro.html" class="tree-item sub active"><span class="icon">🌱</span>引入</a>
+      <a href="agent-explain.html" class="tree-item sub"><span class="icon">📖</span>讲解</a>
+      <a href="agent-practice.html" class="tree-item sub"><span class="icon">✏️</span>练习</a>
+      <a href="agent-extend.html" class="tree-item sub"><span class="icon">🔗</span>拓展</a>
+      <a href="agent-summary.html" class="tree-item sub"><span class="icon">📝</span>总结</a>
+
+      <div class="tree-section">其他项目</div>
+      <a href="index.html" class="tree-item">推荐系统</a>
+      <a href="index.html" class="tree-item">图神经网络</a>
+    </div>
+  </aside>
+
+  <!-- 主舞台 -->
+  <main>
+    <div class="intro-stage">
+
+      <div style="margin-bottom:24px">
+        <h1 style="font-family:var(--font-serif);font-size:1.9rem;font-weight:900">引入 · Rust 所有权</h1>
+        <p class="text-sm text-muted" style="margin-top:6px">
+          引入智能体 · 13:55 完成 · 写入 <code>intro/output.md</code>
+          <span class="badge badge-green" style="margin-left:8px">已完成</span>
+        </p>
+      </div>
+
+      <div class="intro-card story-card">
+        <h3>为什么要学这个</h3>
+        <h1>每行 Rust 代码都在问：这块内存归谁？</h1>
+        <p class="lead">
+          在 C/C++ 里，你手动管内存——忘记释放就泄漏，重复释放就崩溃。
+          在 Java/Python 里，垃圾回收器（GC）替你管——但代价是运行时性能损失和不可预测的暂停。
+        </p>
+        <p class="lead" style="margin-top:12px">
+          <strong>Rust 给了第三条路</strong>：编译器在<strong>编译期</strong>就检查清楚内存的所有者是谁、什么时候释放。
+          运行时零开销，但没有内存安全漏洞。代价？你得学着用"所有权思维"写代码。
+        </p>
+        <p class="lead" style="margin-top:14px;background:var(--orange-soft);border-left:3px solid var(--orange);padding:10px 14px;border-radius:6px;color:var(--orange)">
+          <strong>一句话</strong>：每块内存都有唯一一个"所有者"，所有者离开作用域时自动释放。其他想用这块内存的代码，只能"借用"。这就是接下来要讲的核心。
+        </p>
+      </div>
+
+      <div class="intro-card">
+        <h3>带着这些问题进入讲解</h3>
+        <ol style="font-size:.95rem;line-height:1.85;padding-left:1.5em;color:var(--fg)">
+          <li>为什么 <code>let s2 = s1;</code> 之后 <code>s1</code> 就不能用了？</li>
+          <li>函数参数是怎么"传"的——是复制还是转移？</li>
+          <li>如果我想"借给"函数看一下，但不要拿走所有权，怎么办？</li>
+        </ol>
+      </div>
+
+      <div class="intro-card">
+        <h3>你已经知道什么？（激活先验）</h3>
+        <p style="font-size:.86rem;color:var(--muted-2);margin-bottom:6px">
+          勾选你已经熟悉的——AI 会按你的基础调整讲解深度。
+        </p>
+        <div class="prior-grid">
+          <label><input type="checkbox"> 用过 C/C++ 的指针 / malloc</label>
+          <label><input type="checkbox"> 了解 Java/Python 的 GC</label>
+          <label><input type="checkbox"> 写过 RAII / 析构函数</label>
+          <label><input type="checkbox"> 知道"内存泄漏"和"双重释放"</label>
+          <label><input type="checkbox"> 用过 smart pointer（unique_ptr / shared_ptr）</label>
+          <label><input type="checkbox"> 编译期 vs 运行期检查的区别</label>
+        </div>
+      </div>
+
+      <div class="intro-card">
+        <h3>你为什么学这个？（学习动机）</h3>
+        <p style="font-size:.86rem;color:var(--muted-2);margin-bottom:6px">选 1-3 个最贴近你的</p>
+        <div class="chip-grid">
+          <div class="chip selected">想读懂别人的 Rust 代码</div>
+          <div class="chip">要写 Rust 项目（系统/网络/嵌入式）</div>
+          <div class="chip selected">想搞懂"零成本抽象"是什么</div>
+          <div class="chip">工作/面试需要</div>
+          <div class="chip">学术研究 / 论文阅读</div>
+          <div class="chip">只是好奇</div>
+        </div>
+      </div>
+
+      <div class="intro-card">
+        <h3>在进入讲解前，先回答一个开放问题</h3>
+        <p style="font-size:.86rem;color:var(--muted-2);margin-bottom:14px">
+          不用查资料，凭直觉回答。错的越离谱，讲解越能击中你。
+        </p>
+        <div class="qa-block">
+          <div class="qa-q">下面这段 Python 代码能正常运行：<code>x = [1,2,3]; y = x; y[0] = 99</code>，<code>x</code> 也变成了 <code>[99,2,3]</code>。如果在 Rust 里写类似的代码，会发生什么？</div>
+          <textarea class="qa-textarea" placeholder="你的直觉猜测——Rust 会怎么处理？"></textarea>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div class="cta-bar">
+  <div>
+    <strong style="color:var(--accent);font-size:.92rem">引入阶段完成</strong>
+    <span class="text-sm text-muted" style="margin-left:10px">3 个入门问题已记下，会带到讲解阶段</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn btn-outline btn-sm">编辑 intro/brief.md</button>
+    <a href="agent-explain.html" class="btn btn-primary" style="background:var(--orange);padding:11px 22px;font-size:.9rem;box-shadow:0 6px 18px rgba(232,148,90,.35)">
+      进入讲解阶段 →
+    </a>
+  </div>
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('.chip').forEach(function(c){
+    c.addEventListener('click',function(){c.classList.toggle('selected')});
+  });
+})();
+</script>
+
+</body>
+</html>

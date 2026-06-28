@@ -85,6 +85,10 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read project brief: %w", err)
 	}
+	introSurvey, err := readIntroSurvey(req.ProjectSlug, agent.ID)
+	if err != nil {
+		return nil, fmt.Errorf("read intro survey: %w", err)
+	}
 	if req.PracticeAttempt > 0 && agent.ID != "practice" {
 		return nil, fmt.Errorf("practice attempt evaluation requires practice agent")
 	}
@@ -98,7 +102,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	}
 	outputTargets := outputTargetsFor(agent, req)
 
-	promptMd := renderPrompt(agent, req, preds, memSnap, projectFile, projectBrief)
+	promptMd := renderPrompt(agent, req, preds, memSnap, projectFile, projectBrief, introSurvey)
 
 	runDirName := timestampRunDir(req.AgentID, time.Now().UTC())
 
@@ -143,6 +147,7 @@ func renderPrompt(
 	mem *memorystore.Snapshot,
 	projectFile string,
 	projectBrief string,
+	introSurvey string,
 ) string {
 	var b strings.Builder
 	b.WriteString("# Agent Identity\n\n")
@@ -237,8 +242,22 @@ func renderPrompt(
 	if agent.ID == "intro" {
 		b.WriteString("\n## Intro Calibration Boundary\n\n")
 		b.WriteString("- Do not ask again why the learner chose the topic, their self-rated current level, target level, or completion standard when those fields are present above.\n")
+		b.WriteString("- Generate topic-specific diagnostic questions as `intro/survey.json`; do not ask the learner to answer calibration questions in the CLI/TUI.\n")
 		b.WriteString("- Ask only topic-specific diagnostic questions needed to locate prerequisite gaps, such as terminology, causal understanding, and a concrete application.\n")
 		b.WriteString("- A broad current-level label is context, not proof of mastery. Diagnose specific knowledge without repeating the project-creation interview.\n")
+		b.WriteString("- If `intro/survey.json` below contains learner answers, use those answers as evidence and write `intro/output.md` plus `intro/assessment.json`.\n")
+	}
+
+	if agent.ID == "intro" {
+		b.WriteString("\n# Intro Survey State\n\n")
+		if strings.TrimSpace(introSurvey) == "" {
+			b.WriteString("`intro/survey.json` does not exist yet. First produce that file only, so the frontend can render the calibration questions as a page.\n")
+		} else {
+			b.WriteString("Current `intro/survey.json` content follows. If answers are present, treat them as the learner's calibration evidence.\n\n")
+			b.WriteString("```json\n")
+			b.WriteString(strings.TrimSpace(introSurvey))
+			b.WriteString("\n```\n")
+		}
 	}
 
 	b.WriteString("\n# Predecessor Files\n\n")
@@ -329,6 +348,24 @@ func readProjectBrief(projectSlug string) (string, string, error) {
 		return "", "", err
 	}
 	return projectFile, strings.TrimSpace(string(data)), nil
+}
+
+func readIntroSurvey(projectSlug string, agentID string) (string, error) {
+	if agentID != "intro" {
+		return "", nil
+	}
+	projectRoot, err := workspace.ProjectRootForSlug(projectSlug)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(filepath.Join(projectRoot, "intro", "survey.json"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 // MakeRunDirName constructs a timestamped run directory name for a given agentID.

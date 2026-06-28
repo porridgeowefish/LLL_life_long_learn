@@ -7,6 +7,7 @@ File remains the durable source of truth.
 
 ```text
 intro/output.md
+intro/survey.json
 intro/assessment.json
 explain/manifest.json
 explain/pages/NNN-slug.md

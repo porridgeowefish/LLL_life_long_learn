@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -24,6 +25,7 @@ func LaunchHeadless(
 	claudeBin string,
 	model string,
 	pkg *promptassembly.Package,
+	runtime *agentruntime.Runtime,
 ) error {
 	projectRoot, err := workspace.ProjectRootForSlug(projectSlug)
 	if err != nil {
@@ -56,14 +58,19 @@ func LaunchHeadless(
 	defer stderr.Close()
 
 	startedAt := time.Now().UTC()
-	args := []string{"-p"}
-	if model != "" {
+	rt := headlessRuntime(claudeBin, runtime)
+	if !rt.SupportsHeadless {
+		return fmt.Errorf("%s does not support headless execution yet", rt.Name)
+	}
+	args := headlessArgs(rt, projectRoot, pkg.PromptMd)
+	if rt.ID == agentruntime.RuntimeClaude && model != "" {
 		args = append(args, "--model", model)
 	}
-	args = append(args, "--permission-mode", NormalizePermissionMode(""))
-	cmd := exec.CommandContext(ctx, claudeBin, args...)
+	cmd := exec.CommandContext(ctx, rt.Bin, args...)
 	cmd.Dir = projectRoot
-	cmd.Stdin = strings.NewReader(pkg.PromptMd)
+	if headlessUsesStdin(rt) {
+		cmd.Stdin = strings.NewReader(pkg.PromptMd)
+	}
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	configureHeadlessCommand(cmd)
@@ -81,6 +88,8 @@ func LaunchHeadless(
 		"projectSlug":    projectSlug,
 		"zoneName":       workspace.ZonePractice,
 		"mode":           "headless-single-shot",
+		"runtimeId":      rt.ID,
+		"runtimeBin":     rt.Bin,
 		"permissionMode": NormalizePermissionMode(""),
 		"exitCode":       exitCode,
 		"startedAt":      startedAt,
@@ -92,4 +101,34 @@ func LaunchHeadless(
 		return fmt.Errorf("headless claude evaluation: %w", runErr)
 	}
 	return nil
+}
+
+func headlessRuntime(claudeBin string, runtime *agentruntime.Runtime) agentruntime.Runtime {
+	if runtime != nil {
+		return *runtime
+	}
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeClaude)
+	if claudeBin == "" {
+		claudeBin = def.DefaultBin
+	}
+	return agentruntime.Runtime{Definition: def, Bin: claudeBin, Available: true}
+}
+
+func headlessArgs(rt agentruntime.Runtime, projectRoot, prompt string) []string {
+	switch rt.ID {
+	case agentruntime.RuntimeClaude:
+		return []string{"-p", "--permission-mode", NormalizePermissionMode("")}
+	case agentruntime.RuntimeCodex:
+		return []string{"exec", "-", "--cd", projectRoot}
+	case agentruntime.RuntimeHermes:
+		return []string{"-z", prompt}
+	case agentruntime.RuntimeTrae:
+		return []string{"run", prompt, "--working-dir", projectRoot}
+	default:
+		return nil
+	}
+}
+
+func headlessUsesStdin(rt agentruntime.Runtime) bool {
+	return rt.ID == agentruntime.RuntimeClaude || rt.ID == agentruntime.RuntimeCodex
 }

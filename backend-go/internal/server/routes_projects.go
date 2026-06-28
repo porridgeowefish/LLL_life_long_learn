@@ -288,7 +288,7 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleWriteFile is the POST counterpart of handleReadFile.
-// Write whitelist: memory/<file>, summary/<file>, explain/notes.md.
+// Write whitelist: memory/<file>, summary/<file>, explain/notes.md, intro/survey.json.
 // Learner-owned files — iter-03 expanded from memory-only to support the
 // MarkdownEditor writing notes and summaries from the UI.
 func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
@@ -322,6 +322,9 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	allowed := dir == "memory" || dir == "summary"
 	// explain/ is read-only except for explain/notes.md (learner-owned notes).
 	if dir == "explain" && file == "notes.md" {
+		allowed = true
+	}
+	if dir == "intro" && file == "survey.json" {
 		allowed = true
 	}
 	if !allowed {

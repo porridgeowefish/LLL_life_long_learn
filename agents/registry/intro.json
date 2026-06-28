@@ -16,6 +16,8 @@
   "allowedZones": ["Intro"],
   "charterPath": "agents/charters/intro.md",
   "defaultOutputTargets": [
-    {"zone": "Intro", "filename": "output.md"}
+    {"zone": "Intro", "filename": "survey.json"},
+    {"zone": "Intro", "filename": "output.md"},
+    {"zone": "Intro", "filename": "assessment.json"}
   ]
 }

@@ -4,6 +4,7 @@
 
 import type {
   Agent,
+  AgentRuntimeHealth,
   HealthResponse,
   PredecessorFile,
   ProjectMeta,
@@ -24,6 +25,8 @@ export interface ProjectResponse {
 export interface AgentsListResponse {
   agents: Agent[];
 }
+
+export type AgentRuntimeSettingsResponse = AgentRuntimeHealth;
 
 export interface SessionsListResponse {
   sessions: Session[];

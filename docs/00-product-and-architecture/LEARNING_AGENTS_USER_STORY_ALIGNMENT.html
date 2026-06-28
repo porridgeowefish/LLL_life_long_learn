@@ -1,0 +1,2073 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LLL 五智能体用户故事补充对齐稿</title>
+  <style>
+    :root {
+      --paper: #f4efe5;
+      --paper-deep: #e7dcc9;
+      --ink: #17211d;
+      --muted: #667168;
+      --line: #d2c4ae;
+      --card: rgba(255, 253, 247, .88);
+      --forest: #1f5a47;
+      --forest-soft: #dcebe4;
+      --rust: #b84d2f;
+      --rust-soft: #f4ddd4;
+      --gold: #b47b20;
+      --gold-soft: #f5e8c9;
+      --blue: #2d6383;
+      --blue-soft: #dceaf2;
+      --danger: #9a3f3f;
+      --shadow: 0 18px 50px rgba(55, 45, 31, .12);
+      --serif: "Iowan Old Style", "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+      --sans: "Aptos", "Noto Sans SC", "Source Han Sans SC", sans-serif;
+      --mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: var(--sans);
+      background:
+        radial-gradient(circle at 8% 4%, rgba(184, 77, 47, .14), transparent 28rem),
+        radial-gradient(circle at 96% 92%, rgba(31, 90, 71, .16), transparent 30rem),
+        repeating-linear-gradient(0deg, rgba(83, 68, 45, .025) 0, rgba(83, 68, 45, .025) 1px, transparent 1px, transparent 24px),
+        var(--paper);
+    }
+
+    button,
+    textarea,
+    input,
+    select { font: inherit; }
+
+    button { color: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .rail {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+      padding: 26px 20px;
+      border-right: 1px solid var(--line);
+      background: rgba(247, 242, 232, .92);
+      backdrop-filter: blur(14px);
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--rust);
+      font: 800 11px/1 var(--sans);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+    }
+
+    .rail h1 {
+      margin: 0;
+      font: 900 28px/1.08 var(--serif);
+    }
+
+    .rail-copy {
+      margin: 12px 0 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .summary-box {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .summary-box div {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(255,255,255,.58);
+    }
+
+    .summary-box strong {
+      display: block;
+      font: 800 20px/1 var(--serif);
+    }
+
+    .summary-box span {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .progress-track {
+      height: 7px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #ded5c5;
+    }
+
+    .progress-track span {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--rust), var(--gold), var(--forest));
+      transition: width .25s ease;
+    }
+
+    .page-nav {
+      display: grid;
+      gap: 7px;
+    }
+
+    .page-link {
+      width: 100%;
+      padding: 11px 12px;
+      border: 1px solid transparent;
+      border-radius: 13px;
+      background: transparent;
+      text-align: left;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .page-link:hover,
+    .page-link.active {
+      border-color: var(--line);
+      background: rgba(255,255,255,.72);
+      box-shadow: 0 8px 22px rgba(55,45,31,.08);
+      transform: translateX(3px);
+    }
+
+    .page-link small {
+      display: block;
+      color: var(--rust);
+      font: 800 10px/1 var(--sans);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .page-link strong {
+      display: block;
+      margin-top: 5px;
+      font-size: 14px;
+    }
+
+    .page-link span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .rail-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .rail-actions .wide { grid-column: 1 / -1; }
+
+    .btn {
+      min-height: 39px;
+      padding: 0 13px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255,255,255,.68);
+      cursor: pointer;
+      transition: .16s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 18px rgba(55,45,31,.09); }
+    .btn.primary { border-color: var(--forest); background: var(--forest); color: #fff; }
+    .btn.rust { border-color: var(--rust); background: var(--rust); color: #fff; }
+    .btn.ghost { background: transparent; }
+    .btn:disabled { cursor: not-allowed; opacity: .45; transform: none; box-shadow: none; }
+
+    .main {
+      min-width: 0;
+      padding: 24px 28px 30px;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 14px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      max-width: 1280px;
+      margin: 0 auto 18px;
+      padding: 14px 17px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(250,247,239,.88);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+    }
+
+    .toolbar-title strong {
+      display: block;
+      font: 800 18px/1.2 var(--serif);
+    }
+
+    .toolbar-title span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toolbar-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .toolbar input,
+    .toolbar select {
+      min-height: 39px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(255,255,255,.76);
+      padding: 0 11px;
+    }
+
+    .toolbar input { width: 210px; }
+
+    .page {
+      display: none;
+      max-width: 1280px;
+      min-height: calc(100vh - 130px);
+      margin: 0 auto;
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      background: rgba(255,252,246,.76);
+      box-shadow: var(--shadow);
+    }
+
+    .page.active { display: block; animation: reveal .24s ease both; }
+
+    @keyframes reveal {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .page-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: start;
+      margin-bottom: 22px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .page-head h2 {
+      margin: 0;
+      font: 900 clamp(28px, 4vw, 44px)/1.05 var(--serif);
+    }
+
+    .page-head p {
+      max-width: 850px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.75;
+    }
+
+    .page-number {
+      min-width: 92px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      background: var(--ink);
+      color: #fff;
+      text-align: center;
+    }
+
+    .page-number small {
+      display: block;
+      color: #c9d3cd;
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    .page-number strong {
+      display: block;
+      margin-top: 5px;
+      font: 800 25px/1 var(--serif);
+    }
+
+    .callout {
+      margin-bottom: 18px;
+      padding: 15px 17px;
+      border: 1px solid #dec78d;
+      border-left: 5px solid var(--gold);
+      border-radius: 14px;
+      background: var(--gold-soft);
+      line-height: 1.65;
+      font-size: 13px;
+    }
+
+    .story-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 15px;
+    }
+
+    .story-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--card);
+    }
+
+    .story-card[data-status="accept"] { border-color: #8eb49f; box-shadow: inset 0 4px 0 var(--forest); }
+    .story-card[data-status="revise"] { border-color: #d5ad61; box-shadow: inset 0 4px 0 var(--gold); }
+    .story-card[data-status="reject"] { border-color: #cb8c8c; box-shadow: inset 0 4px 0 var(--danger); }
+    .story-card[data-status="pending"] { box-shadow: inset 0 4px 0 #9aa39d; }
+
+    .story-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .story-id {
+      display: inline-flex;
+      min-height: 25px;
+      align-items: center;
+      padding: 0 9px;
+      border-radius: 999px;
+      background: var(--rust-soft);
+      color: var(--rust);
+      font: 800 11px/1 var(--mono);
+    }
+
+    .consensus {
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: var(--forest-soft);
+      color: var(--forest);
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .story-card h3 {
+      margin: 13px 0 8px;
+      font: 800 21px/1.18 var(--serif);
+    }
+
+    .story-summary {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .story-statement {
+      margin: 14px 0 0;
+      padding: 12px 13px;
+      border-radius: 12px;
+      background: #f3eee4;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .detail {
+      margin-top: 13px;
+      border-top: 1px dashed var(--line);
+      padding-top: 12px;
+    }
+
+    .detail summary {
+      cursor: pointer;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .detail h4 {
+      margin: 13px 0 5px;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .detail ul {
+      margin: 0;
+      padding-left: 19px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    .action-table {
+      width: 100%;
+      margin-top: 8px;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .action-table th,
+    .action-table td {
+      padding: 7px 8px;
+      border: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+
+    .action-table th { background: var(--paper-deep); }
+
+    .source {
+      margin-top: 12px;
+      color: #7a6e5f;
+      font: 10px/1.55 var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .decision {
+      margin-top: auto;
+      padding-top: 16px;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 6px;
+    }
+
+    .status-row label {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status-row input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .status-row label:has(input:checked) {
+      border-color: var(--ink);
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .feedback {
+      width: 100%;
+      min-height: 72px;
+      margin-top: 8px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255,255,255,.8);
+      padding: 10px 11px;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .feedback:focus,
+    .toolbar input:focus,
+    .toolbar select:focus {
+      outline: 2px solid rgba(45,99,131,.22);
+      border-color: var(--blue);
+    }
+
+    .package {
+      display: grid;
+      gap: 14px;
+    }
+
+    .package textarea {
+      width: 100%;
+      min-height: 420px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #1e2421;
+      color: #eef5ef;
+      padding: 18px;
+      font: 12px/1.65 var(--mono);
+    }
+
+    .package-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .empty {
+      grid-column: 1 / -1;
+      padding: 32px;
+      border: 1px dashed var(--line);
+      border-radius: 18px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      z-index: 80;
+      max-width: 360px;
+      padding: 12px 15px;
+      border-radius: 12px;
+      background: var(--ink);
+      color: #fff;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+      transition: .2s ease;
+      font-size: 12px;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+
+    .file-input { display: none; }
+
+    @media (max-width: 1080px) {
+      .app { grid-template-columns: 250px minmax(0, 1fr); }
+      .story-grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      .app { display: block; }
+      .rail { position: static; width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+      .page-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .main { padding: 14px; }
+      .toolbar { position: static; align-items: flex-start; flex-direction: column; }
+      .toolbar-controls { justify-content: flex-start; }
+      .toolbar input { width: min(100%, 280px); }
+      .page { padding: 20px; }
+      .page-head { grid-template-columns: 1fr; }
+      .page-number { width: 92px; }
+      .status-row { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <p class="eyebrow">LLL Product Alignment</p>
+      <h1>五智能体用户故事补充稿</h1>
+      <p class="rail-copy">
+        这不是实现页面，而是实现前的合同桌。逐项选择“认同 / 需修改 / 不采用 / 待决定”，写下反馈，然后下载一份自带结果的 HTML。
+      </p>
+
+      <div class="summary-box">
+        <div><strong id="acceptedCount">0</strong><span>已认同</span></div>
+        <div><strong id="reviewedCount">0</strong><span>已表态</span></div>
+        <div><strong id="feedbackCount">0</strong><span>有反馈</span></div>
+        <div><strong id="totalCount">0</strong><span>故事总数</span></div>
+      </div>
+      <div class="progress-track" aria-label="对齐进度"><span id="progressBar"></span></div>
+
+      <nav class="page-nav" id="pageNav"></nav>
+
+      <div class="rail-actions">
+        <button class="btn ghost" id="prevBtn">上一页</button>
+        <button class="btn primary" id="nextBtn">下一页</button>
+        <button class="btn rust wide" id="exportHtmlBtn">下载已对齐 HTML</button>
+        <button class="btn wide" id="jumpPackageBtn">查看 AI 补充包</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="toolbar">
+        <div class="toolbar-title">
+          <strong id="toolbarTitle"></strong>
+          <span id="toolbarDesc"></span>
+        </div>
+        <div class="toolbar-controls">
+          <input id="searchInput" type="search" placeholder="搜索故事、按钮、数据路径">
+          <select id="statusFilter" aria-label="按状态筛选">
+            <option value="all">全部状态</option>
+            <option value="accept">只看认同</option>
+            <option value="revise">只看需修改</option>
+            <option value="reject">只看不采用</option>
+            <option value="pending">只看待决定</option>
+          </select>
+          <button class="btn" id="exportJsonBtn">导出 JSON</button>
+          <button class="btn" id="importBtn">导入结果</button>
+          <input class="file-input" id="importFile" type="file" accept=".json,application/json">
+          <button class="btn ghost" id="resetBtn">恢复初始</button>
+        </div>
+      </section>
+
+      <section id="deck"></section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script id="alignment-seed">window.__LLL_ALIGNMENT_SEED__ = null;</script>
+  <script>
+    const STORAGE_KEY = "lll-learning-agents-alignment-v1";
+    const STATUS_LABELS = {
+      accept: "认同",
+      revise: "需修改",
+      reject: "不采用",
+      pending: "待决定"
+    };
+
+    const pages = [
+      {
+        id: "guide",
+        short: "使用说明",
+        title: "先把事实、共识和原型猜测分开",
+        desc: "用户本轮明确认可的内容默认标为“认同”；v3 额外出现但尚未确认的能力默认标为“待决定”。",
+        callout: "边界说明：当前 iteration-02 只承诺工作台骨架与 Explain Agent。本文面向后续产品补充，不自动扩大当前迭代的实现范围。",
+        items: [
+          {
+            id: "G-01",
+            title: "五个学习智能体是固定主流程",
+            summary: "项目内保留 Intro / Explain / Practice / Extend（领域）/ Summary 五个阶段；阶段之间共享学习痕迹，但职责不互相吞并。",
+            story: "作为学习者，我希望每个学习项目都有稳定的五阶段骨架，以便我知道现在是在激发兴趣、理解、练习、建立关系，还是沉淀复习材料。",
+            acceptance: [
+              "五阶段在项目导航中固定可见。",
+              "可以跳转，但系统明确展示前置材料是否齐全。",
+              "每个阶段有独立输入、产出、动作和持久化合同。",
+              "Memory Agent 不作为第六个学习阶段；若保留，只能是横切辅助能力。"
+            ],
+            data: ["project state.active_zone", "各 zone 的输出与学习痕迹", "跨阶段 artifact 引用"],
+            source: "用户本轮 1-5；LEARNING_PROJECT_STRUCTURE.md § Learning Flow Zones",
+            consensus: true
+          },
+          {
+            id: "G-02",
+            title: "原型不是产品合同",
+            summary: "v3 中出现的按钮、默认值和布局只能作为候选；只有在本页被认同后，才进入后续用户故事与迭代文档。",
+            story: "作为产品维护者，我希望实验 mock 中的所有暗示都被显式审查，以免开发团队把演示文本误当成已经确认的需求。",
+            acceptance: [
+              "每个交互动作都能在本文找到目的、前置条件、成功结果和失败结果。",
+              "缺失页面或假链接被标为缺口，而不是假装可用。",
+              "用户导出的 HTML 成为下一轮补充输入，不直接替代正式 PRD/iteration 文档。"
+            ],
+            data: ["alignment decision", "feedback", "exportedAt"],
+            source: "frontend-designs/v3/*；DOCUMENTATION_STANDARD 的事实源原则",
+            consensus: true
+          },
+          {
+            id: "G-03",
+            title: "选择结果必须可被下一轮 AI 读取",
+            summary: "对齐结果既保存在浏览器本地，也能下载为一份包含选择与反馈的独立 HTML。",
+            story: "作为产品负责人，我希望完成选择后直接把同一份 HTML 交给 AI，使 AI 只读取我认同或要求修改的故事，再继续补充正式产品文档。",
+            acceptance: [
+              "输入变化自动保存到 localStorage。",
+              "“下载已对齐 HTML”生成可离线打开的单文件。",
+              "导出的 HTML 内嵌当前状态，不依赖原浏览器缓存。",
+              "AI 补充包只列认同与需修改项，并保留反馈。"
+            ],
+            actions: [
+              ["下载已对齐 HTML", "序列化当前页面与全部选择，生成单文件下载", "下载成功；原文件不被浏览器静默覆盖"],
+              ["导出 JSON", "生成机器可读备份", "包含 schemaVersion、时间、逐项状态和反馈"],
+              ["导入结果", "读取此前 JSON 并覆盖当前对齐状态", "先校验结构；无效文件不改变现状"],
+              ["恢复初始", "回到本文预置共识", "需要二次确认，清除本页 localStorage"]
+            ],
+            source: "用户本轮：可以选择和反馈，并且可以保存结果在 HTML 中",
+            consensus: true
+          }
+        ]
+      },
+      {
+        id: "input",
+        short: "学习输入",
+        title: "项目入口只收真正影响学习编排的四项",
+        desc: "主题已由当前项目确定；Intro 的最小输入聚焦学习起点、目标、难度与交付成果。",
+        callout: "与 v3 的差异：分类、模板、起点阶段、备注可以作为高级设置，但不能挤进最小必填表单。v3 的“仅主题必填”也不足以支撑用户明确要求的四项学习合同。",
+        items: [
+          {
+            id: "IN-01",
+            title: "当前学习起点",
+            summary: "让用户用自然语言说明“我现在会什么、不会什么、在哪里卡住”，而不是让系统仅从分类标签猜测。",
+            story: "作为学习者，我希望简单描述当前基础，以便 Intro 和后续智能体从我的真实起点出发，而不是输出一篇通用教材。",
+            acceptance: [
+              "支持自然语言输入，并可提供少量示例占位文本。",
+              "允许“完全不了解”或“已有经验但概念混乱”等非等级化表达。",
+              "输入进入项目 brief，并在后续讲解、练习难度与总结中可追溯。",
+              "系统不得把勾选技术经历直接等同于掌握。"
+            ],
+            data: ["project.md.current_ability", "intro/brief.md", "memory/project-memory.md（经用户确认后）"],
+            source: "用户本轮 Intro 定义；v3 agent-intro 的先验勾选只能作为辅助",
+            consensus: true
+          },
+          {
+            id: "IN-02",
+            title: "学习目标",
+            summary: "明确学习结束后希望达到的能力状态，而不是只填“为什么想学”。",
+            story: "作为学习者，我希望说明想达到什么能力，以便五个智能体围绕同一个终点协作。",
+            acceptance: [
+              "目标描述支持能力动词，如解释、比较、实现、诊断、迁移。",
+              "系统可提示把模糊目标改写为可观察目标，但不替用户擅自改变。",
+              "练习评审标准和总结完成度引用该目标。"
+            ],
+            data: ["project.md.target_ability", "state.json.completion_contract"],
+            source: "用户本轮 Intro 定义；LEARNING_PROJECT_STRUCTURE.md project.md",
+            consensus: true
+          },
+          {
+            id: "IN-03",
+            title: "学习难度",
+            summary: "用户选择期望挑战强度，系统用它校准讲解密度、题目难度与提示程度。",
+            story: "作为学习者，我希望声明学习难度，以便内容既不无聊也不突然越级。",
+            acceptance: [
+              "提供清晰的等级说明，而不只是“入门/常规/挑战/硬核”名字。",
+              "难度影响题目梯度、术语密度、反例深度和提示强度。",
+              "后续可根据练习表现建议调整，但必须让用户知道。",
+              "难度不是能力判定，不能写入长期记忆为固定标签。"
+            ],
+            data: ["project state.requested_difficulty", "practice generation config"],
+            source: "用户本轮 Intro 定义；v3 create-project.html 起始难度",
+            consensus: true
+          },
+          {
+            id: "IN-04",
+            title: "学习交付成果",
+            summary: "用户说明最终要带走什么，如一份讲稿、可运行代码、概念图、考试复习包或决策报告。",
+            story: "作为学习者，我希望提前定义交付成果，以便学习过程不是漫无目的地阅读，而是逐步产出可验证结果。",
+            acceptance: [
+              "支持选择常见成果并补充自定义成果。",
+              "交付成果决定练习形式与 Summary 的最终结构。",
+              "系统在各阶段显示当前成果完成进度。",
+              "Summary 必须能指出成果是否完成、缺什么证据。"
+            ],
+            data: ["project.md.completion_standard", "project state.deliverables[]", "summary/deliverables.md 或 summary.md 对应段落"],
+            source: "用户本轮 Intro 定义；LEARNING_PROJECT_STRUCTURE.md completion standard",
+            consensus: true
+          },
+          {
+            id: "IN-05",
+            title: "高级创建选项降级为可选",
+            summary: "v3 的分类、模板、起点阶段和备注保留为折叠高级设置，不作为开始学习的阻塞项。",
+            story: "作为希望快速开始的学习者，我不想先理解产品的分类系统；作为高级用户，我仍希望用模板或直接进入某阶段。",
+            acceptance: [
+              "默认只显示四项学习合同与主题。",
+              "高级设置可展开，包含分类、模板、起点阶段、备注。",
+              "直接练习或仅总结时，系统提示缺失前置材料的影响。",
+              "模板只预填 brief，不改变五阶段固定结构。"
+            ],
+            actions: [
+              ["分类选项", "只影响展示与模板建议", "不得改变 Agent 职责"],
+              ["模板选项", "预填五阶段 brief", "用户可预览将写入的内容"],
+              ["起点阶段", "设置首个打开的 zone", "不删除其他 zone"],
+              ["取消", "返回来源页且不写盘", "有未保存输入时提示"],
+              ["创建项目", "校验四项合同并创建目录/文件", "成功后进入项目页；失败保留表单"]
+            ],
+            source: "frontend-designs/v3/create-project.html",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "intro",
+        short: "Intro",
+        title: "Intro：从兴趣、历史和用户疑问建立入口",
+        desc: "不是缩短版讲解，也不是资格考试；它负责让用户愿意继续，并把问题意识交给 Explain。",
+        callout: "用户明确要求“从趣味和历史角度，结合用户疑问，生成结果”。v3 已有兴趣钩子和先验激活，但历史脉络尚未成为固定输出合同。",
+        items: [
+          {
+            id: "I-01",
+            title: "趣味钩子",
+            summary: "用反直觉现象、真实冲突、故事或有张力的问题把主题变得值得学。",
+            story: "作为学习者，我希望先看到这个知识为什么有意思，以便产生继续探索的内在动机。",
+            acceptance: [
+              "钩子与用户目标和起点有关，不是通用鸡汤。",
+              "长度克制，不提前展开完整知识讲解。",
+              "至少提出一个可在后续验证的悬念。",
+              "避免伪史料、虚构名人故事和夸大结论。"
+            ],
+            data: ["intro/output.md#兴趣入口", "intro trace.source_questions[]"],
+            source: "用户本轮 Intro 定义；v3 agent-intro story-card",
+            consensus: true
+          },
+          {
+            id: "I-02",
+            title: "历史脉络",
+            summary: "说明这个概念因为什么问题出现、替代了什么旧办法、经历了哪些关键转折。",
+            story: "作为学习者，我希望从历史问题链理解知识为何长成今天这样，以便记住设计动机，而不是孤立背定义。",
+            acceptance: [
+              "历史叙事围绕问题与解决方案，不堆年份。",
+              "区分确定史实、常见解释和类比性叙事。",
+              "必要时列出可核验来源或明确“需要联网核验”。",
+              "历史段落最终回扣用户当前疑问。"
+            ],
+            data: ["intro/output.md#历史线索", "source citations（若启用检索）"],
+            source: "用户本轮明确要求；v3 当前缺口",
+            consensus: true
+          },
+          {
+            id: "I-03",
+            title: "用户疑问驱动的入口问题",
+            summary: "把四项输入与用户原始疑问整理成 2-4 个后续学习问题。",
+            story: "作为学习者，我希望 Intro 记住我为什么来，并把我的疑问变成学习路线，而不是用系统预设问题覆盖我。",
+            acceptance: [
+              "保留用户原始表述，同时给出结构化改写。",
+              "入口问题数量克制，建议 2-4 个。",
+              "每个问题标注会在哪个阶段得到处理或验证。",
+              "Explain 默认继承这些问题，无需用户重复输入。"
+            ],
+            data: ["intro/output.md#入口问题", "project state.open_questions[]", "Explain predecessor context"],
+            source: "用户本轮；ROADMAP Intro output contract",
+            consensus: true
+          },
+          {
+            id: "I-04",
+            title: "先验激活与开放猜测",
+            summary: "可用勾选与开放问题帮助用户暴露直觉，但它是可选增强，不增加额外必填负担。",
+            story: "作为学习者，我希望系统用一个轻量问题唤起已有经验，以便后续讲解能针对我的真实直觉。",
+            acceptance: [
+              "先验勾选可跳过，且不冒充测评结果。",
+              "开放回答在用户进入 Explain 时一并提交。",
+              "回答只用于定制讲解，不公开贴“正确/错误”标签。",
+              "用户可编辑或删除这些输入。"
+            ],
+            actions: [
+              ["先验复选框", "记录用户自报经验", "改变讲解示例与术语起点"],
+              ["动机 chips", "允许选择 1-3 个动机", "与四项合同中的目标互补，不替代目标"],
+              ["开放问题文本框", "保存未经查资料的直觉", "作为 Explain 的误解检测输入"],
+              ["编辑 intro/brief.md", "打开当前 Intro 输入合同", "保存后标记需重新生成或继续沿用"],
+              ["进入讲解阶段", "提交当前 Intro 痕迹并打开 Explain", "不得因未填可选项阻塞"]
+            ],
+            source: "frontend-designs/v3/agent-intro.html",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "explain",
+        short: "Explain",
+        title: "Explain：零额外表单，围绕困惑持续讲清楚",
+        desc: "首次生成自动继承项目输入与 Intro；之后用户通过选中文章和底部追问继续学习。",
+        callout: "“无需额外输入”不等于“没有上下文”。Explain 必须自动读取用户四项学习合同、Intro 输出、项目记忆和已标困惑。",
+        items: [
+          {
+            id: "E-01",
+            title: "自动生成结构化讲解",
+            summary: "用户进入 Explain 后即可调用，不再出现新的启动表单。",
+            story: "作为学习者，我希望不用重复填写信息就获得针对当前目标的讲解，以便把注意力留在理解本身。",
+            acceptance: [
+              "自动读取项目目标、起点、难度、交付成果和 Intro 入口问题。",
+              "输出至少覆盖第一性原理、MECE 结构、概念关系、边界与常见误解。",
+              "内容写入 explain/output.md，原始运行进入 runs。",
+              "重新调用不会无提示覆盖旧版本，需保留版本或明确替换确认。"
+            ],
+            data: ["explain/output.md", "runs/<session>/", "explain/version history"],
+            source: "用户本轮；AGENT_PRIMITIVES.md Explain primitives；v3 agent-explain",
+            consensus: true
+          },
+          {
+            id: "E-02",
+            title: "选中文章段落或文字标记困惑",
+            summary: "支持段落级和字符范围选择，记录引用片段、位置、用户问题与当前文档版本。",
+            story: "作为学习者，我希望选中让我困惑的原文并直接提问，以便 AI 知道我卡在具体哪句话。",
+            acceptance: [
+              "选择文本后出现“标困惑 / 追加问题 / 加入笔记 / 取消”浮层。",
+              "保存 source artifact id、版本、段落 id、字符范围和引用快照。",
+              "原文更新后仍能通过引用快照回看，若定位漂移则明确提示。",
+              "用户可查看、编辑、解决或删除困惑。"
+            ],
+            actions: [
+              ["标困惑", "保存选择范围并允许补一句原因", "进入困惑清单，可用于练习生成"],
+              ["追加问题", "把选中文本作为引用上下文放入底部提问框", "不立即发送，用户可编辑"],
+              ["加入笔记", "复制引用与来源到 explain/notes.md 草稿", "保留来源链接"],
+              ["查看所有困惑", "打开按未解决/已解决筛选的列表", "点击可回到原文位置"]
+            ],
+            source: "用户本轮；v3 DESIGN.md D4；agent-explain.html 段落交互",
+            consensus: true
+          },
+          {
+            id: "E-03",
+            title: "底部追加问题",
+            summary: "页面底部常驻轻量追问输入，支持普通问题或带选中文本引用的问题。",
+            story: "作为学习者，我希望读到哪里就追问到哪里，而且所有问答追加保留，以便形成连续的思考轨迹。",
+            acceptance: [
+              "追问追加到同一学习时间线，不覆盖前文。",
+              "发送前展示将注入的引用、前置文件与会话状态。",
+              "会话不可恢复时，系统明确新建 session 但挂在同一 Explain 线程。",
+              "回复可提炼到讲解、笔记或困惑解决记录，但原始 turn 不变。"
+            ],
+            data: ["runs/<session>/transcript.ndjson", "turns/*", "confusions[]", "explain/notes.md"],
+            source: "用户本轮；iteration-02 USER_STORIES 6-8；v3 project followup panel",
+            consensus: true
+          },
+          {
+            id: "E-04",
+            title: "讲解页动作合同",
+            summary: "把 v3 中已经出现的讲解按钮从视觉占位变成可验收行为。",
+            story: "作为学习者，我希望每个讲解按钮都可预测，以免“重新调用”“进入练习”造成丢失或隐式状态变化。",
+            acceptance: [
+              "重新调用前展示原因输入或默认沿用当前合同。",
+              "进入练习只切换页面，不自动生成题，除非用户确认题量。",
+              "针对困惑生成练习时，清楚列出会被采用的困惑。",
+              "查看 prompt 对用户可见，但敏感本地路径可做必要脱敏。"
+            ],
+            actions: [
+              ["进入练习", "打开练习配置，题量待用户确认", "不直接暴露答案"],
+              ["重新调用讲解", "创建新 run 与输出版本", "旧输出可回看"],
+              ["在练习阶段验证困惑", "预选当前未解决困惑", "用户仍可调整题量和范围"],
+              ["查看 prompt", "展示组装后的身份、前置路径、规则与输出目标", "只读"],
+              ["源文件", "切换渲染视图和 Markdown 原文", "不等同编辑"],
+              ["编辑", "进入受控编辑模式", "保存为学习者编辑版本"]
+            ],
+            source: "frontend-designs/v3/agent-explain.html；project.html",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "practice-generate",
+        short: "练习生成",
+        title: "Practice 上半场：用户只决定题量，AI 只出题不出答案",
+        desc: "题目来自学习目标、讲解内容、困惑与历史表现；默认提醒不超过 10 道。",
+        callout: "练习生成与练习评审必须分成两个阶段。生成题目时严禁把标准答案、解析或可反推出答案的评审细则一并泄露给学习者。",
+        items: [
+          {
+            id: "P-01",
+            title: "题量输入与上限提醒",
+            summary: "用户输入希望生成的题目数量；产品建议 3-5 道，并提醒原则上不超过 10 道。",
+            story: "作为学习者，我希望控制本轮练习规模，以便匹配可用时间和精力。",
+            acceptance: [
+              "题量为 1-10 的整数，默认 5。",
+              "输入超过 10 时不静默截断：说明原因并要求调整或明确二次确认。",
+              "显示预计完成时间或题型分布，帮助用户决定数量。",
+              "重新生成时可选择替换全部、补充若干或只重做某题。"
+            ],
+            data: ["practice run.requested_count", "practice/tasks.md metadata"],
+            source: "用户本轮 Practice 定义；v3 默认 5 道",
+            consensus: true
+          },
+          {
+            id: "P-02",
+            title: "生成无答案训练题",
+            summary: "AI 生成题干、必要材料、作答格式和约束，但隐藏答案、解析、评分结论。",
+            story: "作为学习者，我希望先独立作答，以便练习测到的是我的能力而不是识别 AI 答案的能力。",
+            acceptance: [
+              "题目覆盖目标能力，并按难度递进。",
+              "每题可展示作答要求和不泄题的检查标准。",
+              "答案与解析若预生成，必须存放在学习者不可见的评审 artifact 中。",
+              "提示按层级解锁，第一层不揭示关键步骤。"
+            ],
+            data: ["practice/tasks.md", "private review rubric or run artifact", "task answer_visibility=false"],
+            source: "用户本轮；LEARNING_PROJECT_STRUCTURE Practice rule",
+            consensus: true
+          },
+          {
+            id: "P-03",
+            title: "题型与困惑映射",
+            summary: "题目可来自讲解重点、已标困惑、交付成果和迁移场景，并标记内部覆盖关系。",
+            story: "作为学习者，我希望练习真正检验我卡住的地方，而不是得到一组随机题。",
+            acceptance: [
+              "至少一部分题目针对用户未解决困惑。",
+              "至少一题要求迁移到新情境，而不是复述原文。",
+              "系统内部记录 question -> objective/confusion/source 的映射。",
+              "学习者可以反馈题目有歧义、超纲、重复或答案不可判定。"
+            ],
+            data: ["question.source_refs[]", "question.objective_ids[]", "question.confusion_ids[]"],
+            source: "用户本轮；AGENT_PRIMITIVES transfer；v3 practice criteria",
+            consensus: true
+          },
+          {
+            id: "P-04",
+            title: "生成阶段按钮合同",
+            summary: "重新生成、查看 prompt、反馈题目、求提示和跳过都必须留下原因和状态。",
+            story: "作为学习者，我希望修改练习过程时不破坏已作答内容，并让 AI 知道题目本身是否有问题。",
+            acceptance: [
+              "任何重新生成都不删除已提交答案。",
+              "跳过与不会做分开记录。",
+              "题目反馈不会计入能力评分。",
+              "提示使用情况进入评估上下文，但不能简单按次数扣分。"
+            ],
+            actions: [
+              ["重新生成", "选择重生成范围与原因", "新题获得新 id，旧题归档"],
+              ["查看 prompt", "展示题量、来源、难度、约束", "不展示答案区"],
+              ["反馈题目问题", "记录歧义/超纲/错误/重复/其他", "暂停该题评分"],
+              ["求提示（不揭示答案）", "逐层给提示", "记录提示层级"],
+              ["跳过此题", "要求选择暂时跳过/不会/题目有问题", "保留后续返回入口"],
+              ["题号进度", "切换题目", "未保存回答先自动保存草稿"]
+            ],
+            source: "frontend-designs/v3/agent-practice.html",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "practice-evaluate",
+        short: "作答评估",
+        title: "Practice 下半场：逐题作答与自评，整批提交后 AI 评估并落库",
+        desc: "每题先由用户提交回答和掌握程度；AI 在整批提交后给出证据化评估。",
+        callout: "“一并提交给 AI”意味着系统应保存每题草稿，但默认在用户明确提交整批之前不触发最终评估。是否允许逐题提前评估，列为待决定的例外能力。",
+        items: [
+          {
+            id: "P-05",
+            title: "每题回答表单",
+            summary: "每道题有独立回答区，支持普通文本、Markdown、代码和附件引用。",
+            story: "作为学习者，我希望逐题写下自己的答案并随时保存草稿，以便完成一整轮练习而不丢失过程。",
+            acceptance: [
+              "题目切换时自动保存草稿。",
+              "未作答题、已作答未自评题和已完成题有不同状态。",
+              "提交前展示缺失项清单。",
+              "回答修改保留最后提交版本，是否保留草稿历史可配置。"
+            ],
+            data: ["practice/submissions/<attempt>/<question>.md", "draft state", "attachments[]"],
+            source: "用户本轮；v3 answer editor",
+            consensus: true
+          },
+          {
+            id: "P-06",
+            title: "每题掌握程度自评",
+            summary: "用户为每题评估自己的掌握程度，并可补充卡点或信心理由。",
+            story: "作为学习者，我希望在看到 AI 评价前先判断自己掌握得怎样，以便训练元认知，而不是事后迎合答案。",
+            acceptance: [
+              "每题必须有统一量表，建议 1-5：完全不会、勉强、基本会、较熟练、能迁移。",
+              "自评发生在 AI 最终评价之前。",
+              "可选反思记录卡点、猜测成分和使用过的提示。",
+              "AI 比较自评与证据，但不得羞辱或机械判定“过度自信”。"
+            ],
+            data: ["submission.self_assessment.level", "submission.reflection", "hints_used[]"],
+            source: "用户本轮；v3 4 项星级自评需收敛为每题掌握度合同",
+            consensus: true
+          },
+          {
+            id: "P-07",
+            title: "整批提交与锁定快照",
+            summary: "用户确认后把本轮所有答案、自评、反思与提示使用情况作为不可变评估快照提交给 AI。",
+            story: "作为学习者，我希望知道 AI 评估的是哪一版答案，以便结果可复核。",
+            acceptance: [
+              "提交前二次确认题数、空题、自评缺失与提示使用。",
+              "提交产生 attempt id 和提交时间。",
+              "提交后仍可继续修改，但修改会形成新 attempt，不覆盖旧评估证据。",
+              "AI 评估失败时保留快照并允许重试。"
+            ],
+            data: ["practice attempts", "submitted_snapshot", "evaluation status"],
+            source: "用户本轮：后续一并提交给 AI",
+            consensus: true
+          },
+          {
+            id: "P-08",
+            title: "AI 证据化评估与落库",
+            summary: "AI 按题给出判断、证据、纠错、能力维度、建议复习点，并保存结构化结果。",
+            story: "作为学习者，我希望 AI 不只给总分，而是告诉我哪里理解正确、哪里只是碰巧答对，以及下一步怎么补。",
+            acceptance: [
+              "逐题评价引用用户答案中的具体证据。",
+              "区分正确性、推理质量、迁移能力和表达完整度。",
+              "给出总体能力画像、自评偏差与下一轮建议。",
+              "结构化评估落库，同时生成可读评估文档。",
+              "练习结果可被 Summary 读取；写入长期记忆前需要用户确认或遵循已确认策略。"
+            ],
+            data: [
+              "practice/evaluations/<attempt>.json",
+              "practice/evaluations/<attempt>.md",
+              "project-state.json.practice_summary",
+              "database/index acceleration layer（非事实主源）"
+            ],
+            source: "用户本轮明确要求“AI 评估结果并且落库”；当前 filesystem-first 架构",
+            consensus: true
+          },
+          {
+            id: "P-09",
+            title: "作答页按钮合同",
+            summary: "编辑器、自评、保存和提交动作都有清晰的持久化与错误恢复规则。",
+            story: "作为学习者，我希望在提交前能放心编辑，在提交后能明确看到处理状态。",
+            acceptance: [
+              "保存草稿与提交评估是两个不同动作。",
+              "编辑/预览切换不改变数据。",
+              "格式工具只修改选区或插入标记，支持撤销。",
+              "提交按钮在请求中禁用并展示进度，避免重复 attempt。"
+            ],
+            actions: [
+              ["Markdown 工具栏", "格式化回答", "不触发提交"],
+              ["编辑 / 预览", "切换同一份回答的视图", "不丢光标前内容"],
+              ["自评星级/量表", "记录当前题掌握程度", "提交前可改"],
+              ["反思", "记录卡点与策略", "默认可选"],
+              ["保存草稿", "持久化当前所有题草稿", "显示明确保存时间"],
+              ["提交答案 · 请求 AI 评估", "创建整批 attempt", "成功后进入评估结果；失败可重试"]
+            ],
+            source: "frontend-designs/v3/agent-practice.html",
+            consensus: true
+          }
+        ]
+      },
+      {
+        id: "domain",
+        short: "领域智能体",
+        title: "领域智能体：用四种关系建立知识地图",
+        desc: "无额外启动输入，自动读取全部前序材料；Mermaid 是结构表达手段，不是装饰。",
+        callout: "现有文档把该区称为 Extend，用户称“领域智能体”。建议产品显示名可用“领域 / 拓展”，内部 zone 继续沿用 Extend，避免破坏既有路径。",
+        items: [
+          {
+            id: "D-01",
+            title: "四种关系总图",
+            summary: "围绕当前主题分别生成因果、结构、重要性和同构关系，并用 Mermaid 呈现。",
+            story: "作为学习者，我希望看到知识点之间不同类型的连接，以便从“知道几个点”升级到“理解一个领域”。",
+            acceptance: [
+              "每条边明确关系类型，不用模糊的“相关”。",
+              "图例解释因果、结构、重要性、同构的语义。",
+              "图过大时按关系类型或子主题分图，避免毛线团。",
+              "Mermaid 源码可查看、复制和修正；渲染失败时显示源码与错误。"
+            ],
+            data: ["extend/causal.mmd", "extend/structure.mmd", "extend/importance.mmd", "extend/isomorphism.mmd", "extend/relation-notes.md"],
+            source: "用户本轮；LEARNING_PROJECT_STRUCTURE Target relation types",
+            consensus: true
+          },
+          {
+            id: "D-02",
+            title: "因果关系",
+            summary: "回答“什么导致什么、通过什么机制、在什么条件下不成立”。",
+            story: "作为学习者，我希望沿原因、机制和结果追问，以便避免把相关性误当因果。",
+            acceptance: [
+              "区分直接原因、条件、机制、中介和结果。",
+              "至少给一个反事实或失效条件。",
+              "提示用户检查证据强度，而不是直接宣布因果。",
+              "可从图节点打开对应思考提示。"
+            ],
+            data: ["relation.type=causal", "claim", "mechanism", "conditions", "counterfactual"],
+            source: "用户本轮",
+            consensus: true
+          },
+          {
+            id: "D-03",
+            title: "结构关系",
+            summary: "回答“整体由什么组成、层级如何、接口和边界在哪里”。",
+            story: "作为学习者，我希望看到组成、层级和边界，以便建立可导航的知识结构。",
+            acceptance: [
+              "区分组成、包含、依赖、接口和边界。",
+              "支持从整体展开子结构，也支持从部件回到整体。",
+              "避免把时间顺序或因果关系误画成结构关系。",
+              "可提示哪些结构适合拆成子项目。"
+            ],
+            data: ["relation.type=structural", "parent", "children[]", "interfaces[]", "boundaries[]"],
+            source: "用户本轮",
+            consensus: true
+          },
+          {
+            id: "D-04",
+            title: "重要性关系",
+            summary: "回答“哪些更基础、更关键、更高杠杆，排序依据是什么”。",
+            story: "作为学习者，我希望理解知识点的重要性差异，以便有限时间优先攻克高价值部分。",
+            acceptance: [
+              "重要性必须附带评判维度，如先修性、频率、风险、迁移价值。",
+              "区分“基础”与“常用”，避免单一总排名。",
+              "允许用户改变维度后重新排序。",
+              "输出说明排序的不确定性。"
+            ],
+            data: ["relation.type=importance", "dimension", "score/rank", "rationale"],
+            source: "用户本轮；LEARNING_PROJECT_STRUCTURE priority or degree relations",
+            consensus: true
+          },
+          {
+            id: "D-05",
+            title: "同构关系",
+            summary: "回答“不同领域是否共享同一种结构、映射在哪里成立、又在哪里失效”。",
+            story: "作为学习者，我希望通过跨领域同构建立迁移能力，同时避免把类比当成证明。",
+            acceptance: [
+              "明确源领域、目标领域和对应映射。",
+              "至少指出一个映射失效点。",
+              "区分类比启发、结构同构和表面相似。",
+              "鼓励用户自己补充一个同构例子并接受 AI 质询。"
+            ],
+            data: ["relation.type=isomorphic", "source_domain", "target_domain", "mapping[]", "breakpoints[]"],
+            source: "用户本轮",
+            consensus: true
+          },
+          {
+            id: "D-06",
+            title: "领域提示与批判性提问",
+            summary: "图之外给出几个延伸领域提示，以及反事实、边界、证据、替代解释等批判性问题。",
+            story: "作为学习者，我希望系统推动我自己思考，而不是把所谓“高阶结论”直接端给我。",
+            acceptance: [
+              "提示数量克制，建议每类 2-4 个。",
+              "问题与用户当前目标和困惑有关。",
+              "默认不给终局答案，可提供逐层提示。",
+              "用户的关系陈述和回答可保存到 relation-notes.md。"
+            ],
+            actions: [
+              ["关系类型切换", "在四种关系图之间切换", "保留当前缩放与选中节点"],
+              ["查看 Mermaid 源码", "展示并允许复制", "编辑能力需另行确认"],
+              ["节点思考提示", "打开该节点的批判性问题", "不自动给答案"],
+              ["相关主题卡", "预填子项目候选", "点击后先确认范围和继承上下文"],
+              ["+ 建子项目", "创建完整五阶段子项目", "父项目记录来源关系"],
+              ["进入总结阶段", "携带关系图、笔记与未解决问题", "不自动把所有提示写进总结"]
+            ],
+            source: "用户本轮；v3 agent-extend.html；critical_thinking primitive",
+            consensus: true
+          }
+        ]
+      },
+      {
+        id: "flashcards",
+        short: "总结闪卡",
+        title: "Summary 第一页：从真实学习痕迹生成可交互闪卡",
+        desc: "闪卡不是讲解摘要的切片，而是面向主动回忆与间隔复习的独立学习对象。",
+        callout: "用户明确要求“闪卡一页，总结一页”。因此 Summary 采用两个子页，而不是把闪卡塞在长总结底部。",
+        items: [
+          {
+            id: "S-01",
+            title: "从全部学习痕迹生成闪卡",
+            summary: "读取输入合同、Intro、讲解困惑、练习答案与评估、领域关系和用户笔记，生成有来源的卡片。",
+            story: "作为学习者，我希望闪卡来自我真实学过和错过的内容，以便复习击中自己的薄弱点。",
+            acceptance: [
+              "每张卡可追溯到来源 artifact 或练习证据。",
+              "覆盖概念回忆、辨析、因果、结构、迁移和易错点。",
+              "避免答案过长或一个问题塞多个知识点。",
+              "AI 标注卡片生成原因，用户可删除或改写。"
+            ],
+            data: ["summary/flashcards.json", "summary/review-pack.md", "source_refs[]"],
+            source: "用户本轮；ROADMAP Summary spaced-repetition cards",
+            consensus: true
+          },
+          {
+            id: "S-02",
+            title: "闪卡交互",
+            summary: "先看问题，主动回忆后翻面，再评价掌握程度并进入复习队列。",
+            story: "作为学习者，我希望通过先回忆后看答案的方式复习，而不是被动浏览总结。",
+            acceptance: [
+              "默认只显示正面问题。",
+              "翻面前可输入或口述自己的答案（口述能力后续确认）。",
+              "翻面后提供“忘记 / 模糊 / 掌握 / 太简单”评价。",
+              "评价更新本地复习计划，不静默改写知识事实。",
+              "支持上一张、下一张、随机、只看错卡和重置本轮。"
+            ],
+            actions: [
+              ["显示答案 / 翻面", "展示当前卡背面", "记录是否先作答"],
+              ["忘记 / 模糊 / 掌握 / 太简单", "保存复习反馈", "计算下次复习建议"],
+              ["上一张 / 下一张", "切换卡片", "未评价时可提醒但不强制"],
+              ["只看错卡", "筛选本轮低掌握卡", "不删除其他卡"],
+              ["编辑卡片", "修改问题、答案或标签", "保留 AI 原始建议用于审计"],
+              ["删除卡片", "从活跃卡组移除", "允许从归档恢复"]
+            ],
+            source: "用户本轮“复习闪卡（可交互）”",
+            consensus: true
+          },
+          {
+            id: "S-03",
+            title: "复习调度边界",
+            summary: "首版可提供简单下次复习日期；复杂 SRS 算法不是本轮必须承诺。",
+            story: "作为学习者，我希望知道下一次何时复习，但不希望算法复杂度拖慢核心五智能体落地。",
+            acceptance: [
+              "最小版按评价给出可解释的复习间隔。",
+              "用户可手动调整日期。",
+              "算法版本记录在卡组元数据中。",
+              "后续替换算法不丢历史复习记录。"
+            ],
+            data: ["flashcard.review_history[]", "next_review_at", "scheduler_version"],
+            source: "ROADMAP review cadence recommendation；产品范围推导",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "summary",
+        short: "总结报告",
+        title: "Summary 第二页：汇总全部学习痕迹，但保持学习者主权",
+        desc: "总结既呈现已经掌握的知识，也呈现证据、未解决问题、交付成果和下一步。",
+        callout: "v3 已有“AI 建议接受/改写/拒绝”和可编辑 summary.md，这一方向与用户要求一致；需要补上闪卡独立页与完整痕迹汇总合同。",
+        items: [
+          {
+            id: "S-04",
+            title: "学习痕迹总览",
+            summary: "总结本项目的输入、问题、阅读、困惑、练习、自评、AI 评估、关系图、笔记和复习状态。",
+            story: "作为学习者，我希望看到这次学习到底发生了什么，以便复盘自己的过程，而不仅是一篇知识摘要。",
+            acceptance: [
+              "按阶段列出关键痕迹和数量，并可跳回来源。",
+              "区分用户原文、AI 产出、AI 评估和系统推断。",
+              "显示练习 attempt 与评估版本。",
+              "不把未完成或未提交草稿当成已掌握证据。"
+            ],
+            data: ["summary/trace-index.json", "all zone artifacts", "runs index"],
+            source: "用户本轮“所有痕迹”；iteration-02 append-only/audit trail",
+            consensus: true
+          },
+          {
+            id: "S-05",
+            title: "知识总结栏目",
+            summary: "整理已掌握、仍困惑、关键关系、交付成果、可复用表达和下一步。",
+            story: "作为学习者，我希望得到一份可继续编辑的总结，以便将这次学习沉淀成自己的知识资产。",
+            acceptance: [
+              "总结引用练习证据和用户笔记，不只摘要 AI 讲解。",
+              "明确“已掌握”的证据门槛与不确定性。",
+              "交付成果有完成/部分完成/未完成状态和证据链接。",
+              "summary/summary.md 始终由用户最终控制。"
+            ],
+            data: ["summary/summary.md", "summary/next-steps.md", "deliverable status"],
+            source: "用户本轮；LEARNING_PROJECT_STRUCTURE Summary",
+            consensus: true
+          },
+          {
+            id: "S-06",
+            title: "AI 建议必须经过审阅",
+            summary: "AI 对总结只提出结构化建议，用户逐项接受、改写或拒绝。",
+            story: "作为学习者，我希望 AI 帮我整理但不替我定稿，以便最终知识仍然属于我。",
+            acceptance: [
+              "建议显示目标位置、变更内容、理由和来源。",
+              "接受后才写入编辑稿。",
+              "改写进入用户编辑区，不自动提交。",
+              "拒绝保留审计记录但不再反复弹出同一建议。",
+              "保存到磁盘有成功路径、冲突处理和失败提示。"
+            ],
+            actions: [
+              ["展开/收起", "显示或隐藏 AI 建议，不改变建议状态", "保持阅读位置"],
+              ["接受", "应用指定建议", "记录接受者、时间与来源"],
+              ["改写", "把建议放入可编辑草稿", "用户确认后应用"],
+              ["拒绝", "标记不采用", "不修改 summary.md"],
+              ["查看 prompt", "展示总结组装上下文", "不含隐藏答案之外的敏感内容"],
+              ["保存到磁盘", "以并发安全方式保存 summary.md", "冲突时不覆盖外部修改"],
+              ["编辑 / 预览 / Markdown 工具栏", "编辑同一份学习者文档", "支持撤销与明确保存状态"]
+            ],
+            source: "frontend-designs/v3/agent-summary.html；iteration-02 Story 9",
+            consensus: true
+          }
+        ]
+      },
+      {
+        id: "data",
+        short: "数据与记忆",
+        title: "学习痕迹先成为可审计事实，再进入记忆与索引",
+        desc: "文件仍是项目事实源；“落库”用于结构化查询和加速，不能反客为主。",
+        callout: "当前长期文档明确 filesystem-first。练习评估“落库”可以引入数据库索引，但必须同步保存可读文件，并定义数据库损坏后的重建路径。",
+        items: [
+          {
+            id: "DATA-01",
+            title: "学习痕迹统一事件模型",
+            summary: "每次输入、选择、困惑、作答、自评、评估、复习与编辑都带项目、阶段、来源、时间和版本。",
+            story: "作为系统，我需要可追溯地连接一条学习行为与它的上下文，以便 Summary 和后续 Agent 不靠猜。",
+            acceptance: [
+              "事件至少包含 id、project_id、zone、type、actor、created_at、source_refs、artifact_version。",
+              "用户删除内容时定义软删除或墓碑事件。",
+              "任何 AI 推断与用户原始输入分开存。",
+              "事件模型不要求当前 iteration-02 立即全部实现。"
+            ],
+            data: ["runs/transcript", "zone artifacts", "trace index/database"],
+            source: "用户本轮所有痕迹；现有 append-only session 方向",
+            consensus: true
+          },
+          {
+            id: "DATA-02",
+            title: "练习评估双写合同",
+            summary: "评估结果写入可读 Markdown/JSON 文件，并写入可查询数据库索引。",
+            story: "作为学习者和维护者，我希望评估既能在项目文件中长期保存，也能被系统快速查询和汇总。",
+            acceptance: [
+              "文件写成功后才把数据库索引标为完成，或采用可恢复事务流程。",
+              "数据库记录保存 artifact path 与 content hash。",
+              "数据库可从项目文件重建。",
+              "写入失败明确展示哪一层失败并允许重试。"
+            ],
+            data: ["practice/evaluations/*.json", "practice/evaluations/*.md", "evaluation index table"],
+            source: "用户本轮“落库”；DATABASE_DESIGN.md filesystem-first",
+            consensus: true
+          },
+          {
+            id: "DATA-03",
+            title: "记忆更新需可见、可审阅",
+            summary: "从练习和困惑中推导出的记忆更新以建议形式出现，不静默贴标签。",
+            story: "作为学习者，我希望系统记住对我有用的模式，但我能看到并纠正它的判断。",
+            acceptance: [
+              "区分项目记忆与全局学习者记忆。",
+              "每条建议显示依据和影响哪些 Agent。",
+              "用户可接受、改写、拒绝和撤销。",
+              "“答错一次”不能直接形成稳定能力结论。"
+            ],
+            data: ["memory proposals", "project-memory.md", "learner-profile.md"],
+            source: "LEARNING_PROJECT_STRUCTURE Memory System；v3 memory 差异审查概念",
+            consensus: true
+          },
+          {
+            id: "DATA-04",
+            title: "Memory Agent 与自定义 Agent 暂不并入五智能体合同",
+            summary: "v3 出现第六个 Memory Agent 和自定义 Agent 创建器，但用户本轮只确认五个学习智能体。",
+            story: "作为产品维护者，我希望先稳定核心学习闭环，再决定是否开放角色创建和独立记忆智能体，以免产品从学习工具膨胀成 Agent 平台。",
+            acceptance: [
+              "Memory 保持横切系统能力或后续独立审议。",
+              "自定义 Agent 不阻塞五智能体交付。",
+              "若保留创建器，必须校验章程、阶段权限、读写路径和安全边界。",
+              "agents.html 与 memory.html 当前在 v3 中缺失，应明确为原型断链。"
+            ],
+            source: "frontend-designs/v3/create-agent.html；v3 缺少 agents.html / memory.html；用户本轮范围",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "buttons",
+        short: "按钮审计",
+        title: "v3 每类按钮背后的功能合同",
+        desc: "重复导航合并审计，但每个独特动作都必须有前置条件、成功结果和失败反馈。",
+        callout: "这一页不是说所有按钮都要实现，而是防止未来实现时出现“按钮能点，但没有数据语义”的空壳。",
+        items: [
+          {
+            id: "BTN-01",
+            title: "全局导航与项目入口",
+            summary: "审计 v3 所有页面重复出现的总览、项目、智能体、记忆、项目树和阶段导航。",
+            story: "作为用户，我希望任何导航动作都不会误写数据，并能准确反映当前项目与阶段。",
+            acceptance: [
+              "当前路由和选中态一致。",
+              "存在未保存编辑时提示或自动保存。",
+              "缺失路由不应显示为可用链接。",
+              "项目树的“其他项目”必须进入对应项目，而不是统一跳总览。"
+            ],
+            actions: [
+              ["Life Long Learn / 总览", "进入总览", "不改变 active project"],
+              ["项目", "进入当前或项目列表", "无当前项目时展示选择页"],
+              ["智能体", "进入智能体注册表", "当前 v3 缺 agents.html，需补页或隐藏"],
+              ["记忆", "进入记忆审阅", "当前 v3 缺 memory.html，需补页或隐藏"],
+              ["项目树项目名", "切换 active project", "未保存编辑先处理"],
+              ["五阶段导航", "切换 zone", "展示前置缺失状态但原则上允许查看"],
+              ["其他项目", "打开真实目标项目", "不能全部指向 index.html"],
+              ["新建项目", "进入创建流程", "来源路由可返回"]
+            ],
+            source: "frontend-designs/v3 全部 HTML 顶栏与侧栏",
+            consensus: false
+          },
+          {
+            id: "BTN-02",
+            title: "项目页与会话控制",
+            summary: "项目页混合了文件查看、Agent 调用、brief 编辑、子项目和外部 PowerShell 会话。",
+            story: "作为用户，我希望项目页的控制动作明确区分“编辑知识文件”和“控制运行中的会话”。",
+            acceptance: [
+              "危险动作“结束会话”需要确认且不删除历史。",
+              "切到 PowerShell 只聚焦窗口，不创建新会话。",
+              "二次追问明确发送目标 session。",
+              "brief 保存后说明是否影响正在运行的 session。"
+            ],
+            actions: [
+              ["在练习阶段调用智能体", "组装 prompt 并启动新 session", "已有运行会话时先提示"],
+              ["编辑 project.md", "打开项目合同编辑器", "保存时校验关键字段"],
+              ["查看 prompt", "只读展示本次组装结果", "对应正确 run"],
+              ["源文件", "查看 artifact 原文", "不自动进入编辑"],
+              ["编辑", "编辑当前 artifact", "保留 AI 原始版本"],
+              ["重新调用", "创建新 run", "不覆盖现有 session/history"],
+              ["编辑本阶段 brief", "打开抽屉", "保存后显示影响范围"],
+              ["展开详情", "展示前置文件及版本", "可跳转查看"],
+              ["进入子项目", "切 active project", "继承关系可见"],
+              ["关闭 brief", "关闭抽屉", "脏数据先保存或确认丢弃"],
+              ["切到 PowerShell 终端", "聚焦已存在窗口", "窗口失效时提示恢复/重开"],
+              ["二次追问", "展开输入面板", "不直接发送"],
+              ["发送到 PowerShell", "把输入写入目标会话", "展示发送与接收状态"],
+              ["结束会话", "终止进程并封存 run", "历史仍可读"],
+              ["追问面板关闭", "收起面板", "保留未发送草稿"]
+            ],
+            source: "frontend-designs/v3/project.html",
+            consensus: false
+          },
+          {
+            id: "BTN-03",
+            title: "创建智能体表单",
+            summary: "v3 的模板、图标、类型、阶段权限、章程、取消与创建构成一个高风险扩展面。",
+            story: "作为维护者，如果未来开放自定义智能体，我希望创建动作不能生成越权或无效的文件读写配置。",
+            acceptance: [
+              "模板选择只预填，不隐藏继承内容。",
+              "名称、slug 和目标路径必须唯一且安全。",
+              "允许阶段与读写路径经过校验。",
+              "章程必须包含行为边界、输入、输出和禁止事项。",
+              "创建失败不跳转，保留用户输入。"
+            ],
+            actions: [
+              ["内置模板单选", "预填名称、类型、阶段、章程", "切换前提示覆盖自定义内容"],
+              ["自定义模式", "清空模板依赖并启用完整表单", "需要更多必填校验"],
+              ["图标按钮", "选择展示图标", "不参与身份安全判断"],
+              ["类型下拉", "选择运行范式", "决定默认规则但可审阅"],
+              ["允许阶段复选", "限定可调用 zone", "全阶段与单阶段规则明确"],
+              ["取消", "返回注册表", "脏数据提示"],
+              ["创建智能体", "写 charter 与 registry", "先校验 primitive、路径与权限"]
+            ],
+            source: "frontend-designs/v3/create-agent.html",
+            consensus: false
+          },
+          {
+            id: "BTN-04",
+            title: "Markdown 编辑器通用动作",
+            summary: "v3 多处出现标题、粗体、斜体、列表、引用、代码、链接、编辑/预览与保存状态。",
+            story: "作为用户，我希望所有编辑器遵循同一套可预测行为，而不是每页做一套半成品。",
+            acceptance: [
+              "工具栏对选区操作；无选区时插入可撤销标记。",
+              "编辑/预览共享同一内容源。",
+              "自动保存、手动保存和未提交状态视觉区分。",
+              "链接与附件进行路径/协议安全校验。",
+              "Mermaid 预览错误不阻止保存源码。"
+            ],
+            actions: [
+              ["H1/H2/H3", "插入或切换标题级别", "避免重复井号"],
+              ["B / I", "切换粗体/斜体", "保留选区"],
+              ["• / 1. / ☐", "插入列表或任务项", "连续行正确编号"],
+              ["❝", "插入引用", "支持多行"],
+              ["</>", "插入行内或代码块", "按选区是否多行决定"],
+              ["链接", "插入安全链接", "无协议时提示"],
+              ["编辑 / 预览", "切换模式", "不保存、不提交"],
+              ["保存状态", "展示保存中/已保存/失败/冲突", "失败可重试"]
+            ],
+            source: "frontend-designs/v3/project.html、agent-practice.html、agent-summary.html",
+            consensus: false
+          }
+        ]
+      },
+      {
+        id: "decisions",
+        short: "待拍板",
+        title: "需要明确拍板的冲突、命名和实现边界",
+        desc: "这些问题如果不先对齐，开发会被迫替产品做决定。",
+        callout: "建议先确认用户旅程与数据合同，再讨论编辑器库、动态路由等技术选型。技术选型不应掩盖产品语义尚未确定。",
+        items: [
+          {
+            id: "Q-01",
+            title: "Extend 的产品名称是否改为“领域”",
+            summary: "用户采用“领域智能体”，代码与文件结构采用 Extend。",
+            story: "作为团队，我希望显示名和内部标识各自稳定，以免改名导致路径迁移或用户困惑。",
+            acceptance: [
+              "候选：显示“领域”，副标题“拓展”；内部保持 extend。",
+              "正式文档给出中文显示名与英文 zone id 对照。",
+              "API、目录和历史数据不因显示名变化而迁移。"
+            ],
+            source: "用户本轮 vs 现有五区命名",
+            consensus: false
+          },
+          {
+            id: "Q-02",
+            title: "练习是整批评估，还是允许逐题提前评估",
+            summary: "用户明确说后续一并提交；v3 视觉以单题为主。",
+            story: "作为学习者，我需要明确何时会看到 AI 判断，以免提前反馈污染后续独立作答。",
+            acceptance: [
+              "默认整批提交后评估。",
+              "若允许逐题评估，必须是用户主动选择的模式。",
+              "逐题评估模式需要说明它会影响后续题目的独立性。"
+            ],
+            source: "用户本轮；v3 practice 单题页面",
+            consensus: false
+          },
+          {
+            id: "Q-03",
+            title: "字符级标注作为目标，段落级是否可作为首版",
+            summary: "用户要求可选中段落和文字；v3 设计文档把字符级列为更复杂选项。",
+            story: "作为团队，我希望既不降低最终体验，也能定义可交付的首版切片。",
+            acceptance: [
+              "最终合同支持字符范围。",
+              "若首版只做段落级，UI 明确当前限制。",
+              "数据模型从第一天预留字符 range，避免后续迁移困难。"
+            ],
+            source: "用户本轮；v3 DESIGN.md D4",
+            consensus: false
+          },
+          {
+            id: "Q-04",
+            title: "“落库”的数据库选型与事实源边界",
+            summary: "用户要求练习评估落库，现有架构坚持文件为事实源。",
+            story: "作为维护者，我希望数据库提升查询能力但不制造第二套互相冲突的事实。",
+            acceptance: [
+              "先确认首版是否引入 SQLite。",
+              "无论选型，评估必须有可读文件副本。",
+              "定义重建、迁移、校验和冲突策略。"
+            ],
+            source: "用户本轮；iteration-02 DATABASE_DESIGN.md",
+            consensus: false
+          },
+          {
+            id: "Q-05",
+            title: "Summary 两页的导航形态",
+            summary: "闪卡页与总结页可作为 Summary 内部标签，也可作为相邻子路由。",
+            story: "作为学习者，我希望两种复习方式清晰分离，同时能快速切换。",
+            acceptance: [
+              "候选 A：Summary 内部“闪卡 / 总结”标签。",
+              "候选 B：/summary/flashcards 与 /summary/report 子路由。",
+              "两者共享同一 Summary 状态与来源索引。"
+            ],
+            source: "用户本轮",
+            consensus: false
+          },
+          {
+            id: "Q-06",
+            title: "当前迭代不扩 scope，先形成下一迭代合同",
+            summary: "五智能体完整实现明显超出 iteration-02 的已定义范围。",
+            story: "作为维护者，我希望本次对齐先沉淀需求，再单独定义后续可测试切片，避免在现有迭代里偷改范围。",
+            acceptance: [
+              "本 HTML 标记为对齐材料，不宣称已实现。",
+              "用户确认后再更新长期文档与新 iteration 用户故事。",
+              "每个后续切片独立定义 API、数据、测试和验收。"
+            ],
+            source: "iteration-02 README Included/Excluded；AGENTS.md 迭代边界",
+            consensus: true
+          }
+        ]
+      },
+      {
+        id: "package",
+        short: "AI 补充包",
+        title: "把你认同的故事交给下一轮 AI",
+        desc: "本页自动汇总“认同”和“需修改”项。下载 HTML 后，这份汇总与全部反馈会一起留在文件中。",
+        callout: "建议下一步：先完成选择并下载 HTML，再让 AI 读取该文件，将认同项写入新的 iteration 用户故事、API/数据合同与验收文档。",
+        package: true
+      }
+    ];
+
+    const storyMap = new Map();
+    pages.forEach(page => (page.items || []).forEach(item => storyMap.set(item.id, item)));
+
+    const defaultState = () => {
+      const decisions = {};
+      storyMap.forEach(item => {
+        decisions[item.id] = {
+          status: item.consensus ? "accept" : "pending",
+          feedback: ""
+        };
+      });
+      return {
+        schemaVersion: 1,
+        currentPage: 0,
+        decisions,
+        savedAt: null,
+        exportedAt: null
+      };
+    };
+
+    function normalizeState(candidate) {
+      const base = defaultState();
+      if (!candidate || typeof candidate !== "object") return base;
+      for (const id of storyMap.keys()) {
+        const incoming = candidate.decisions && candidate.decisions[id];
+        if (!incoming) continue;
+        if (STATUS_LABELS[incoming.status]) base.decisions[id].status = incoming.status;
+        if (typeof incoming.feedback === "string") base.decisions[id].feedback = incoming.feedback;
+      }
+      if (Number.isInteger(candidate.currentPage)) {
+        base.currentPage = Math.max(0, Math.min(candidate.currentPage, pages.length - 1));
+      }
+      base.savedAt = candidate.savedAt || null;
+      base.exportedAt = candidate.exportedAt || null;
+      return base;
+    }
+
+    function loadState() {
+      if (window.__LLL_ALIGNMENT_SEED__) {
+        return normalizeState(window.__LLL_ALIGNMENT_SEED__);
+      }
+      try {
+        return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY)));
+      } catch (_) {
+        return defaultState();
+      }
+    }
+
+    let state = loadState();
+    let search = "";
+    let statusFilter = "all";
+    let toastTimer = null;
+
+    const deck = document.querySelector("#deck");
+    const pageNav = document.querySelector("#pageNav");
+    const toolbarTitle = document.querySelector("#toolbarTitle");
+    const toolbarDesc = document.querySelector("#toolbarDesc");
+    const prevBtn = document.querySelector("#prevBtn");
+    const nextBtn = document.querySelector("#nextBtn");
+    const searchInput = document.querySelector("#searchInput");
+    const statusFilterInput = document.querySelector("#statusFilter");
+    const importFile = document.querySelector("#importFile");
+    const toast = document.querySelector("#toast");
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function saveState() {
+      state.savedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      updateSummary();
+      if (pages[state.currentPage].package) renderPackage();
+    }
+
+    function showToast(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.classList.add("show");
+      toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+    }
+
+    function actionsTable(actions) {
+      if (!actions || !actions.length) return "";
+      return `
+        <h4>按钮 / 动作合同</h4>
+        <table class="action-table">
+          <thead><tr><th>动作</th><th>系统行为</th><th>完成语义</th></tr></thead>
+          <tbody>
+            ${actions.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function itemSearchText(item) {
+      return [
+        item.id,
+        item.title,
+        item.summary,
+        item.story,
+        ...(item.acceptance || []),
+        ...(item.data || []),
+        ...((item.actions || []).flat()),
+        item.source
+      ].join(" ").toLowerCase();
+    }
+
+    function storyCard(item) {
+      const decision = state.decisions[item.id];
+      return `
+        <article class="story-card" data-story-id="${item.id}" data-status="${decision.status}">
+          <div class="story-top">
+            <span class="story-id">${item.id}</span>
+            ${item.consensus ? '<span class="consensus">用户已明确认可</span>' : ""}
+          </div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p class="story-summary">${escapeHtml(item.summary)}</p>
+          <p class="story-statement"><strong>用户故事：</strong>${escapeHtml(item.story)}</p>
+          <details class="detail">
+            <summary>展开验收、数据与按钮合同</summary>
+            <h4>验收标准</h4>
+            <ul>${(item.acceptance || []).map(row => `<li>${escapeHtml(row)}</li>`).join("")}</ul>
+            ${item.data && item.data.length ? `<h4>数据 / 文件落点</h4><ul>${item.data.map(row => `<li><code>${escapeHtml(row)}</code></li>`).join("")}</ul>` : ""}
+            ${actionsTable(item.actions)}
+            <div class="source">来源：${escapeHtml(item.source || "本轮产品整理")}</div>
+          </details>
+          <div class="decision">
+            <div class="status-row" role="radiogroup" aria-label="${escapeHtml(item.title)} 的对齐状态">
+              ${Object.entries(STATUS_LABELS).map(([value, label]) => `
+                <label>
+                  <input type="radio" name="status-${item.id}" value="${value}" ${decision.status === value ? "checked" : ""}>
+                  ${label}
+                </label>
+              `).join("")}
+            </div>
+            <textarea class="feedback" data-feedback-id="${item.id}" placeholder="写下修改意见、边界、例外或验收补充...">${escapeHtml(decision.feedback)}</textarea>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderNav() {
+      pageNav.innerHTML = pages.map((page, index) => `
+        <button class="page-link ${index === state.currentPage ? "active" : ""}" data-page="${index}">
+          <small>Page ${String(index + 1).padStart(2, "0")}</small>
+          <strong>${escapeHtml(page.short)}</strong>
+          <span>${escapeHtml(page.title)}</span>
+        </button>
+      `).join("");
+    }
+
+    function renderDeck() {
+      deck.innerHTML = pages.map((page, index) => `
+        <article class="page ${index === state.currentPage ? "active" : ""}" data-page-id="${page.id}">
+          <header class="page-head">
+            <div>
+              <p class="eyebrow">${escapeHtml(page.short)}</p>
+              <h2>${escapeHtml(page.title)}</h2>
+              <p>${escapeHtml(page.desc)}</p>
+            </div>
+            <div class="page-number"><small>Page</small><strong>${String(index + 1).padStart(2, "0")}</strong></div>
+          </header>
+          ${page.callout ? `<div class="callout">${escapeHtml(page.callout)}</div>` : ""}
+          ${page.package
+            ? `<div class="package">
+                <textarea id="packageText" readonly></textarea>
+                <div class="package-actions">
+                  <button class="btn primary" id="copyPackageBtn">复制 AI 补充包</button>
+                  <button class="btn" id="downloadPackageBtn">下载 Markdown</button>
+                  <button class="btn rust" id="packageExportHtmlBtn">下载已对齐 HTML</button>
+                </div>
+              </div>`
+            : `<div class="story-grid" data-story-grid="${page.id}">${(page.items || []).map(storyCard).join("")}</div>`
+          }
+        </article>
+      `).join("");
+      renderPackage();
+      applyFilters();
+    }
+
+    function renderPage(index) {
+      state.currentPage = Math.max(0, Math.min(index, pages.length - 1));
+      document.querySelectorAll(".page").forEach((page, i) => page.classList.toggle("active", i === state.currentPage));
+      document.querySelectorAll(".page-link").forEach((link, i) => link.classList.toggle("active", i === state.currentPage));
+      const page = pages[state.currentPage];
+      toolbarTitle.textContent = `${String(state.currentPage + 1).padStart(2, "0")} · ${page.title}`;
+      toolbarDesc.textContent = page.desc;
+      prevBtn.disabled = state.currentPage === 0;
+      nextBtn.disabled = state.currentPage === pages.length - 1;
+      saveState();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function updateSummary() {
+      const decisions = Object.values(state.decisions);
+      const accepted = decisions.filter(item => item.status === "accept").length;
+      const reviewed = decisions.filter(item => item.status !== "pending").length;
+      const feedback = decisions.filter(item => item.feedback.trim()).length;
+      document.querySelector("#acceptedCount").textContent = accepted;
+      document.querySelector("#reviewedCount").textContent = reviewed;
+      document.querySelector("#feedbackCount").textContent = feedback;
+      document.querySelector("#totalCount").textContent = decisions.length;
+      document.querySelector("#progressBar").style.width = `${Math.round(reviewed / decisions.length * 100)}%`;
+    }
+
+    function applyFilters() {
+      document.querySelectorAll(".story-card").forEach(card => {
+        const item = storyMap.get(card.dataset.storyId);
+        const decision = state.decisions[item.id];
+        const matchesStatus = statusFilter === "all" || decision.status === statusFilter;
+        const matchesSearch = !search || itemSearchText(item).includes(search);
+        card.hidden = !(matchesStatus && matchesSearch);
+      });
+      document.querySelectorAll("[data-story-grid]").forEach(grid => {
+        let empty = grid.querySelector(".empty");
+        const visible = [...grid.querySelectorAll(".story-card")].some(card => !card.hidden);
+        if (!visible && !empty) {
+          empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "当前页没有符合筛选条件的故事。";
+          grid.append(empty);
+        }
+        if (empty) empty.hidden = visible;
+      });
+    }
+
+    function buildPackage() {
+      const included = [];
+      pages.forEach(page => {
+        const items = (page.items || []).filter(item => ["accept", "revise"].includes(state.decisions[item.id].status));
+        if (items.length) included.push({ page, items });
+      });
+      const lines = [
+        "# LLL 五智能体产品补充包",
+        "",
+        `生成时间：${new Date().toISOString()}`,
+        "",
+        "读取规则：",
+        "- 只把“认同”项视为已确认需求。",
+        "- “需修改”项必须结合对应反馈改写后，再进入正式文档。",
+        "- “待决定”和“不采用”项不得偷偷进入实现范围。",
+        "- 当前 iteration-02 范围不因本包自动扩大；请新建后续 iteration 合同。",
+        ""
+      ];
+      included.forEach(({ page, items }) => {
+        lines.push(`## ${page.title}`, "");
+        items.forEach(item => {
+          const decision = state.decisions[item.id];
+          lines.push(`### ${item.id} ${item.title}`);
+          lines.push(`状态：${STATUS_LABELS[decision.status]}`);
+          lines.push(`用户故事：${item.story}`);
+          lines.push("验收标准：");
+          (item.acceptance || []).forEach(row => lines.push(`- ${row}`));
+          if (item.data && item.data.length) {
+            lines.push("数据 / 文件落点：");
+            item.data.forEach(row => lines.push(`- ${row}`));
+          }
+          if (decision.feedback.trim()) {
+            lines.push(`用户反馈：${decision.feedback.trim()}`);
+          }
+          lines.push("");
+        });
+      });
+      return lines.join("\n");
+    }
+
+    function renderPackage() {
+      const area = document.querySelector("#packageText");
+      if (area) area.value = buildPackage();
+    }
+
+    function download(name, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = name;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      const helper = document.createElement("textarea");
+      helper.value = text;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "fixed";
+      helper.style.opacity = "0";
+      document.body.append(helper);
+      helper.select();
+      const copied = document.execCommand("copy");
+      helper.remove();
+      if (!copied) throw new Error("copy command was rejected");
+    }
+
+    function exportJson() {
+      const payload = {
+        ...state,
+        exportedAt: new Date().toISOString(),
+        document: "LEARNING_AGENTS_USER_STORY_ALIGNMENT.html"
+      };
+      download("lll-learning-agents-alignment.json", JSON.stringify(payload, null, 2), "application/json;charset=utf-8");
+      showToast("JSON 对齐结果已下载");
+    }
+
+    function exportHtml() {
+      const exportState = {
+        ...state,
+        exportedAt: new Date().toISOString()
+      };
+      const serialized = JSON.stringify(exportState).replaceAll("<", "\\u003c");
+      const clone = document.documentElement.cloneNode(true);
+      const seed = clone.querySelector("#alignment-seed");
+      seed.textContent = `window.__LLL_ALIGNMENT_SEED__ = ${serialized};`;
+      const exported = "<!doctype html>\n" + clone.outerHTML;
+      download("LLL_五智能体_已对齐结果.html", exported, "text/html;charset=utf-8");
+      showToast("已下载包含选择结果的独立 HTML");
+    }
+
+    pageNav.addEventListener("click", event => {
+      const button = event.target.closest("[data-page]");
+      if (button) renderPage(Number(button.dataset.page));
+    });
+
+    deck.addEventListener("change", event => {
+      const radio = event.target.closest('input[type="radio"][name^="status-"]');
+      if (!radio) return;
+      const id = radio.name.replace("status-", "");
+      state.decisions[id].status = radio.value;
+      const card = radio.closest(".story-card");
+      card.dataset.status = radio.value;
+      saveState();
+      applyFilters();
+    });
+
+    deck.addEventListener("input", event => {
+      const area = event.target.closest("[data-feedback-id]");
+      if (!area) return;
+      state.decisions[area.dataset.feedbackId].feedback = area.value;
+      saveState();
+    });
+
+    deck.addEventListener("click", async event => {
+      if (event.target.closest("#copyPackageBtn")) {
+        try {
+          await copyText(buildPackage());
+          showToast("AI 补充包已复制");
+        } catch (_) {
+          const area = document.querySelector("#packageText");
+          if (area) {
+            area.focus();
+            area.select();
+          }
+          showToast("复制失败，请在文本框中全选复制");
+        }
+      }
+      if (event.target.closest("#downloadPackageBtn")) {
+        download("LLL_五智能体_AI补充包.md", buildPackage(), "text/markdown;charset=utf-8");
+        showToast("Markdown 补充包已下载");
+      }
+      if (event.target.closest("#packageExportHtmlBtn")) exportHtml();
+    });
+
+    searchInput.addEventListener("input", () => {
+      search = searchInput.value.trim().toLowerCase();
+      applyFilters();
+    });
+
+    statusFilterInput.addEventListener("change", () => {
+      statusFilter = statusFilterInput.value;
+      applyFilters();
+    });
+
+    prevBtn.addEventListener("click", () => renderPage(state.currentPage - 1));
+    nextBtn.addEventListener("click", () => renderPage(state.currentPage + 1));
+    document.querySelector("#jumpPackageBtn").addEventListener("click", () => renderPage(pages.findIndex(page => page.package)));
+    document.querySelector("#exportHtmlBtn").addEventListener("click", exportHtml);
+    document.querySelector("#exportJsonBtn").addEventListener("click", exportJson);
+    document.querySelector("#importBtn").addEventListener("click", () => importFile.click());
+
+    importFile.addEventListener("change", async () => {
+      const [file] = importFile.files;
+      if (!file) return;
+      try {
+        state = normalizeState(JSON.parse(await file.text()));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        renderNav();
+        renderDeck();
+        updateSummary();
+        renderPage(state.currentPage);
+        showToast("对齐结果已导入");
+      } catch (_) {
+        showToast("导入失败：不是有效的对齐 JSON");
+      } finally {
+        importFile.value = "";
+      }
+    });
+
+    document.querySelector("#resetBtn").addEventListener("click", () => {
+      if (!confirm("恢复初始状态会清除当前选择和反馈，继续吗？")) return;
+      state = defaultState();
+      localStorage.removeItem(STORAGE_KEY);
+      renderNav();
+      renderDeck();
+      updateSummary();
+      renderPage(0);
+      showToast("已恢复初始共识");
+    });
+
+    document.addEventListener("keydown", event => {
+      const editing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+      if (editing) return;
+      if (event.key === "ArrowLeft") renderPage(state.currentPage - 1);
+      if (event.key === "ArrowRight") renderPage(state.currentPage + 1);
+    });
+
+    renderNav();
+    renderDeck();
+    updateSummary();
+    renderPage(state.currentPage);
+  </script>
+</body>
+</html>
