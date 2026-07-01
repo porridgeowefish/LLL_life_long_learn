@@ -40,6 +40,8 @@ Last reviewed: 2026-06-15
 - Agent runtime settings list Claude/WorkBuddy/Hermes/Codex/Trae providers,
   persist only the selected runtime ID, preserve other `config.local.json`
   fields, and expose selected runtime health through `/api/health`.
+- Frontend Exit calls the local-only shutdown endpoint; non-loopback requests
+  are rejected and loopback requests invoke the configured shutdown callback.
 - Agent invocation and follow-up use the selected runtime while keeping the
   learning agent IDs and prompt assembly contract unchanged.
 - Run all Go tests, Vitest, and the production frontend build.
@@ -59,3 +61,5 @@ Last reviewed: 2026-06-15
   the existing Claude-style color tokens.
 - The home page shows a dismissible first-entry guide and the settings page lets
   the learner switch CLI type without asking for model configuration.
+- The top bar exposes an Exit button that confirms before stopping the local
+  server, allowing a desktop entry process to close after startup.

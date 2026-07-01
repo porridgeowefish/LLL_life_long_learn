@@ -39,6 +39,7 @@ CLAUDE.md                     Thin Claude-specific loader
 
 ```bash
 cd D:\2_Study\LLL
+npm run build
 go run ./backend-go/cmd/lll
 ```
 

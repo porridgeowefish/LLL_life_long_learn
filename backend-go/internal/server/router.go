@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ type Server struct {
 	RuntimeOptions  []agentruntime.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
+	shutdown        func()
 	mu              sync.RWMutex
 }
 
@@ -84,6 +86,7 @@ func (s *Server) Handler() http.Handler {
 
 	// Health
 	mux.HandleFunc("GET /api/health", s.handleHealth)
+	mux.HandleFunc("POST /api/system/shutdown", s.handleShutdown)
 	mux.HandleFunc("GET /api/settings/agent-runtime", s.handleGetAgentRuntimeSettings)
 	mux.HandleFunc("PUT /api/settings/agent-runtime", s.handlePutAgentRuntimeSettings)
 
@@ -154,6 +157,41 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("/", spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX))
 
 	return logging(mux)
+}
+
+// SetShutdownFunc installs the process-level shutdown callback used by the
+// local-only frontend exit button. Tests can leave this unset.
+func (s *Server) SetShutdownFunc(fn func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.shutdown = fn
+}
+
+func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if !isLoopbackRemoteAddr(r.RemoteAddr) {
+		httpx.Error(w, http.StatusForbidden, "shutdown is only allowed from localhost")
+		return
+	}
+
+	s.mu.RLock()
+	shutdown := s.shutdown
+	s.mu.RUnlock()
+	if shutdown == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "shutdown handler is not configured")
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"shuttingDown": true})
+	go shutdown()
+}
+
+func isLoopbackRemoteAddr(remoteAddr string) bool {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		host = remoteAddr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // spaHandler serves static files from root, falling back to indexFile for

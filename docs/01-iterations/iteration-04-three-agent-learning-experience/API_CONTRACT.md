@@ -74,6 +74,20 @@ other local config fields.
 `GET /api/health` includes `agentRuntime` with the selected provider and probe
 status. The legacy `claude` field remains for compatibility.
 
+## Local App Lifecycle
+
+```text
+POST /api/system/shutdown
+```
+
+Stops the local LLL HTTP server after returning the response, so the frontend
+can expose an Exit button for desktop-entry workflows. The endpoint accepts
+only loopback requests (`127.0.0.1` / `::1`) and returns:
+
+```json
+{"shuttingDown":true}
+```
+
 `POST /api/agents/{id}/invoke` adds optional:
 
 ```json

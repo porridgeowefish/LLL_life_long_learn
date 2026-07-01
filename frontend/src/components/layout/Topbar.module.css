@@ -81,3 +81,7 @@
   font-size: 0.72rem;
   color: var(--muted);
 }
+
+.exitBtn {
+  flex: 0 0 auto;
+}

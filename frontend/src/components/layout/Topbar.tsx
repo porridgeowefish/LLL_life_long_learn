@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import clsx from 'clsx';
+
+import { requestShutdown } from '@/api/system';
+import { Button } from '@/components/primitive/Button';
+import { Icon } from '@/components/primitive/Icon';
 
 import { ConnectionBadge } from './ConnectionBadge';
 import s from './Topbar.module.css';
@@ -19,6 +24,21 @@ const NAV_ITEMS: readonly NavItem[] = [
 ];
 
 export function Topbar() {
+  const [exiting, setExiting] = useState(false);
+
+  const handleExit = async () => {
+    if (exiting) return;
+    const ok = window.confirm('关闭 LifeLongLearn 本地服务？');
+    if (!ok) return;
+    setExiting(true);
+    try {
+      await requestShutdown();
+    } catch (err) {
+      setExiting(false);
+      window.alert(`关闭失败：${(err as Error).message}`);
+    }
+  };
+
   return (
     <header className={s.topbar}>
       <a href="/" className={s.logo}>
@@ -40,6 +60,17 @@ export function Topbar() {
       </nav>
       <div className={s.right}>
         <ConnectionBadge />
+        <Button
+          size="sm"
+          variant="ghost"
+          className={s.exitBtn}
+          iconLeft={<Icon name="x" size={13} />}
+          loading={exiting}
+          onClick={handleExit}
+          title="关闭本地服务"
+        >
+          退出
+        </Button>
       </div>
     </header>
   );

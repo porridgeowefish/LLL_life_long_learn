@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/server"
@@ -31,6 +32,11 @@ func main() {
 	fmt.Printf("Listening on http://localhost:%s\n", port)
 
 	httpServer := &http.Server{Addr: addr, Handler: srv.Handler()}
+	srv.SetShutdownFunc(func() {
+		time.Sleep(200 * time.Millisecond)
+		fmt.Println("\nShutting down from UI...")
+		_ = httpServer.Close()
+	})
 
 	// Graceful shutdown on Ctrl+C.
 	go func() {
