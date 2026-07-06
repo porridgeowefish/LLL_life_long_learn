@@ -21,6 +21,14 @@ Read only the rule files triggered by the current task. Do not preload the whole
 state sync, math preprocessing, etc.). Every agent MUST read it before
 touching the launcher, the frontend, or any charter/primitive file.
 
+**Iteration docs are the delivery source of truth.** Specs, plans, API
+contracts, and tests for a slice live inside `docs/01-iterations/iteration-NN-<name>/`
+(see `docs/01-iterations/README.md` for the required file set). Planning/design
+skills (e.g. superpowers brainstorming/writing-plans) MUST detect this system
+and write INTO it — plans under `iteration-NN-<name>/plans/`, design folded
+into the iteration's own docs — and never create a parallel `docs/superpowers/`
+layer.
+
 ## 1. Team Principles
 
 All agents must follow:

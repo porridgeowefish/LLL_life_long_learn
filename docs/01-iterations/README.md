@@ -11,7 +11,9 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 04 | Three-agent learning experience refactor (active) | [iteration-04-three-agent-learning-experience](./iteration-04-three-agent-learning-experience/README.md) |
+| 06 | Ask-AI inline help and live run progress (proposed) | [iteration-06-ask-ai-and-live-progress](./iteration-06-ask-ai-and-live-progress/README.md) |
+| 05 | Follow-up update mechanism (active) | [iteration-05-follow-up-update-mechanism](./iteration-05-follow-up-update-mechanism/README.md) |
+| 04 | Three-agent learning experience refactor (implemented) | [iteration-04-three-agent-learning-experience](./iteration-04-three-agent-learning-experience/README.md) |
 | 03 | Five agents and learning loops (draft, scoping) | [iteration-03-five-agents-and-learning-loops](./iteration-03-five-agents-and-learning-loops/README.md) |
 | 02 | Local learning workbench foundation | [iteration-02-local-learning-workbench-foundation](./iteration-02-local-learning-workbench-foundation/README.md) |
 | 01 | Core orchestrator foundation (superseded baseline) | [iteration-01-core-orchestrator-foundation](./iteration-01-core-orchestrator-foundation/README.md) |
