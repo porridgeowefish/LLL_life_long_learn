@@ -19,7 +19,7 @@ import {
   type Submission,
 } from '@/api/practice';
 import { useProjectProgress } from '@/api/progress';
-import { PERMISSION_MODES, PRACTICE_GEN_POLL_MS, PRACTICE_GEN_TIMEOUT_MS } from '@/lib/constants';
+import { PERMISSION_MODES, PRACTICE_GEN_TIMEOUT_MS } from '@/lib/constants';
 import {
   draftMatches,
   isEmptyPracticeAnswer,
@@ -169,9 +169,7 @@ export function PracticeFlow({ projectSlug }: { projectSlug: string }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const requestedEvaluations = useRef(new Set<number>());
 
-  const tasksData = usePracticeTasks(projectSlug, {
-    refetchInterval: state.phase === 'generating' ? PRACTICE_GEN_POLL_MS : false,
-  });
+  const tasksData = usePracticeTasks(projectSlug);
   const tasks = tasksData.data?.tasks ?? [];
   const generatedAt = tasksData.data?.generatedAt;
   const hasTasks = tasksData.data?.generated === true && Array.isArray(tasks) && tasks.length > 0;

@@ -213,7 +213,6 @@ export function usePracticeEvaluation(projectSlug: string | undefined, attempt: 
     queryKey: ['practice', 'evaluation', projectSlug, attempt],
     enabled: !!projectSlug && attempt > 0,
     retry: false,
-    refetchInterval: (query) => query.state.data ? false : 3000,
     queryFn: async () => {
       const res = await http.get<{ evaluation: Evaluation }>(
         `/api/projects/${encodeURIComponent(projectSlug!)}/practice/evaluation?attempt=${attempt}`,

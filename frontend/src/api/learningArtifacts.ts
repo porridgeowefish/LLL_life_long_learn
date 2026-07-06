@@ -113,7 +113,6 @@ export function useExplainManifest(projectSlug: string) {
   return useQuery({
     queryKey: qk.files.raw(projectSlug, 'explain/manifest.json'),
     retry: false,
-    refetchInterval: 5000,
     queryFn: () =>
       http.get<ExplainManifest>(
         `/files/projects/${encodeURIComponent(projectSlug)}/explain/manifest.json`,
