@@ -1,0 +1,33 @@
+package artifactwatch
+
+import "testing"
+
+func TestParseZonePath(t *testing.T) {
+	cases := []struct {
+		rel      string
+		wantSlug string
+		wantZone string
+		wantOK   bool
+	}{
+		{"myproj/explain/pages/01.md", "myproj", "explain", true},
+		{"myproj/explain/manifest.json", "myproj", "explain", true},
+		{"p/subprojects/c/practice/tasks.json", "p/subprojects/c", "practice", true},
+		{"abc/intro/output.md", "abc", "intro", true},
+		{"abc/summary/summary.md", "abc", "summary", true},
+		// ignored structural folders before a zone -> not a zone artifact
+		{"abc/runs/2026-x/explain/result.md", "", "", false},
+		{"abc/memory/note.md", "", "", false},
+		{"abc/progress/summary.json", "", "", false},
+		// no zone at all
+		{"README.md", "", "", false},
+		// windows backslashes
+		{"myproj\\explain\\pages\\01.md", "myproj", "explain", true},
+	}
+	for _, c := range cases {
+		slug, zone, ok := parseZonePath(c.rel)
+		if slug != c.wantSlug || zone != c.wantZone || ok != c.wantOK {
+			t.Errorf("parseZonePath(%q) = (%q,%q,%t), want (%q,%q,%t)",
+				c.rel, slug, zone, ok, c.wantSlug, c.wantZone, c.wantOK)
+		}
+	}
+}
