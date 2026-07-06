@@ -36,6 +36,24 @@ type Confusion struct {
 	Notes            string `json:"notes,omitempty"`
 	State            State  `json:"state"`
 	CreatedAt        string `json:"createdAt"`
+	Ask              *Ask   `json:"ask,omitempty"`
+}
+
+// AskMessage is one turn of an Ask-AI exchange attached to a confusion.
+type AskMessage struct {
+	ID        string `json:"id"`
+	Role      string `json:"role"` // "user" | "assistant"
+	Content   string `json:"content"`
+	CreatedAt string `json:"createdAt"`
+}
+
+// Ask is the persisted Ask-AI exchange for a confusion.
+type Ask struct {
+	Messages     []AskMessage `json:"messages,omitempty"`
+	Summary      string       `json:"summary,omitempty"`
+	SummaryState string       `json:"summaryState,omitempty"` // idle | pending | done | failed
+	ProviderID   string       `json:"providerId,omitempty"`
+	UpdatedAt    string       `json:"updatedAt,omitempty"`
 }
 
 // Store is a file-backed confusion store for one project.
@@ -178,6 +196,58 @@ func (s *Store) Get(id string) (Confusion, error) {
 	for _, c := range s.data {
 		if c.ID == id {
 			return c, nil
+		}
+	}
+	return Confusion{}, os.ErrNotExist
+}
+
+// AppendAskMessage appends a message to the confusion's ask exchange (creating
+// the Ask object on first use) and persists. New messages reset SummaryState to
+// "idle" so a stale summary is not shown after a new turn.
+func (s *Store) AppendAskMessage(id string, msg AskMessage) (Confusion, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, c := range s.data {
+		if c.ID == id {
+			if c.Ask == nil {
+				c.Ask = &Ask{}
+			}
+			if msg.ID == "" {
+				msg.ID = newID()
+			}
+			if msg.CreatedAt == "" {
+				msg.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+			}
+			c.Ask.Messages = append(c.Ask.Messages, msg)
+			c.Ask.SummaryState = "idle"
+			c.Ask.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+			s.data[i] = c
+			s.dirty = true
+			return c, s.save()
+		}
+	}
+	return Confusion{}, os.ErrNotExist
+}
+
+// SetAskSummary stores the summary and state for a confusion's ask exchange.
+// state "done" flips the confusion to StateAsked.
+func (s *Store) SetAskSummary(id, summary, state string) (Confusion, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, c := range s.data {
+		if c.ID == id {
+			if c.Ask == nil {
+				c.Ask = &Ask{}
+			}
+			c.Ask.Summary = summary
+			c.Ask.SummaryState = state
+			c.Ask.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+			if state == "done" {
+				c.State = StateAsked
+			}
+			s.data[i] = c
+			s.dirty = true
+			return c, s.save()
 		}
 	}
 	return Confusion{}, os.ErrNotExist
