@@ -131,6 +131,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 			Events:         broadcaster,
 			ClaudeBin:      s.ClaudeBin,
 			Runtime:        &runtime,
+			RunProgress:    s.runProgress,
 		})
 		if launchErr != nil {
 			os.WriteFile(filepath.Join(
@@ -266,6 +267,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 			Events:         broadcaster,
 			ClaudeBin:      s.ClaudeBin,
 			Runtime:        &runtime,
+			RunProgress:    s.runProgress,
 		})
 	}()
 
