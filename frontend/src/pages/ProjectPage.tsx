@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/primitive/EmptyState';
 import { Icon } from '@/components/primitive/Icon';
 import { ZoneTimeline } from '@/components/feature/project/ZoneTimeline';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
+import { RunProgressBar } from '@/components/feature/project/RunProgressBar';
 import { AgentInvokePanel } from '@/components/feature/agent/AgentInvokePanel';
 import { ConfusionPanel } from '@/components/feature/explain/ConfusionPanel';
 import { ExplainReader } from '@/components/feature/explain/ExplainReader';
@@ -13,6 +14,8 @@ import { IntroPage } from '@/components/feature/intro/IntroPage';
 import { PracticeFlow } from '@/components/feature/practice/PracticeFlow';
 import { ExtendPage } from '@/components/feature/extend/ExtendPage';
 import { SummaryPage } from '@/components/feature/summary/SummaryPage';
+import { useArtifactRefresh } from '@/hooks/useArtifactRefresh';
+import { useRunProgress } from '@/hooks/useRunProgress';
 import { useProjectStore } from '@/store/slices/project';
 import { useUiStore } from '@/store/slices/ui';
 import { ZONE_DISPLAY, type ZoneName } from '@/types/domain';
@@ -34,6 +37,9 @@ export function ProjectPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const summaryPanelCollapsed = useUiStore((state) => state.summaryPanelCollapsed);
   const setSummaryPanelCollapsed = useUiStore((state) => state.setSummaryPanelCollapsed);
+
+  useArtifactRefresh(slug);
+  const runProgress = useRunProgress(slug);
 
   useEffect(() => {
     if (slug) selectProject(slug);
@@ -162,6 +168,11 @@ export function ProjectPage() {
               </div>
             )}
           </div>
+          <RunProgressBar
+            active={runProgress.active}
+            activity={runProgress.activity}
+            onDismiss={runProgress.dismiss}
+          />
         </header>
 
         <div className={s.scroll}>
