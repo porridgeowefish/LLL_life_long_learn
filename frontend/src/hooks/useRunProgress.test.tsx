@@ -52,4 +52,30 @@ describe('useRunProgress', () => {
     act(() => result.current.dismiss());
     expect(result.current.active).toBe(false);
   });
+
+  it('subscribes to run-progress for the active session and exposes pages', () => {
+    useSessionStore.setState({ activeSessionId: 's1' });
+    const { result } = renderHook(() => useRunProgress('myproj'));
+    // run-progress for a different runId must be ignored.
+    act(() => handlers['run-progress']({ runId: 'other', pagesDone: 9, pagesPlanned: 10 }));
+    expect(result.current.pagesDone).toBe(0);
+    expect(result.current.pagesPlanned).toBe(0);
+    // run-progress for the active session drives the determinate counters.
+    act(() => handlers['run-progress']({ runId: 's1', pagesDone: 3, pagesPlanned: 5, activity: 'wrote p3' }));
+    expect(result.current.pagesDone).toBe(3);
+    expect(result.current.pagesPlanned).toBe(5);
+    expect(result.current.activity).toBe('wrote p3');
+    expect(result.current.active).toBe(true);
+  });
+
+  it('resets pages when the active session changes', () => {
+    useSessionStore.setState({ activeSessionId: 's1' });
+    const { result } = renderHook(() => useRunProgress('myproj'));
+    act(() => handlers['run-progress']({ runId: 's1', pagesDone: 3, pagesPlanned: 5 }));
+    expect(result.current.pagesPlanned).toBe(5);
+    // Switching the active session clears the run-scoped counters.
+    act(() => useSessionStore.setState({ activeSessionId: 's2' }));
+    expect(result.current.pagesDone).toBe(0);
+    expect(result.current.pagesPlanned).toBe(0);
+  });
 });

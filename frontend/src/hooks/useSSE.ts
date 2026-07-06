@@ -60,6 +60,7 @@ function ensureConnection() {
     SSE_EVENTS.turnCreated,
     SSE_EVENTS.artifactUpdated,
     SSE_EVENTS.confusionUpdated,
+    SSE_EVENTS.runProgress,
     SSE_EVENTS.sessionCompleted,
     SSE_EVENTS.sessionFailed,
   ];

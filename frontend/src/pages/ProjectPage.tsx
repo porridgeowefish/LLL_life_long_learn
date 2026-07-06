@@ -171,6 +171,8 @@ export function ProjectPage() {
           <RunProgressBar
             active={runProgress.active}
             activity={runProgress.activity}
+            pagesDone={runProgress.pagesDone}
+            pagesPlanned={runProgress.pagesPlanned}
             onDismiss={runProgress.dismiss}
           />
         </header>

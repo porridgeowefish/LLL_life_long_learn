@@ -25,4 +25,16 @@ describe('RunProgressBar', () => {
     fireEvent.click(screen.getByRole('button', { name: '收起进度' }));
     expect(onDismiss).toHaveBeenCalledOnce();
   });
+
+  it('renders determinate "N / M 页" text when pagesPlanned > 0', () => {
+    render(<RunProgressBar active={true} activity={'running'} pagesDone={3} pagesPlanned={5} />);
+    expect(screen.getByText('3 / 5 页')).toBeTruthy();
+    // The activity text must NOT win when the determinate label is shown.
+    expect(screen.queryByText('running')).toBeNull();
+  });
+
+  it('stays indeterminate (shows activity) when pagesPlanned is 0', () => {
+    render(<RunProgressBar active={true} activity={'最近更新：explain'} pagesDone={0} pagesPlanned={0} />);
+    expect(screen.getByText('最近更新：explain')).toBeTruthy();
+  });
 });

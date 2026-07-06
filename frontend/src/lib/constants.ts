@@ -19,6 +19,7 @@ export const SSE_EVENTS = {
   terminalOutput: 'terminal-output',
   artifactUpdated: 'artifact-updated',
   confusionUpdated: 'confusion-updated',
+  runProgress: 'run-progress',
   sessionCompleted: 'session-completed',
   sessionFailed: 'session-failed',
 } as const;
