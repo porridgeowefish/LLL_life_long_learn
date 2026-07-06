@@ -171,3 +171,107 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Ask-AI provider management ─────────────────────────────────── */
+
+.askSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.askActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.askEngine {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.askEngine select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.8rem;
+  background: var(--card);
+  color: var(--fg);
+}
+
+.askList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.askField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  flex: 1;
+  min-width: 0;
+}
+
+.askField input,
+.askField select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 0.82rem;
+  background: var(--card);
+  color: var(--fg);
+  font-family: inherit;
+}
+
+.askDefault {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.askFlags {
+  display: flex;
+  gap: 14px;
+  font-size: 0.76rem;
+  color: var(--muted);
+}
+
+.askFlags label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.askRowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.askProbeOk {
+  font-size: 0.76rem;
+  color: var(--accent);
+}
+
+.askProbeErr {
+  font-size: 0.76rem;
+  color: var(--pink);
+}
+
+@media (max-width: 900px) {
+  .askList {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,13 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { useAgentRuntimeSettings, useUpdateAgentRuntime } from '@/api/settings';
+import {
+  useAskAiSettings,
+  useSaveAskAiSettings,
+  useProbeAskAi,
+  type AskConfig,
+  type AskProvider,
+} from '@/api/askAi';
 import { Button } from '@/components/primitive/Button';
 import { Card } from '@/components/primitive/Card';
 import { Icon } from '@/components/primitive/Icon';
@@ -72,6 +79,8 @@ export function SettingsPage() {
           </div>
         )}
 
+        <AskAiSection />
+
         <section className={s.notes}>
           <div className={s.note}>
             <span className={s.noteIcon}><Icon name="check" size={14} /></span>
@@ -127,6 +136,240 @@ function RuntimeCard({ provider, selected, saving, onSelect }: RuntimeCardProps)
       >
         {selected ? '当前选择' : '选择'}
       </Button>
+    </Card>
+  );
+}
+
+const MASKED_KEY = '••••';
+
+function newProvider(): AskProvider {
+  return {
+    id: `prov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    kind: 'openai',
+    name: '',
+    baseURL: '',
+    apiKey: '',
+    model: '',
+  };
+}
+
+function AskAiSection() {
+  const { data, isLoading, isError, error } = useAskAiSettings();
+  const save = useSaveAskAiSettings();
+  const probe = useProbeAskAi();
+
+  // Local draft, re-seeded whenever the server snapshot (`data`) changes —
+  // initial load and after a save (the save mutation invalidates the query,
+  // refetch returns a new `data` identity, this effect re-seeds). In-flight
+  // edits are preserved between fetches.
+  const [draft, setDraft] = useState<AskConfig | null>(null);
+  useEffect(() => {
+    if (!data) return;
+    setDraft({
+      default: data.default,
+      searchEngine: data.searchEngine,
+      providers: data.providers.map((p) => ({ ...p })),
+    });
+  }, [data]);
+
+  if (isLoading) return <div className={s.loading}>加载 Ask-AI 配置…</div>;
+  if (isError) {
+    return (
+      <div className={s.error} role="alert">
+        Ask-AI 配置读取失败：{(error as Error).message}
+      </div>
+    );
+  }
+  if (!draft) return null;
+
+  const patchProvider = (id: string, patch: Partial<AskProvider>) => {
+    setDraft((d) =>
+      d ? { ...d, providers: d.providers.map((p) => (p.id === id ? { ...p, ...patch } : p)) } : d,
+    );
+  };
+
+  const removeProvider = (id: string) => {
+    setDraft((d) => {
+      if (!d) return d;
+      const providers = d.providers.filter((p) => p.id !== id);
+      return { ...d, providers, default: d.default === id ? (providers[0]?.id ?? '') : d.default };
+    });
+  };
+
+  const addProvider = () => {
+    setDraft((d) => {
+      if (!d) return d;
+      const p = newProvider();
+      return { ...d, providers: [...d.providers, p], default: d.default || p.id };
+    });
+  };
+
+  const setDefault = (id: string) => setDraft((d) => (d ? { ...d, default: id } : d));
+  const setSearchEngine = (engine: 'google' | 'bing') =>
+    setDraft((d) => (d ? { ...d, searchEngine: engine } : d));
+
+  const onSave = () => save.mutate(draft);
+
+  return (
+    <section className={s.askSection} aria-label="Ask-AI 模型源">
+      <header className={s.header}>
+        <div>
+          <h2 className={s.title}>Ask-AI 模型源</h2>
+          <p className={s.subtitle}>
+            选中教程文字后「问 AI」使用的模型源。API Key 在服务端加密；未修改时回显占位符 {MASKED_KEY}。
+          </p>
+        </div>
+        <div className={s.askActions}>
+          <label className={s.askEngine}>
+            搜索引擎
+            <select
+              value={draft.searchEngine}
+              onChange={(e) => setSearchEngine(e.target.value as 'google' | 'bing')}
+            >
+              <option value="google">Google</option>
+              <option value="bing">Bing</option>
+            </select>
+          </label>
+          <Button variant="outline" onClick={addProvider}>添加模型源</Button>
+          <Button variant="primary" loading={save.isPending} onClick={onSave}>保存</Button>
+        </div>
+      </header>
+
+      {save.isError && (
+        <div className={s.error} role="alert">
+          保存失败：{(save.error as Error).message}
+        </div>
+      )}
+
+      <div className={s.askList}>
+        {draft.providers.length === 0 && (
+          <div className={s.loading}>还没有模型源。点击「添加模型源」新建一个。</div>
+        )}
+        {draft.providers.map((p) => (
+          <ProviderRow
+            key={p.id}
+            provider={p}
+            isDefault={draft.default === p.id}
+            onSetDefault={() => setDefault(p.id)}
+            onPatch={(patch) => patchProvider(p.id, patch)}
+            onRemove={() => removeProvider(p.id)}
+            onProbe={() => probe.mutate({ providerId: p.id })}
+            probeResult={probe.variables?.providerId === p.id ? probe.data : undefined}
+            probePending={probe.isPending && probe.variables?.providerId === p.id}
+            probeError={probe.variables?.providerId === p.id && probe.isError
+              ? (probe.error as Error).message
+              : undefined}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ProviderRow({
+  provider,
+  isDefault,
+  onSetDefault,
+  onPatch,
+  onRemove,
+  onProbe,
+  probeResult,
+  probePending,
+  probeError,
+}: {
+  provider: AskProvider;
+  isDefault: boolean;
+  onSetDefault: () => void;
+  onPatch: (patch: Partial<AskProvider>) => void;
+  onRemove: () => void;
+  onProbe: () => void;
+  probeResult?: { ok: boolean; error?: string };
+  probePending: boolean;
+  probeError?: string;
+}) {
+  const showThinking = provider.kind === 'anthropic';
+  return (
+    <Card variant="outlined" className={s.card}>
+      <div className={s.cardTop}>
+        <label className={s.askField}>
+          名称
+          <input
+            value={provider.name ?? ''}
+            onChange={(e) => onPatch({ name: e.target.value })}
+            placeholder="如：GPT-4o / Claude"
+          />
+        </label>
+        <label className={s.askField}>
+          类型
+          <select
+            value={provider.kind}
+            onChange={(e) => onPatch({ kind: e.target.value as 'openai' | 'anthropic' })}
+          >
+            <option value="openai">openai</option>
+            <option value="anthropic">anthropic</option>
+          </select>
+        </label>
+        <label className={s.askDefault}>
+          <input type="radio" checked={isDefault} onChange={onSetDefault} />
+          默认
+        </label>
+      </div>
+      <label className={s.askField}>
+        Base URL
+        <input
+          value={provider.baseURL}
+          onChange={(e) => onPatch({ baseURL: e.target.value })}
+          placeholder="https://api.openai.com/v1"
+        />
+      </label>
+      <label className={s.askField}>
+        Model
+        <input
+          value={provider.model}
+          onChange={(e) => onPatch({ model: e.target.value })}
+          placeholder="gpt-4o / claude-sonnet-4"
+        />
+      </label>
+      <label className={s.askField}>
+        API Key
+        <input
+          value={provider.apiKey}
+          onChange={(e) => onPatch({ apiKey: e.target.value })}
+          placeholder={MASKED_KEY}
+          type="password"
+        />
+      </label>
+      <div className={s.askFlags}>
+        <label>
+          <input
+            type="checkbox"
+            checked={!!provider.reasoning}
+            onChange={(e) => onPatch({ reasoning: e.target.checked })}
+          />
+          reasoning
+        </label>
+        {showThinking && (
+          <label>
+            <input
+              type="checkbox"
+              checked={!!provider.thinking}
+              onChange={(e) => onPatch({ thinking: e.target.checked })}
+            />
+            thinking
+          </label>
+        )}
+      </div>
+      <div className={s.askRowActions}>
+        <Button variant="outline" size="sm" loading={probePending} onClick={onProbe}>
+          探测
+        </Button>
+        {probeError && <span className={s.askProbeErr}>失败：{probeError}</span>}
+        {probeResult?.ok === false && !probeError && (
+          <span className={s.askProbeErr}>失败：{probeResult.error ?? '未知'}</span>
+        )}
+        {probeResult?.ok && <span className={s.askProbeOk}>已连通</span>}
+        <Button variant="ghost" size="sm" onClick={onRemove}>删除</Button>
+      </div>
     </Card>
   );
 }
