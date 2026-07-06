@@ -17,6 +17,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	"github.com/xmz14/lll/backend-go/internal/paths"
+	"github.com/xmz14/lll/backend-go/internal/runprogress"
 )
 
 // Server bundles runtime dependencies shared across handlers.
@@ -27,6 +28,7 @@ type Server struct {
 	RuntimeOptions  []agentruntime.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
+	runProgress     *runprogress.Store
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
 	mu              sync.RWMutex
@@ -85,6 +87,7 @@ func New() *Server {
 		RuntimeOptions:  runtimeOptions,
 		ImageConfig:     imgCfg,
 		ImageAvailable:  imgAvailable,
+		runProgress:     runprogress.New(),
 		watcher:         watcher,
 	}
 }
@@ -157,6 +160,9 @@ func (s *Server) Handler() http.Handler {
 	// Explain infographic
 	mux.HandleFunc("POST /api/projects/{id}/explain/infographic", s.handleRequestExplainInfographic)
 	mux.HandleFunc("GET /api/projects/{id}/explain/infographic", s.handleGetExplainInfographic)
+
+	// Run progress reports from injected Claude Code hooks (Phase C).
+	mux.HandleFunc("POST /api/runs/{runId}/status", s.handleRunStatus)
 
 	// Events (SSE)
 	mux.HandleFunc("GET /api/events", broadcaster.SSEHandler(map[string]any{
