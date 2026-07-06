@@ -5,8 +5,17 @@ import clsx from 'clsx';
 import { useConfusions, useDeleteConfusion, type Confusion } from '@/api/confusions';
 import { Button } from '@/components/primitive/Button';
 import { Modal } from '@/components/primitive/Modal';
+import { useAskAiStore } from '@/store/slices/askAi';
 
 import s from './ConfusionPanel.module.css';
+
+function askHoverTitle(ask?: { summaryState?: string; summary?: string }): string | undefined {
+  if (!ask) return undefined;
+  if (ask.summaryState === 'pending') return '生成总结中...';
+  if (ask.summaryState === 'failed') return '总结生成失败';
+  if (ask.summaryState === 'done') return ask.summary;
+  return undefined;
+}
 
 interface ConfusionPanelProps {
   projectSlug: string;
@@ -26,6 +35,7 @@ export function ConfusionPanel({
   const [copied, setCopied] = useState(false);
   const { data: confusions = [], isLoading } = useConfusions(projectSlug);
   const deleteConfusion = useDeleteConfusion();
+  const askAi = useAskAiStore();
   const visible = useMemo(
     () => confusions.filter((item) => item.state !== 'deleted'),
     [confusions],
@@ -99,6 +109,15 @@ export function ConfusionPanel({
             selected={selected.has(item.id)}
             onToggle={() => toggleSelect(item.id)}
             onDelete={() => setDeleteTarget(item)}
+            onReview={(msgAnchor) =>
+              askAi.openReview({
+                projectSlug,
+                confusionId: item.id,
+                quote: item.quoteSnapshot,
+                anchor: msgAnchor,
+                messages: item.ask!.messages,
+              })
+            }
           />
         ))}
       </div>
@@ -161,18 +180,36 @@ function SummaryItem({
   selected,
   onToggle,
   onDelete,
+  onReview,
 }: {
   summary: Confusion;
   selected: boolean;
   onToggle: () => void;
   onDelete: () => void;
+  onReview: (anchor: { top: number; left: number }) => void;
 }) {
+  const hover = askHoverTitle(summary.ask);
   return (
-    <div className={clsx(s.item, selected && s.itemSelected)}>
+    <div
+      className={clsx(s.item, summary.ask && s.itemAsk, selected && s.itemSelected)}
+      title={hover}
+    >
       <label className={s.itemCheck}>
         <input type="checkbox" checked={selected} onChange={onToggle} />
       </label>
       <blockquote className={s.quote}>{summary.quoteSnapshot}</blockquote>
+      {summary.ask && (
+        <button
+          type="button"
+          className={s.reviewBtn}
+          title={hover}
+          onClick={() =>
+            onReview({ top: 120, left: window.innerWidth - 460 })
+          }
+        >
+          答疑
+        </button>
+      )}
       <button
         className={s.deleteButton}
         onClick={onDelete}
