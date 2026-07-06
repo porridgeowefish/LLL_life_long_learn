@@ -98,6 +98,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/system/shutdown", s.handleShutdown)
 	mux.HandleFunc("GET /api/settings/agent-runtime", s.handleGetAgentRuntimeSettings)
 	mux.HandleFunc("PUT /api/settings/agent-runtime", s.handlePutAgentRuntimeSettings)
+	mux.HandleFunc("GET /api/settings/ask-ai", s.handleGetAskAiSettings)
+	mux.HandleFunc("PUT /api/settings/ask-ai", s.handlePutAskAiSettings)
+	mux.HandleFunc("POST /api/settings/ask-ai/probe", s.handleProbeAskAi)
 
 	// Projects
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
