@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
@@ -210,4 +212,63 @@ func loadPageContext(slug, pageArtifactID string) (string, error) {
 		s = s[:cap] + "\n…(truncated)"
 	}
 	return s, nil
+}
+
+func (s *Server) handleAskAiSummarize(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("id")
+	cid := r.PathValue("confusionId")
+	if !workspace.ValidateSlug(slug) {
+		httpx.Error(w, http.StatusBadRequest, "invalid slug")
+		return
+	}
+	store, err := confusionstore.New(slug)
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	conf, err := store.Get(cid)
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, "confusion not found")
+		return
+	}
+
+	// Mark pending immediately + notify (sidebar shows "生成总结中...").
+	store.SetAskSummary(cid, "", "pending")
+	broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
+
+	go summarizeAskExchange(slug, cid, conf.QuoteSnapshot, conf.Ask)
+
+	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "pending"})
+}
+
+func summarizeAskExchange(slug, cid, quote string, ask *confusionstore.Ask) {
+	cfg, err := askaiconfig.Load()
+	if err != nil || !cfg.Enabled() {
+		store, _ := confusionstore.New(slug)
+		store.SetAskSummary(cid, "总结生成失败：未配置 Ask-AI 模型源。", "failed")
+		broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
+		return
+	}
+	pc := cfg.Find("")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
+
+	system := "结合用户的疑问点和下面的对话，生成一段不超过 250 个汉字的中文总结，帮助用户日后回忆这次答疑的结论。直接输出总结正文，不要寒暄或多余说明。"
+	var msgs []askaiprovider.Message
+	msgs = append(msgs, askaiprovider.Message{Role: "user", Content: "疑问原文：" + quote})
+	if ask != nil {
+		for _, m := range ask.Messages {
+			msgs = append(msgs, askaiprovider.Message{Role: m.Role, Content: m.Content})
+		}
+	}
+	summary, err := askaiprovider.Complete(ctx, prov, system, msgs)
+	store, _ := confusionstore.New(slug)
+	if err != nil || strings.TrimSpace(summary) == "" {
+		store.SetAskSummary(cid, "总结生成失败。", "failed")
+	} else {
+		store.SetAskSummary(cid, strings.TrimSpace(summary), "done")
+	}
+	broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
 }
