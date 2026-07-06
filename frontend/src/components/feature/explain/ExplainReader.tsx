@@ -6,6 +6,9 @@ import { useExplainManifest, useExplainPage } from '@/api/learningArtifacts';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
 import { ExplainInfographic } from './ExplainInfographic';
+import { AskAiPanel } from './AskAiPanel';
+import { useAskAiSettings } from '@/api/askAi';
+import { useAskAiStore } from '@/store/slices/askAi';
 import { useMarkdown } from '@/hooks/useMarkdown';
 import {
   applyHighlights,
@@ -137,6 +140,7 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
       {pages.length > 0 && (
         <ExplainInfographic projectSlug={projectSlug} visible={currentIndex === pages.length - 1} />
       )}
+      <AskAiPanel />
     </div>
   );
 }
@@ -155,6 +159,8 @@ function ExplainPage({
   const hostRef = useRef<HTMLElement>(null);
   const markdownRef = useRef<HTMLDivElement>(null);
   const createConfusion = useCreateConfusion();
+  const askAi = useAskAiStore();
+  const askAiSettings = useAskAiSettings();
   const { data: allConfusions = [] } = useConfusions(projectSlug);
   const artifactID = `explain/${file}`;
   const pageConfusions = useMemo(
@@ -164,7 +170,7 @@ function ExplainPage({
     [allConfusions, artifactID],
   );
   const [selection, setSelection] = useState<
-    (TextAnchor & { top: number; left: number; overlaps: boolean }) | null
+    (TextAnchor & { top: number; left: number; screenTop: number; screenLeft: number; overlaps: boolean }) | null
   >(null);
 
   useEffect(() => {
@@ -223,6 +229,8 @@ function ExplainPage({
           ...anchor,
           top: rect.top - (hostRect?.top ?? 0) - 42,
           left: rect.left - (hostRect?.left ?? 0) + rect.width / 2,
+          screenTop: rect.top,
+          screenLeft: rect.left + rect.width / 2,
           overlaps: overlapsExisting(anchor, pageConfusions),
         });
       }}
@@ -253,6 +261,31 @@ function ExplainPage({
             }}
           >
             {selection.overlaps ? '已在摘要中' : '保存摘要'}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const created = await createConfusion.mutateAsync({
+                projectSlug,
+                confusion: {
+                  sourceArtifactId: artifactID,
+                  quoteSnapshot: selection.text.slice(0, 500),
+                  charStart: selection.start,
+                  charEnd: Math.min(selection.end, selection.start + 500),
+                },
+              });
+              askAi.openActive({
+                projectSlug,
+                confusionId: created.confusion.id,
+                quote: selection.text.slice(0, 500),
+                anchor: { top: selection.screenTop, left: selection.screenLeft },
+                providerId: askAiSettings.data?.default ?? '',
+              });
+              setSelection(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            问 AI
           </button>
           <button type="button" onClick={() => setSelection(null)}>取消</button>
         </div>
