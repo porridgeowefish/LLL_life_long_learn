@@ -23,6 +23,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
+	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -44,6 +45,12 @@ type LaunchRequest struct {
 	Events         EventEmitter
 	ClaudeBin      string
 	Runtime        *agentruntime.Runtime
+	// RunProgress, when non-nil and the runtime is Claude Code, triggers
+	// per-run hook injection: the launcher registers the run, writes a
+	// run-scoped claude-settings.json whose PostToolUse/Stop hooks POST to
+	// /api/runs/{runId}/status, and passes it via `claude --settings <file>`.
+	// Nil = no hooks (non-Claude runtimes keep the Phase-A indeterminate bar).
+	RunProgress    *runprogress.Store
 }
 
 const defaultPermissionMode = "auto"
@@ -127,11 +134,29 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 
 	runtime := selectedRuntime(req)
 
+	// Phase C: when a run-progress store is wired in and the runtime is the
+	// Claude CLI, register the run + emit a run-scoped Claude Code settings
+	// file whose hooks POST activity/completion to /api/runs/{runId}/status.
+	// The settings file is passed to `claude --settings <file>` below. Live
+	// validation of the hook command + schema is a manual step — see
+	// docs/01-iterations/iteration-06-ask-ai-and-live-progress/DELIVERY_NOTES.md.
+	var settingsFile string
+	if req.RunProgress != nil && runtime.ID == agentruntime.RuntimeClaude {
+		sf, _, herr := writeHookSettings(runDirAbs, req.Session.ID, req.RunProgress)
+		if herr != nil {
+			// Non-fatal: hooks are best-effort. The run still proceeds; the
+			// frontend falls back to the Phase-A indeterminate bar.
+			println("runprogress: write hook settings warning:", herr.Error())
+		} else {
+			settingsFile = sf
+		}
+	}
+
 	// Build the PowerShell wrapper script. For runtimes that support an
 	// initial prompt argument, LLL passes the prompt directly. For runtimes
 	// whose interactive prompt contract is not stable, LLL preloads the
 	// assembled prompt onto the clipboard and opens the real CLI surface.
-	psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stdoutPath, req)
+	psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stdoutPath, settingsFile, req)
 
 	// 写 wrapper 脚本到 runDir/wrapper.ps1，用 -File 启动 —— 规避 -Command
 	// 内联引号地狱（中文项目路径 / 单引号 / `& 'claude'` 全部免转义）。
@@ -228,10 +253,10 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 // binary / launch failure is a CAUGHT, logged terminating error — silent
 // failures are not acceptable for diagnosis. The clipboard is kept as a
 // silent fallback in case the arg is ever mangled for an edge-case prompt.
-func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath string, req LaunchRequest) string {
+func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) string {
 	permissionMode := NormalizePermissionMode(req.PermissionMode)
 	runtime := selectedRuntime(req)
-	execLine := interactiveExecLine(runtime, projectRoot)
+	execLine := interactiveExecLine(runtime, projectRoot, settingsFile)
 	promptNotice := "初始 prompt 会自动带入（无需手动粘贴）。"
 	if runtime.PromptDelivery == agentruntime.PromptClipboard {
 		promptNotice = "已把初始 prompt 放入剪贴板；进入 CLI 后按 Ctrl+V 再回车。"
@@ -313,10 +338,16 @@ func selectedRuntime(req LaunchRequest) agentruntime.Runtime {
 	return agentruntime.Runtime{Definition: def, Bin: bin, Available: true}
 }
 
-func interactiveExecLine(rt agentruntime.Runtime, projectRoot string) string {
+func interactiveExecLine(rt agentruntime.Runtime, projectRoot, settingsFile string) string {
+	// Phase C: --settings <file> loads the run-scoped hook config. Only the
+	// Claude CLI takes it; other runtimes ignore the arg.
+	settingsArg := ""
+	if strings.TrimSpace(settingsFile) != "" {
+		settingsArg = fmt.Sprintf(" --settings '%s'", settingsFile)
+	}
 	switch rt.ID {
 	case agentruntime.RuntimeClaude:
-		return "if ($promptText) { & $agentExe --permission-mode $permissionMode $promptText } else { & $agentExe --permission-mode $permissionMode }"
+		return "if ($promptText) { & $agentExe --permission-mode $permissionMode" + settingsArg + " $promptText } else { & $agentExe --permission-mode $permissionMode" + settingsArg + " }"
 	case agentruntime.RuntimeCodex:
 		return "if ($promptText) { & $agentExe $promptText } else { & $agentExe }"
 	case agentruntime.RuntimeTrae:
@@ -324,4 +355,44 @@ func interactiveExecLine(rt agentruntime.Runtime, projectRoot string) string {
 	default:
 		return "& $agentExe"
 	}
+}
+
+// writeHookSettings writes a run-scoped Claude Code settings JSON that reports
+// progress to LLL via the run-status endpoint, and returns its path + the
+// generated auth token. The launcher passes the file to `claude --settings`.
+//
+// Hook command + schema are the best Windows-curl form for the current Claude
+// Code CLI (confirmed: `claude --help` lists `--settings <file-or-json>`).
+// Live end-to-end validation of the PostToolUse/Stop hooks firing against a
+// real Explain run is a manual step — see DELIVERY_NOTES.md (Phase C). Per
+// the project's Windows + UTF-8 rule (CLAUDE.md), only ASCII goes on the curl
+// command line; Chinese activity text would be mangled via argv.
+func writeHookSettings(runDir, runId string, store *runprogress.Store) (path, token string, err error) {
+	token = store.Register(runId)
+	base := "http://127.0.0.1:8787/api/runs/" + runId + "/status"
+	post := `curl.exe -s -o /dev/null -X POST ` + base +
+		` -H "X-Run-Token: ` + token + `" -H "Content-Type: application/json" -d ` +
+		`"{\\"activity\\":\\"page write\\"}"`
+	done := `curl.exe -s -o /dev/null -X POST ` + base +
+		` -H "X-Run-Token: ` + token + `" -H "Content-Type: application/json" -d ` +
+		`"{\\"done\\":true}"`
+	settings := map[string]any{
+		"hooks": map[string]any{
+			"PostToolUse": []map[string]any{{
+				"matcher": "Write|Edit",
+				"hooks":   []map[string]any{{"type": "command", "command": post}},
+			}},
+			"Stop": []map[string]any{{
+				"hooks": []map[string]any{{"type": "command", "command": done}},
+			}},
+		},
+	}
+	path = filepath.Join(runDir, "claude-settings.json")
+	var data []byte
+	data, err = json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return path, token, err
+	}
+	err = os.WriteFile(path, data, 0o644)
+	return path, token, err
 }
