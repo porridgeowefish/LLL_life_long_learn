@@ -9,6 +9,23 @@ import { qk } from './queryKeys';
 
 export type ConfusionState = 'open' | 'asked' | 'resolved' | 'deleted';
 
+export type AskSummaryState = 'idle' | 'pending' | 'done' | 'failed';
+
+export interface AskMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+}
+
+export interface AskExchange {
+  messages: AskMessage[];
+  summary?: string;
+  summaryState?: AskSummaryState;
+  providerId?: string;
+  updatedAt?: string;
+}
+
 export interface Confusion {
   id: string;
   sourceArtifactId?: string;
@@ -19,6 +36,7 @@ export interface Confusion {
   notes?: string;
   state: ConfusionState;
   createdAt: string;
+  ask?: AskExchange;
 }
 
 interface ListResponse {
