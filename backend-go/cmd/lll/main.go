@@ -15,6 +15,7 @@ import (
 
 func main() {
 	srv := server.New()
+	defer srv.Close()
 
 	port := os.Getenv("PORT")
 	if port == "" {

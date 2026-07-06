@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
+	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	"github.com/xmz14/lll/backend-go/internal/paths"
@@ -26,6 +27,7 @@ type Server struct {
 	RuntimeOptions  []agentruntime.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
+	watcher         *artifactwatch.Watcher
 	shutdown        func()
 	mu              sync.RWMutex
 }
@@ -70,6 +72,12 @@ func New() *Server {
 		}
 	}
 
+	// Start the artifact file watcher (event-driven refresh; replaces polling).
+	watcher, werr := artifactwatch.Start(paths.PROJECTS_ROOT, broadcaster.Emit)
+	if werr != nil {
+		println("artifactwatch: start warning:", werr.Error())
+	}
+
 	return &Server{
 		ClaudeBin:       bin,
 		ClaudeAvailable: available,
@@ -77,6 +85,7 @@ func New() *Server {
 		RuntimeOptions:  runtimeOptions,
 		ImageConfig:     imgCfg,
 		ImageAvailable:  imgAvailable,
+		watcher:         watcher,
 	}
 }
 
@@ -165,6 +174,13 @@ func (s *Server) SetShutdownFunc(fn func()) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.shutdown = fn
+}
+
+// Close releases background resources (the artifact file watcher).
+func (s *Server) Close() {
+	if s.watcher != nil {
+		_ = s.watcher.Close()
+	}
 }
 
 func (s *Server) handleShutdown(w http.ResponseWriter, r *http.Request) {
