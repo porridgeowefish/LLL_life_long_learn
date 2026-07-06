@@ -1,25 +1,42 @@
-/* LLL design tokens — copied verbatim from legacy frontend/css/styles.css:3-8
-   to preserve v2 visual identity (decision D4 in the refactor plan).
-   These tokens are the single source of truth for color, spacing, and shadow
-   across all CSS Modules in this app. */
+/* LLL design tokens — warm "paper" identity. Single source of truth for color,
+   spacing, and shadow across all CSS Modules.
+   Strengthened (iter-06): added an AA-safe accent-ink, layered warm surfaces,
+   a shadow scale, and a radius scale. Existing tokens preserved (identity retained). */
 
 :root {
-  /* palette */
+  /* palette — warm paper */
   --bg: #faf8f4;
   --fg: #3d3229;
   --card: #fff;
   --border: #e8e2d9;
   --muted: #9e9588;
 
+  /* accent — sage is the ONLY saturated accent */
   --accent: #7c9a72;
   --accent2: #6b8a62;
+  --accent-ink: #4f6b47;   /* sage darkened to AA on cream — accent text/links */
+
+  /* warm semantic accents (used sparingly) */
   --orange: #e8945a;
   --sky: #87b5d4;
   --pink: #c4715e;
 
+  /* layered warm surfaces */
+  --surface-raised: #ffffff;
+  --surface-sunken: #f3eee6;  /* recessed: thinking blocks, code, input hover */
+  --surface-tint: #eef3ea;    /* faint sage tint: active/hover, user bubble */
+
   /* shape */
+  --radius-sm: 6px;
   --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* shadow scale (warm ink tint, never pure black) */
+  --shadow-sm: 0 1px 2px rgba(61, 50, 41, 0.05);
   --shadow: 0 2px 8px rgba(61, 50, 41, 0.06);
+  --shadow-md: 0 6px 18px rgba(61, 50, 41, 0.08);
+  --shadow-lg: 0 18px 44px rgba(61, 50, 41, 0.14);
 
   /* layout — minimal sidebars, max content room */
   --sidebar-w: 144px;
