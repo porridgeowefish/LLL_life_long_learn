@@ -37,8 +37,9 @@ Which rules guide implementation and delivery
 
 These files are useful alignment inputs, but not core delivery contracts:
 
-- [WORKBENCH_ALIGNMENT_REVIEW.html](./WORKBENCH_ALIGNMENT_REVIEW.html)
-- [LEARNING_AGENTS_USER_STORY_ALIGNMENT.html](./LEARNING_AGENTS_USER_STORY_ALIGNMENT.html)
+- [ALIGNMENT_MODE.md](./ALIGNMENT_MODE.md)
+- [WORKBENCH_ALIGNMENT_REVIEW.html](./WORKBENCH_ALIGNMENT_REVIEW.html) — legacy visual reference
+- [LEARNING_AGENTS_USER_STORY_ALIGNMENT.html](./LEARNING_AGENTS_USER_STORY_ALIGNMENT.html) — legacy visual reference
 
 ## Relationship To Iteration Docs
 

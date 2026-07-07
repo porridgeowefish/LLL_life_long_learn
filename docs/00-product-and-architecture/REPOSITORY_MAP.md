@@ -67,8 +67,9 @@ These are useful, but they are not executable truth and should not override code
 
 ```text
 frontend-designs/v3/           mock pages + DESIGN.md for alignment/reference
-docs/00-product-and-architecture/WORKBENCH_ALIGNMENT_REVIEW.html
-docs/00-product-and-architecture/LEARNING_AGENTS_USER_STORY_ALIGNMENT.html
+docs/00-product-and-architecture/ALIGNMENT_MODE.md
+docs/00-product-and-architecture/WORKBENCH_ALIGNMENT_REVIEW.html          legacy visual reference
+docs/00-product-and-architecture/LEARNING_AGENTS_USER_STORY_ALIGNMENT.html legacy visual reference
 荔枝读书.png                    standalone visual reference
 research/                      raw research / source material
 ```
@@ -78,6 +79,7 @@ Rule:
 ```text
 reference attachments may explain intent
 they do not by themselves prove a feature is implemented
+new alignment handoff should use Markdown, not HTML
 ```
 
 ## 5. Legacy / Archive / Superseded Material
