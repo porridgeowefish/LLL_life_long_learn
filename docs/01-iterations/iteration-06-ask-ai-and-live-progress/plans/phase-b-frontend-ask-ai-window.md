@@ -1144,7 +1144,24 @@ git commit -m "feat(explain): confusion sidebar hover summary + read-only review
 
 ---
 
-## End-to-End Smoke (after all 8 tasks, with Phase B backend running)
+### Task 9: SettingsPage Ask-AI provider management
+
+**Files:**
+- Modify: `frontend/src/pages/SettingsPage.tsx` (+ a colocated test if the file has none)
+
+**Interfaces:**
+- Consumes: `useAskAiSettings`, `useSaveAskAiSettings`, `useProbeAskAi` (Task 2); the masked-key convention `"••••"` (backend masks on GET, preserves on PUT when the mask is echoed back).
+- Produces: an "Ask-AI 模型源" section in SettingsPage: lists providers (name / kind / model / baseURL), add / edit / delete, set default, a `searchEngine` toggle (Google / Bing), and a per-provider 探测 (probe) button showing ok/error. The API-key field shows `••••` for existing providers; typing a new value replaces it; saving echoes `••••` for unchanged keys.
+
+- [ ] **Step 1:** Read `frontend/src/pages/SettingsPage.tsx` and match its existing section/card patterns (it currently renders the Agent-CLI runtime cards + note cards). Reuse its styling conventions.
+- [ ] **Step 2:** Add an "Ask-AI 模型源" section driven by `useAskAiSettings()`; edit the `{default, searchEngine, providers[]}` shape in local state; save via `useSaveAskAiSettings()`. Add provider appends a blank `{id, kind:'openai', name, baseURL, apiKey, model}`; `kind` is a `<select>` of `openai`/`anthropic`; `reasoning`/`thinking` checkboxes shown per kind. Probe calls `useProbeAskAi().mutate({providerId})` and shows `ok` / the error.
+- [ ] **Step 3:** Test — mock `@/api/askAi` to return sample settings; render the section; assert providers render and that editing + save calls the save mutation. (Follow the existing SettingsPage test style if one exists.)
+- [ ] **Step 4:** `cd frontend && npm run test && npm run build`.
+- [ ] **Step 5:** Commit — `git add frontend/src/pages/SettingsPage.tsx` (+ test) → `feat(settings): Ask-AI provider management UI`.
+
+---
+
+## End-to-End Smoke (after all 9 tasks, with Phase B backend running)
 
 1. `cd frontend && npm run dev` (proxies to `go run ./backend-go/cmd/lll`).
 2. Settings → add an OpenAI-compatible provider + an Anthropic provider; probe both → ok.

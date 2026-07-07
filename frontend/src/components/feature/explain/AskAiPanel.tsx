@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { Cross2Icon } from '@radix-ui/react-icons';
 
 import { streamAskAi, summarizeAsk, useAskAiSettings } from '@/api/askAi';
@@ -8,7 +8,25 @@ import { flipPosition } from '@/lib/floatingPosition';
 
 import s from './AskAiPanel.module.css';
 
-const PANEL_SIZE = { width: 440, height: 520 };
+const PANEL_MAX_SIZE = { width: 460, height: 540 };
+
+function formatAskAiError(error: unknown): string {
+  const status = error instanceof Error && 'status' in error ? (error as { status: number }).status : undefined;
+  const message = error instanceof Error ? error.message : String(error);
+  if (status === 0) {
+    return '回答失败：无法连接 Ask-AI 服务，请确认本地后端还在运行。';
+  }
+  if (message.includes('ask-ai not configured')) {
+    return '回答失败：Ask-AI 模型源还没配置。请到设置里添加模型源，并先点“探测”确认可用。';
+  }
+  if (message.includes('provider not found')) {
+    return '回答失败：当前选择的模型源不存在。请切换一个可用模型源后重试。';
+  }
+  if (message.trim()) {
+    return `回答失败：${message}`;
+  }
+  return '回答失败：模型源没有返回有效内容，请稍后重试。';
+}
 
 export function AskAiPanel() {
   const store = useAskAiStore();
@@ -25,9 +43,42 @@ export function AskAiPanel() {
     }
   }, [store.messages, store.streaming]);
 
+  const stop = () => {
+    abortRef.current?.abort();
+    store.finishStream();
+  };
+
+  const close = () => {
+    if (!store.reviewMode && store.messages.some((m) => m.role === 'assistant')) {
+      void summarizeAsk(store.projectSlug, store.confusionId);
+    }
+    stop();
+    store.close();
+  };
+
+  useEffect(() => {
+    if (!store.open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
   if (!store.open) return null;
 
-  const pos = flipPosition(store.anchor, PANEL_SIZE, { w: window.innerWidth, h: window.innerHeight });
+  const viewport = { w: window.innerWidth, h: window.innerHeight };
+  const panelSize = {
+    width: Math.min(PANEL_MAX_SIZE.width, viewport.w - 16),
+    height: Math.min(PANEL_MAX_SIZE.height, viewport.h - 16),
+  };
+  const pos = flipPosition(store.anchor, panelSize, viewport);
+  const panelStyle: CSSProperties = store.reviewMode
+    ? {
+      top: Math.min(Math.max(store.anchor.top, 8), Math.max(8, viewport.h - panelSize.height - 8)),
+      right: 8,
+    }
+    : { top: pos.top, left: pos.left };
 
   const send = async () => {
     const content = input.trim();
@@ -46,28 +97,20 @@ export function AskAiPanel() {
         onFrame: (f) => {
           if (f.type === 'text') store.appendDelta('text', f.content);
           else if (f.type === 'thinking') store.appendDelta('thinking', f.content);
-          else if (f.type === 'done') store.finishStream();
+          else if (f.type === 'error') {
+            store.appendDelta('text', formatAskAiError(new Error(f.content)));
+            store.finishStream();
+          } else if (f.type === 'done') store.finishStream();
         },
       });
-    } catch {
-      /* aborted or errored */
+    } catch (err) {
+      if (!ac.signal.aborted) {
+        store.appendDelta('text', formatAskAiError(err));
+      }
     } finally {
       store.finishStream();
       abortRef.current = null;
     }
-  };
-
-  const stop = () => {
-    abortRef.current?.abort();
-    store.finishStream();
-  };
-
-  const close = () => {
-    if (!store.reviewMode && store.messages.some((m) => m.role === 'assistant')) {
-      void summarizeAsk(store.projectSlug, store.confusionId);
-    }
-    stop();
-    store.close();
   };
 
   const searchURL =
@@ -75,7 +118,7 @@ export function AskAiPanel() {
     encodeURIComponent(store.quote);
 
   return (
-    <div className={s.panel} style={{ top: pos.top, left: pos.left }} role="dialog" aria-label="问 AI">
+    <div className={s.panel} style={panelStyle} role="dialog" aria-label={store.reviewMode ? '答疑回顾' : '问 AI'}>
       <header className={s.header}>
         <span className={s.title}>{store.reviewMode ? '答疑回顾' : '问 AI'}</span>
         {!store.reviewMode && settingsQuery.data && (
@@ -140,6 +183,13 @@ export function AskAiPanel() {
               发送
             </button>
           )}
+        </footer>
+      )}
+      {store.reviewMode && (
+        <footer className={s.footer}>
+          <button type="button" className={s.reviewCloseBtn} onClick={close}>
+            关闭
+          </button>
         </footer>
       )}
     </div>

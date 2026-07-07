@@ -39,10 +39,15 @@ describe('streamAskAi', () => {
 
   it('throws on non-2xx', async () => {
     const original = global.fetch;
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, body: null } as Response);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      body: null,
+      text: async () => '{"error":"ask-ai not configured"}',
+    } as Response);
     await expect(
       streamAskAi('p', 'c', { content: 'hi' }, { onFrame: () => {} }),
-    ).rejects.toThrow();
+    ).rejects.toThrow('ask-ai not configured');
     global.fetch = original;
   });
 });

@@ -1,8 +1,8 @@
 .panel {
   position: fixed;
   z-index: 210;
-  width: 460px;
-  height: 540px;
+  width: min(460px, calc(100vw - 16px));
+  height: min(540px, calc(100vh - 16px));
   display: flex;
   flex-direction: column;
   background: var(--card);
@@ -156,3 +156,21 @@
 }
 .stopBtn { background: var(--surface-sunken); color: var(--fg); }
 .stopBtn:hover { background: var(--surface-tint); }
+
+.reviewCloseBtn {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  background: var(--card);
+  color: var(--fg);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.reviewCloseBtn:hover {
+  background: var(--surface-tint);
+  border-color: var(--accent);
+}

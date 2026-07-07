@@ -43,17 +43,38 @@ export async function streamAskAi(
   body: StreamBody,
   handlers: { onFrame: (f: AskFrame) => void; signal?: AbortSignal },
 ): Promise<void> {
-  const res = await fetch(
-    `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/confusions/${encodeURIComponent(confusionId)}/ask-stream`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: handlers.signal,
-    },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/confusions/${encodeURIComponent(confusionId)}/ask-stream`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: handlers.signal,
+      },
+    );
+  } catch (err) {
+    throw new ApiError(0, `network: ${(err as Error).message}`, null);
+  }
   if (!res.ok || !res.body) {
-    throw new ApiError(res.status, `ask-stream failed: ${res.status}`, null);
+    let parsed: unknown = null;
+    let message = `ask-stream failed: ${res.status}`;
+    try {
+      const text = await res.text();
+      parsed = text ? JSON.parse(text) : null;
+      if (
+        parsed &&
+        typeof parsed === 'object' &&
+        'error' in parsed &&
+        typeof (parsed as { error: unknown }).error === 'string'
+      ) {
+        message = (parsed as { error: string }).error;
+      }
+    } catch {
+      // Fall back to the status-only message.
+    }
+    throw new ApiError(res.status, message, parsed);
   }
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
