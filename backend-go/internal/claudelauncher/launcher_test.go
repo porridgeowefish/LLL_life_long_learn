@@ -101,3 +101,22 @@ func TestWriteHookSettingsRegistersRunAndToken(t *testing.T) {
 		t.Errorf("store accepted a wrong token")
 	}
 }
+
+func TestResumeWrapperLaunchesClaudeContinue(t *testing.T) {
+	script := buildResumeWrapperScript(
+		`D:\workspace\project`,
+		`D:\workspace\project\runs\resume\stderr.log`,
+		ResumeRequest{
+			ProjectSlug: "demo",
+			ZoneName:    workspace.ZoneExplain,
+			ClaudeBin:   "claude",
+		},
+	)
+
+	if !strings.Contains(script, "& $agentExe -c") {
+		t.Fatalf("resume wrapper did not call claude -c:\n%s", script)
+	}
+	if strings.Contains(script, "$promptText") {
+		t.Fatalf("resume wrapper should not inject a new prompt:\n%s", script)
+	}
+}

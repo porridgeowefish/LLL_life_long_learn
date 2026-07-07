@@ -54,7 +54,7 @@ Supported runtime IDs:
 
 ```text
 claude
-workbuddy
+codebuddy
 hermes
 codex
 trae
@@ -95,6 +95,24 @@ only loopback requests (`127.0.0.1` / `::1`) and returns:
 ```
 
 For Explain, this means append a follow-up page linked to that parent.
+
+`POST /api/projects/{id}/explain/resume` opens a visible Claude Code terminal
+from the project root and runs:
+
+```text
+claude -c
+```
+
+This endpoint is scoped to the Explain reading experience. It resumes Claude
+Code's most recent conversation instead of assembling a new prompt or creating
+a new Explain artifact. A successful response is:
+
+```json
+{"resumed":true,"runDir":"2026-06-30T12-00-00-explain-resume","session":{}}
+```
+
+`session` is omitted when no in-memory LLL session can be associated, but the
+terminal still opens so Claude Code can use its own local conversation history.
 
 ## Practice
 

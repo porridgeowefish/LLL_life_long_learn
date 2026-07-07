@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useAgents, useInvokeAgent } from '@/api/agents';
+import { useAgents, useInvokeAgent, useResumeExplainSession } from '@/api/agents';
 import { useSessionStore } from '@/store/slices/session';
 import { Button } from '@/components/primitive/Button';
 import { Icon } from '@/components/primitive/Icon';
@@ -25,6 +25,7 @@ interface AgentInvokePanelProps {
 export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInvokePanelProps) {
   const { data: agentsData } = useAgents();
   const invoke = useInvokeAgent();
+  const resumeExplain = useResumeExplainSession();
   const setActiveSession = useSessionStore((s) => s.setActiveSession);
 
   const compatibleAgents = (agentsData?.agents ?? []).filter((a) =>
@@ -37,6 +38,7 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
   const [intent, setIntent] = useState('');
   const [showIntentInput, setShowIntentInput] = useState(false);
   const [justInvoked, setJustInvoked] = useState(false);
+  const [justResumed, setJustResumed] = useState(false);
 
   useEffect(() => {
     if (compatibleAgents.length === 0) return;
@@ -62,6 +64,15 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
     setJustInvoked(true);
     onInvoked?.();
     window.setTimeout(() => setJustInvoked(false), 6000);
+  };
+
+  const handleResumeExplain = async () => {
+    const res = await resumeExplain.mutateAsync(slug);
+    if (res.session?.id) {
+      setActiveSession(res.session.id);
+    }
+    setJustResumed(true);
+    window.setTimeout(() => setJustResumed(false), 6000);
   };
 
   if (compatibleAgents.length === 0) {
@@ -113,14 +124,22 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
         />
       )}
 
-      {invoke.error && (
-        <span className={s.errorInline} title={(invoke.error as Error).message}>
-          调用失败
+      {(invoke.error || resumeExplain.error) && (
+        <span
+          className={s.errorInline}
+          title={((invoke.error || resumeExplain.error) as Error).message}
+        >
+          操作失败
         </span>
       )}
       {justInvoked && (
         <span className={s.invokedInline}>
           <Icon name="check" size={12} /> 已启动
+        </span>
+      )}
+      {justResumed && (
+        <span className={s.resumedInline}>
+          <Icon name="terminal" size={12} /> 已打开继续会话
         </span>
       )}
 
@@ -133,6 +152,18 @@ export function AgentInvokePanel({ slug, zone, sourceRefs, onInvoked }: AgentInv
       >
         调用
       </Button>
+      {zone === 'Explain' && (
+        <Button
+          variant="outline"
+          onClick={handleResumeExplain}
+          loading={resumeExplain.isPending}
+          className={s.resumeBtn}
+          iconLeft={<Icon name="terminal" size={14} />}
+          title="打开 Claude Code 最近一次会话，不重新生成"
+        >
+          继续上次会话
+        </Button>
+      )}
     </div>
   );
 }

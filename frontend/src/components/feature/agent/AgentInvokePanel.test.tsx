@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AgentInvokePanel } from './AgentInvokePanel';
 
 const mutateAsync = vi.fn();
+const resumeMutateAsync = vi.fn();
 const setActiveSession = vi.fn();
 
 vi.mock('@/api/agents', () => ({
@@ -20,11 +21,27 @@ vi.mock('@/api/agents', () => ({
           charterPath: 'agents/charters/intro.md',
           defaultOutputTargets: [],
         },
+        {
+          id: 'explain',
+          name: 'Explain Agent',
+          icon: 'E',
+          description: 'explain',
+          userStory: 'help me understand',
+          allowedZones: ['Explain'],
+          primitives: { required: [], optional: [] },
+          charterPath: 'agents/charters/explain.md',
+          defaultOutputTargets: [],
+        },
       ],
     },
   }),
   useInvokeAgent: () => ({
     mutateAsync,
+    isPending: false,
+    error: null,
+  }),
+  useResumeExplainSession: () => ({
+    mutateAsync: resumeMutateAsync,
     isPending: false,
     error: null,
   }),
@@ -38,8 +55,14 @@ vi.mock('@/store/slices/session', () => ({
 describe('AgentInvokePanel', () => {
   beforeEach(() => {
     mutateAsync.mockReset();
+    resumeMutateAsync.mockReset();
     setActiveSession.mockReset();
     mutateAsync.mockResolvedValue({ session: { id: 'sess-1' }, runDir: 'runs/test' });
+    resumeMutateAsync.mockResolvedValue({
+      resumed: true,
+      session: { id: 'sess-explain' },
+      runDir: 'runs/resume',
+    });
   });
 
   it('invokes without additional guidance by default', async () => {
@@ -58,6 +81,7 @@ describe('AgentInvokePanel', () => {
       }),
     });
     expect(setActiveSession).toHaveBeenCalledWith('sess-1');
+    expect(screen.queryByRole('button', { name: '继续上次会话' })).not.toBeInTheDocument();
   });
 
   it('sends optional guidance when the field is expanded', async () => {
@@ -76,5 +100,16 @@ describe('AgentInvokePanel', () => {
         intent: '先帮我搭一个最短入门路径',
       }),
     });
+  });
+
+  it('resumes the previous Explain session with a distinct button', async () => {
+    render(<AgentInvokePanel slug="demo" zone="Explain" />);
+
+    fireEvent.click(screen.getByRole('button', { name: '继续上次会话' }));
+
+    await waitFor(() => expect(resumeMutateAsync).toHaveBeenCalledTimes(1));
+    expect(resumeMutateAsync).toHaveBeenCalledWith('demo');
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(setActiveSession).toHaveBeenCalledWith('sess-explain');
   });
 });

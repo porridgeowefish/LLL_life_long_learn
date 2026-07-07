@@ -53,6 +53,18 @@ type LaunchRequest struct {
 	RunProgress    *runprogress.Store
 }
 
+// ResumeRequest carries the minimal context needed to reopen Claude Code's
+// most recent conversation for a project.
+type ResumeRequest struct {
+	ProjectSlug string
+	ZoneName    workspace.ZoneName
+	Session     *sessionstore.Session
+	Store       *sessionstore.Store
+	Events      EventEmitter
+	ClaudeBin   string
+	RunDirName  string
+}
+
 const defaultPermissionMode = "auto"
 
 // NormalizePermissionMode keeps old clients working while making auto mode the
@@ -237,6 +249,92 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	}, nil
 }
 
+// LaunchResume opens a visible PowerShell window and runs `claude -c` from the
+// project root. It intentionally does not pass a freshly assembled prompt:
+// Claude owns the conversation history being resumed.
+func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
+	if req.ProjectSlug == "" {
+		return nil, errors.New("missing project slug")
+	}
+	projectRoot, err := workspace.ProjectRootForSlug(req.ProjectSlug)
+	if err != nil {
+		return nil, err
+	}
+	runDirName := strings.TrimSpace(req.RunDirName)
+	if runDirName == "" {
+		runDirName = "resume"
+	}
+	runDirAbs := filepath.Join(projectRoot, "runs", runDirName)
+	runDirRel := filepath.Join("runs", runDirName)
+	if err := os.MkdirAll(runDirAbs, 0o755); err != nil {
+		return nil, fmt.Errorf("mkdir run dir: %w", err)
+	}
+	stdoutPath := filepath.Join(runDirAbs, "stdout.log")
+	stderrPath := filepath.Join(runDirAbs, "stderr.log")
+	_ = os.WriteFile(stdoutPath, []byte("resume mode — launching `claude -c` in a visible PowerShell window\n"), 0o644)
+	_ = os.WriteFile(stderrPath, []byte{}, 0o644)
+
+	if req.Session != nil && req.Store != nil {
+		req.Store.AppendTurn(req.Session.ID, "system", "resume requested with claude -c", runDirRel)
+		req.Store.Update(req.Session.ID, func(s *sessionstore.Session) {
+			s.State = sessionstore.StateRunning
+			s.RunDirRel = runDirRel
+		})
+		if req.Events != nil {
+			req.Events.Emit("session-state", map[string]any{
+				"sessionId": req.Session.ID, "state": "running", "runDirRel": runDirRel,
+			})
+		}
+	}
+
+	psCmd := buildResumeWrapperScript(projectRoot, stdoutPath, req)
+	wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
+	if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
+		return nil, fmt.Errorf("write wrapper.ps1: %w", err)
+	}
+
+	if err := launchVisibleWindow("powershell.exe",
+		[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
+		projectRoot,
+	); err != nil {
+		_ = os.WriteFile(stderrPath, []byte("launch resume window: "+err.Error()+"\nwrapperPs1: "+wrapperPs1Path+"\n"), 0o644)
+		if req.Session != nil && req.Store != nil {
+			req.Store.SetFinished(req.Session.ID, sessionstore.StateFailed, -1)
+		}
+		if req.Events != nil && req.Session != nil {
+			req.Events.Emit("session-failed", map[string]any{
+				"sessionId": req.Session.ID, "error": err.Error(),
+			})
+		}
+		return nil, fmt.Errorf("spawn claude resume wrapper: %w", err)
+	}
+
+	runMeta := map[string]any{
+		"projectSlug": req.ProjectSlug,
+		"zoneName":    req.ZoneName,
+		"mode":        "interactive-tui-resume",
+		"runtimeId":   "claude",
+		"runtimeBin":  selectedClaudeBin(req.ClaudeBin),
+		"command":     "claude -c",
+		"stdoutLog":   filepath.Join(runDirRel, "stdout.log"),
+		"stderrLog":   filepath.Join(runDirRel, "stderr.log"),
+		"startedAt":   time.Now().UTC(),
+	}
+	if req.Session != nil {
+		runMeta["sessionId"] = req.Session.ID
+	}
+	metaJSON, _ := json.MarshalIndent(runMeta, "", "  ")
+	_ = os.WriteFile(filepath.Join(runDirAbs, "run.json"), metaJSON, 0o644)
+
+	return &RunResult{
+		ExitCode:      0,
+		StdoutLogPath: stdoutPath,
+		StderrLogPath: stderrPath,
+		RunDirAbs:     runDirAbs,
+		RunDirRel:     runDirRel,
+	}, nil
+}
+
 // buildTUIWrapperScript returns the PowerShell command that:
 //  1. cd into the project root; logs the spawn env PATH (ground truth)
 //  2. reads prompt.md and resolves claude to a FULL path (Get-Command
@@ -324,6 +422,39 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile s
 		`$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`,
 		`exit $code`,
 	}, "; ")
+}
+
+func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest) string {
+	claudeBin := selectedClaudeBin(req.ClaudeBin)
+	return strings.Join([]string{
+		`$ErrorActionPreference='Continue'`,
+		fmt.Sprintf(`Set-Location -LiteralPath '%s'`, projectRoot),
+		`$env:FORCE_COLOR='1'`,
+		fmt.Sprintf(`function Log-Err($msg) { try { Add-Content -LiteralPath '%s' -Value "[$(Get-Date -Format 'HH:mm:ss')] $msg" } catch {} }`, stderrPath),
+		`Log-Err "resume spawn env PATH=$env:PATH"`,
+		`Write-Host '=============================================' -ForegroundColor Cyan`,
+		fmt.Sprintf(`Write-Host ' LLL 项目: %s  |  Explain 继续上次会话  |  Runtime: Claude Code ' -ForegroundColor Cyan`, req.ProjectSlug),
+		`Write-Host '=============================================' -ForegroundColor Cyan`,
+		`Write-Host ''`,
+		fmt.Sprintf(`$agentExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $agentExe = $cmd.Source }; Log-Err "resolved claude agentExe=$agentExe"`, claudeBin),
+		`if (-not $agentExe) { Log-Err "claude NOT FOUND"; Write-Host "⚠️  找不到 claude。请确认 Claude Code 已安装，或设置 CLAUDE_BIN 指向可执行文件全路径。" -ForegroundColor Red; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown'); exit 1 }`,
+		`Write-Host '正在执行 claude -c，恢复 Claude Code 最近一次会话...' -ForegroundColor Green`,
+		`Write-Host ''`,
+		`$ErrorActionPreference='Stop'; $code = 0; try { & $agentExe -c; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "claude -c failed: $_"; Write-Host "⚠️  Claude 继续会话失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		`Write-Host ''`,
+		`Write-Host "=============================================" -ForegroundColor Cyan`,
+		`Write-Host " Claude 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
+		`Write-Host "=============================================" -ForegroundColor Cyan`,
+		`$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`,
+		`exit $code`,
+	}, "; ")
+}
+
+func selectedClaudeBin(bin string) string {
+	if strings.TrimSpace(bin) == "" {
+		return "claude"
+	}
+	return strings.TrimSpace(bin)
 }
 
 func selectedRuntime(req LaunchRequest) agentruntime.Runtime {

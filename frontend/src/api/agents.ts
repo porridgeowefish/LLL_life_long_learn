@@ -14,6 +14,12 @@ interface InvokeAgentResponse {
   runDir: string;
 }
 
+interface ResumeExplainResponse {
+  resumed: boolean;
+  runDir: string;
+  session?: Session;
+}
+
 export function useAgents() {
   return useQuery({
     queryKey: qk.agents.all(),
@@ -31,6 +37,20 @@ export function useInvokeAgent() {
       ),
     onSuccess: () => {
       // Optimistic: the new session is "active"; refresh active list.
+      qc.invalidateQueries({ queryKey: qk.sessions.active() });
+      qc.invalidateQueries({ queryKey: qk.sessions.recent() });
+    },
+  });
+}
+
+export function useResumeExplainSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (projectSlug: string) =>
+      http.post<ResumeExplainResponse>(
+        `/api/projects/${encodeURIComponent(projectSlug)}/explain/resume`,
+      ),
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.sessions.active() });
       qc.invalidateQueries({ queryKey: qk.sessions.recent() });
     },

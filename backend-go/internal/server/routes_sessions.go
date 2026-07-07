@@ -190,6 +190,50 @@ func (s *Server) handleListActiveSessions(w http.ResponseWriter, r *http.Request
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sessions": list})
 }
 
+// handleResumeExplainSession opens Claude Code's most recent conversation via
+// `claude -c` from the project root. It is intentionally scoped to Explain:
+// the UI uses this when the learner is reading generated Explain material and
+// wants to reopen the closed native TUI to keep asking questions.
+func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Request) {
+	if !s.ClaudeAvailable {
+		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
+		return
+	}
+	projectID := r.PathValue("id")
+	if !workspace.ValidateSlug(projectID) {
+		httpx.Error(w, http.StatusBadRequest, "invalid projectId")
+		return
+	}
+	exists, err := workspace.ProjectExists(projectID)
+	if err != nil || !exists {
+		httpx.Error(w, http.StatusNotFound, "project not found")
+		return
+	}
+	sess := latestProjectZoneSession(projectID, string(workspace.ZoneExplain))
+	runDirName := promptassembly.MakeRunDirName("explain-resume", time.Now().UTC())
+	result, err := claudelauncher.LaunchResume(context.Background(), claudelauncher.ResumeRequest{
+		ProjectSlug: projectID,
+		ZoneName:    workspace.ZoneExplain,
+		Session:     sess,
+		Store:       sessions,
+		Events:      broadcaster,
+		ClaudeBin:   s.ClaudeBin,
+		RunDirName:  runDirName,
+	})
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "resume explain session: "+err.Error())
+		return
+	}
+	payload := map[string]any{
+		"resumed": true,
+		"runDir":  filepath.Base(result.RunDirRel),
+	}
+	if sess != nil {
+		payload["session"] = sess
+	}
+	httpx.WriteJSON(w, http.StatusAccepted, payload)
+}
+
 // handleGetSession returns one session's state including the full turn timeline.
 func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
@@ -303,6 +347,19 @@ func collectPriorResultPaths(sess *sessionstore.Session) []string {
 		}
 	}
 	return out
+}
+
+func latestProjectZoneSession(projectSlug, zoneName string) *sessionstore.Session {
+	var latest *sessionstore.Session
+	for _, sess := range sessions.List(projectSlug) {
+		if sess.ZoneName != zoneName {
+			continue
+		}
+		if latest == nil || sess.CreatedAt.After(latest.CreatedAt) {
+			latest = sess
+		}
+	}
+	return latest
 }
 
 func newSessionID() string {

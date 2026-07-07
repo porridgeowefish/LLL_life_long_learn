@@ -82,6 +82,28 @@
   flex-shrink: 0;
 }
 
+.resumedInline {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  color: var(--accent-ink);
+  flex-shrink: 0;
+}
+
 .invokeBtn {
   flex-shrink: 0;
+}
+
+.resumeBtn {
+  flex-shrink: 0;
+  color: var(--accent-ink);
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+  background: var(--surface-tint);
+}
+
+.resumeBtn:hover:not(:disabled) {
+  color: var(--accent2);
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, transparent);
 }
