@@ -3,7 +3,7 @@
   "agentRuntime": "claude",
   "agentRuntimeBins": {
     "claude": "claude",
-    "workbuddy": "workbuddy",
+    "codebuddy": "codebuddy",
     "hermes": "hermes",
     "codex": "codex",
     "trae": "trae-cli"

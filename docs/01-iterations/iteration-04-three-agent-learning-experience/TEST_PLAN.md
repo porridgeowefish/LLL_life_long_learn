@@ -37,7 +37,7 @@ Last reviewed: 2026-06-15
   Summary generated from a valid card file.
 - Flashcard UI supports filters, Markdown answers, flip controls, keyboard
   navigation, grading, and review progress.
-- Agent runtime settings list Claude/WorkBuddy/Hermes/Codex/Trae providers,
+- Agent runtime settings list Claude/CodeBuddy/Hermes/Codex/Trae providers,
   persist only the selected runtime ID, preserve other `config.local.json`
   fields, and expose selected runtime health through `/api/health`.
 - Frontend Exit calls the local-only shutdown endpoint; non-loopback requests

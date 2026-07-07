@@ -131,7 +131,7 @@ export interface HealthStats {
   activeSessions: number;
 }
 
-export type AgentRuntimeID = 'claude' | 'workbuddy' | 'hermes' | 'codex' | 'trae';
+export type AgentRuntimeID = 'claude' | 'codebuddy' | 'hermes' | 'codex' | 'trae';
 
 export interface AgentRuntimeProvider {
   id: AgentRuntimeID;

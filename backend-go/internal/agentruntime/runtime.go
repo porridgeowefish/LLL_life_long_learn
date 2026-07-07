@@ -18,7 +18,7 @@ type ID string
 
 const (
 	RuntimeClaude    ID = "claude"
-	RuntimeWorkbuddy ID = "workbuddy"
+	RuntimeCodeBuddy ID = "codebuddy"
 	RuntimeHermes    ID = "hermes"
 	RuntimeCodex     ID = "codex"
 	RuntimeTrae      ID = "trae"
@@ -61,8 +61,8 @@ func Definitions() []Definition {
 			ProbeArgs:   []string{"--version"}, PromptDelivery: PromptArg, SupportsHeadless: true,
 		},
 		{
-			ID: RuntimeWorkbuddy, Name: "WorkBuddy CLI", DefaultBin: "workbuddy", BinEnv: "WORKBUDDY_BIN",
-			Description: "WorkBuddy/CodeBuddy 本地 Agent 入口；公开 CLI 细节仍在变化，LLL 以可见终端和剪贴板 prompt 方式接入。",
+			ID: RuntimeCodeBuddy, Name: "CodeBuddy CLI", DefaultBin: "codebuddy", BinEnv: "CODEBUDDY_BIN",
+			Description: "Tencent CodeBuddy 本地 Agent 入口；LLL 以可见终端和剪贴板 prompt 方式接入。",
 			ProbeArgs:   []string{"--version"}, PromptDelivery: PromptClipboard, SupportsHeadless: false,
 		},
 		{
@@ -95,7 +95,7 @@ func DefinitionByID(id ID) (Definition, bool) {
 func Load() (Config, error) {
 	cfg := Config{Selected: RuntimeClaude, Bins: map[string]string{}}
 	if env := strings.TrimSpace(os.Getenv("LLL_AGENT_RUNTIME")); env != "" {
-		cfg.Selected = ID(env)
+		cfg.Selected = normalizeID(ID(env))
 	}
 	data, err := os.ReadFile(configPath())
 	if err != nil {
@@ -109,13 +109,16 @@ func Load() (Config, error) {
 		return cfg, err
 	}
 	if disk.Selected != "" {
-		cfg.Selected = disk.Selected
+		cfg.Selected = normalizeID(disk.Selected)
 	}
 	if disk.Bins != nil {
 		cfg.Bins = disk.Bins
+		if cfg.Bins[string(RuntimeCodeBuddy)] == "" && cfg.Bins["workbuddy"] != "" {
+			cfg.Bins[string(RuntimeCodeBuddy)] = cfg.Bins["workbuddy"]
+		}
 	}
 	if env := strings.TrimSpace(os.Getenv("LLL_AGENT_RUNTIME")); env != "" {
-		cfg.Selected = ID(env)
+		cfg.Selected = normalizeID(ID(env))
 	}
 	return cfg, nil
 }
@@ -188,4 +191,11 @@ func configPath() string {
 		root = paths.PROJECT_ROOT
 	}
 	return filepath.Join(root, "config.local.json")
+}
+
+func normalizeID(id ID) ID {
+	if id == "workbuddy" {
+		return RuntimeCodeBuddy
+	}
+	return id
 }

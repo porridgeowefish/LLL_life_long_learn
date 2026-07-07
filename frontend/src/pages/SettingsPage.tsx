@@ -16,11 +16,11 @@ import type { AgentRuntimeID, AgentRuntimeProvider } from '@/types/domain';
 
 import s from './SettingsPage.module.css';
 
-const ORDER: AgentRuntimeID[] = ['workbuddy', 'hermes', 'codex', 'trae', 'claude'];
+const ORDER: AgentRuntimeID[] = ['codebuddy', 'hermes', 'codex', 'trae', 'claude'];
 
 const RUNTIME_LOGOS: Record<AgentRuntimeID, string> = {
   claude: '/img/agent-runtimes/claude.png',
-  workbuddy: '/img/agent-runtimes/workbuddy.png',
+  codebuddy: '/img/agent-runtimes/codebuddy.png',
   hermes: '/img/agent-runtimes/hermes.png',
   codex: '/img/agent-runtimes/codex.png',
   trae: '/img/agent-runtimes/trae.png',
