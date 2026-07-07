@@ -6,6 +6,8 @@
   "scripts": {
     "build": "npm --prefix frontend run build && go build -o dist/lll.exe ./backend-go/cmd/lll",
     "build:backend": "go build -o dist/lll.exe ./backend-go/cmd/lll",
+    "desktop:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-Desktop-Shortcut.ps1",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Stop-LLL.ps1",
     "run": "go run ./backend-go/cmd/lll",
     "start": "dist/lll.exe",
     "test": "go test ./...",

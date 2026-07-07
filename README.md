@@ -49,6 +49,25 @@ Then open:
 http://localhost:8787/
 ```
 
+## Desktop Launcher
+
+```bash
+npm run desktop:install
+```
+
+This creates a `LifeLongLearn` shortcut on the Windows desktop. The shortcut
+refreshes the production build when frontend or backend sources are newer than
+`dist/lll.exe` / `frontend/dist/index.html`, starts `dist/lll.exe` in the
+background, waits for `/api/health`, opens the browser, then exits. If port
+`8787` is held by a stale LLL process from this workspace, the launcher clears
+it before starting a fresh server.
+
+To stop the background server without using the frontend Exit button:
+
+```bash
+npm run stop
+```
+
 ## Reading Order
 
 1. `docs/INDEX.md`
