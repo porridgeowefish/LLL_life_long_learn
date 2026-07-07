@@ -286,7 +286,9 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		{"summary/report.md", true},
 		{"explain/notes.md", true},
 		{"intro/survey.json", true},
+		{"extend/flower.json", true},
 		{"intro/output.md", false},
+		{"extend/prompts.md", false},
 		{"practice/tasks.md", false},
 	}
 	for _, tt := range tests {

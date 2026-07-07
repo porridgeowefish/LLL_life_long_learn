@@ -107,7 +107,7 @@ export function ProjectPage() {
       case 'Practice':
         return <PracticeFlow projectSlug={slug} />;
       case 'Extend':
-        return <ExtendPage projectSlug={slug} />;
+        return <ExtendPage projectSlug={slug} projectTitle={project.title} />;
       case 'Summary':
         return <SummaryPage projectSlug={slug} />;
       default:
@@ -162,7 +162,7 @@ export function ProjectPage() {
                 当前阶段：<strong>{ZONE_DISPLAY[zone]}</strong>
               </p>
             </div>
-            {zone !== 'Practice' && (
+            {zone !== 'Practice' && zone !== 'Extend' && (
               <div className={s.headerActions}>
                 <AgentInvokePanel slug={slug} zone={zone} />
               </div>

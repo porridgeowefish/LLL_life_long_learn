@@ -1,0 +1,410 @@
+.root {
+  display: flex;
+  width: min(1220px, 100%);
+  margin: 0 auto;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 22px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.kicker {
+  margin: 0 0 4px;
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.title {
+  max-width: 720px;
+  margin: 0;
+  color: var(--fg);
+  font-size: 1.42rem;
+  line-height: 1.35;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--accent-ink);
+  font-size: 0.84rem;
+  font-weight: 850;
+  text-decoration: none;
+  background: var(--surface-tint);
+  border: 1px solid rgba(124, 154, 114, 0.22);
+  border-radius: var(--radius-sm);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(560px, 1fr) minmax(320px, 390px);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.greenhouse {
+  position: relative;
+  min-height: 640px;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.64), rgba(255, 255, 255, 0) 28%),
+    linear-gradient(90deg, transparent 0 49.8%, rgba(124, 154, 114, 0.12) 49.8% 50.2%, transparent 50.2%),
+    linear-gradient(160deg, rgba(167, 217, 255, 0.12), transparent 42%),
+    #f5efe3;
+  border: 1px solid rgba(232, 226, 217, 0.92);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.glassRoof {
+  position: absolute;
+  top: 18px;
+  right: 24px;
+  left: 24px;
+  height: 140px;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0 18%, rgba(124, 154, 114, 0.22) 18% 19%, transparent 19% 48%, rgba(124, 154, 114, 0.18) 48% 49%, transparent 49%),
+    linear-gradient(60deg, transparent 0 42%, rgba(135, 181, 212, 0.22) 42% 43%, transparent 43%);
+  border-top: 1px solid rgba(124, 154, 114, 0.28);
+  border-right: 1px solid rgba(124, 154, 114, 0.12);
+  border-left: 1px solid rgba(124, 154, 114, 0.12);
+  border-radius: 50% 50% 0 0 / 42% 42% 0 0;
+}
+
+.glassRoof::before,
+.glassRoof::after {
+  position: absolute;
+  inset: 12px auto 0 50%;
+  width: 1px;
+  content: "";
+  background: linear-gradient(to bottom, rgba(124, 154, 114, 0.2), transparent);
+  transform-origin: bottom;
+}
+
+.glassRoof::before {
+  transform: translateX(-50%) rotate(-24deg);
+}
+
+.glassRoof::after {
+  transform: translateX(-50%) rotate(24deg);
+}
+
+.bed {
+  position: absolute;
+  right: 34px;
+  bottom: 36px;
+  left: 34px;
+  display: grid;
+  min-height: 430px;
+  grid-template-columns: repeat(4, minmax(118px, 1fr));
+  gap: 34px 24px;
+  align-content: end;
+  padding: 54px 28px 34px;
+  background:
+    repeating-linear-gradient(0deg, rgba(124, 154, 114, 0.14) 0 1px, transparent 1px 72px),
+    linear-gradient(90deg, rgba(124, 154, 114, 0.08), transparent 18%, transparent 82%, rgba(124, 154, 114, 0.08)),
+    linear-gradient(180deg, rgba(238, 243, 234, 0.62), rgba(214, 199, 171, 0.18));
+  border: 1px solid rgba(124, 154, 114, 0.16);
+  border-radius: 24px 24px var(--radius) var(--radius);
+  box-shadow: inset 0 16px 36px rgba(255, 255, 255, 0.46);
+}
+
+.bed::before {
+  position: absolute;
+  inset: 18px 22px auto;
+  height: 16px;
+  content: "";
+  background: linear-gradient(90deg, rgba(124, 154, 114, 0.16), rgba(124, 154, 114, 0.04));
+  border-radius: 999px;
+}
+
+.bed::after {
+  position: absolute;
+  right: 24px;
+  bottom: 106px;
+  left: 24px;
+  height: 1px;
+  content: "";
+  background: rgba(124, 154, 114, 0.18);
+  box-shadow:
+    0 -96px 0 rgba(124, 154, 114, 0.12),
+    0 72px 0 rgba(124, 154, 114, 0.12);
+}
+
+.emptyBed {
+  position: relative;
+  z-index: 2;
+  grid-column: 1 / -1;
+  align-self: center;
+  justify-self: center;
+  max-width: 480px;
+  padding: 18px 22px;
+  color: #6f645a;
+  font-size: 0.92rem;
+  line-height: 1.75;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(124, 154, 114, 0.16);
+  border-radius: var(--radius);
+}
+
+.flowerPlot {
+  --plot-shift: 0px;
+  --plot-scale: 1;
+  --plot-enter: 0px;
+  position: relative;
+  display: grid;
+  min-height: 176px;
+  place-items: center;
+  padding: 14px 8px 12px;
+  color: var(--fg);
+  font: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transform: translateY(calc(var(--plot-shift) + var(--plot-enter))) scale(var(--plot-scale));
+  transform-origin: center bottom;
+}
+
+.flowerPlot > * {
+  position: relative;
+  z-index: 2;
+}
+
+.flowerPlot::before {
+  position: absolute;
+  right: 22%;
+  bottom: 40px;
+  left: 22%;
+  z-index: 1;
+  height: 26px;
+  content: "";
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), transparent 36%),
+    #e3d3b8;
+  border: 1px solid rgba(142, 118, 84, 0.14);
+  border-radius: 8px 8px 18px 18px;
+  box-shadow: inset 0 -5px 10px rgba(126, 95, 58, 0.08);
+}
+
+.flowerPlot::after {
+  position: absolute;
+  right: 14%;
+  bottom: 18px;
+  left: 14%;
+  height: 14px;
+  content: "";
+  background: radial-gradient(ellipse, rgba(84, 99, 70, 0.18), transparent 70%);
+  border-radius: 50%;
+}
+
+.flowerPlotActive {
+  background: rgba(255, 255, 255, 0.34);
+  box-shadow: inset 0 0 0 1px rgba(124, 154, 114, 0.16);
+}
+
+.plotTitle {
+  position: relative;
+  z-index: 2;
+  margin-top: 6px;
+  font-size: 0.84rem;
+  font-weight: 850;
+}
+
+.plotMeta {
+  position: relative;
+  z-index: 2;
+  color: #817568;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 640px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(232, 226, 217, 0.92);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.panelKicker {
+  margin: 0;
+  color: var(--accent-ink);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--fg);
+  font-size: 1.28rem;
+}
+
+.panelMood {
+  margin: 0;
+  color: #6f645a;
+  font-size: 0.92rem;
+  line-height: 1.7;
+}
+
+.petalTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.petalTab {
+  --petal-color: var(--accent);
+  min-height: 32px;
+  padding: 0 10px;
+  color: #62564c;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  background: color-mix(in srgb, var(--petal-color) 20%, white);
+  border: 1px solid color-mix(in srgb, var(--petal-color) 30%, white);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.petalTabActive {
+  background: color-mix(in srgb, var(--petal-color) 72%, white);
+}
+
+.petalTabMuted {
+  color: var(--muted);
+  background: #f7f2ea;
+  border-style: dashed;
+}
+
+.detail {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: #fffaf4;
+  border: 1px solid rgba(232, 226, 217, 0.9);
+  border-radius: var(--radius);
+}
+
+.detailMark {
+  --petal-color: var(--accent);
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  color: rgba(61, 50, 41, 0.76);
+  font-size: 0.9rem;
+  font-weight: 900;
+  background: color-mix(in srgb, var(--petal-color) 76%, white);
+  border: 1px solid color-mix(in srgb, var(--petal-color) 54%, white);
+  border-radius: 50%;
+}
+
+.detailTitle {
+  margin: 0 0 4px;
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-weight: 850;
+}
+
+.detailBody {
+  margin: 0;
+  color: #62564c;
+  font-size: 0.92rem;
+  line-height: 1.72;
+}
+
+.editNote {
+  margin-top: auto;
+  padding: 12px 14px;
+  color: #6f645a;
+  font-size: 0.86rem;
+  line-height: 1.65;
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+}
+
+.editLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 850;
+  text-decoration: none;
+  background: var(--accent-ink);
+  border-radius: var(--radius-sm);
+}
+
+.emptyPanel {
+  justify-content: center;
+}
+
+@media (max-width: 1120px) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .greenhouse,
+  .panel {
+    min-height: auto;
+  }
+
+  .greenhouse {
+    height: 620px;
+  }
+}
+
+@media (max-width: 760px) {
+  .root {
+    gap: 12px;
+    padding-top: 14px;
+  }
+
+  .title {
+    font-size: 1.18rem;
+  }
+
+  .header {
+    gap: 10px;
+  }
+
+  .bed {
+    right: 14px;
+    left: 14px;
+    grid-template-columns: repeat(2, minmax(112px, 1fr));
+    gap: 20px 10px;
+    padding: 36px 10px 22px;
+  }
+
+  .flowerPlot {
+    min-height: 152px;
+  }
+
+  .detail {
+    grid-template-columns: 1fr;
+  }
+}

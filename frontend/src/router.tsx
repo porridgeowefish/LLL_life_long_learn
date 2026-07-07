@@ -11,6 +11,9 @@ const ProjectPage = lazy(() => import('./pages/ProjectPage').then((m) => ({ defa
 const AgentsPage = lazy(() => import('./pages/AgentsPage').then((m) => ({ default: m.AgentsPage })));
 const MemoryPage = lazy(() => import('./pages/MemoryPage').then((m) => ({ default: m.MemoryPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const GreenhousePage = lazy(() =>
+  import('./pages/GreenhousePage').then((m) => ({ default: m.GreenhousePage })),
+);
 
 function PageFallback() {
   return <div style={{ padding: 24, color: 'var(--muted)' }}>加载中…</div>;
@@ -46,6 +49,10 @@ export const routes: RouteObject[] = [
       {
         path: 'settings',
         element: withShell(<SettingsPage />),
+      },
+      {
+        path: 'greenhouse',
+        element: withShell(<GreenhousePage />),
       },
       {
         path: '*',
