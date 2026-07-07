@@ -195,6 +195,33 @@
   border-radius: 6px;
 }
 
+.markdown :global(table) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.88rem;
+}
+
+.markdown :global(th),
+.markdown :global(td) {
+  border: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown :global(th) {
+  background: rgba(124, 154, 114, 0.08);
+  font-weight: 700;
+}
+
+.markdown :global(tbody tr:nth-child(even)) {
+  background: rgba(124, 154, 114, 0.035);
+}
+
 /* ---------- Summary (last) page: 8-dimension critical-thinking recap ----------
    Editorial treatment, no card grid. CSS counters auto-number each `##`
    dimension (01..08) so the layout adapts to however many sections the

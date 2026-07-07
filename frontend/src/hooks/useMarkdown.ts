@@ -138,6 +138,34 @@ DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
   }
 });
 
+export function renderMarkdown(input: string): MarkdownRender {
+  // Step 1: extract math BEFORE marked touches anything.
+  const { stripped, placeholders } = extractMath(input);
+
+  // Step 2: extract mermaid blocks (placeholder form).
+  const { mdStripped, blocks } = extractMermaid(stripped);
+
+  // Step 3: parse remaining markdown.
+  const rawHtml = marked.parse(mdStripped) as string;
+
+  // Step 4: splice KaTeX-rendered HTML back into placeholders.
+  // Placeholder IDs are alphanumeric tokens (MATHBLOCK0X / MATHINLINE3X),
+  // which survived marked unchanged. replaceAll handles duplicates.
+  let withMath = rawHtml;
+  for (const [id, html] of placeholders) {
+    withMath = withMath.split(id).join(html);
+  }
+
+  // Step 5: sanitize. KaTeX tags/attrs are whitelisted so the MathML
+  // half of the output (used for screen readers + copy) survives.
+  const safe = DOMPurify.sanitize(withMath, {
+    ADD_ATTR: ['data-mermaid-id', ...KATEX_ATTRS],
+    ADD_TAGS: KATEX_TAGS,
+  });
+
+  return { html: safe, mermaid: blocks };
+}
+
 export function useMarkdown(input: string): MarkdownRender {
   const [mermaidReady, setMermaidReady] = useState(false);
 
@@ -159,31 +187,5 @@ export function useMarkdown(input: string): MarkdownRender {
     };
   }, [mermaidReady]);
 
-  return useMemo<MarkdownRender>(() => {
-    // Step 1: extract math BEFORE marked touches anything.
-    const { stripped, placeholders } = extractMath(input);
-
-    // Step 2: extract mermaid blocks (placeholder form).
-    const { mdStripped, blocks } = extractMermaid(stripped);
-
-    // Step 3: parse remaining markdown.
-    const rawHtml = marked.parse(mdStripped) as string;
-
-    // Step 4: splice KaTeX-rendered HTML back into placeholders.
-    // Placeholder IDs are alphanumeric tokens (MATHBLOCK0X / MATHINLINE3X),
-    // which survived marked unchanged. replaceAll handles duplicates.
-    let withMath = rawHtml;
-    for (const [id, html] of placeholders) {
-      withMath = withMath.split(id).join(html);
-    }
-
-    // Step 5: sanitize. KaTeX tags/attrs are whitelisted so the MathML
-    // half of the output (used for screen readers + copy) survives.
-    const safe = DOMPurify.sanitize(withMath, {
-      ADD_ATTR: ['data-mermaid-id', ...KATEX_ATTRS],
-      ADD_TAGS: KATEX_TAGS,
-    });
-
-    return { html: safe, mermaid: blocks };
-  }, [input]);
+  return useMemo<MarkdownRender>(() => renderMarkdown(input), [input]);
 }
