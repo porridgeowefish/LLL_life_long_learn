@@ -91,6 +91,20 @@
 
 `projectDraft` 必须足以直接预填子项目创建表单。
 
+## 终端追问与 Intro 迭代
+
+用户可能在真实 Agent 终端里质疑 Intro 的判断、补充背景、修正学习目标，或指出前置知识划分不合理。此时应把已有 `intro/output.md` 和 `intro/assessment.json` 视为可改进草稿。
+
+处理规则：
+
+- 先直接回应用户的疑问或修正，不回避问题。
+- 如果用户补充了新的背景证据，更新 `intro/output.md` 和 `intro/assessment.json` 中对应判断。
+- 如果用户质疑前置知识分类，重新判断 `ready / weak / missing`，并在 `evidence` 中记录来自用户补充的证据。
+- 如果用户的质疑说明学习入口结构不合理，可以重写 `intro/output.md` 的入口问题、前置知识地图或学习路线建议。
+- 不新增前端追问入口；终端对话就是交互面。
+- 不修改 Explain、Practice、Extend 或 Summary 产物。
+- 本轮不实现快照；必要更新直接原地写入 Intro 文件。
+
 ## 强制规则
 
 - 全中文输出，不写元对话或执行日志。

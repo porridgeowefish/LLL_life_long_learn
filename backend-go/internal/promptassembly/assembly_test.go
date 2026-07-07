@@ -641,6 +641,54 @@ func TestBuild_ExplainIncludesTutorialArtifactContract(t *testing.T) {
 	}
 }
 
+func TestBuild_ExplainParentPageContextDoesNotForceAppend(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("load production registry: %v", err)
+	}
+
+	pkg, err := Build(Request{
+		ProjectSlug:  "test",
+		ZoneName:     workspace.ZoneExplain,
+		AgentID:      "explain",
+		ParentPageID: "p003",
+	}, reg)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	required := []string{
+		"parentPageId: `p003`",
+		"not as an instruction to append a page",
+		"Default to updating the relevant existing Explain page",
+		"kind: \"module\"",
+		"revise page titles, order, splits, merges, sections, and manifest in place",
+		"Do not create revision snapshots",
+	}
+	for _, fragment := range required {
+		if !strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("follow-up prompt missing %q\n--- prompt ---\n%s", fragment, pkg.PromptMd)
+		}
+	}
+	forbidden := []string{
+		"append one manifest entry",
+		"Treat this invocation as a follow-up page",
+	}
+	for _, fragment := range forbidden {
+		if strings.Contains(pkg.PromptMd, fragment) {
+			t.Errorf("follow-up prompt still contains append contract %q\n--- prompt ---\n%s", fragment, pkg.PromptMd)
+		}
+	}
+}
+
 func TestBuild_ProductionExplainPromptHasNoLegacyFirstPrinciplesContract(t *testing.T) {
 	ClearPrimitiveCacheForTest()
 	dir := t.TempDir()

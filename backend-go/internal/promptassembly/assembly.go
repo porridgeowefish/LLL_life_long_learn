@@ -194,6 +194,13 @@ func renderPrompt(
 		b.WriteString("- 研究问题框架由整套教程整体覆盖，不得让每一页机械重复同一组栏目。\n")
 		b.WriteString("- 不写文件协议、追问机制、生成过程、交付摘要、后续邀请或智能体自述。\n\n")
 	}
+	if agent.ID == "intro" {
+		b.WriteString("# Intro Iteration Contract\n\n")
+		b.WriteString("- 如果用户在终端里质疑、补充或修正 Intro 判断，把已有 Intro 产物视为可改进草稿。\n")
+		b.WriteString("- 先直接回应用户疑问，再按证据更新 `intro/output.md` 与 `intro/assessment.json`。\n")
+		b.WriteString("- 只改 Intro 产物；不要改 Explain、Practice、Extend 或 Summary 产物。\n")
+		b.WriteString("- 本轮不新增前端追问入口，也不实现快照；必要更新直接原地写入 Intro 文件。\n\n")
+	}
 	if agent.ID == "practice" && req.PracticeAttempt > 0 {
 		b.WriteString("# Practice Evaluation Artifact Contract\n\n")
 		b.WriteString(fmt.Sprintf("- This invocation evaluates submitted attempt %d. Do not generate or overwrite `practice/tasks.json` or `practice/answer-key.json`.\n", req.PracticeAttempt))
@@ -298,7 +305,11 @@ func renderPrompt(
 	if strings.TrimSpace(req.ParentPageID) != "" {
 		b.WriteString("\n# Explain Page Context\n\n")
 		b.WriteString(fmt.Sprintf("- parentPageId: `%s`\n", req.ParentPageID))
-		b.WriteString("- Treat this invocation as a follow-up page. Preserve existing pages and append one manifest entry.\n")
+		b.WriteString("- Treat `parentPageId` as optional context for the terminal follow-up, not as an instruction to append a page.\n")
+		b.WriteString("- Default to updating the relevant existing Explain page. Create a new `kind: \"module\"` page only for an independent knowledge module.\n")
+		b.WriteString("- If the follow-up exposes a better logical structure, revise page titles, order, splits, merges, sections, and manifest in place.\n")
+		b.WriteString("- Preserve useful learner hypotheses or objections inside the artifact, then explain their limits or corrections.\n")
+		b.WriteString("- Do not create revision snapshots in this iteration.\n")
 	}
 
 	b.WriteString("\n# Output Targets\n\n")

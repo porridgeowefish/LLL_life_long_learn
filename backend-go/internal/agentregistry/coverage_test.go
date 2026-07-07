@@ -188,7 +188,9 @@ func TestIteration04CharterContracts(t *testing.T) {
 		"explain": {
 			"研究目的",
 			"explain/manifest.json",
-			"parentPageId",
+			"更新相关已有页面",
+			"kind: \"module\"",
+			"重构整体结构",
 			"可独立阅读的教程",
 			"不得创建名为“第一性原理”",
 			"不写“用户说”",
