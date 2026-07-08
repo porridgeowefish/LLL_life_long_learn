@@ -116,10 +116,13 @@
 }
 
 .selectionBar {
-  position: absolute;
+  position: fixed;
   z-index: 10;
   transform: translateX(-50%);
   display: flex;
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 4px;
   padding: 5px;
   border-radius: 6px;

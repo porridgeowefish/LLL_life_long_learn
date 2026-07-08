@@ -228,12 +228,16 @@ function ExplainPage({
         }
         const anchor = selectionToTextAnchor(markdown, range);
         if (!anchor) return;
-        const rect = selected.getRangeAt(0).getBoundingClientRect();
-        const hostRect = hostRef.current?.getBoundingClientRect();
+        const rect = selectionRect(range);
+        if (!rect) {
+          setSelection(null);
+          return;
+        }
+        const toolbar = toolbarPosition(rect);
         setSelection({
           ...anchor,
-          top: rect.top - (hostRect?.top ?? 0) - 42,
-          left: rect.left - (hostRect?.left ?? 0) + rect.width / 2,
+          top: toolbar.top,
+          left: toolbar.left,
           screenTop: rect.top,
           screenLeft: rect.left + rect.width / 2,
           overlaps: overlapsExisting(anchor, pageConfusions),
@@ -308,4 +312,42 @@ function ExplainPage({
       )}
     </article>
   );
+}
+
+function selectionRect(range: Range): DOMRect | null {
+  const rects = Array.from(range.getClientRects()).filter((rect) =>
+    rect.width > 0 && rect.height > 0 &&
+    Number.isFinite(rect.top) && Number.isFinite(rect.left),
+  );
+  if (rects.length > 0) {
+    return rects.reduce((best, rect) => {
+      if (rect.top < best.top) return rect;
+      if (Math.abs(rect.top - best.top) < 1 && rect.left < best.left) return rect;
+      return best;
+    }, rects[0]);
+  }
+
+  const rect = range.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0 || !Number.isFinite(rect.top) || !Number.isFinite(rect.left)) {
+    return null;
+  }
+  return rect;
+}
+
+function toolbarPosition(rect: DOMRect) {
+  const halfToolbarWidth = 150;
+  const toolbarHeight = 40;
+  const margin = 8;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const above = rect.top - toolbarHeight - margin;
+  const below = rect.bottom + margin;
+  const preferredTop = above >= margin ? above : below;
+  return {
+    top: Math.min(Math.max(preferredTop, margin), Math.max(margin, viewportHeight - toolbarHeight - margin)),
+    left: Math.min(
+      Math.max(rect.left + rect.width / 2, halfToolbarWidth + margin),
+      Math.max(halfToolbarWidth + margin, viewportWidth - halfToolbarWidth - margin),
+    ),
+  };
 }
