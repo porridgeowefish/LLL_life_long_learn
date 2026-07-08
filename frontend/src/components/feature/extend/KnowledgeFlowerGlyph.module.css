@@ -7,7 +7,7 @@
 }
 
 .large {
-  --flower-size: clamp(270px, 34vw, 410px);
+  --flower-size: clamp(203px, 25.5vw, 308px);
 }
 
 .medium {

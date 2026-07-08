@@ -73,18 +73,18 @@
 
 .stageGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  grid-template-columns: minmax(500px, 1fr) minmax(360px, 420px);
   gap: 18px;
 }
 
 .stage {
   position: relative;
   display: grid;
-  min-height: 560px;
-  grid-template-columns: minmax(160px, 200px) minmax(260px, 1fr);
-  gap: 22px;
+  min-height: 500px;
+  grid-template-columns: minmax(140px, 160px) minmax(230px, 1fr);
+  gap: 18px;
   align-items: center;
-  padding: 30px;
+  padding: 24px;
   overflow: hidden;
   background:
     radial-gradient(circle at 70% 30%, rgba(154, 219, 183, 0.18), transparent 30%),
@@ -150,18 +150,57 @@
 
 .flowerDock {
   display: grid;
-  min-height: 430px;
+  min-height: 330px;
   place-items: center;
 }
 
+.flowerDock > div {
+  --flower-size: min(260px, 100%);
+}
+
+.dimensionGuide {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  align-self: center;
+}
+
+.dimensionItem {
+  --petal-color: var(--accent);
+  display: grid;
+  gap: 3px;
+  padding: 9px 11px;
+  color: #5f554b;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid color-mix(in srgb, var(--petal-color) 22%, white);
+  border-left: 3px solid var(--petal-color);
+  border-radius: var(--radius-sm);
+}
+
+.dimensionItem strong {
+  color: var(--fg);
+  font-size: 0.84rem;
+}
+
+.dimensionItem span {
+  color: #70665c;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
+.dimensionItemActive {
+  background: color-mix(in srgb, var(--petal-color) 14%, white);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--petal-color) 36%, white);
+}
+
 .gardenHint {
-  position: absolute;
-  right: 28px;
-  bottom: 22px;
+  grid-column: 1 / -1;
   display: flex;
   gap: 12px;
   align-items: center;
-  max-width: min(360px, 52%);
+  max-width: none;
   padding: 12px 16px;
   color: #6d6258;
   background: rgba(255, 255, 255, 0.78);
@@ -187,7 +226,7 @@
 
 .panel {
   display: flex;
-  min-height: 560px;
+  min-height: 500px;
   flex-direction: column;
   gap: 14px;
   padding: 22px;
@@ -294,7 +333,7 @@
   color: #9b3d31;
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1320px) {
   .head {
     align-items: flex-start;
     flex-direction: column;
@@ -339,6 +378,10 @@
     position: static;
     max-width: none;
     grid-column: 1;
+  }
+
+  .dimensionGuide {
+    grid-template-columns: 1fr;
   }
 
   .selectedPreview {

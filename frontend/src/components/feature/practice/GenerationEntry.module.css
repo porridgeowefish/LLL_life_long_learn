@@ -1,15 +1,19 @@
 .root {
-  padding: 24px 28px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 560px;
+  gap: 12px;
+  max-width: 760px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--card);
 }
 
 .title {
   font-family: 'Lora', Georgia, serif;
   font-weight: 500;
-  font-size: 1.2rem;
+  font-size: 1.05rem;
   color: var(--fg);
 }
 
@@ -35,7 +39,7 @@
 .stepBtn {
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
   background: var(--card);
   color: var(--fg);
@@ -58,7 +62,7 @@
   height: 36px;
   text-align: center;
   border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   font-size: 1rem;
   font-weight: 600;
   color: var(--fg);
@@ -81,7 +85,7 @@
   line-height: 1.5;
   color: #b06a36;
   padding: 8px 12px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: rgba(232, 148, 90, 0.1);
   border-left: 3px solid var(--orange);
 }

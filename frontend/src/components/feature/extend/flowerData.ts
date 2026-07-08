@@ -82,6 +82,14 @@ export const emptyPetalContent: Record<PetalId, string> = {
   creation: '',
 };
 
+export const flowerPetalMeanings: Record<PetalId, string> = {
+  known: '把新知识接回你已有的概念地图，说明它和旧知识哪里相连、哪里不同。',
+  life: '找到生活、工作或新闻里的真实例子，让抽象概念落到可观察场景。',
+  boundary: '写清楚适用边界、反例和误用风险，避免把一个工具用到所有地方。',
+  action: '把理解变成下一次可以执行的小动作、练习或判断步骤。',
+  creation: '产出一句解释、一个图、一段代码或一个可分享的小作品。',
+};
+
 export function createEmptyFlower(projectSlug: string, projectTitle: string): KnowledgeFlower {
   return {
     id: projectSlug,

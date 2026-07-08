@@ -9,6 +9,7 @@ import { KnowledgeFlowerGlyph } from './KnowledgeFlowerGlyph';
 import {
   completedPetalsFor,
   completenessFor,
+  flowerPetalMeanings,
   flowerPetals,
   type KnowledgeFlower,
   type PetalId,
@@ -178,6 +179,21 @@ export function ExtendKnowledgeFlower({
               onPetalSelect={setSelectedPetalId}
               size="large"
             />
+          </div>
+
+          <div className={s.dimensionGuide} aria-label="知识花五个维度">
+            {flowerPetals.map((petal) => (
+              <button
+                key={petal.id}
+                type="button"
+                className={clsx(s.dimensionItem, selectedPetalId === petal.id && s.dimensionItemActive)}
+                style={{ '--petal-color': petal.color } as CSSProperties}
+                onClick={() => setSelectedPetalId(petal.id)}
+              >
+                <strong>{petal.label}</strong>
+                <span>{flowerPetalMeanings[petal.id]}</span>
+              </button>
+            ))}
           </div>
 
           <div className={s.gardenHint}>

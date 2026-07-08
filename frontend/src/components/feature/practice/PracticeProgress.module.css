@@ -2,17 +2,17 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   box-shadow: var(--shadow);
 }
 
 .cell {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
   background: var(--bg);
   color: var(--muted);

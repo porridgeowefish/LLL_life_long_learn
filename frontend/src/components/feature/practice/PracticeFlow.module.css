@@ -1,21 +1,23 @@
 .exam {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 20px 24px;
-  max-width: 760px;
+  gap: 12px;
+  padding: 16px 18px 22px;
+  max-width: 980px;
 }
 
 .examHead {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .examTitle {
   font-family: 'Lora', Georgia, serif;
   font-weight: 500;
-  font-size: 1.15rem;
+  font-size: 1rem;
   color: var(--fg);
 }
 
@@ -45,7 +47,7 @@
 }
 
 .evaluationSummary {
-  padding: 14px 16px;
+  padding: 12px 14px;
   border: 1px solid rgba(124, 154, 114, 0.28);
   border-radius: var(--radius);
   background: rgba(124, 154, 114, 0.06);
@@ -75,8 +77,8 @@
 .nav {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-top: 12px;
+  gap: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--border);
 }
 

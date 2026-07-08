@@ -1,8 +1,11 @@
 .root {
-  padding: 24px 28px;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
 }
 
 .head {
@@ -110,7 +113,7 @@
 .assessBtn {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
   background: var(--card);
   color: var(--muted);
@@ -148,7 +151,7 @@
 /* feedback (submitted/evaluated) */
 .feedback {
   padding: 12px 14px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: rgba(124, 154, 114, 0.06);
   border-left: 3px solid var(--accent);
 }
