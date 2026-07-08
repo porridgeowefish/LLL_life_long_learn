@@ -1,7 +1,7 @@
 # Iteration 06 Acceptance Criteria
 
 Status: proposed
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-08
 
 ```text
 Ask-AI
@@ -24,6 +24,9 @@ the sidebar shows the doubt quote; hover shows the summary
 hover shows 生成总结中... while pending and 总结生成失败 on failure
 reopening from the sidebar is read-only review with no follow-up
 a one-click browser search opens Google (or Bing when configured) for the quote
+browser search is a sibling selection action, not a link inside the Ask-AI panel
+opening Ask-AI from a selection pre-fills the input with "请你解释「<selected text>」"
+the Ask-AI panel can be dragged and resized, while still clamping inside the viewport
 API keys are never returned in plaintext by GET /api/settings/ask-ai
 config.local.json round-trips without clobbering other keys
 
@@ -57,6 +60,15 @@ non-Claude runtimes
 get fsnotify event-driven refresh
 get an indeterminate progress bar with latest activity
 are not broken by the absence of Claude Code hooks
+
+compatibility and robustness patch
+Windows installs can detect Claude/Codex installed inside WSL when no native binary is available
+WSL-launched Claude/Codex reads prompt.md from the Linux side instead of passing Chinese text through argv/env
+corrupt local JSON stores are backed up to .corrupt-*.json and the app falls back to an empty safe state
+
+UI patch
+Knowledge Flower large glyph is scaled to 75% and the freed space explains the five dimensions
+Practice generation, Settings/AI config, project cards, and Home use denser, less rounded layouts
 
 quality gates
 all Go tests pass

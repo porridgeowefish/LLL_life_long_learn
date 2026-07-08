@@ -1,7 +1,7 @@
 # Iteration 06 Test Plan
 
 Status: proposed
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-08
 
 ## Automated
 
@@ -23,6 +23,8 @@ Last reviewed: 2026-07-06
 - `parseAskAiStream` (frontend): splits a `fetch` ReadableStream on `\n\n`,
   parses `data:` JSON, handles partial chunks across reads.
 - `floatingPosition` (frontend): flips/clamps the anchor rect at viewport edges.
+- `AskAiPanel` (frontend): opening from a selected quote pre-fills the input
+  with `请你解释「<quote>」`; browser search is not rendered inside the panel.
 - `useMarkdown` on streamed fragments continues to render GFM + KaTeX + Mermaid
   (extend existing `useMarkdown.test.ts` cases).
 
@@ -103,3 +105,24 @@ Last reviewed: 2026-07-06
   indeterminate progress bar.
 - Verify SettingsPage copy no longer claims the platform never asks for model
   parameters, and the ADR explains the carve-out.
+
+## Patch Smoke (2026-07-08)
+
+- Select text in Explain and confirm the selection bar exposes annotation,
+  Ask-AI, and browser search as same-level actions.
+- Open Ask-AI from selected text and confirm the input is pre-filled as
+  `请你解释「<selected text>」`.
+- Confirm browser search opens Google/Bing directly from the selection bar and
+  no longer appears inside the Ask-AI chat footer.
+- Drag and resize Ask-AI; confirm it remains clamped to the viewport and source
+  text can still be reached for copying.
+- On a Windows host where Claude/Codex are installed only inside WSL, confirm
+  runtime detection reports WSL mode and launch opens the CLI in the project
+  root. The prompt must be read from `prompt.md`, not passed through argv/env.
+- Corrupt `confusions.json`, `folders.json`, or a practice `draft.json` in a
+  disposable project; confirm a `.corrupt-*.json` backup is written and the app
+  falls back to an empty safe state.
+- Visually review Knowledge Flower: large glyph is 75% of the prior size and
+  the five dimension descriptions use the freed space.
+- Visually review Home, AI config, and Practice generation pages for denser
+  spacing, lower-radius cards, and less empty table-like space.

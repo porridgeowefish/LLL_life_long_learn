@@ -1,7 +1,7 @@
 # Iteration 06 API Contract
 
 Status: proposed
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-08
 
 ## Existing Endpoints (unchanged unless noted)
 
@@ -13,6 +13,26 @@ POST /api/projects/{id}/explain/resume
 GET  /api/events                      the app-wide SSE bus (lifecycle events only)
 POST /api/projects/{id}/confusions    reused to create the doubt that Ask-AI attaches to
 ```
+
+## Runtime discovery patch (2026-07-08)
+
+Runtime provider objects may include an optional `mode` field:
+
+```jsonc
+{
+  "id": "codex",
+  "name": "Codex CLI",
+  "bin": "codex",
+  "available": true,
+  "mode": "wsl"                     // "native" | "wsl"; omitted by older clients
+}
+```
+
+On Windows, if a native Claude/Codex probe fails, the backend probes WSL with
+`wsl.exe -e sh -lc "command -v <bin> && <bin> --version"`. WSL-mode launches
+convert project and prompt paths with `wslpath`; the Linux side reads
+`prompt.md` directly, so Chinese prompt text does not cross the Windows argv or
+environment boundary.
 
 ## Ask-AI Settings
 

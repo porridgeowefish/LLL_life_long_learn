@@ -1,7 +1,7 @@
 # Iteration 06 Delivery Notes
 
 Status: in progress (Phase C landed)
-Last reviewed: 2026-07-06
+Last reviewed: 2026-07-08
 
 Iteration 06 is approved as a design and phased A -> B -> C. Delivery has not
 begun. Update this file per phase as work lands.
@@ -12,6 +12,48 @@ begun. Update this file per phase as work lands.
 Phase A (Theme 2 core)   fsnotify watcher -> kill polling; run-progress indeterminate bar; wire completed/failed
 Phase B (Theme 1)        ask-ai config + settings + confusion-tied streaming endpoint + anchored floating window; multi-turn 持久化; 关闭自动生成 ≤250 字总结; 侧栏悬停查看; 调回只读; confusion -> 'asked'
 Phase C (Theme 2 enhancement) Claude Code hooks -> granular progress + reliable completion
+```
+
+## Patch Round (2026-07-08) - compatibility, Ask-AI UX, and UI polish
+
+### What landed
+
+```text
+backend-go/internal/agentruntime/        runtime resolution now falls back to WSL for Claude/Codex on Windows
+backend-go/internal/claudelauncher/      interactive/headless launch paths understand WSL mode; WSL reads prompt.md
+backend-go/internal/workspace/           corrupt JSON backup helper for local store recovery
+confusionstore/folderstore/practicestore corrupt JSON now backs up to .corrupt-*.json and falls back safely
+frontend Ask-AI                          selected text pre-fills the explain-selected-text prompt; browser search moved to the selection bar;
+                                         floating panel is draggable/resizable and viewport-clamped
+frontend Knowledge Flower                large glyph reduced to 75%; five dimension guide added beside the flower
+frontend Home/Settings/Practice           denser spacing, smaller radii, less empty table-like space
+```
+
+### Research basis
+
+```text
+Claude Code official docs: macOS/Linux/WSL install is the shell installer; Windows has a PowerShell installer;
+interactive usage is `claude`, programmatic usage is `claude -p/--print`.
+Codex CLI official docs: WSL install is the shell installer; Windows has a PowerShell installer;
+interactive usage is `codex`, noninteractive usage is `codex exec`; WSL2 is recommended.
+Microsoft WSL docs: Windows can launch Linux commands through wsl.exe and path ownership should match the toolchain.
+```
+
+### Validation
+
+```text
+go test ./backend-go/...        PASS
+npm run test -- --run           PASS (existing React act warnings remain in ExplainInfographic tests)
+npm run build                   PASS
+headless visual smoke           PASS (Home, Settings, Extend, Practice at 1280px: no horizontal overflow)
+```
+
+### Residual manual checks
+
+```text
+Real WSL launch was researched against official docs and implemented best-effort from Windows, but still needs
+manual validation on a machine where Claude/Codex are installed only inside WSL.
+Visual acceptance still needs a browser pass on the user's target screen sizes.
 ```
 
 ## Implementation Status

@@ -76,7 +76,7 @@ in-app terminal output mirroring (prior principle stands)
 in-window AI web search / Perplexity-style retrieval (only one-click browser search this iteration)
 follow-up on a reopened (closed) Ask-AI session (review is read-only)
 injecting Ask-AI summaries into subsequent agent generation prompts (out of scope)
-floating window dragging, resizing, or multiple concurrent windows
+multiple concurrent Ask-AI windows
 non-Claude runtime equivalents of Claude Code hooks (they use the fsnotify fallback path)
 moving the heavy agent generation runs to HTTP providers (still CLI)
 image generation provider changes
