@@ -11,6 +11,13 @@ export interface AskAnchor {
   left: number;
 }
 
+export interface AskPanelGeometry {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
 interface AskAiState {
   open: boolean;
   reviewMode: boolean;
@@ -21,6 +28,8 @@ interface AskAiState {
   messages: LiveAskMessage[];
   streaming: boolean;
   providerId: string;
+  initialInput: string;
+  geometry: AskPanelGeometry | null;
 
   openActive: (args: {
     projectSlug: string;
@@ -28,6 +37,7 @@ interface AskAiState {
     quote: string;
     anchor: AskAnchor;
     providerId: string;
+    initialInput?: string;
   }) => void;
   openReview: (args: {
     projectSlug: string;
@@ -42,6 +52,7 @@ interface AskAiState {
   appendDelta: (type: 'text' | 'thinking', content: string) => void;
   finishStream: () => void;
   setProvider: (id: string) => void;
+  setGeometry: (geometry: AskPanelGeometry) => void;
 }
 
 let msgSeq = 0;
@@ -60,8 +71,10 @@ export const useAskAiStore = create<AskAiState>()((set) => ({
   messages: [],
   streaming: false,
   providerId: '',
+  initialInput: '',
+  geometry: null,
 
-  openActive: ({ projectSlug, confusionId, quote, anchor, providerId }) =>
+  openActive: ({ projectSlug, confusionId, quote, anchor, providerId, initialInput }) =>
     set({
       open: true,
       reviewMode: false,
@@ -70,6 +83,8 @@ export const useAskAiStore = create<AskAiState>()((set) => ({
       quote,
       anchor,
       providerId,
+      initialInput: initialInput ?? '',
+      geometry: null,
       messages: [],
       streaming: false,
     }),
@@ -84,8 +99,10 @@ export const useAskAiStore = create<AskAiState>()((set) => ({
       messages: messages.map((m) => ({ ...m })),
       streaming: false,
       providerId: '',
+      initialInput: '',
+      geometry: null,
     }),
-  close: () => set({ open: false, streaming: false, messages: [] }),
+  close: () => set({ open: false, streaming: false, messages: [], geometry: null, initialInput: '' }),
   appendUser: (content) =>
     set((s) => ({
       messages: [...s.messages, { id: localId(), role: 'user', content, createdAt: new Date().toISOString() }],
@@ -111,4 +128,5 @@ export const useAskAiStore = create<AskAiState>()((set) => ({
     }),
   finishStream: () => set({ streaming: false }),
   setProvider: (id) => set({ providerId: id }),
+  setGeometry: (geometry) => set({ geometry }),
 }));

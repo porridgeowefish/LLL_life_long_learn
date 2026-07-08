@@ -23,7 +23,7 @@ beforeEach(() => {
   Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
   askAiMocks.streamAskAi.mockReset();
   askAiMocks.summarizeAsk.mockReset();
-  useAskAiStore.setState({ open: false, messages: [], streaming: false, reviewMode: false });
+  useAskAiStore.setState({ open: false, messages: [], streaming: false, reviewMode: false, initialInput: '', geometry: null });
 });
 
 describe('AskAiPanel', () => {
@@ -45,14 +45,14 @@ describe('AskAiPanel', () => {
     expect(dialog.style.top).toBe('108px');
   });
 
-  it('active mode shows input + provider switcher + browser search', () => {
+  it('active mode shows prefilled input + provider switcher', () => {
     useAskAiStore.getState().openActive({
       projectSlug: 'p', confusionId: 'c', quote: 'sel',
-      anchor: { top: 100, left: 100 }, providerId: 'p1',
+      anchor: { top: 100, left: 100 }, providerId: 'p1', initialInput: '请你解释「sel」',
     });
     render(<AskAiPanel />);
-    expect(screen.getByPlaceholderText(/问/)).toBeTruthy();
-    expect(screen.getByTitle(/浏览器搜索/)).toBeTruthy();
+    expect(screen.getByDisplayValue('请你解释「sel」')).toBeTruthy();
+    expect(screen.getByLabelText('模型源')).toBeTruthy();
   });
 
   it('review mode is read-only (no input)', () => {
@@ -66,7 +66,7 @@ describe('AskAiPanel', () => {
     expect(screen.getByText('prior answer')).toBeTruthy();
   });
 
-  it('pins review mode to the viewport right edge', () => {
+  it('places review mode near the viewport right edge', () => {
     useAskAiStore.getState().openReview({
       projectSlug: 'p', confusionId: 'c', quote: 'sel',
       anchor: { top: 100, left: -9999 },
@@ -74,8 +74,8 @@ describe('AskAiPanel', () => {
     });
     render(<AskAiPanel />);
     const dialog = screen.getByRole('dialog', { name: '答疑回顾' });
-    expect(dialog.style.right).toBe('8px');
-    expect(dialog.style.left).toBe('');
+    expect(dialog.style.left).toBe('556px');
+    expect(dialog.style.top).toBe('100px');
   });
 
   it('close button closes the panel', () => {

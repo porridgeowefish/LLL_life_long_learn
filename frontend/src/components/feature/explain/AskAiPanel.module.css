@@ -7,7 +7,7 @@
   flex-direction: column;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   font-size: 14px;
@@ -21,7 +21,10 @@
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
+  cursor: grab;
+  user-select: none;
 }
+.header:active { cursor: grabbing; }
 .title { font-weight: 600; flex: 1; color: var(--fg); letter-spacing: -0.01em; }
 
 .provider {
@@ -110,17 +113,6 @@
   background: var(--bg);
 }
 
-.searchLink {
-  font-size: 12.5px;
-  color: var(--accent-ink);
-  text-decoration: none;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
-  border: 1px solid transparent;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-.searchLink:hover { background: var(--surface-tint); border-color: var(--border); }
-
 .input {
   flex: 1;
   border: 1px solid var(--border);
@@ -173,4 +165,24 @@
 .reviewCloseBtn:hover {
   background: var(--surface-tint);
   border-color: var(--accent);
+}
+
+.resizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+}
+
+.resizeHandle::before {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 8px;
+  height: 8px;
+  content: "";
+  border-right: 2px solid color-mix(in oklab, var(--muted) 70%, transparent);
+  border-bottom: 2px solid color-mix(in oklab, var(--muted) 70%, transparent);
 }

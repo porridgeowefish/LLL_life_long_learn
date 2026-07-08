@@ -172,6 +172,11 @@ function ExplainPage({
   const [selection, setSelection] = useState<
     (TextAnchor & { top: number; left: number; screenTop: number; screenLeft: number; overlaps: boolean }) | null
   >(null);
+  const openBrowserSearch = (text: string) => {
+    const engine = askAiSettings.data?.searchEngine === 'bing' ? 'bing' : 'google';
+    const base = engine === 'bing' ? 'https://www.bing.com/search?q=' : 'https://www.google.com/search?q=';
+    window.open(base + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
+  };
 
   useEffect(() => {
     if (!hostRef.current || mermaid.length === 0) return;
@@ -280,12 +285,23 @@ function ExplainPage({
                 quote: selection.text.slice(0, 500),
                 anchor: { top: selection.screenTop, left: selection.screenLeft },
                 providerId: askAiSettings.data?.default ?? '',
+                initialInput: `请你解释「${selection.text.slice(0, 120)}」`,
               });
               setSelection(null);
               window.getSelection()?.removeAllRanges();
             }}
           >
             问 AI
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              openBrowserSearch(selection.text);
+              setSelection(null);
+              window.getSelection()?.removeAllRanges();
+            }}
+          >
+            浏览器搜索
           </button>
           <button type="button" onClick={() => setSelection(null)}>取消</button>
         </div>

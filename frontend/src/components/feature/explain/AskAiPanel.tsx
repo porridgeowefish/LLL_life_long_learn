@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
 import { Cross2Icon } from '@radix-ui/react-icons';
 
 import { streamAskAi, summarizeAsk, useAskAiSettings } from '@/api/askAi';
@@ -35,6 +35,12 @@ export function AskAiPanel() {
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (store.open && !store.reviewMode) {
+      setInput(store.initialInput);
+    }
+  }, [store.confusionId, store.initialInput, store.open, store.reviewMode]);
+
   // Auto-scroll on new content. Guard for jsdom (no scrollTo) — no-op there.
   useEffect(() => {
     const el = listRef.current;
@@ -68,17 +74,70 @@ export function AskAiPanel() {
   if (!store.open) return null;
 
   const viewport = { w: window.innerWidth, h: window.innerHeight };
-  const panelSize = {
+  const defaultPanelSize = {
     width: Math.min(PANEL_MAX_SIZE.width, viewport.w - 16),
     height: Math.min(PANEL_MAX_SIZE.height, viewport.h - 16),
   };
-  const pos = flipPosition(store.anchor, panelSize, viewport);
-  const panelStyle: CSSProperties = store.reviewMode
-    ? {
-      top: Math.min(Math.max(store.anchor.top, 8), Math.max(8, viewport.h - panelSize.height - 8)),
-      right: 8,
-    }
-    : { top: pos.top, left: pos.left };
+  const pos = flipPosition(store.anchor, defaultPanelSize, viewport);
+  const geometry = store.geometry ?? {
+    top: store.reviewMode
+      ? Math.min(Math.max(store.anchor.top, 8), Math.max(8, viewport.h - defaultPanelSize.height - 8))
+      : pos.top,
+    left: store.reviewMode ? Math.max(8, viewport.w - defaultPanelSize.width - 8) : pos.left,
+    width: defaultPanelSize.width,
+    height: defaultPanelSize.height,
+  };
+  const clampGeometry = (next: typeof geometry) => {
+    const width = Math.min(Math.max(next.width, 320), Math.max(320, viewport.w - 16));
+    const height = Math.min(Math.max(next.height, 280), Math.max(280, viewport.h - 16));
+    return {
+      width,
+      height,
+      top: Math.min(Math.max(next.top, 8), Math.max(8, viewport.h - height - 8)),
+      left: Math.min(Math.max(next.left, 8), Math.max(8, viewport.w - width - 8)),
+    };
+  };
+  const beginDrag = (event: ReactPointerEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest('button,select,input,a')) return;
+    const start = { x: event.clientX, y: event.clientY, ...geometry };
+    const move = (moveEvent: PointerEvent) => {
+      store.setGeometry(clampGeometry({
+        ...start,
+        top: start.top + moveEvent.clientY - start.y,
+        left: start.left + moveEvent.clientX - start.x,
+      }));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const beginResize = (event: ReactPointerEvent<HTMLSpanElement>) => {
+    event.preventDefault();
+    const start = { x: event.clientX, y: event.clientY, ...geometry };
+    const move = (moveEvent: PointerEvent) => {
+      store.setGeometry(clampGeometry({
+        ...start,
+        width: start.width + moveEvent.clientX - start.x,
+        height: start.height + moveEvent.clientY - start.y,
+      }));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+  const panelStyle: CSSProperties = {
+    top: geometry.top,
+    left: geometry.left,
+    width: geometry.width,
+    height: geometry.height,
+  };
 
   const send = async () => {
     const content = input.trim();
@@ -113,13 +172,9 @@ export function AskAiPanel() {
     }
   };
 
-  const searchURL =
-    (settingsQuery.data?.searchEngine === 'bing' ? 'https://www.bing.com/search?q=' : 'https://www.google.com/search?q=') +
-    encodeURIComponent(store.quote);
-
   return (
     <div className={s.panel} style={panelStyle} role="dialog" aria-label={store.reviewMode ? '答疑回顾' : '问 AI'}>
-      <header className={s.header}>
+      <header className={s.header} onPointerDown={beginDrag}>
         <span className={s.title}>{store.reviewMode ? '答疑回顾' : '问 AI'}</span>
         {!store.reviewMode && settingsQuery.data && (
           <select
@@ -161,9 +216,6 @@ export function AskAiPanel() {
 
       {!store.reviewMode && (
         <footer className={s.footer}>
-          <a className={s.searchLink} href={searchURL} target="_blank" rel="noreferrer" title="在浏览器搜索">
-            搜索
-          </a>
           <input
             className={s.input}
             placeholder="追问…（Enter 发送）"
@@ -192,6 +244,7 @@ export function AskAiPanel() {
           </button>
         </footer>
       )}
+      <span className={s.resizeHandle} onPointerDown={beginResize} aria-hidden="true" />
     </div>
   );
 }
