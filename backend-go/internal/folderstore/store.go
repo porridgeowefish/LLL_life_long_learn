@@ -58,7 +58,12 @@ func (s *Store) load() error {
 		s.data = Layout{}
 		return nil
 	}
-	return json.Unmarshal(raw, &s.data)
+	if err := json.Unmarshal(raw, &s.data); err != nil {
+		_, _ = workspace.BackupCorruptFile(s.filePath, err)
+		s.data = Layout{}
+		return nil
+	}
+	return nil
 }
 
 func (s *Store) save() error {

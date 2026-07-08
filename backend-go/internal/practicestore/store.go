@@ -195,7 +195,8 @@ func (s *Store) ReadDraft() (*DraftFile, error) {
 	}
 	var draft DraftFile
 	if err := json.Unmarshal(raw, &draft); err != nil {
-		return nil, fmt.Errorf("parse draft.json: %w", err)
+		_, _ = workspace.BackupCorruptFile(filepath.Join(s.practiceDir(), "draft.json"), err)
+		return nil, nil
 	}
 	if draft.SchemaVersion == 0 {
 		draft.SchemaVersion = 1
