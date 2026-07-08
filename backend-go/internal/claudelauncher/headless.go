@@ -67,6 +67,16 @@ func LaunchHeadless(
 		args = append(args, "--model", model)
 	}
 	cmd := exec.CommandContext(ctx, rt.Bin, args...)
+	if rt.Mode == "wsl" {
+		var wslProject string
+		if out, err := exec.CommandContext(ctx, "wsl.exe", "wslpath", "-a", projectRoot).Output(); err == nil {
+			wslProject = strings.TrimSpace(string(out))
+		}
+		if wslProject == "" {
+			wslProject = projectRoot
+		}
+		cmd = exec.CommandContext(ctx, "wsl.exe", "-e", "sh", "-lc", "cd "+shQuote(wslProject)+" && "+headlessShellCommand(rt, model))
+	}
 	cmd.Dir = projectRoot
 	if headlessUsesStdin(rt) {
 		cmd.Stdin = strings.NewReader(pkg.PromptMd)
@@ -131,4 +141,19 @@ func headlessArgs(rt agentruntime.Runtime, projectRoot, prompt string) []string 
 
 func headlessUsesStdin(rt agentruntime.Runtime) bool {
 	return rt.ID == agentruntime.RuntimeClaude || rt.ID == agentruntime.RuntimeCodex
+}
+
+func headlessShellCommand(rt agentruntime.Runtime, model string) string {
+	switch rt.ID {
+	case agentruntime.RuntimeClaude:
+		args := []string{shQuote(rt.Bin), "-p", "--permission-mode", shQuote(NormalizePermissionMode(""))}
+		if model != "" {
+			args = append(args, "--model", shQuote(model))
+		}
+		return strings.Join(args, " ")
+	case agentruntime.RuntimeCodex:
+		return shQuote(rt.Bin) + " exec - --cd ."
+	default:
+		return shQuote(rt.Bin)
+	}
 }

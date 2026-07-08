@@ -126,6 +126,7 @@ function RuntimeCard({ provider, selected, saving, onSelect }: RuntimeCardProps)
       <p className={s.desc}>{provider.description}</p>
       <div className={s.meta}>
         <span>命令：<code>{provider.bin}</code></span>
+        <span>来源：<code>{provider.mode === 'wsl' ? 'WSL' : 'Native'}</code></span>
         <span>覆盖：<code>{provider.binEnv}</code></span>
         <span>{provider.supportsHeadless ? '支持后台任务' : '仅交互终端'}</span>
       </div>

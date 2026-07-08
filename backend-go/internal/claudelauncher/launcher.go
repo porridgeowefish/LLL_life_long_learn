@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -50,7 +51,7 @@ type LaunchRequest struct {
 	// run-scoped claude-settings.json whose PostToolUse/Stop hooks POST to
 	// /api/runs/{runId}/status, and passes it via `claude --settings <file>`.
 	// Nil = no hooks (non-Claude runtimes keep the Phase-A indeterminate bar).
-	RunProgress    *runprogress.Store
+	RunProgress *runprogress.Store
 }
 
 // ResumeRequest carries the minimal context needed to reopen Claude Code's
@@ -168,44 +169,16 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	// initial prompt argument, LLL passes the prompt directly. For runtimes
 	// whose interactive prompt contract is not stable, LLL preloads the
 	// assembled prompt onto the clipboard and opens the real CLI surface.
-	psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stdoutPath, settingsFile, req)
-
-	// 写 wrapper 脚本到 runDir/wrapper.ps1，用 -File 启动 —— 规避 -Command
-	// 内联引号地狱（中文项目路径 / 单引号 / `& 'claude'` 全部免转义）。
-	wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
-	// Write wrapper.ps1 with a UTF-8 BOM. PowerShell 5.1 decodes a .ps1 with
-	// no BOM using the system ANSI codepage (GBK/CP936 on Chinese Windows),
-	// which mangles every Chinese path in the script — e.g. the project root
-	// projects/金融投资 is read as projects/閲戣瀺鎶曲祫, so Set-Location and
-	// the prompt.md Get-Content both fail and Claude launches with an empty
-	// prompt. The BOM forces PS to decode the script as UTF-8. Verified by a
-	// control test: no-BOM Set-Location fails with the garbled path; with-BOM
-	// it resolves the Chinese path correctly. See LESSONS_LEARNED (encoding).
-	if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
-		return nil, fmt.Errorf("write wrapper.ps1: %w", err)
-	}
-
-	// 用 ShellExecute("open", powershell.exe, ...) 开可见窗口。
-	// 根因（SO #30182508 / terraform-exec#570，已 repro + 用户端到端确认）：
-	// os/exec（CreateProcess）的子控制台窗口可见性取决于父进程控制台分配；
-	// 服务进程（go run 起、stdio 重定向）即使用 CREATE_NEW_CONSOLE 或
-	// cmd /c start 也拿不到可见窗口——子进程在跑但窗口永不出现。ShellExecute
-	// 走 Windows Shell（等同 Explorer 双击），强制在交互桌面开可见窗口。
-	// wrapper 脚本仍落 wrapper.ps1，用 -File 启动规避 -Command 引号地狱。
-	if err := launchVisibleWindow("powershell.exe",
-		[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
-		projectRoot,
-	); err != nil {
-		// Persist the spawn failure to stderr.log so the user can see
-		// why nothing happened (instead of a silent failure).
-		_ = os.WriteFile(stderrPath, []byte("launch window: "+err.Error()+"\nwrapperPs1: "+wrapperPs1Path+"\n"), 0o644)
+	wrapperPath, err := writeAndLaunchInteractiveWrapper(runDirAbs, projectRoot, promptMdPath, stdoutPath, settingsFile, req)
+	if err != nil {
+		_ = os.WriteFile(stderrPath, []byte("launch window: "+err.Error()+"\nwrapper: "+wrapperPath+"\n"), 0o644)
 		req.Store.SetFinished(req.Session.ID, sessionstore.StateFailed, -1)
 		if req.Events != nil {
 			req.Events.Emit("session-failed", map[string]any{
 				"sessionId": req.Session.ID, "error": err.Error(),
 			})
 		}
-		return nil, fmt.Errorf("spawn claude wrapper: %w", err)
+		return nil, fmt.Errorf("spawn agent wrapper: %w", err)
 	}
 
 	// run.json metadata (written immediately; exitCode is left 0 since
@@ -287,17 +260,9 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 		}
 	}
 
-	psCmd := buildResumeWrapperScript(projectRoot, stdoutPath, req)
-	wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
-	if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
-		return nil, fmt.Errorf("write wrapper.ps1: %w", err)
-	}
-
-	if err := launchVisibleWindow("powershell.exe",
-		[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
-		projectRoot,
-	); err != nil {
-		_ = os.WriteFile(stderrPath, []byte("launch resume window: "+err.Error()+"\nwrapperPs1: "+wrapperPs1Path+"\n"), 0o644)
+	wrapperPath, err := writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stdoutPath, req)
+	if err != nil {
+		_ = os.WriteFile(stderrPath, []byte("launch resume window: "+err.Error()+"\nwrapper: "+wrapperPath+"\n"), 0o644)
 		if req.Session != nil && req.Store != nil {
 			req.Store.SetFinished(req.Session.ID, sessionstore.StateFailed, -1)
 		}
@@ -335,6 +300,104 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 	}, nil
 }
 
+func writeAndLaunchInteractiveWrapper(runDirAbs, projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) (string, error) {
+	if runtime.GOOS == "windows" {
+		psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile, req)
+		wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
+		if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
+			return wrapperPs1Path, fmt.Errorf("write wrapper.ps1: %w", err)
+		}
+		return wrapperPs1Path, launchVisibleWindow("powershell.exe",
+			[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
+			projectRoot,
+		)
+	}
+
+	shCmd := buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsFile, req)
+	wrapperShPath := filepath.Join(runDirAbs, "wrapper.sh")
+	if err := os.WriteFile(wrapperShPath, []byte(shCmd), 0o755); err != nil {
+		return wrapperShPath, fmt.Errorf("write wrapper.sh: %w", err)
+	}
+	return wrapperShPath, launchVisibleWindow("/bin/sh", []string{wrapperShPath}, projectRoot)
+}
+
+func writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stderrPath string, req ResumeRequest) (string, error) {
+	if runtime.GOOS == "windows" {
+		psCmd := buildResumeWrapperScript(projectRoot, stderrPath, req)
+		wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
+		if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
+			return wrapperPs1Path, fmt.Errorf("write wrapper.ps1: %w", err)
+		}
+		return wrapperPs1Path, launchVisibleWindow("powershell.exe",
+			[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
+			projectRoot,
+		)
+	}
+
+	shCmd := buildResumeWrapperShellScript(projectRoot, stderrPath, req)
+	wrapperShPath := filepath.Join(runDirAbs, "wrapper.sh")
+	if err := os.WriteFile(wrapperShPath, []byte(shCmd), 0o755); err != nil {
+		return wrapperShPath, fmt.Errorf("write wrapper.sh: %w", err)
+	}
+	return wrapperShPath, launchVisibleWindow("/bin/sh", []string{wrapperShPath}, projectRoot)
+}
+
+func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) string {
+	rt := selectedRuntime(req)
+	execLine := interactiveShellExecLine(rt, settingsFile)
+	return strings.Join([]string{
+		`#!/bin/sh`,
+		`set +e`,
+		fmt.Sprintf(`cd %s || exit 1`, shQuote(projectRoot)),
+		fmt.Sprintf(`log_file=%s`, shQuote(stderrPath)),
+		`log_err() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$1" >> "$log_file"; }`,
+		`log_err "spawn env PATH=$PATH"`,
+		`printf '%s\n' '============================================='`,
+		fmt.Sprintf(`printf ' LLL Project: %s | Agent: %s | Runtime: %s | Zone: %s\n'`, req.ProjectSlug, req.Agent.Name, rt.Name, req.ZoneName),
+		`printf '%s\n\n' '============================================='`,
+		fmt.Sprintf(`prompt_file=%s`, shQuote(promptMdPath)),
+		`prompt_text=''`,
+		`if [ -f "$prompt_file" ]; then prompt_text=$(cat "$prompt_file"); else log_err "prompt.md missing: $prompt_file"; fi`,
+		`command -v clip.exe >/dev/null 2>&1 && clip.exe < "$prompt_file" 2>/dev/null`,
+		fmt.Sprintf(`agent_bin=%s`, shQuote(rt.Bin)),
+		`agent_exe=$(command -v "$agent_bin" 2>/dev/null)`,
+		`log_err "resolved runtime agentExe=$agent_exe"`,
+		`if [ -z "$agent_exe" ]; then printf 'Cannot find %s. Install it inside this Linux/WSL environment, then rerun.\n' "$agent_bin"; read -r _; exit 1; fi`,
+		fmt.Sprintf(`permission_mode=%s`, shQuote(NormalizePermissionMode(req.PermissionMode))),
+		`export FORCE_COLOR=1`,
+		`printf 'Starting %s. The initial prompt is loaded from prompt.md.\n\n' "$agent_bin"`,
+		execLine,
+		`code=$?`,
+		`printf '\n=============================================\n'`,
+		`printf 'Agent CLI exited with code %s. Press Enter to close.\n' "$code"`,
+		`printf '=============================================\n'`,
+		`read -r _`,
+		`exit "$code"`,
+	}, "\n")
+}
+
+func buildResumeWrapperShellScript(projectRoot, stderrPath string, req ResumeRequest) string {
+	claudeBin := selectedClaudeBin(req.ClaudeBin)
+	return strings.Join([]string{
+		`#!/bin/sh`,
+		`set +e`,
+		fmt.Sprintf(`cd %s || exit 1`, shQuote(projectRoot)),
+		fmt.Sprintf(`log_file=%s`, shQuote(stderrPath)),
+		`log_err() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$1" >> "$log_file"; }`,
+		`log_err "resume spawn env PATH=$PATH"`,
+		fmt.Sprintf(`agent_bin=%s`, shQuote(claudeBin)),
+		`agent_exe=$(command -v "$agent_bin" 2>/dev/null)`,
+		`log_err "resolved claude agentExe=$agent_exe"`,
+		`if [ -z "$agent_exe" ]; then printf 'Cannot find claude. Install Claude Code inside this Linux/WSL environment, then rerun.\n'; read -r _; exit 1; fi`,
+		`printf 'Resuming Claude Code with claude -c...\n\n'`,
+		`"$agent_exe" -c`,
+		`code=$?`,
+		`printf '\nClaude exited with code %s. Press Enter to close.\n' "$code"`,
+		`read -r _`,
+		`exit "$code"`,
+	}, "\n")
+}
+
 // buildTUIWrapperScript returns the PowerShell command that:
 //  1. cd into the project root; logs the spawn env PATH (ground truth)
 //  2. reads prompt.md and resolves claude to a FULL path (Get-Command
@@ -354,7 +417,7 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) string {
 	permissionMode := NormalizePermissionMode(req.PermissionMode)
 	runtime := selectedRuntime(req)
-	execLine := interactiveExecLine(runtime, projectRoot, settingsFile)
+	execLine := interactiveExecLine(runtime, projectRoot, promptMdPath, settingsFile)
 	promptNotice := "初始 prompt 会自动带入（无需手动粘贴）。"
 	if runtime.PromptDelivery == agentruntime.PromptClipboard {
 		promptNotice = "已把初始 prompt 放入剪贴板；进入 CLI 后按 Ctrl+V 再回车。"
@@ -469,11 +532,14 @@ func selectedRuntime(req LaunchRequest) agentruntime.Runtime {
 	return agentruntime.Runtime{Definition: def, Bin: bin, Available: true}
 }
 
-func interactiveExecLine(rt agentruntime.Runtime, projectRoot, settingsFile string) string {
+func interactiveExecLine(rt agentruntime.Runtime, projectRoot, promptMdPath, settingsFile string) string {
+	if rt.Mode == "wsl" {
+		return interactiveWSLExecLine(rt, projectRoot, promptMdPath, settingsFile)
+	}
 	// Phase C: --settings <file> loads the run-scoped hook config. Only the
 	// Claude CLI takes it; other runtimes ignore the arg.
 	settingsArg := ""
-	if strings.TrimSpace(settingsFile) != "" {
+	if strings.TrimSpace(settingsFile) != "" && rt.ID == agentruntime.RuntimeClaude {
 		settingsArg = fmt.Sprintf(" --settings '%s'", settingsFile)
 	}
 	switch rt.ID {
@@ -486,6 +552,52 @@ func interactiveExecLine(rt agentruntime.Runtime, projectRoot, settingsFile stri
 	default:
 		return "& $agentExe"
 	}
+}
+
+func interactiveShellExecLine(rt agentruntime.Runtime, settingsFile string) string {
+	settingsArg := ""
+	if strings.TrimSpace(settingsFile) != "" && rt.ID == agentruntime.RuntimeClaude {
+		settingsArg = " --settings " + shQuote(settingsFile)
+	}
+	switch rt.ID {
+	case agentruntime.RuntimeClaude:
+		return `if [ -n "$prompt_text" ]; then "$agent_exe" --permission-mode "$permission_mode"` + settingsArg + ` "$prompt_text"; else "$agent_exe" --permission-mode "$permission_mode"` + settingsArg + `; fi`
+	case agentruntime.RuntimeCodex:
+		return `if [ -n "$prompt_text" ]; then "$agent_exe" "$prompt_text"; else "$agent_exe"; fi`
+	case agentruntime.RuntimeTrae:
+		return `if [ -n "$prompt_text" ]; then "$agent_exe" run "$prompt_text" --working-dir "$PWD"; else "$agent_exe" interactive; fi`
+	default:
+		return `"$agent_exe"`
+	}
+}
+
+func interactiveWSLExecLine(rt agentruntime.Runtime, projectRoot, promptMdPath, settingsFile string) string {
+	bin := shQuote(rt.Bin)
+	project := psSingleQuote(projectRoot)
+	prompt := psSingleQuote(promptMdPath)
+	settingsPrefix := ""
+	settingsArg := ""
+	if strings.TrimSpace(settingsFile) != "" && rt.ID == agentruntime.RuntimeClaude {
+		settingsPrefix = fmt.Sprintf(`$wslSettings = (& wsl.exe wslpath -a '%s').Trim(); `, psSingleQuote(settingsFile))
+		settingsArg = ` --settings ""$wslSettings""`
+	}
+	prefix := fmt.Sprintf(`$wslProject = (& wsl.exe wslpath -a '%s').Trim(); $wslPrompt = (& wsl.exe wslpath -a '%s').Trim(); %s`, project, prompt, settingsPrefix)
+	switch rt.ID {
+	case agentruntime.RuntimeClaude:
+		return fmt.Sprintf(`%s& wsl.exe -e sh -lc "cd ""$wslProject"" && prompt_text=\$(cat ""$wslPrompt"" 2>/dev/null) && if [ -n ""\$prompt_text"" ]; then exec %s --permission-mode auto%s ""\$prompt_text""; else exec %s --permission-mode auto%s; fi"`, prefix, bin, settingsArg, bin, settingsArg)
+	case agentruntime.RuntimeCodex:
+		return fmt.Sprintf(`%s& wsl.exe -e sh -lc "cd ""$wslProject"" && prompt_text=\$(cat ""$wslPrompt"" 2>/dev/null) && if [ -n ""\$prompt_text"" ]; then exec %s ""\$prompt_text""; else exec %s; fi"`, prefix, bin, bin)
+	default:
+		return `& $agentExe`
+	}
+}
+
+func shQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
+
+func psSingleQuote(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
 }
 
 // writeHookSettings writes a run-scoped Claude Code settings JSON that reports

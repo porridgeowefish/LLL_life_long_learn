@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -46,6 +47,7 @@ type Runtime struct {
 	Definition
 	Bin       string `json:"bin"`
 	Available bool   `json:"available"`
+	Mode      string `json:"mode,omitempty"` // native | wsl
 }
 
 type Config struct {
@@ -151,28 +153,16 @@ func Resolve(cfg Config) Runtime {
 	if !ok {
 		def, _ = DefinitionByID(RuntimeClaude)
 	}
-	bin := strings.TrimSpace(cfg.Bins[string(def.ID)])
-	if env := strings.TrimSpace(os.Getenv(def.BinEnv)); env != "" {
-		bin = env
-	}
-	if bin == "" {
-		bin = def.DefaultBin
-	}
-	return Runtime{Definition: def, Bin: bin, Available: Probe(bin, def.ProbeArgs, 3*time.Second)}
+	bin, mode, available := resolveCommand(def, cfg.Bins)
+	return Runtime{Definition: def, Bin: bin, Available: available, Mode: mode}
 }
 
 func List(cfg Config) []Runtime {
 	defs := Definitions()
 	out := make([]Runtime, 0, len(defs))
 	for _, def := range defs {
-		bin := strings.TrimSpace(cfg.Bins[string(def.ID)])
-		if env := strings.TrimSpace(os.Getenv(def.BinEnv)); env != "" {
-			bin = env
-		}
-		if bin == "" {
-			bin = def.DefaultBin
-		}
-		out = append(out, Runtime{Definition: def, Bin: bin, Available: Probe(bin, def.ProbeArgs, 3*time.Second)})
+		bin, mode, available := resolveCommand(def, cfg.Bins)
+		out = append(out, Runtime{Definition: def, Bin: bin, Available: available, Mode: mode})
 	}
 	return out
 }
@@ -183,6 +173,48 @@ func Probe(bin string, args []string, timeout time.Duration) bool {
 	cmd := exec.CommandContext(ctx, bin, args...)
 	out, err := cmd.CombinedOutput()
 	return err == nil && strings.TrimSpace(string(out)) != ""
+}
+
+func resolveCommand(def Definition, bins map[string]string) (bin, mode string, available bool) {
+	bin = strings.TrimSpace(bins[string(def.ID)])
+	if env := strings.TrimSpace(os.Getenv(def.BinEnv)); env != "" {
+		bin = env
+	}
+	if bin == "" {
+		bin = def.DefaultBin
+	}
+	if Probe(bin, def.ProbeArgs, 3*time.Second) {
+		return bin, "native", true
+	}
+	if runtime.GOOS == "windows" && canProbeWSL(def) && probeWSL(def.DefaultBin, def.ProbeArgs, 3*time.Second) {
+		return def.DefaultBin, "wsl", true
+	}
+	return bin, "native", false
+}
+
+func canProbeWSL(def Definition) bool {
+	return def.ID == RuntimeClaude || def.ID == RuntimeCodex
+}
+
+func probeWSL(bin string, args []string, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	parts := []string{"command -v " + shellQuote(bin) + " >/dev/null 2>&1"}
+	if len(args) > 0 {
+		quoted := make([]string, 0, len(args)+1)
+		quoted = append(quoted, shellQuote(bin))
+		for _, arg := range args {
+			quoted = append(quoted, shellQuote(arg))
+		}
+		parts = append(parts, strings.Join(quoted, " "))
+	}
+	cmd := exec.CommandContext(ctx, "wsl.exe", "-e", "sh", "-lc", strings.Join(parts, " && "))
+	out, err := cmd.CombinedOutput()
+	return err == nil && strings.TrimSpace(string(out)) != ""
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func configPath() string {

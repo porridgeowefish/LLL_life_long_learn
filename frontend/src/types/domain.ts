@@ -143,6 +143,7 @@ export interface AgentRuntimeProvider {
   supportsHeadless: boolean;
   bin: string;
   available: boolean;
+  mode?: 'native' | 'wsl';
 }
 
 export interface AgentRuntimeHealth {
