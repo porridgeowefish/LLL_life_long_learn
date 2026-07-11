@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 
 import { useConfusions, useCreateConfusion } from '@/api/confusions';
 import { useExplainManifest, useExplainPage } from '@/api/learningArtifacts';
+import { useRecordReading } from '@/api/activity';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
 import { ExplainInfographic } from './ExplainInfographic';
@@ -163,14 +165,23 @@ function ExplainPage({
   const askAiSettings = useAskAiSettings();
   const { data: allConfusions = [] } = useConfusions(projectSlug);
   const artifactID = `explain/${file}`;
+  useEffectiveReading(projectSlug, artifactID, file, markdownRef);
   const pageConfusions = useMemo(
     () => allConfusions.filter((item) =>
       item.state !== 'deleted' && item.sourceArtifactId === artifactID,
     ),
     [allConfusions, artifactID],
   );
+  const selectionBarRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<
-    (TextAnchor & { top: number; left: number; screenTop: number; screenLeft: number; overlaps: boolean }) | null
+    (TextAnchor & {
+      top: number;
+      left: number;
+      screenTop: number;
+      screenLeft: number;
+      rect: SelectionBox;
+      overlaps: boolean;
+    }) | null
   >(null);
   const openBrowserSearch = (text: string) => {
     const engine = askAiSettings.data?.searchEngine === 'bing' ? 'bing' : 'google';
@@ -207,6 +218,15 @@ function ExplainPage({
     })));
   }, [html, pageConfusions]);
 
+  useLayoutEffect(() => {
+    if (!selection || !selectionBarRef.current) return;
+    const barRect = selectionBarRef.current.getBoundingClientRect();
+    const next = toolbarPosition(selection.rect, { width: barRect.width, height: barRect.height });
+    if (Math.abs(next.top - selection.top) > 1 || Math.abs(next.left - selection.left) > 1) {
+      setSelection({ ...selection, ...next });
+    }
+  }, [selection]);
+
   if (page.isLoading) return <div className={s.loading}>加载页面…</div>;
   if (page.error) return <EmptyState title="页面文件不存在" description={file} />;
 
@@ -233,13 +253,15 @@ function ExplainPage({
           setSelection(null);
           return;
         }
-        const toolbar = toolbarPosition(rect);
+        const rectBox = toSelectionBox(rect);
+        const toolbar = toolbarPosition(rectBox);
         setSelection({
           ...anchor,
           top: toolbar.top,
           left: toolbar.left,
-          screenTop: rect.top,
-          screenLeft: rect.left + rect.width / 2,
+          screenTop: rectBox.top,
+          screenLeft: rectBox.left + rectBox.width / 2,
+          rect: rectBox,
           overlaps: overlapsExisting(anchor, pageConfusions),
         });
       }}
@@ -250,8 +272,8 @@ function ExplainPage({
         className={s.markdown}
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {selection && (
-        <div className={s.selectionBar} style={{ top: selection.top, left: selection.left }}>
+      {selection && createPortal((
+        <div ref={selectionBarRef} className={s.selectionBar} style={{ top: selection.top, left: selection.left }}>
           <button
             type="button"
             disabled={selection.overlaps}
@@ -287,7 +309,14 @@ function ExplainPage({
                 projectSlug,
                 confusionId: created.confusion.id,
                 quote: selection.text.slice(0, 500),
-                anchor: { top: selection.screenTop, left: selection.screenLeft },
+                anchor: {
+                  top: selection.rect.top,
+                  left: selection.rect.left + selection.rect.width / 2,
+                  right: selection.rect.right,
+                  bottom: selection.rect.bottom,
+                  width: selection.rect.width,
+                  height: selection.rect.height,
+                },
                 providerId: askAiSettings.data?.default ?? '',
                 initialInput: `请你解释「${selection.text.slice(0, 120)}」`,
               });
@@ -309,9 +338,61 @@ function ExplainPage({
           </button>
           <button type="button" onClick={() => setSelection(null)}>取消</button>
         </div>
-      )}
+      ), document.body)}
     </article>
   );
+}
+
+const EFFECTIVE_READING_MS = 3 * 60 * 1000;
+
+function useEffectiveReading(
+  projectSlug: string,
+  artifactID: string,
+  title: string,
+  contentRef: React.RefObject<HTMLElement>,
+) {
+  const { mutate: recordReading } = useRecordReading(projectSlug);
+  const sentRef = useRef('');
+
+  useEffect(() => {
+    let engaged = false;
+    let accumulated = 0;
+    let previous = Date.now();
+    const markEngaged = (event: Event) => {
+      const target = event.target as Node | null;
+      if (!target || contentRef.current?.contains(target) || event.type === 'scroll') engaged = true;
+    };
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      const elapsed = Math.min(now - previous, 6_000);
+      previous = now;
+      if (document.visibilityState === 'visible' && engaged) accumulated += elapsed;
+      const localDate = new Date().toLocaleDateString('sv-SE');
+      const id = `${artifactID}:${localDate}`;
+      if (accumulated >= EFFECTIVE_READING_MS && sentRef.current !== id) {
+        sentRef.current = id;
+        recordReading({ id, sourceId: artifactID, title: '有效阅读', detail: title, activityDelta: 2 });
+      }
+    }, 5_000);
+    document.addEventListener('scroll', markEngaged, true);
+    document.addEventListener('pointerdown', markEngaged, true);
+    document.addEventListener('selectionchange', markEngaged);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('scroll', markEngaged, true);
+      document.removeEventListener('pointerdown', markEngaged, true);
+      document.removeEventListener('selectionchange', markEngaged);
+    };
+  }, [artifactID, contentRef, recordReading, title]);
+}
+
+interface SelectionBox {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  width: number;
+  height: number;
 }
 
 function selectionRect(range: Range): DOMRect | null {
@@ -334,15 +415,29 @@ function selectionRect(range: Range): DOMRect | null {
   return rect;
 }
 
-function toolbarPosition(rect: DOMRect) {
-  const halfToolbarWidth = 150;
-  const toolbarHeight = 40;
+function toSelectionBox(rect: DOMRect): SelectionBox {
+  return {
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
+function toolbarPosition(rect: SelectionBox, measured?: { width: number; height: number }) {
+  const toolbarWidth = measured?.width ?? 360;
+  const toolbarHeight = measured?.height ?? 46;
+  const halfToolbarWidth = toolbarWidth / 2;
   const margin = 8;
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-  const above = rect.top - toolbarHeight - margin;
-  const below = rect.bottom + margin;
-  const preferredTop = above >= margin ? above : below;
+  const spaceAbove = rect.top - margin;
+  const spaceBelow = viewportHeight - rect.bottom - margin;
+  const preferredTop = spaceBelow >= toolbarHeight || spaceBelow > spaceAbove
+    ? rect.bottom + margin
+    : rect.top - toolbarHeight - margin;
   return {
     top: Math.min(Math.max(preferredTop, margin), Math.max(margin, viewportHeight - toolbarHeight - margin)),
     left: Math.min(

@@ -68,6 +68,13 @@ To stop the background server without using the frontend Exit button:
 npm run stop
 ```
 
+## Contributing
+
+Bug reports, focused feature proposals, and Pull Requests are welcome. Read
+[`CONTRIBUTING.md`](./CONTRIBUTING.md) before submitting a change. The repository
+maintainer must enable public Issue creation in GitHub settings for the in-app
+"报告问题" entry to accept new reports.
+
 ## Reading Order
 
 1. `docs/INDEX.md`

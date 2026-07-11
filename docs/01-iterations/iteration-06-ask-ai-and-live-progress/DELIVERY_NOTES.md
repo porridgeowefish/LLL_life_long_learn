@@ -29,6 +29,15 @@ frontend Knowledge Flower                large glyph reduced to 75%; five dimens
 frontend Home/Settings/Practice           denser spacing, smaller radii, less empty table-like space
 ```
 
+### Follow-up patch (2026-07-08) - selection/Ask-AI placement and icons
+
+```text
+Explain selection toolbar              rendered through document.body and measured before final placement, so bottom-edge selections stay visible
+Ask-AI active window                   opens beside the selected text when possible, avoids covering the source quote, focuses the prefilled prompt
+Ask-AI review window                   opens centered and clamped inside the viewport instead of requiring a manual drag from a clipped edge
+frontend icon sprite                   Icon now references #ico-* symbols; missing zone icons filled from the local SVG sprite
+```
+
 ### Research basis
 
 ```text
@@ -46,6 +55,8 @@ go test ./backend-go/...        PASS
 npm run test -- --run           PASS (existing React act warnings remain in ExplainInfographic tests)
 npm run build                   PASS
 headless visual smoke           PASS (Home, Settings, Extend, Practice at 1280px: no horizontal overflow)
+follow-up frontend test/build    PASS (Vitest 25 files / 85 tests; production build)
+git diff --check                 PASS (CRLF warnings only)
 ```
 
 ### Residual manual checks

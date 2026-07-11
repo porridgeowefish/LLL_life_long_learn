@@ -1,14 +1,15 @@
 import { type CSSProperties, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Cross2Icon } from '@radix-ui/react-icons';
 
 import { streamAskAi, summarizeAsk, useAskAiSettings } from '@/api/askAi';
 import { useAskAiStore } from '@/store/slices/askAi';
 import { MarkdownView } from '@/components/primitive/MarkdownView';
-import { flipPosition } from '@/lib/floatingPosition';
 
 import s from './AskAiPanel.module.css';
 
-const PANEL_MAX_SIZE = { width: 460, height: 540 };
+const ACTIVE_PANEL_SIZE = { width: 460, height: 380 };
+const REVIEW_PANEL_SIZE = { width: 520, height: 540 };
 
 function formatAskAiError(error: unknown): string {
   const status = error instanceof Error && 'status' in error ? (error as { status: number }).status : undefined;
@@ -34,10 +35,15 @@ export function AskAiPanel() {
   const [input, setInput] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (store.open && !store.reviewMode) {
       setInput(store.initialInput);
+      window.setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 0);
     }
   }, [store.confusionId, store.initialInput, store.open, store.reviewMode]);
 
@@ -74,19 +80,8 @@ export function AskAiPanel() {
   if (!store.open) return null;
 
   const viewport = { w: window.innerWidth, h: window.innerHeight };
-  const defaultPanelSize = {
-    width: Math.min(PANEL_MAX_SIZE.width, viewport.w - 16),
-    height: Math.min(PANEL_MAX_SIZE.height, viewport.h - 16),
-  };
-  const pos = flipPosition(store.anchor, defaultPanelSize, viewport);
-  const geometry = store.geometry ?? {
-    top: store.reviewMode
-      ? Math.min(Math.max(store.anchor.top, 8), Math.max(8, viewport.h - defaultPanelSize.height - 8))
-      : pos.top,
-    left: store.reviewMode ? Math.max(8, viewport.w - defaultPanelSize.width - 8) : pos.left,
-    width: defaultPanelSize.width,
-    height: defaultPanelSize.height,
-  };
+  const defaultPanelSize = panelSize(store.reviewMode, viewport);
+  const geometry = store.geometry ?? initialPanelGeometry(store.anchor, defaultPanelSize, viewport, store.reviewMode);
   const clampGeometry = (next: typeof geometry) => {
     const width = Math.min(Math.max(next.width, 320), Math.max(320, viewport.w - 16));
     const height = Math.min(Math.max(next.height, 280), Math.max(280, viewport.h - 16));
@@ -172,7 +167,7 @@ export function AskAiPanel() {
     }
   };
 
-  return (
+  return createPortal((
     <div className={s.panel} style={panelStyle} role="dialog" aria-label={store.reviewMode ? '答疑回顾' : '问 AI'}>
       <header className={s.header} onPointerDown={beginDrag}>
         <span className={s.title}>{store.reviewMode ? '答疑回顾' : '问 AI'}</span>
@@ -217,6 +212,7 @@ export function AskAiPanel() {
       {!store.reviewMode && (
         <footer className={s.footer}>
           <input
+            ref={inputRef}
             className={s.input}
             placeholder="追问…（Enter 发送）"
             value={input}
@@ -246,5 +242,75 @@ export function AskAiPanel() {
       )}
       <span className={s.resizeHandle} onPointerDown={beginResize} aria-hidden="true" />
     </div>
-  );
+  ), document.body);
+}
+
+function panelSize(reviewMode: boolean, viewport: { w: number; h: number }) {
+  const target = reviewMode ? REVIEW_PANEL_SIZE : ACTIVE_PANEL_SIZE;
+  return {
+    width: Math.min(target.width, Math.max(320, viewport.w - 16)),
+    height: Math.min(target.height, Math.max(280, viewport.h - 16)),
+  };
+}
+
+function initialPanelGeometry(
+  anchor: { top: number; left: number; right?: number; bottom?: number },
+  size: { width: number; height: number },
+  viewport: { w: number; h: number },
+  reviewMode: boolean,
+) {
+  const margin = 12;
+  if (reviewMode) {
+    return clampPanel({
+      top: Math.min(88, Math.max(margin, viewport.h * 0.12)),
+      left: (viewport.w - size.width) / 2,
+      ...size,
+    }, viewport, margin);
+  }
+
+  const leftEdge = anchor.left;
+  const rightEdge = anchor.right ?? anchor.left;
+  const topEdge = anchor.top;
+  const bottomEdge = anchor.bottom ?? anchor.top;
+
+  if (viewport.w - rightEdge >= size.width + margin) {
+    return clampPanel({
+      top: topEdge - size.height * 0.25,
+      left: rightEdge + margin,
+      ...size,
+    }, viewport, margin);
+  }
+
+  if (leftEdge >= size.width + margin) {
+    return clampPanel({
+      top: topEdge - size.height * 0.25,
+      left: leftEdge - size.width - margin,
+      ...size,
+    }, viewport, margin);
+  }
+
+  const top = viewport.h - bottomEdge >= size.height + margin
+    ? bottomEdge + margin
+    : topEdge - size.height - margin;
+  return clampPanel({
+    top,
+    left: anchor.left - size.width / 2,
+    ...size,
+  }, viewport, margin);
+}
+
+function clampPanel<T extends { top: number; left: number; width: number; height: number }>(
+  geometry: T,
+  viewport: { w: number; h: number },
+  margin = 8,
+) {
+  const width = Math.min(Math.max(geometry.width, 320), Math.max(320, viewport.w - margin * 2));
+  const height = Math.min(Math.max(geometry.height, 260), Math.max(260, viewport.h - margin * 2));
+  return {
+    ...geometry,
+    width,
+    height,
+    top: Math.min(Math.max(geometry.top, margin), Math.max(margin, viewport.h - height - margin)),
+    left: Math.min(Math.max(geometry.left, margin), Math.max(margin, viewport.w - width - margin)),
+  };
 }

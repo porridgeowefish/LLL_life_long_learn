@@ -14,6 +14,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/confusionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -146,10 +147,20 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Append the user turn immediately so it persists even if the stream aborts.
-	if _, err := store.AppendAskMessage(cid, confusionstore.AskMessage{Role: "user", Content: in.Content}); err != nil {
+	updatedConfusion, err := store.AppendAskMessage(cid, confusionstore.AskMessage{Role: "user", Content: in.Content})
+	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	messageID := cid
+	if updatedConfusion.Ask != nil && len(updatedConfusion.Ask.Messages) > 0 {
+		messageID = updatedConfusion.Ask.Messages[len(updatedConfusion.Ask.Messages)-1].ID
+	}
+	_, _, _ = awardLearningEvent(slug, progressstore.Event{
+		ID:         "ask-ai:" + messageID,
+		SourceType: "ask-ai", SourceID: cid, ActivityDelta: 1,
+		Title: "使用 Ask AI", Detail: strings.TrimSpace(conf.QuoteSnapshot),
+	})
 
 	// Build the message history (prior turns + this user turn).
 	var msgs []askaiprovider.Message

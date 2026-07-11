@@ -59,6 +59,15 @@ export function Topbar() {
         ))}
       </nav>
       <div className={s.right}>
+        <a
+          className={s.github}
+          href="https://github.com/porridgeowefish/LLL_life_long_learn"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="在 GitHub 查看 LifeLongLearn 源码，可提交 Issue 和 Pull Request"
+        >
+          GitHub
+        </a>
         <ConnectionBadge />
         <Button
           size="sm"

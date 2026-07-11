@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { useAppearance, useUpdateAppearance } from '@/api/appearance';
 import { useAgentRuntimeSettings, useUpdateAgentRuntime } from '@/api/settings';
 import {
   useAskAiSettings,
@@ -13,6 +14,7 @@ import { Card } from '@/components/primitive/Card';
 import { Icon } from '@/components/primitive/Icon';
 import { Tag } from '@/components/primitive/Tag';
 import type { AgentRuntimeID, AgentRuntimeProvider } from '@/types/domain';
+import type { ThemePreference } from '@/lib/theme';
 
 import s from './SettingsPage.module.css';
 
@@ -53,6 +55,8 @@ export function SettingsPage() {
             刷新探测
           </Button>
         </header>
+
+        <AppearanceSection />
 
         {isLoading && <div className={s.loading}>加载配置中…</div>}
         {isError && (
@@ -97,8 +101,67 @@ export function SettingsPage() {
             </div>
           </div>
         </section>
+
+        <OpenSourceSection />
       </div>
     </div>
+  );
+}
+
+const THEME_OPTIONS: Array<{ id: ThemePreference; name: string; description: string; swatches: string[] }> = [
+  { id: 'lychee-paper', name: '荔枝暖纸', description: '温暖、安静的默认阅读主题', swatches: ['#faf8f4', '#fffdf9', '#60775a'] },
+  { id: 'mountain-mist', name: '远山雾蓝', description: '清凉克制，适合长时间专注', swatches: ['#f4f7f7', '#fbfdfd', '#557987'] },
+  { id: 'wisteria-gray', name: '紫藤柔灰', description: '柔和人文，降低界面刺激', swatches: ['#f7f5f7', '#fefcfe', '#796a80'] },
+  { id: 'night-ink', name: '夜读墨绿', description: '低光环境下的舒缓深色主题', swatches: ['#202521', '#292f2a', '#a7b99f'] },
+];
+
+function AppearanceSection() {
+  const appearance = useAppearance();
+  const update = useUpdateAppearance();
+  const selected = update.data?.theme ?? appearance.data?.theme ?? 'lychee-paper';
+  return (
+    <section className={s.appearance} aria-labelledby="appearance-title">
+      <div>
+        <h2 id="appearance-title">外观</h2>
+        <p>选择一套柔和、可访问的配色。更改会立即应用并保存在本机。</p>
+      </div>
+      <div className={s.themeChoices} role="radiogroup" aria-label="界面主题">
+        {THEME_OPTIONS.map((theme) => (
+          <button
+            key={theme.id}
+            type="button"
+            role="radio"
+            aria-checked={selected === theme.id}
+            className={`${s.themeChoice} ${selected === theme.id ? s.themeSelected : ''}`}
+            onClick={() => update.mutate(theme.id)}
+          >
+            <span className={s.themePreview} aria-hidden="true">
+              {theme.swatches.map((color) => <i key={color} style={{ background: color }} />)}
+            </span>
+            <span><strong>{theme.name}</strong><small>{theme.description}</small></span>
+            {selected === theme.id && <Icon name="check" size={14} />}
+          </button>
+        ))}
+      </div>
+      {update.isError && <div className={s.error}>主题保存失败：{(update.error as Error).message}</div>}
+    </section>
+  );
+}
+
+function OpenSourceSection() {
+  const repo = 'https://github.com/porridgeowefish/LLL_life_long_learn';
+  return (
+    <section className={s.openSource} aria-labelledby="open-source-title">
+      <div>
+        <h2 id="open-source-title">开源与反馈</h2>
+        <p>LifeLongLearn 欢迎问题反馈和代码贡献。当前仓库需由维护者开启公开 Issue 创建权限。</p>
+      </div>
+      <div className={s.openSourceActions}>
+        <a href={`${repo}/issues`} target="_blank" rel="noreferrer">报告问题</a>
+        <a href={`${repo}/blob/main/CONTRIBUTING.md`} target="_blank" rel="noreferrer">贡献代码</a>
+        <a href={repo} target="_blank" rel="noreferrer">查看源码</a>
+      </div>
+    </section>
   );
 }
 

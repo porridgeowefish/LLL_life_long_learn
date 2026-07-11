@@ -27,6 +27,9 @@ a one-click browser search opens Google (or Bing when configured) for the quote
 browser search is a sibling selection action, not a link inside the Ask-AI panel
 opening Ask-AI from a selection pre-fills the input with "请你解释「<selected text>」"
 the Ask-AI panel can be dragged and resized, while still clamping inside the viewport
+the selection toolbar is fully visible for top, middle, and bottom-of-viewport selections
+the Ask-AI panel opens beside the selected text when possible instead of covering the quote
+reopened Ask-AI history is immediately visible and viewport-clamped
 API keys are never returned in plaintext by GET /api/settings/ask-ai
 config.local.json round-trips without clobbering other keys
 
@@ -69,6 +72,7 @@ corrupt local JSON stores are backed up to .corrupt-*.json and the app falls bac
 UI patch
 Knowledge Flower large glyph is scaled to 75% and the freed space explains the five dimensions
 Practice generation, Settings/AI config, project cards, and Home use denser, less rounded layouts
+reserved icon slots render actual local SVG sprite icons instead of blank space
 
 quality gates
 all Go tests pass

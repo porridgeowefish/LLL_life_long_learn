@@ -60,7 +60,7 @@ export function useGradeFlashcard() {
     }) =>
       http.post(
         `/api/projects/${encodeURIComponent(projectSlug)}/summary/flashcards/grade`,
-        { cardId, grade },
+        { cardId, grade, eventId: crypto.randomUUID() },
       ),
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['summary', 'flashcards', vars.projectSlug] });

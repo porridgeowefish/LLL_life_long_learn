@@ -2,40 +2,39 @@
 
 ## Theme
 
-Warm, paper-like, scholarly. Light mode. A cream "paper" canvas with brown-ink
-text and a sage-green accent; soft warm hairline borders and shadows. Editorial
-calm. Strengthen the existing identity — do not replace it.
+Calm, scholarly product UI with user-selectable semantic themes. Lychee Paper
+preserves the warm paper identity; Mountain Mist, Wisteria Gray, and Night Ink
+offer equally restrained alternatives. System mode maps light preference to
+Lychee Paper and dark preference to Night Ink.
 
 ## Color
 
-Existing tokens (`frontend/src/styles/tokens.css`) are the source of truth — evolve them.
+`frontend/src/styles/tokens.css` is the source of truth. Components consume
+semantic roles and never preset hex values.
 
 ```css
 --bg: #faf8f4;       /* cream paper — body */
 --fg: #3d3229;       /* warm brown ink — text */
---card: #ffffff;     /* surfaces */
---border: #e8e2d9;   /* warm hairline */
---muted: #9e9588;    /* MUST stay ≥4.5:1 on cream — verify, bump toward ink if close */
---accent: #7c9a72;   /* sage — the one accent */
---accent2: #6b8a62;  /* deeper sage — hover/active */
---orange: #e8945a; --sky: #87b5d4; --pink: #c4715e;  /* sparing, semantic only */
+--card: #fffdf9;     /* surfaces */
+--border: #ddd6cc;   /* warm hairline */
+--muted: #6f685f;    /* 5.18:1 on the default background */
+--accent: #60775a;   /* primary actions and selected state */
+--accent2: #50664b;  /* hover/active */
 ```
 
-New tokens to add (strengthen, not break):
+Every preset supplies these roles:
 
 ```css
---accent-ink: #4f6b47;   /* sage darkened to AA on cream — for accent-colored text/links */
---surface-raised: #ffffff;
---surface-sunken: #f3eee6;  /* warm recessed tint for thinking blocks, inputs hover */
---surface-tint: #eef3ea;    /* faint sage tint for active/hover states */
---shadow-sm: 0 1px 2px rgba(61,50,41,.05);
---shadow-md: 0 4px 14px rgba(61,50,41,.07);
---shadow-lg: 0 16px 40px rgba(61,50,41,.12);
---radius-sm: 6px; --radius: 8px; --radius-lg: 12px; --radius-pill: 999px;
+--bg; --fg; --card; --border; --muted;
+--accent; --accent2; --accent-ink; --on-accent;
+--surface-raised; --surface-sunken; --surface-tint;
+--heat-0; --heat-1; --heat-2; --heat-3; --heat-4;
+--orange; --sky; --pink;
 ```
 
-Rule: the ONLY saturated accent is sage. No blue (`#4c6ef5`) anywhere — the prior
-iter-06 components used off-brand blue and must be reskinned to sage.
+Rules: one restrained accent per preset; semantic warning/danger/info colors do
+not become decorative accents. Normal text is at least 4.5:1, essential UI
+boundaries at least 3:1, and state never relies on hue alone.
 
 ## Typography
 
@@ -46,9 +45,9 @@ iter-06 components used off-brand blue and must be reskinned to sage.
 
 ## Components
 
-- **Buttons** (primitive): sage primary (solid `--accent`, ink-on-sage or white text per contrast), outline (warm border), ghost (transparent), danger (warm red-brown, not pure red). Pill or 8px radius; clear `:hover`/`:active`/`:disabled`.
+- **Buttons** (primitive): semantic primary (`--accent` + `--on-accent`), outline, ghost, and danger; clear `:hover`/`:active`/`:disabled`.
 - **Cards**: `--card` on `--bg`, `--radius`, `--shadow-sm`, `--border` hairline. No nested cards.
-- **Modal** (Radix dialog): cream surface, `--shadow-lg`, warm border.
+- **Modal** (Radix dialog): themed surface, `--shadow-lg`, semantic border.
 - **Ask-AI panel** (floating): warm `--card` surface, sage primary actions, user bubble in sage tint (`--surface-tint` with `--accent-ink` text — not blue), assistant via MarkdownView, collapsible thinking in `--surface-sunken`.
 - **RunProgressBar**: sage fill (`--accent`) on warm track; determinate "N / M 页".
 - **Sidebar / Topbar**: minimal warm chrome that recedes; active item in `--surface-tint` + `--accent-ink`.
@@ -67,7 +66,7 @@ iter-06 components used off-brand blue and must be reskinned to sage.
 
 ## Absolute bans (slop — refuse on sight)
 
-- Blue accents (`#4c6ef5` etc.) — off-brand; the iter-06 components must be reskinned to sage.
+- Hard-coded preset colors inside components.
 - Gradient text, side-stripe accents, glassmorphism-as-default.
 - All-gray low-contrast body text on cream.
 - Italic emphasis.

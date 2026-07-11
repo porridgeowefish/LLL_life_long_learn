@@ -1,10 +1,13 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/flashcardstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -41,8 +44,9 @@ func (s *Server) handleGradeFlashcard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		CardID string `json:"cardId"`
-		Grade  string `json:"grade"`
+		CardID  string `json:"cardId"`
+		Grade   string `json:"grade"`
+		EventID string `json:"eventId"`
 	}
 	if err := httpx.ReadJSON(r, &body); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
@@ -66,5 +70,18 @@ func (s *Server) handleGradeFlashcard(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	eventID := body.EventID
+	if eventID == "" {
+		eventID = fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	growth := 0
+	if body.Grade == "got-it" || body.Grade == "easy" {
+		growth = 1
+	}
+	_, _, _ = awardLearningEvent(slug, progressstore.Event{
+		ID: "flashcard:" + eventID, SourceType: "flashcard-review", SourceID: body.CardID,
+		ActivityDelta: 1, Delta: growth, Outcome: body.Grade,
+		Title: "复习闪卡", Detail: body.CardID,
+	})
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

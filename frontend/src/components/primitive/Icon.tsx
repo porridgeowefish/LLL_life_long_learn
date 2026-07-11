@@ -16,7 +16,12 @@ export type IconName =
   | 'brain'
   | 'bot'
   | 'zap'
-  | 'x';
+  | 'x'
+  | 'leaf'
+  | 'book'
+  | 'pen'
+  | 'link'
+  | 'file';
 
 interface IconProps {
   name: IconName;
@@ -40,7 +45,7 @@ export function Icon({ name, size = 18, className, style, title }: IconProps) {
       role={title ? 'img' : 'presentation'}
       aria-label={title}
     >
-      <use href={`/img/icons.svg#${name}`} />
+      <use href={`/img/icons.svg#ico-${name}`} />
     </svg>
   );
 }

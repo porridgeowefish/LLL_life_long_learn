@@ -9,6 +9,10 @@ export interface LiveAskMessage extends AskMessage {
 export interface AskAnchor {
   top: number; // screen coords (position: fixed)
   left: number;
+  right?: number;
+  bottom?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface AskPanelGeometry {

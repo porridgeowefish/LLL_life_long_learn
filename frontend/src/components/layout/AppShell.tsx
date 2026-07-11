@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 
+import { useAppearance } from '@/api/appearance';
 import { useSSE } from '@/hooks/useSSE';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -20,6 +21,7 @@ import s from './AppShell.module.css';
 // TerminalDrawer component file is kept only as a recoverable artifact.
 export function AppShell() {
   useSSE();
+  useAppearance();
 
   return (
     <div className={s.root}>

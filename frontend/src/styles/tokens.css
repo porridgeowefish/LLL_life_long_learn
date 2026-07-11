@@ -1,44 +1,142 @@
-/* LLL design tokens — warm "paper" identity. Single source of truth for color,
-   spacing, and shadow across all CSS Modules.
-   Strengthened (iter-06): added an AA-safe accent-ink, layered warm surfaces,
-   a shadow scale, and a radius scale. Existing tokens preserved (identity retained). */
-
-:root {
-  /* palette — warm paper */
+/* Semantic theme tokens. Components consume roles, never preset values. */
+:root,
+:root[data-theme='lychee-paper'] {
+  color-scheme: light;
   --bg: #faf8f4;
   --fg: #3d3229;
-  --card: #fff;
-  --border: #e8e2d9;
-  --muted: #9e9588;
-
-  /* accent — sage is the ONLY saturated accent */
-  --accent: #7c9a72;
-  --accent2: #6b8a62;
-  --accent-ink: #4f6b47;   /* sage darkened to AA on cream — accent text/links */
-
-  /* warm semantic accents (used sparingly) */
-  --orange: #e8945a;
-  --sky: #87b5d4;
-  --pink: #c4715e;
-
-  /* layered warm surfaces */
+  --card: #fffdf9;
+  --border: #ddd6cc;
+  --muted: #6f685f;
+  --accent: #60775a;
+  --accent2: #50664b;
+  --accent-ink: #4f654a;
+  --on-accent: #ffffff;
+  --orange: #a96832;
+  --sky: #557d91;
+  --pink: #a24f48;
   --surface-raised: #ffffff;
-  --surface-sunken: #f3eee6;  /* recessed: thinking blocks, code, input hover */
-  --surface-tint: #eef3ea;    /* faint sage tint: active/hover, user bubble */
+  --surface-sunken: #f1ece4;
+  --surface-tint: #edf2ea;
+  --surface-translucent: rgba(255, 253, 249, 0.76);
+  --accent-soft: rgba(96, 119, 90, 0.08);
+  --accent-medium: rgba(96, 119, 90, 0.16);
+  --ink-soft: rgba(61, 50, 41, 0.08);
+  --overlay: rgba(61, 50, 41, 0.42);
+  --code-bg: #2a2520;
+  --code-fg: #eee8de;
+  --heat-0: #eae6dc;
+  --heat-1: #d9e2d4;
+  --heat-2: #b8c9af;
+  --heat-3: #8da384;
+  --heat-4: #5d745c;
+  --shadow-color: 61 50 41;
+}
 
-  /* shape */
+:root[data-theme='mountain-mist'] {
+  color-scheme: light;
+  --bg: #f4f7f7;
+  --fg: #29363a;
+  --card: #fbfdfd;
+  --border: #d7e0e1;
+  --muted: #5f6d71;
+  --accent: #557987;
+  --accent2: #456976;
+  --accent-ink: #456976;
+  --on-accent: #ffffff;
+  --orange: #9c693c;
+  --sky: #4d788b;
+  --pink: #99535a;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eaf0f1;
+  --surface-tint: #e8f0f2;
+  --surface-translucent: rgba(251, 253, 253, 0.78);
+  --accent-soft: rgba(85, 121, 135, 0.09);
+  --accent-medium: rgba(85, 121, 135, 0.18);
+  --ink-soft: rgba(41, 54, 58, 0.08);
+  --overlay: rgba(41, 54, 58, 0.42);
+  --code-bg: #202b2f;
+  --code-fg: #e9eff0;
+  --heat-0: #e4eaea;
+  --heat-1: #d3e0e3;
+  --heat-2: #aec6cd;
+  --heat-3: #7ca3ae;
+  --heat-4: #4e7784;
+  --shadow-color: 41 54 58;
+}
+
+:root[data-theme='wisteria-gray'] {
+  color-scheme: light;
+  --bg: #f7f5f7;
+  --fg: #39323d;
+  --card: #fefcfe;
+  --border: #e1dae2;
+  --muted: #6f6674;
+  --accent: #796a80;
+  --accent2: #67586e;
+  --accent-ink: #66566e;
+  --on-accent: #ffffff;
+  --orange: #9b673f;
+  --sky: #5c758a;
+  --pink: #9a515d;
+  --surface-raised: #ffffff;
+  --surface-sunken: #efebf0;
+  --surface-tint: #f0ebf1;
+  --surface-translucent: rgba(254, 252, 254, 0.78);
+  --accent-soft: rgba(121, 106, 128, 0.09);
+  --accent-medium: rgba(121, 106, 128, 0.18);
+  --ink-soft: rgba(57, 50, 61, 0.08);
+  --overlay: rgba(57, 50, 61, 0.42);
+  --code-bg: #29232d;
+  --code-fg: #eee9ef;
+  --heat-0: #e9e4ea;
+  --heat-1: #dfd5e1;
+  --heat-2: #c5b5ca;
+  --heat-3: #9e88a5;
+  --heat-4: #735f7b;
+  --shadow-color: 57 50 61;
+}
+
+:root[data-theme='night-ink'] {
+  color-scheme: dark;
+  --bg: #202521;
+  --fg: #ebeee8;
+  --card: #292f2a;
+  --border: #465047;
+  --muted: #b7bdb4;
+  --accent: #a7b99f;
+  --accent2: #bdcbb7;
+  --accent-ink: #c9d7c2;
+  --on-accent: #1d261d;
+  --orange: #d6a26e;
+  --sky: #9ab9c7;
+  --pink: #d68d8a;
+  --surface-raised: #303731;
+  --surface-sunken: #191e1a;
+  --surface-tint: #323a32;
+  --surface-translucent: rgba(41, 47, 42, 0.82);
+  --accent-soft: rgba(167, 185, 159, 0.10);
+  --accent-medium: rgba(167, 185, 159, 0.20);
+  --ink-soft: rgba(235, 238, 232, 0.09);
+  --overlay: rgba(7, 10, 8, 0.65);
+  --code-bg: #121612;
+  --code-fg: #e5eae2;
+  --heat-0: #313832;
+  --heat-1: #465347;
+  --heat-2: #607361;
+  --heat-3: #819680;
+  --heat-4: #a7b99f;
+  --shadow-color: 5 8 6;
+}
+
+:root {
   --radius-sm: 6px;
   --radius: 8px;
   --radius-lg: 12px;
   --radius-pill: 999px;
-
-  /* shadow scale (warm ink tint, never pure black) */
-  --shadow-sm: 0 1px 2px rgba(61, 50, 41, 0.05);
-  --shadow: 0 2px 8px rgba(61, 50, 41, 0.06);
-  --shadow-md: 0 6px 18px rgba(61, 50, 41, 0.08);
-  --shadow-lg: 0 18px 44px rgba(61, 50, 41, 0.14);
-
-  /* layout — minimal sidebars, max content room */
+  --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.06);
+  --shadow: 0 2px 8px rgb(var(--shadow-color) / 0.08);
+  --shadow-md: 0 6px 18px rgb(var(--shadow-color) / 0.10);
+  --shadow-lg: 0 18px 44px rgb(var(--shadow-color) / 0.18);
   --sidebar-w: 144px;
   --header-h: 44px;
 }

@@ -104,6 +104,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings/ask-ai", s.handleGetAskAiSettings)
 	mux.HandleFunc("PUT /api/settings/ask-ai", s.handlePutAskAiSettings)
 	mux.HandleFunc("POST /api/settings/ask-ai/probe", s.handleProbeAskAi)
+	mux.HandleFunc("GET /api/settings/appearance", s.handleGetAppearance)
+	mux.HandleFunc("PUT /api/settings/appearance", s.handlePutAppearance)
+	mux.HandleFunc("GET /api/activity", s.handleGetActivity)
 
 	// Projects
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
@@ -112,6 +115,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/tree", s.handleProjectTree)
 	mux.HandleFunc("GET /api/projects/{id}/zones/{zone}", s.handleGetZone)
 	mux.HandleFunc("POST /api/projects/{id}/subprojects", s.handleCreateSubproject)
+	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 
 	// Agents
 	mux.HandleFunc("GET /api/agents", s.handleListAgents)

@@ -87,8 +87,14 @@
   min-width: 0;
 }
 
-.emoji {
-  font-size: 0.85rem;
+.zoneIcon {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.current .zoneIcon,
+.done .zoneIcon {
+  color: var(--accent);
 }
 
 .label {

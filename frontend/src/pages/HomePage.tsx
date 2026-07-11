@@ -11,6 +11,7 @@ import { Tag } from '@/components/primitive/Tag';
 import { Icon } from '@/components/primitive/Icon';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { ProjectCard } from '@/components/feature/project/ProjectCard';
+import { LearningRhythm } from '@/components/feature/activity/LearningRhythm';
 import { CreateProjectModal } from '@/components/feature/project/CreateProjectModal';
 import { formatRelativeTime } from '@/lib/format';
 
@@ -28,7 +29,6 @@ export function HomePage() {
   const { data: active } = useActiveSessions();
 
   const projects = projectsData?.projects ?? [];
-  const stats = health?.stats;
   const runtime = health?.agentRuntime?.runtime;
 
   return (
@@ -48,13 +48,7 @@ export function HomePage() {
 
         <OnboardingBanner runtimeName={runtime?.name} runtimeReady={runtime?.available ?? false} />
 
-        {/* Stats hero */}
-        <section className={s.statsRow}>
-          <StatCard label="学习项目" value={stats?.projects ?? '—'} />
-          <StatCard label="会话总数" value={stats?.sessions ?? '—'} />
-          <StatCard label="对话轮次" value={stats?.turns ?? '—'} />
-          <StatCard label="运行中" value={stats?.activeSessions ?? '—'} tone="orange" />
-        </section>
+        <LearningRhythm projects={projects} />
 
         {/* Active sessions hero */}
         {active?.sessions && active.sessions.length > 0 && (
@@ -176,22 +170,5 @@ function OnboardingBanner({ runtimeName, runtimeReady }: OnboardingBannerProps) 
         知道了
       </Button>
     </section>
-  );
-}
-
-interface StatCardProps {
-  label: string;
-  value: number | string;
-  tone?: 'neutral' | 'orange';
-}
-
-function StatCard({ label, value, tone = 'neutral' }: StatCardProps) {
-  return (
-    <Card variant="outlined" className={s.stat}>
-      <div className={s.statLabel}>{label}</div>
-      <div className={s.statValue} style={{ color: tone === 'orange' ? 'var(--orange)' : 'var(--fg)' }}>
-        {value}
-      </div>
-    </Card>
   );
 }

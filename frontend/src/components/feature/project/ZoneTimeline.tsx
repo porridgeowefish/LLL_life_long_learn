@@ -1,16 +1,16 @@
 import clsx from 'clsx';
 
 import { ALL_ZONES, type ZoneName, ZONE_DISPLAY } from '@/types/domain';
-import { Icon } from '@/components/primitive/Icon';
+import { Icon, type IconName } from '@/components/primitive/Icon';
 
 import s from './ZoneTimeline.module.css';
 
-const ZONE_EMOJI: Record<ZoneName, string> = {
-  Intro: '🌱',
-  Explain: '📖',
-  Practice: '✏️',
-  Extend: '🔗',
-  Summary: '📝',
+const ZONE_ICON: Record<ZoneName, IconName> = {
+  Intro: 'leaf',
+  Explain: 'book',
+  Practice: 'pen',
+  Extend: 'link',
+  Summary: 'file',
 };
 
 interface ZoneTimelineProps {
@@ -49,7 +49,7 @@ export function ZoneTimeline({
                 {done ? <Icon name="check" size={11} /> : <span className={s.dotInner} />}
               </span>
               <span className={s.body}>
-                <span className={s.emoji}>{ZONE_EMOJI[zone]}</span>
+                <Icon name={ZONE_ICON[zone]} size={14} className={s.zoneIcon} />
                 <span className={s.label}>{ZONE_DISPLAY[zone]}</span>
               </span>
             </button>

@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LLL · 学习总览概念样例</title>
+  <style>
+    :root {
+      --paper: #f5f1e8;
+      --paper-deep: #ebe4d7;
+      --card: rgba(255, 253, 248, .88);
+      --ink: #302d28;
+      --muted: #817b70;
+      --line: #ded7ca;
+      --sage: #71836a;
+      --sage-deep: #4f6350;
+      --sage-soft: #dce4d7;
+      --amber: #bd7f42;
+      --heat-0: #eae6dc;
+      --heat-1: #d9e2d4;
+      --heat-2: #b8c9af;
+      --heat-3: #8da384;
+      --heat-4: #5d745c;
+      --shadow: 0 16px 46px rgba(64, 54, 40, .08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 78% 2%, rgba(155, 175, 145, .18), transparent 28rem),
+        linear-gradient(rgba(103, 91, 70, .025) 1px, transparent 1px),
+        var(--paper);
+      background-size: auto, 100% 24px, auto;
+      font-family: "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+    }
+
+    button, select { font: inherit; }
+    button { color: inherit; }
+
+    .topbar {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      gap: 26px;
+      padding: 0 34px;
+      border-bottom: 1px solid rgba(110, 99, 80, .14);
+      background: rgba(249, 246, 239, .78);
+      backdrop-filter: blur(18px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; font-family: Georgia, serif; font-size: 18px; }
+    .brand-mark {
+      width: 28px; height: 28px; border-radius: 45% 55% 48% 52%;
+      display: grid; place-items: center; color: white; background: var(--sage-deep);
+      transform: rotate(-4deg); box-shadow: inset 0 0 0 4px rgba(255,255,255,.12);
+    }
+    .brand-mark span { transform: rotate(4deg); font-size: 14px; }
+    nav { display: flex; align-items: stretch; gap: 5px; height: 100%; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 13px; padding: 20px 12px 0; position: relative; }
+    nav a.active { color: var(--ink); font-weight: 650; }
+    nav a.active::after { content: ""; height: 2px; border-radius: 2px; background: var(--sage); position: absolute; inset: auto 12px 0; }
+    .top-spacer { flex: 1; }
+    .local { font-size: 12px; color: var(--sage-deep); display: flex; align-items: center; gap: 7px; }
+    .local::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #6d9966; box-shadow: 0 0 0 4px rgba(109,153,102,.12); }
+
+    main { width: min(1180px, calc(100% - 42px)); margin: 0 auto; padding: 34px 0 70px; }
+    .page-head { display: flex; justify-content: space-between; align-items: end; margin-bottom: 26px; }
+    .eyebrow { margin: 0 0 5px; font-size: 11px; color: var(--sage-deep); letter-spacing: .16em; font-weight: 750; }
+    h1 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: clamp(28px, 3vw, 42px); font-weight: 500; letter-spacing: -.035em; }
+    .page-head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .primary {
+      border: 0; border-radius: 99px; padding: 10px 17px; background: var(--sage-deep); color: white;
+      box-shadow: 0 5px 16px rgba(79,99,80,.18); cursor: pointer;
+    }
+
+    .rhythm {
+      border: 1px solid rgba(105, 94, 75, .16);
+      border-radius: 22px;
+      background: var(--card);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .rhythm-head { display: flex; align-items: flex-start; gap: 20px; padding: 25px 28px 19px; }
+    .rhythm-title { min-width: 210px; }
+    .rhythm-title h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: 21px; font-weight: 500; }
+    .rhythm-title p { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+    .filters { margin-left: auto; display: flex; gap: 8px; }
+    .select, .range-button {
+      border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.58); padding: 8px 10px; font-size: 12px; outline: none;
+    }
+    .range-button { cursor: pointer; color: var(--muted); }
+    .range-button.on { color: var(--sage-deep); border-color: #aebca7; background: #eef2eb; }
+
+    .rhythm-body { display: grid; grid-template-columns: 178px minmax(0, 1fr); border-top: 1px solid rgba(105, 94, 75, .12); }
+    .streak-panel { padding: 24px 24px 22px 28px; border-right: 1px solid rgba(105, 94, 75, .12); background: linear-gradient(160deg, rgba(226,232,220,.62), rgba(255,255,255,.18)); }
+    .streak-number { font-family: Georgia, serif; font-size: 52px; line-height: .9; color: var(--sage-deep); letter-spacing: -.06em; }
+    .streak-label { margin-top: 9px; font-size: 12px; color: var(--muted); }
+    .streak-note { margin-top: 22px; padding-top: 17px; border-top: 1px solid rgba(94,115,92,.19); color: var(--ink); font-size: 12px; line-height: 1.7; }
+    .streak-note strong { display: block; color: var(--amber); font-size: 13px; }
+
+    .calendar-wrap { min-width: 0; padding: 22px 27px 17px; overflow-x: auto; }
+    .month-row { height: 19px; display: grid; grid-template-columns: repeat(26, 15px); gap: 5px; padding-left: 30px; font-size: 10px; color: var(--muted); min-width: 550px; }
+    .month-row span { white-space: nowrap; }
+    .calendar-line { display: flex; align-items: flex-start; min-width: 550px; }
+    .day-labels { width: 30px; display: grid; grid-template-rows: repeat(7, 15px); gap: 5px; font-size: 9px; color: var(--muted); padding-top: 1px; }
+    .day-labels span:nth-child(1) { grid-row: 2; }
+    .day-labels span:nth-child(2) { grid-row: 4; }
+    .day-labels span:nth-child(3) { grid-row: 6; }
+    .heatmap { display: grid; grid-template-columns: repeat(26, 15px); grid-template-rows: repeat(7, 15px); grid-auto-flow: column; gap: 5px; }
+    .day {
+      width: 15px; height: 15px; border: 0; border-radius: 4px; padding: 0; background: var(--heat-0); cursor: pointer;
+      transition: transform .12s, box-shadow .12s, filter .12s;
+    }
+    .day:hover, .day:focus-visible { transform: scale(1.34); box-shadow: 0 3px 9px rgba(61,76,57,.22); outline: 2px solid var(--paper); z-index: 2; }
+    .day.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .day[data-level="1"] { background: var(--heat-1); }
+    .day[data-level="2"] { background: var(--heat-2); }
+    .day[data-level="3"] { background: var(--heat-3); }
+    .day[data-level="4"] { background: var(--heat-4); }
+    .calendar-foot { display: flex; align-items: center; margin-top: 16px; font-size: 10px; color: var(--muted); }
+    .legend { margin-left: auto; display: flex; align-items: center; gap: 5px; }
+    .legend i { width: 12px; height: 12px; border-radius: 3px; display: block; }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid rgba(105, 94, 75, .12); }
+    .metric { padding: 18px 24px; border-right: 1px solid rgba(105, 94, 75, .12); }
+    .metric:last-child { border-right: 0; }
+    .metric span { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+    .metric strong { font-family: Georgia, serif; font-weight: 500; font-size: 25px; }
+    .metric em { font-style: normal; font-size: 11px; color: var(--sage-deep); margin-left: 4px; }
+
+    .detail { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(250px, .65fr); gap: 16px; margin-top: 16px; }
+    .panel { border: 1px solid rgba(105, 94, 75, .16); border-radius: 17px; background: rgba(255,253,248,.72); padding: 20px 22px; box-shadow: 0 8px 26px rgba(64,54,40,.045); }
+    .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 17px; }
+    .panel h3 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: 17px; font-weight: 500; }
+    .panel-head span { font-size: 11px; color: var(--muted); }
+    .activity-list { list-style: none; padding: 0; margin: 0; }
+    .activity-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 11px; align-items: center; padding: 11px 0; border-top: 1px solid rgba(105,94,75,.1); }
+    .activity-list li:first-child { border-top: 0; padding-top: 0; }
+    .activity-icon { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--sage-soft); color: var(--sage-deep); font-size: 13px; }
+    .activity-copy strong { display: block; font-size: 13px; font-weight: 650; }
+    .activity-copy small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .gain { font-size: 11px; color: var(--amber); background: #f4e9db; padding: 4px 7px; border-radius: 99px; white-space: nowrap; }
+
+    .week-bars { height: 92px; display: flex; align-items: end; gap: 8px; padding: 5px 4px 0; }
+    .bar { flex: 1; min-width: 12px; border-radius: 8px 8px 3px 3px; background: linear-gradient(to top, var(--sage), #b8c9af); position: relative; opacity: .9; }
+    .bar::after { content: attr(data-day); position: absolute; top: calc(100% + 6px); width: 100%; text-align: center; font-size: 9px; color: var(--muted); }
+    .week-insight { margin: 28px 0 0; font-size: 12px; line-height: 1.75; color: var(--muted); }
+    .week-insight strong { color: var(--ink); }
+
+    .projects-head { display: flex; align-items: center; justify-content: space-between; margin: 31px 0 12px; }
+    .projects-head h2 { margin: 0; font-family: Georgia, "Noto Serif SC", serif; font-size: 19px; font-weight: 500; }
+    .projects-head a { font-size: 12px; color: var(--sage-deep); }
+    .projects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; }
+    .project { border: 1px solid rgba(105,94,75,.15); border-radius: 15px; background: rgba(255,253,248,.62); padding: 18px; }
+    .project small { color: var(--muted); }
+    .project h3 { margin: 9px 0 15px; font-size: 14px; }
+    .progress { height: 5px; border-radius: 9px; overflow: hidden; background: var(--paper-deep); }
+    .progress i { display: block; height: 100%; border-radius: inherit; background: var(--sage); }
+    .project-meta { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 10px; }
+
+    .tooltip { position: fixed; z-index: 50; pointer-events: none; opacity: 0; transform: translate(-50%, -8px); background: #37352f; color: white; padding: 8px 10px; border-radius: 8px; font-size: 11px; line-height: 1.5; box-shadow: 0 8px 22px rgba(0,0,0,.18); transition: opacity .1s; }
+    .tooltip.show { opacity: 1; }
+
+    @media (max-width: 860px) {
+      nav { display: none; }
+      main { width: min(100% - 24px, 720px); padding-top: 22px; }
+      .rhythm-head { flex-wrap: wrap; }
+      .filters { width: 100%; margin: 0; }
+      .rhythm-body { grid-template-columns: 1fr; }
+      .streak-panel { border-right: 0; border-bottom: 1px solid rgba(105,94,75,.12); }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:nth-child(-n+2) { border-bottom: 1px solid rgba(105,94,75,.12); }
+      .detail, .projects { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark"><span>荔</span></span> LifeLongLearn</div>
+    <nav>
+      <a class="active" href="#">总览</a><a href="#">项目</a><a href="#">智能体</a><a href="#">记忆</a><a href="#">配置</a>
+    </nav>
+    <div class="top-spacer"></div>
+    <span class="local">本地服务已连接</span>
+  </header>
+
+  <main>
+    <header class="page-head">
+      <div>
+        <p class="eyebrow">YOUR LEARNING LANDSCAPE</p>
+        <h1>下午好，继续生长。</h1>
+        <p>坚持留下节律，投入积累成长。所有记录只保存在这台电脑。</p>
+      </div>
+      <button class="primary">＋ 新建学习项目</button>
+    </header>
+
+    <section class="rhythm" aria-labelledby="rhythm-title">
+      <div class="rhythm-head">
+        <div class="rhythm-title">
+          <h2 id="rhythm-title">学习节律</h2>
+          <p>颜色表示每日投入，连续天数记录坚持。</p>
+        </div>
+        <div class="filters">
+          <select id="project-filter" class="select" aria-label="项目筛选">
+            <option value="all">全部项目</option>
+            <option value="linear">线性代数</option>
+            <option value="probability">概率论</option>
+            <option value="writing">非虚构写作</option>
+          </select>
+          <button class="range-button on" data-weeks="26">近 26 周</button>
+          <button class="range-button" data-weeks="52">近一年</button>
+        </div>
+      </div>
+
+      <div class="rhythm-body">
+        <aside class="streak-panel">
+          <div class="streak-number">5</div>
+          <div class="streak-label">天 · 当前连续学习</div>
+          <div class="streak-note"><strong>本周节律稳定</strong>比过去四周多学习 1 天。保持现在的频率，比追求单日高强度更重要。</div>
+        </aside>
+
+        <div class="calendar-wrap">
+          <div class="month-row" id="month-row" aria-hidden="true"></div>
+          <div class="calendar-line">
+            <div class="day-labels" aria-hidden="true"><span>一</span><span>三</span><span>五</span></div>
+            <div id="heatmap" class="heatmap" role="grid" aria-label="最近 26 周学习热度"></div>
+          </div>
+          <div class="calendar-foot">
+            <span>点击一天，查看当天具体学习记录</span>
+            <span class="legend">少 <i style="background:var(--heat-0)"></i><i style="background:var(--heat-1)"></i><i style="background:var(--heat-2)"></i><i style="background:var(--heat-3)"></i><i style="background:var(--heat-4)"></i> 多</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><span>近 26 周活跃</span><strong id="active-days">46</strong><em>天</em></div>
+        <div class="metric"><span>最长连续</span><strong>12</strong><em>天</em></div>
+        <div class="metric"><span>有效学习行动</span><strong id="action-count">128</strong><em>次</em></div>
+        <div class="metric"><span>累计成长值</span><strong id="growth-total">368</strong><em>分</em></div>
+      </div>
+    </section>
+
+    <section class="detail">
+      <article class="panel">
+        <div class="panel-head"><h3 id="detail-date">今天 · 7 月 11 日</h3><span id="detail-heat">投入热度 12</span></div>
+        <ul class="activity-list" id="activity-list">
+          <li><span class="activity-icon">阅</span><span class="activity-copy"><strong>阅读「特征值的几何意义」</strong><small>线性代数 · 有效阅读 18 分钟</small></span><span class="gain">热度 +2</span></li>
+          <li><span class="activity-icon">练</span><span class="activity-copy"><strong>完成渐进练习</strong><small>线性代数 · 5 题 · 正确率 80%</small></span><span class="gain">成长 +14</span></li>
+          <li><span class="activity-icon">问</span><span class="activity-copy"><strong>向 Explain Agent 追问</strong><small>概率论 · 条件独立与相关性的区别</small></span><span class="gain">热度 +1</span></li>
+        </ul>
+      </article>
+
+      <aside class="panel">
+        <div class="panel-head"><h3>本周投入</h3><span>4 / 7 天</span></div>
+        <div class="week-bars" aria-label="本周每日学习投入">
+          <div class="bar" data-day="一" style="height:31%"></div><div class="bar" data-day="二" style="height:68%"></div>
+          <div class="bar" data-day="三" style="height:44%"></div><div class="bar" data-day="四" style="height:0"></div>
+          <div class="bar" data-day="五" style="height:82%"></div><div class="bar" data-day="六" style="height:0"></div>
+          <div class="bar" data-day="日" style="height:0"></div>
+        </div>
+        <p class="week-insight"><strong>练习是本周主要投入。</strong><br />共获得 37 成长值；下次学习建议先复习 6 张到期卡片，再继续新内容。</p>
+      </aside>
+    </section>
+
+    <div class="projects-head"><h2>正在学习</h2><a href="#">查看全部项目 →</a></div>
+    <section class="projects">
+      <article class="project"><small>数学 · 5 天前开始</small><h3>线性代数</h3><div class="progress"><i style="width:68%"></i></div><div class="project-meta"><span>Explain · 核心概念</span><span>成长值 184</span></div></article>
+      <article class="project"><small>数学 · 2 周前开始</small><h3>概率论</h3><div class="progress"><i style="width:43%"></i></div><div class="project-meta"><span>Practice · 渐进练习</span><span>成长值 126</span></div></article>
+      <article class="project"><small>写作 · 1 个月前开始</small><h3>非虚构写作</h3><div class="progress"><i style="width:31%"></i></div><div class="project-meta"><span>Explain · 叙事结构</span><span>成长值 58</span></div></article>
+    </section>
+  </main>
+
+  <div id="tooltip" class="tooltip" role="tooltip"></div>
+
+  <script>
+    const heatmap = document.querySelector('#heatmap');
+    const monthRow = document.querySelector('#month-row');
+    const tooltip = document.querySelector('#tooltip');
+    const filter = document.querySelector('#project-filter');
+    const activities = [
+      ['阅读学习材料', '完成渐进练习', '复习闪卡'],
+      ['向 Agent 追问', '整理学习笔记'],
+      ['完成练习并获得反馈', '标记一个疑问'],
+      ['复习到期闪卡', '阅读概念讲解']
+    ];
+    let weeks = 26;
+
+    function hash(date, salt = 0) {
+      const n = Number(date.toISOString().slice(0, 10).replaceAll('-', '')) + salt;
+      return Math.abs(Math.sin(n * 12.9898) * 43758.5453) % 1;
+    }
+
+    function render() {
+      heatmap.innerHTML = '';
+      monthRow.innerHTML = '';
+      heatmap.style.gridTemplateColumns = `repeat(${weeks}, 15px)`;
+      monthRow.style.gridTemplateColumns = `repeat(${weeks}, 15px)`;
+      const end = new Date();
+      const start = new Date(end);
+      start.setDate(end.getDate() - (weeks * 7 - 1));
+      const salt = filter.selectedIndex * 97;
+      let previousMonth = -1;
+      let active = 0, actions = 0, growth = 0;
+
+      for (let week = 0; week < weeks; week++) {
+        const markerDate = new Date(start); markerDate.setDate(start.getDate() + week * 7);
+        const month = markerDate.getMonth();
+        const marker = document.createElement('span');
+        if (month !== previousMonth) marker.textContent = `${month + 1}月`;
+        monthRow.appendChild(marker); previousMonth = month;
+
+        for (let dow = 0; dow < 7; dow++) {
+          const date = new Date(start); date.setDate(start.getDate() + week * 7 + dow);
+          const r = hash(date, salt);
+          let level = r < .56 ? 0 : r < .72 ? 1 : r < .85 ? 2 : r < .94 ? 3 : 4;
+          if (date > end) level = 0;
+          if (level) { active++; actions += level + Math.floor(hash(date, salt + 3) * 3); growth += level * 2 + Math.floor(hash(date, salt + 5) * 5); }
+          const button = document.createElement('button');
+          const label = `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+          button.className = 'day'; button.dataset.level = level; button.dataset.label = label;
+          button.dataset.heat = level * 3; button.setAttribute('aria-label', `${label}，投入等级 ${level}`);
+          button.addEventListener('mouseenter', showTooltip);
+          button.addEventListener('mousemove', moveTooltip);
+          button.addEventListener('mouseleave', hideTooltip);
+          button.addEventListener('click', () => selectDay(button, date, level));
+          heatmap.appendChild(button);
+        }
+      }
+      document.querySelector('#active-days').textContent = active;
+      document.querySelector('#action-count').textContent = actions;
+      document.querySelector('#growth-total').textContent = growth;
+    }
+
+    function showTooltip(event) {
+      const d = event.currentTarget;
+      tooltip.innerHTML = `<strong>${d.dataset.label}</strong><br>${d.dataset.level === '0' ? '没有记录学习行动' : `投入热度 ${d.dataset.heat} · 点击查看`}`;
+      tooltip.classList.add('show'); moveTooltip(event);
+    }
+    function moveTooltip(event) { tooltip.style.left = `${event.clientX}px`; tooltip.style.top = `${event.clientY - 12}px`; }
+    function hideTooltip() { tooltip.classList.remove('show'); }
+
+    function selectDay(button, date, level) {
+      document.querySelectorAll('.day.selected').forEach(x => x.classList.remove('selected'));
+      button.classList.add('selected');
+      document.querySelector('#detail-date').textContent = `${date.getMonth() + 1} 月 ${date.getDate()} 日`;
+      document.querySelector('#detail-heat').textContent = level ? `投入热度 ${level * 3}` : '休息日';
+      const list = document.querySelector('#activity-list');
+      if (!level) {
+        list.innerHTML = '<li><span class="activity-icon">息</span><span class="activity-copy"><strong>这一天没有学习记录</strong><small>适当休息也是长期学习的一部分。</small></span></li>';
+        return;
+      }
+      const chosen = activities[Math.floor(hash(date, 11) * activities.length)];
+      list.innerHTML = chosen.slice(0, Math.max(1, level - 1)).map((name, index) => `<li><span class="activity-icon">${['阅','练','问'][index % 3]}</span><span class="activity-copy"><strong>${name}</strong><small>${filter.value === 'all' ? ['线性代数','概率论','非虚构写作'][index % 3] : filter.options[filter.selectedIndex].text}</small></span><span class="gain">${index === 1 ? '成长 +8' : '热度 +1'}</span></li>`).join('');
+    }
+
+    filter.addEventListener('change', render);
+    document.querySelectorAll('.range-button').forEach(button => button.addEventListener('click', () => {
+      weeks = Number(button.dataset.weeks);
+      document.querySelectorAll('.range-button').forEach(x => x.classList.toggle('on', x === button));
+      render();
+    }));
+    render();
+  </script>
+</body>
+</html>

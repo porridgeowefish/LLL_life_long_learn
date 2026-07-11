@@ -114,6 +114,13 @@ Last reviewed: 2026-07-08
   `请你解释「<selected text>」`.
 - Confirm browser search opens Google/Bing directly from the selection bar and
   no longer appears inside the Ask-AI chat footer.
+- Select text near the bottom edge of the reader and confirm the selection bar
+  remains fully visible instead of being clipped by the viewport or container.
+- Open Ask-AI on a selected quote and confirm the window chooses a visible
+  side/below/above position that keeps the source quote accessible.
+- Reopen an existing Ask-AI record from the sidebar and confirm the review
+  window is immediately visible without manual dragging.
+- Confirm zone timeline and other sprite-backed icon slots render real icons.
 - Drag and resize Ask-AI; confirm it remains clamped to the viewport and source
   text can still be reached for copying.
 - On a Windows host where Claude/Codex are installed only inside WSL, confirm

@@ -14,6 +14,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -101,6 +102,10 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 	sessions.Create(sess)
 	// Initial system turn.
 	sessions.AppendTurn(sessID, "system", "session created", "")
+	_, _, _ = awardLearningEvent(req.ProjectID, progressstore.Event{
+		ID: "agent-invoke:" + sessID, SourceType: "agent-invoke", SourceID: agent.ID,
+		ActivityDelta: 1, Title: "开始学习", Detail: string(zoneName) + " · " + agent.Name,
+	})
 	if broadcaster != nil {
 		broadcaster.Emit("session-created", map[string]any{"sessionId": sessID, "session": sess})
 	}
@@ -224,6 +229,10 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 		httpx.Error(w, http.StatusInternalServerError, "resume explain session: "+err.Error())
 		return
 	}
+	_, _, _ = awardLearningEvent(projectID, progressstore.Event{
+		ID: "agent-resume:" + runDirName, SourceType: "agent-resume", SourceID: "explain",
+		ActivityDelta: 1, Title: "继续学习", Detail: "Explain · 恢复会话",
+	})
 	payload := map[string]any{
 		"resumed": true,
 		"runDir":  filepath.Base(result.RunDirRel),
@@ -297,6 +306,10 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reset session state to running, then launch again.
 	sessions.SetState(sess.ID, sessionstore.StateRunning)
+	_, _, _ = awardLearningEvent(sess.ProjectSlug, progressstore.Event{
+		ID: "agent-followup:" + sess.ID + ":" + pkg.RunDirName, SourceType: "agent-followup", SourceID: sess.AgentID,
+		ActivityDelta: 1, Title: "追问学习 Agent", Detail: sess.ZoneName,
+	})
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

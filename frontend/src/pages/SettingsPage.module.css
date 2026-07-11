@@ -55,7 +55,7 @@
 
 .cardSelected {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(124, 154, 114, 0.25);
+  box-shadow: 0 0 0 1px var(--accent-medium);
 }
 
 .cardTop {
@@ -77,8 +77,8 @@
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.72);
-  border: 1px solid rgba(61, 50, 41, 0.08);
+  background: var(--surface-raised);
+  border: 1px solid var(--ink-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -123,7 +123,7 @@
 
 .meta code {
   color: var(--fg);
-  background: rgba(61, 50, 41, 0.06);
+  background: var(--ink-soft);
   padding: 1px 5px;
   border-radius: 3px;
 }
@@ -139,7 +139,7 @@
   gap: 10px;
   padding: 14px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.46);
+  background: var(--surface-translucent);
   border-radius: var(--radius);
 }
 
@@ -147,8 +147,8 @@
   width: 24px;
   height: 24px;
   border-radius: 7px;
-  background: rgba(124, 154, 114, 0.1);
-  color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -200,9 +200,8 @@
   gap: 12px;
   padding: 14px;
   border: 1px solid color-mix(in oklab, var(--accent) 22%, var(--border));
-  border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--surface-tint) 48%, white);
+  background: color-mix(in srgb, var(--surface-tint) 48%, var(--card));
 }
 
 .askActions {
@@ -288,6 +287,88 @@
 .askProbeOk {
   font-size: 0.76rem;
   color: var(--accent);
+}
+
+.appearance,
+.openSource {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-translucent);
+}
+
+.appearance h2,
+.openSource h2 {
+  font-size: 1rem;
+  margin-bottom: 3px;
+}
+
+.appearance p,
+.openSource p {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.themeChoices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+
+.themeChoice {
+  min-height: 66px;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 16px;
+  gap: 9px;
+  align-items: center;
+  text-align: left;
+  padding: 9px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+
+.themeChoice:hover { border-color: var(--accent); }
+.themeSelected { border-color: var(--accent); background: var(--surface-tint); }
+.themeChoice strong, .themeChoice small { display: block; }
+.themeChoice strong { font-size: 0.78rem; }
+.themeChoice small { margin-top: 2px; color: var(--muted); font-size: 0.68rem; line-height: 1.35; }
+
+.themePreview {
+  height: 38px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.themePreview i:first-child { grid-row: 1 / 3; }
+
+.openSource {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.openSourceActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.openSourceActions a {
+  padding: 6px 9px;
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  text-decoration: none;
+}
+.openSourceActions a:hover { border-color: var(--accent); }
+
+@media (max-width: 720px) {
+  .openSource { align-items: flex-start; flex-direction: column; }
 }
 
 .askProbeErr {

@@ -15,6 +15,7 @@ import (
 )
 
 const PolicyVersion = "practice-v1"
+const LearningPolicyVersion = "learning-v1"
 
 type Event struct {
 	ID            string `json:"id"`
@@ -24,6 +25,9 @@ type Event struct {
 	Difficulty    int    `json:"difficulty"`
 	Outcome       string `json:"outcome"`
 	Delta         int    `json:"delta"`
+	ActivityDelta int    `json:"activityDelta,omitempty"`
+	Title         string `json:"title,omitempty"`
+	Detail        string `json:"detail,omitempty"`
 	PolicyVersion string `json:"policyVersion"`
 	CreatedAt     string `json:"createdAt"`
 }

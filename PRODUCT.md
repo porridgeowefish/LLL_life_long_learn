@@ -35,14 +35,14 @@ corporate.
 ## Design Principles
 
 - Calm reading first: the study page is the hero; chrome recedes.
-- Warm and handcrafted, not sterile: cream paper, sage accent, soft warm shadows.
-- One accent (sage) used with restraint; warm neutrals carry the surface.
+- Calm and handcrafted, not sterile: restrained surfaces and soft, hue-aware layers.
+- One accent per selected theme, used for action and state rather than decoration.
 - Show thinking, invite questioning: surfaces make uncertainty and revision feel normal.
 - Honest density: enough information per screen, generous whitespace, no card-grid filler.
 
 ## Accessibility & Inclusion
 
-- Body text ≥4.5:1 on the cream paper — the muted tone must stay readable (verify; bump toward ink if close).
+- Body text ≥4.5:1 in every theme; muted text remains readable and essential UI boundaries reach 3:1.
 - `prefers-reduced-motion` respected on every animation.
 - No italic emphasis (weight only); the global italic-disable stays.
 - Bilingual copy (Chinese + English); PingFang SC / Microsoft YaHei fallbacks kept.

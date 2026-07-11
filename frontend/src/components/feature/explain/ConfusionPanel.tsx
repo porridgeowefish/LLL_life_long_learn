@@ -186,7 +186,7 @@ function SummaryItem({
   selected: boolean;
   onToggle: () => void;
   onDelete: () => void;
-  onReview: (anchor: { top: number; left: number }) => void;
+  onReview: (anchor: { top: number; left: number; right?: number; bottom?: number; width?: number; height?: number }) => void;
 }) {
   const hover = askHoverTitle(summary.ask);
   return (
@@ -203,9 +203,17 @@ function SummaryItem({
           type="button"
           className={s.reviewBtn}
           title={hover}
-          onClick={() =>
-            onReview({ top: 120, left: window.innerWidth - 460 })
-          }
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            onReview({
+              top: rect.top,
+              left: rect.left + rect.width / 2,
+              right: rect.right,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height,
+            });
+          }}
         >
           答疑
         </button>

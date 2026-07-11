@@ -15,5 +15,8 @@
   "imageBackupBaseURL": "https://api.ohmygpt.com/v1",
   "imageBackupModel": "gpt-image-2",
   "imagePromptModel": "opus",
-  "pythonBin": "python"
+  "pythonBin": "python",
+  "ui": {
+    "theme": "lychee-paper"
+  }
 }

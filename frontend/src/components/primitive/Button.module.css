@@ -38,7 +38,7 @@
 /* Variants */
 .v-primary {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 .v-primary:hover:not(:disabled) {
@@ -52,7 +52,7 @@
   border-color: var(--border);
 }
 .v-outline:hover:not(:disabled) {
-  background: rgba(124, 154, 114, 0.06);
+  background: var(--accent-soft);
   border-color: var(--accent);
 }
 
@@ -62,7 +62,7 @@
   border-color: transparent;
 }
 .v-ghost:hover:not(:disabled) {
-  background: rgba(124, 154, 114, 0.08);
+  background: var(--accent-soft);
 }
 
 .v-danger {

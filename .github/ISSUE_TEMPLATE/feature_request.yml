@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose a focused learner-facing improvement
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: learner-problem
+    attributes:
+      label: Learner problem
+      description: What learning situation is difficult today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the outcome, not only a UI control.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

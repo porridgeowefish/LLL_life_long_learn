@@ -1,0 +1,91 @@
+// Package uiconfig persists local UI preferences without clobbering other config.
+package uiconfig
+
+import (
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+
+	"github.com/xmz14/lll/backend-go/internal/paths"
+	"github.com/xmz14/lll/backend-go/internal/workspace"
+)
+
+type Theme string
+
+const (
+	ThemeLycheePaper  Theme = "lychee-paper"
+	ThemeMountainMist Theme = "mountain-mist"
+	ThemeWisteriaGray Theme = "wisteria-gray"
+	ThemeNightInk     Theme = "night-ink"
+)
+
+type Config struct {
+	Theme Theme `json:"theme"`
+}
+
+func ValidTheme(theme Theme) bool {
+	switch theme {
+	case ThemeLycheePaper, ThemeMountainMist, ThemeWisteriaGray, ThemeNightInk:
+		return true
+	default:
+		return false
+	}
+}
+
+var pathFn = func() string {
+	base := paths.WORKSPACE
+	if base == "" {
+		base = paths.PROJECT_ROOT
+	}
+	return filepath.Join(base, "config.local.json")
+}
+
+func UseConfigPathForTest(path string) func() {
+	old := pathFn
+	pathFn = func() string { return path }
+	return func() { pathFn = old }
+}
+
+func Load() (Config, error) {
+	out := Config{Theme: ThemeLycheePaper}
+	data, err := os.ReadFile(pathFn())
+	if err != nil {
+		if os.IsNotExist(err) {
+			return out, nil
+		}
+		return out, err
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return out, err
+	}
+	if section, ok := raw["ui"]; ok {
+		if err := json.Unmarshal(section, &out); err != nil {
+			return Config{}, err
+		}
+	}
+	if !ValidTheme(out.Theme) {
+		out.Theme = ThemeLycheePaper
+	}
+	return out, nil
+}
+
+func Save(cfg Config) error {
+	if !ValidTheme(cfg.Theme) {
+		return errors.New("unknown theme")
+	}
+	raw := map[string]json.RawMessage{}
+	if data, err := os.ReadFile(pathFn()); err == nil {
+		_ = json.Unmarshal(data, &raw)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	section, _ := json.Marshal(cfg)
+	raw["ui"] = section
+	out, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return err
+	}
+	return workspace.AtomicWriteFile(pathFn(), append(out, '\n'), 0o644)
+}

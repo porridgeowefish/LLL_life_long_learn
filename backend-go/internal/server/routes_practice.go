@@ -174,13 +174,16 @@ func (s *Server) handleCheckObjective(w http.ResponseWriter, r *http.Request) {
 	delta := 0
 	if progress != nil {
 		_, added, summary, awardErr := progress.Award(progressstore.Event{
-			ID:         fmt.Sprintf("practice-submit:%d:%s", attemptID, taskID),
-			SourceType: "practice-submit",
-			SourceID:   taskID,
-			AttemptID:  strconv.Itoa(attemptID),
-			Difficulty: difficulty,
-			Outcome:    "submitted",
-			Delta:      difficulty,
+			ID:            fmt.Sprintf("practice-submit:%d:%s", attemptID, taskID),
+			SourceType:    "practice-submit",
+			SourceID:      taskID,
+			AttemptID:     strconv.Itoa(attemptID),
+			Difficulty:    difficulty,
+			Outcome:       "submitted",
+			Delta:         difficulty,
+			ActivityDelta: 1,
+			Title:         "完成练习题",
+			Detail:        taskID,
 		})
 		if awardErr == nil && added {
 			delta += difficulty
@@ -244,13 +247,16 @@ func (s *Server) handleSubmitPracticeAttempt(w http.ResponseWriter, r *http.Requ
 				continue
 			}
 			_, added, _, awardErr := progress.Award(progressstore.Event{
-				ID:         fmt.Sprintf("practice-submit:%d:%s", attemptID, sub.TaskID),
-				SourceType: "practice-submit",
-				SourceID:   sub.TaskID,
-				AttemptID:  strconv.Itoa(attemptID),
-				Difficulty: task.Difficulty,
-				Outcome:    "submitted",
-				Delta:      task.Difficulty,
+				ID:            fmt.Sprintf("practice-submit:%d:%s", attemptID, sub.TaskID),
+				SourceType:    "practice-submit",
+				SourceID:      sub.TaskID,
+				AttemptID:     strconv.Itoa(attemptID),
+				Difficulty:    task.Difficulty,
+				Outcome:       "submitted",
+				Delta:         task.Difficulty,
+				ActivityDelta: 1,
+				Title:         "完成练习题",
+				Detail:        sub.TaskID,
 			})
 			if awardErr == nil && added {
 				growthDelta += task.Difficulty

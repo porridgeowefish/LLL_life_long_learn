@@ -32,7 +32,7 @@ describe('AskAiPanel', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('centers the panel on the selection anchor', () => {
+  it('opens a new Ask-AI panel beside the selection when there is room', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1000, configurable: true });
     Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
     useAskAiStore.getState().openActive({
@@ -41,8 +41,8 @@ describe('AskAiPanel', () => {
     });
     render(<AskAiPanel />);
     const dialog = screen.getByRole('dialog', { name: '问 AI' });
-    expect(dialog.style.left).toBe('270px');
-    expect(dialog.style.top).toBe('108px');
+    expect(dialog.style.left).toBe('512px');
+    expect(dialog.style.top).toBe('12px');
   });
 
   it('active mode shows prefilled input + provider switcher', () => {
@@ -66,7 +66,7 @@ describe('AskAiPanel', () => {
     expect(screen.getByText('prior answer')).toBeTruthy();
   });
 
-  it('places review mode near the viewport right edge', () => {
+  it('opens review mode centered and fully visible', () => {
     useAskAiStore.getState().openReview({
       projectSlug: 'p', confusionId: 'c', quote: 'sel',
       anchor: { top: 100, left: -9999 },
@@ -74,8 +74,8 @@ describe('AskAiPanel', () => {
     });
     render(<AskAiPanel />);
     const dialog = screen.getByRole('dialog', { name: '答疑回顾' });
-    expect(dialog.style.left).toBe('556px');
-    expect(dialog.style.top).toBe('100px');
+    expect(dialog.style.left).toBe('252px');
+    expect(dialog.style.top).toBe('88px');
   });
 
   it('close button closes the panel', () => {

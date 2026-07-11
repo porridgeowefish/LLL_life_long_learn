@@ -87,6 +87,18 @@ learner_memory_snapshots
 - profile_path
 - state_path
 - updated_at
+
+learning_events (implemented file-first in `progress/events.jsonl`)
+- id
+- project_slug
+- source_type
+- source_id
+- activity_delta
+- growth_delta (`delta` on disk for backward compatibility)
+- title
+- detail
+- outcome
+- created_at
 ```
 
 ## Current Reality
