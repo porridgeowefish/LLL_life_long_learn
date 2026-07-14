@@ -8,6 +8,7 @@ import type {
   HealthResponse,
   PredecessorFile,
   ProjectMeta,
+  ProjectType,
   ProjectState,
   Session,
   ZoneName,
@@ -20,6 +21,11 @@ export interface ProjectsListResponse {
 
 export interface ProjectResponse {
   project: ProjectState;
+}
+
+export interface DeleteProjectResponse {
+  deleted: true;
+  projectId: string;
 }
 
 export interface AgentsListResponse {
@@ -44,21 +50,42 @@ export interface ZoneResponse {
 // Requests
 export interface CreateProjectRequest {
   title: string;
+  projectType: ProjectType;
   slug?: string;
-  parentProjectId?: string;
   why?: string;
   current?: string;
   target?: string;
   standard?: string;
 }
 
-export interface CreateSubprojectRequest {
-  title: string;
-  slug?: string;
+export interface ProjectTypeAdviceRequest {
+  title?: string;
   why?: string;
-  current?: string;
-  target?: string;
+  current: string;
+  target: string;
   standard?: string;
+  messages: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+}
+
+export interface ProjectTypeAdviceResponse {
+  reply: string;
+  recommendation?: ProjectType;
+  reason?: string;
+  tradeoff?: string;
+  confidence: 'low' | 'medium' | 'high';
+}
+
+export interface DisciplineOverviewResponse {
+  title: string;
+  content: string;
+}
+
+export interface DisciplineOverviewGenerationResponse {
+  session: Session;
+  runDir: string;
 }
 
 export interface InvokeAgentRequest {

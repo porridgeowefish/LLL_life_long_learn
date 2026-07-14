@@ -63,6 +63,7 @@ type ResumeRequest struct {
 	Store       *sessionstore.Store
 	Events      EventEmitter
 	ClaudeBin   string
+	Runtime     *agentruntime.Runtime
 	RunDirName  string
 }
 
@@ -222,12 +223,16 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	}, nil
 }
 
-// LaunchResume opens a visible PowerShell window and runs `claude -c` from the
-// project root. It intentionally does not pass a freshly assembled prompt:
-// Claude owns the conversation history being resumed.
+// LaunchResume opens a visible terminal and resumes the selected runtime's
+// latest conversation from the project root. It intentionally does not pass a
+// freshly assembled prompt: the runtime owns the conversation history.
 func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 	if req.ProjectSlug == "" {
 		return nil, errors.New("missing project slug")
+	}
+	rt := selectedResumeRuntime(req)
+	if rt.ID != agentruntime.RuntimeClaude && rt.ID != agentruntime.RuntimeCodex {
+		return nil, fmt.Errorf("runtime %s does not support interactive resume", rt.ID)
 	}
 	projectRoot, err := workspace.ProjectRootForSlug(req.ProjectSlug)
 	if err != nil {
@@ -244,11 +249,12 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 	}
 	stdoutPath := filepath.Join(runDirAbs, "stdout.log")
 	stderrPath := filepath.Join(runDirAbs, "stderr.log")
-	_ = os.WriteFile(stdoutPath, []byte("resume mode — launching `claude -c` in a visible PowerShell window\n"), 0o644)
+	command := resumeCommandDescription(rt)
+	_ = os.WriteFile(stdoutPath, []byte("resume mode — launching `"+command+"` in a visible terminal\n"), 0o644)
 	_ = os.WriteFile(stderrPath, []byte{}, 0o644)
 
 	if req.Session != nil && req.Store != nil {
-		req.Store.AppendTurn(req.Session.ID, "system", "resume requested with claude -c", runDirRel)
+		req.Store.AppendTurn(req.Session.ID, "system", "resume requested with "+command, runDirRel)
 		req.Store.Update(req.Session.ID, func(s *sessionstore.Session) {
 			s.State = sessionstore.StateRunning
 			s.RunDirRel = runDirRel
@@ -271,16 +277,16 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 				"sessionId": req.Session.ID, "error": err.Error(),
 			})
 		}
-		return nil, fmt.Errorf("spawn claude resume wrapper: %w", err)
+		return nil, fmt.Errorf("spawn %s resume wrapper: %w", rt.ID, err)
 	}
 
 	runMeta := map[string]any{
 		"projectSlug": req.ProjectSlug,
 		"zoneName":    req.ZoneName,
 		"mode":        "interactive-tui-resume",
-		"runtimeId":   "claude",
-		"runtimeBin":  selectedClaudeBin(req.ClaudeBin),
-		"command":     "claude -c",
+		"runtimeId":   rt.ID,
+		"runtimeBin":  rt.Bin,
+		"command":     command,
 		"stdoutLog":   filepath.Join(runDirRel, "stdout.log"),
 		"stderrLog":   filepath.Join(runDirRel, "stderr.log"),
 		"startedAt":   time.Now().UTC(),
@@ -377,7 +383,9 @@ func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsF
 }
 
 func buildResumeWrapperShellScript(projectRoot, stderrPath string, req ResumeRequest) string {
-	claudeBin := selectedClaudeBin(req.ClaudeBin)
+	rt := selectedResumeRuntime(req)
+	execLine := resumeShellExecLine(rt)
+	command := resumeCommandDescription(rt)
 	return strings.Join([]string{
 		`#!/bin/sh`,
 		`set +e`,
@@ -385,14 +393,14 @@ func buildResumeWrapperShellScript(projectRoot, stderrPath string, req ResumeReq
 		fmt.Sprintf(`log_file=%s`, shQuote(stderrPath)),
 		`log_err() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$1" >> "$log_file"; }`,
 		`log_err "resume spawn env PATH=$PATH"`,
-		fmt.Sprintf(`agent_bin=%s`, shQuote(claudeBin)),
+		fmt.Sprintf(`agent_bin=%s`, shQuote(rt.Bin)),
 		`agent_exe=$(command -v "$agent_bin" 2>/dev/null)`,
-		`log_err "resolved claude agentExe=$agent_exe"`,
-		`if [ -z "$agent_exe" ]; then printf 'Cannot find claude. Install Claude Code inside this Linux/WSL environment, then rerun.\n'; read -r _; exit 1; fi`,
-		`printf 'Resuming Claude Code with claude -c...\n\n'`,
-		`"$agent_exe" -c`,
+		fmt.Sprintf(`log_err "resolved runtime=%s agentExe=$agent_exe"`, rt.ID),
+		`if [ -z "$agent_exe" ]; then printf 'Cannot find %s in this Linux environment.\n' "$agent_bin"; read -r _; exit 1; fi`,
+		fmt.Sprintf(`printf 'Resuming with %s...\n\n'`, command),
+		execLine,
 		`code=$?`,
-		`printf '\nClaude exited with code %s. Press Enter to close.\n' "$code"`,
+		`printf '\nAgent CLI exited with code %s. Press Enter to close.\n' "$code"`,
 		`read -r _`,
 		`exit "$code"`,
 	}, "\n")
@@ -488,29 +496,40 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile s
 }
 
 func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest) string {
-	claudeBin := selectedClaudeBin(req.ClaudeBin)
-	return strings.Join([]string{
+	rt := selectedResumeRuntime(req)
+	command := resumeCommandDescription(rt)
+	execLine := resumePowerShellExecLine(rt, projectRoot)
+	resolveLines := []string{}
+	if rt.Mode != "wsl" {
+		resolveLines = append(resolveLines,
+			fmt.Sprintf(`$agentExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $agentExe = $cmd.Source }; Log-Err "resolved runtime=%s agentExe=$agentExe"`, rt.Bin, rt.ID),
+			fmt.Sprintf(`if (-not $agentExe) { Log-Err "%s NOT FOUND"; Write-Host "⚠️  找不到 %s。请确认已安装，或设置 %s 指向可执行文件全路径。" -ForegroundColor Red; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown'); exit 1 }`, rt.DefaultBin, rt.DefaultBin, rt.BinEnv),
+		)
+	}
+	lines := []string{
 		`$ErrorActionPreference='Continue'`,
 		fmt.Sprintf(`Set-Location -LiteralPath '%s'`, projectRoot),
 		`$env:FORCE_COLOR='1'`,
 		fmt.Sprintf(`function Log-Err($msg) { try { Add-Content -LiteralPath '%s' -Value "[$(Get-Date -Format 'HH:mm:ss')] $msg" } catch {} }`, stderrPath),
 		`Log-Err "resume spawn env PATH=$env:PATH"`,
 		`Write-Host '=============================================' -ForegroundColor Cyan`,
-		fmt.Sprintf(`Write-Host ' LLL 项目: %s  |  Explain 继续上次会话  |  Runtime: Claude Code ' -ForegroundColor Cyan`, req.ProjectSlug),
+		fmt.Sprintf(`Write-Host ' LLL 项目: %s  |  Explain 继续上次会话  |  Runtime: %s ' -ForegroundColor Cyan`, req.ProjectSlug, rt.Name),
 		`Write-Host '=============================================' -ForegroundColor Cyan`,
 		`Write-Host ''`,
-		fmt.Sprintf(`$agentExe = $null; $cmd = Get-Command '%s' -ErrorAction SilentlyContinue; if ($cmd) { $agentExe = $cmd.Source }; Log-Err "resolved claude agentExe=$agentExe"`, claudeBin),
-		`if (-not $agentExe) { Log-Err "claude NOT FOUND"; Write-Host "⚠️  找不到 claude。请确认 Claude Code 已安装，或设置 CLAUDE_BIN 指向可执行文件全路径。" -ForegroundColor Red; $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown'); exit 1 }`,
-		`Write-Host '正在执行 claude -c，恢复 Claude Code 最近一次会话...' -ForegroundColor Green`,
+	}
+	lines = append(lines, resolveLines...)
+	lines = append(lines,
+		fmt.Sprintf(`Write-Host '正在执行 %s，恢复最近一次会话...' -ForegroundColor Green`, command),
 		`Write-Host ''`,
-		`$ErrorActionPreference='Stop'; $code = 0; try { & $agentExe -c; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "claude -c failed: $_"; Write-Host "⚠️  Claude 继续会话失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		`$ErrorActionPreference='Stop'; $code = 0; try { `+execLine+`; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "resume failed: $_"; Write-Host "⚠️  Agent 继续会话失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
 		`Write-Host ''`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
-		`Write-Host " Claude 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
+		`Write-Host " Agent CLI 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`,
 		`exit $code`,
-	}, "; ")
+	)
+	return strings.Join(lines, "; ")
 }
 
 func selectedClaudeBin(bin string) string {
@@ -518,6 +537,42 @@ func selectedClaudeBin(bin string) string {
 		return "claude"
 	}
 	return strings.TrimSpace(bin)
+}
+
+func selectedResumeRuntime(req ResumeRequest) agentruntime.Runtime {
+	if req.Runtime != nil {
+		return *req.Runtime
+	}
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeClaude)
+	return agentruntime.Runtime{Definition: def, Bin: selectedClaudeBin(req.ClaudeBin), Available: true, Mode: "native"}
+}
+
+func resumeCommandDescription(rt agentruntime.Runtime) string {
+	if rt.ID == agentruntime.RuntimeCodex {
+		return "codex resume --last --yolo"
+	}
+	return "claude -c"
+}
+
+func resumePowerShellExecLine(rt agentruntime.Runtime, projectRoot string) string {
+	if rt.Mode == "wsl" {
+		project := psSingleQuote(projectRoot)
+		if rt.ID == agentruntime.RuntimeCodex {
+			return fmt.Sprintf(`$wslProject = (& wsl.exe wslpath -a '%s').Trim(); & wsl.exe -e sh -lc "cd ""$wslProject"" && exec %s resume --last --yolo"`, project, shQuote(rt.Bin))
+		}
+		return fmt.Sprintf(`$wslProject = (& wsl.exe wslpath -a '%s').Trim(); & wsl.exe -e sh -lc "cd ""$wslProject"" && exec %s -c"`, project, shQuote(rt.Bin))
+	}
+	if rt.ID == agentruntime.RuntimeCodex {
+		return `& $agentExe resume --last --yolo`
+	}
+	return `& $agentExe -c`
+}
+
+func resumeShellExecLine(rt agentruntime.Runtime) string {
+	if rt.ID == agentruntime.RuntimeCodex {
+		return `"$agent_exe" resume --last --yolo`
+	}
+	return `"$agent_exe" -c`
 }
 
 func selectedRuntime(req LaunchRequest) agentruntime.Runtime {
@@ -546,7 +601,7 @@ func interactiveExecLine(rt agentruntime.Runtime, projectRoot, promptMdPath, set
 	case agentruntime.RuntimeClaude:
 		return "if ($promptText) { & $agentExe --permission-mode $permissionMode" + settingsArg + " $promptText } else { & $agentExe --permission-mode $permissionMode" + settingsArg + " }"
 	case agentruntime.RuntimeCodex:
-		return "if ($promptText) { & $agentExe $promptText } else { & $agentExe }"
+		return "if ($promptText) { & $agentExe --yolo $promptText } else { & $agentExe --yolo }"
 	case agentruntime.RuntimeTrae:
 		return fmt.Sprintf("if ($promptText) { & $agentExe run $promptText --working-dir '%s' } else { & $agentExe interactive }", projectRoot)
 	default:
@@ -563,7 +618,7 @@ func interactiveShellExecLine(rt agentruntime.Runtime, settingsFile string) stri
 	case agentruntime.RuntimeClaude:
 		return `if [ -n "$prompt_text" ]; then "$agent_exe" --permission-mode "$permission_mode"` + settingsArg + ` "$prompt_text"; else "$agent_exe" --permission-mode "$permission_mode"` + settingsArg + `; fi`
 	case agentruntime.RuntimeCodex:
-		return `if [ -n "$prompt_text" ]; then "$agent_exe" "$prompt_text"; else "$agent_exe"; fi`
+		return `if [ -n "$prompt_text" ]; then "$agent_exe" --yolo "$prompt_text"; else "$agent_exe" --yolo; fi`
 	case agentruntime.RuntimeTrae:
 		return `if [ -n "$prompt_text" ]; then "$agent_exe" run "$prompt_text" --working-dir "$PWD"; else "$agent_exe" interactive; fi`
 	default:
@@ -586,7 +641,7 @@ func interactiveWSLExecLine(rt agentruntime.Runtime, projectRoot, promptMdPath, 
 	case agentruntime.RuntimeClaude:
 		return fmt.Sprintf(`%s& wsl.exe -e sh -lc "cd ""$wslProject"" && prompt_text=\$(cat ""$wslPrompt"" 2>/dev/null) && if [ -n ""\$prompt_text"" ]; then exec %s --permission-mode auto%s ""\$prompt_text""; else exec %s --permission-mode auto%s; fi"`, prefix, bin, settingsArg, bin, settingsArg)
 	case agentruntime.RuntimeCodex:
-		return fmt.Sprintf(`%s& wsl.exe -e sh -lc "cd ""$wslProject"" && prompt_text=\$(cat ""$wslPrompt"" 2>/dev/null) && if [ -n ""\$prompt_text"" ]; then exec %s ""\$prompt_text""; else exec %s; fi"`, prefix, bin, bin)
+		return fmt.Sprintf(`%s& wsl.exe -e sh -lc "cd ""$wslProject"" && prompt_text=\$(cat ""$wslPrompt"" 2>/dev/null) && if [ -n ""\$prompt_text"" ]; then exec %s --yolo ""\$prompt_text""; else exec %s --yolo; fi"`, prefix, bin, bin)
 	default:
 		return `& $agentExe`
 	}

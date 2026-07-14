@@ -1,11 +1,29 @@
 # AGENTS.md: LLL Agent Entry
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
 Source of truth: lightweight entry point for all AI coding agents.
 
-## 0. Working Rule
+## 0. Learning Runtime Boundary
+
+This file governs AI coding agents maintaining the LLL repository. It does not
+govern learner-facing Agents launched by LLL inside `projects/<slug>/`.
+
+When the current directory is under `projects/<slug>/` and the initial prompt
+contains an LLL `Agent Identity`, `Charter`, and declared output path:
+
+```text
+Treat the run as learner-artifact generation, not repository maintenance.
+Do not execute the repository startup/document-reading sequence below.
+Do not inspect repository code or docs unless the injected Charter requests it.
+Follow only the injected learning-Agent role, context, and output contract.
+Do not invoke external skills unless the injected prompt explicitly names one.
+```
+
+All remaining sections apply to repository maintenance work.
+
+## 1. Working Rule
 
 Keep this file short. Read this file first, then:
 
@@ -17,19 +35,21 @@ docs/00-product-and-architecture/LESSONS_LEARNED.md   ← 必读：调试教训�
 
 Read only the rule files triggered by the current task. Do not preload the whole docs tree.
 
-**LESSONS_LEARNED.md** contains 11 hard-won rules (Claude CLI modes, React
+**LESSONS_LEARNED.md** contains 13 hard-won rules (Claude CLI modes, React
 state sync, math preprocessing, etc.). Every agent MUST read it before
 touching the launcher, the frontend, or any charter/primitive file.
 
 **Iteration docs are the delivery source of truth.** Specs, plans, API
 contracts, and tests for a slice live inside `docs/01-iterations/iteration-NN-<name>/`
-(see `docs/01-iterations/README.md` for the required file set). Planning/design
+(see `docs/01-iterations/README.md` for the required file set). Product, domain,
+data, or architecture changes must also satisfy the documentation-governance
+landing table and ADR gate in the same task. Planning/design
 skills (e.g. superpowers brainstorming/writing-plans) MUST detect this system
 and write INTO it — plans under `iteration-NN-<name>/plans/`, design folded
 into the iteration's own docs — and never create a parallel `docs/superpowers/`
 layer.
 
-## 1. Team Principles
+## 2. Team Principles
 
 All agents must follow:
 
@@ -49,11 +69,13 @@ Execution meaning:
 ```text
 Before changing behavior, check code, API, docs, and current iteration scope.
 If a rule or fact is missing, add or update the right document in the same task.
+An ADR alone is not enough: synchronize every long-lived fact source named by
+the architecture-change landing table before considering planning complete.
 Prefer incremental structure over speculative abstraction.
 Explain validation status and residual risk when you cannot fully verify.
 ```
 
-## 2. Progressive Disclosure
+## 3. Progressive Disclosure
 
 Use:
 
@@ -72,7 +94,7 @@ task orchestration and safety
 long-task refresh
 ```
 
-## 3. Frontend Stack (iter-02.3)
+## 4. Frontend Stack (iter-02.3)
 
 The frontend is a Vite + React 18 + TypeScript SPA under `frontend/`. The
 Go binary serves `frontend/dist/` in production with an SPA fallback

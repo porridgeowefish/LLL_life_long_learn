@@ -1,8 +1,8 @@
 # Product And Architecture
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-09  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-15
 Source of truth: `docs/INDEX.md` routes readers here; each linked document owns its topic.
 
 This directory stores long-lived documents that answer:
@@ -29,9 +29,7 @@ Which rules guide implementation and delivery
 - [MVP_ROADMAP.md](./MVP_ROADMAP.md)
 - [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md)
 - [agent-rules/README.md](./agent-rules/README.md)
-- [ADR/0001-documentation-structure.md](./ADR/0001-documentation-structure.md)
-- [ADR/0002-local-learning-workbench-structure.md](./ADR/0002-local-learning-workbench-structure.md)
-- [ADR/0003-backend-session-and-project-runtime.md](./ADR/0003-backend-session-and-project-runtime.md)
+- [ADR index](./ADR/README.md)
 
 ## Reference Attachments
 

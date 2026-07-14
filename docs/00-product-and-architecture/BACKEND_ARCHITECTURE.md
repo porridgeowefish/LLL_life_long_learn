@@ -2,7 +2,7 @@
 
 Status: draft  
 Owner: project maintainer  
-Last reviewed: 2026-06-08  
+Last reviewed: 2026-07-14
 Source of truth: this document defines the target backend architecture for the local learning workbench.
 
 ## Intent
@@ -53,6 +53,7 @@ Backend owns:
 ```text
 workspace discovery
 project tree indexing
+workspace-global sidebar-folder persistence and discipline-map reconciliation
 filesystem reads and writes
 agent registry loading
 prompt assembly
@@ -110,7 +111,7 @@ Purpose:
 
 ```text
 discover projects from the filesystem
-index project trees and subprojects
+index flat top-level project directories
 read project metadata
 resolve learning zones
 provide canonical file paths to downstream services
@@ -233,7 +234,7 @@ Owns:
 ```text
 project metadata
 learning zones
-subprojects
+system-learning projects created from any entry point
 memory files
 assets
 runs
@@ -379,7 +380,6 @@ projects/
     summary/
     runs/
     assets/
-    subprojects/
 
 memory/
   learner-profile.md
@@ -415,6 +415,24 @@ frontend requests agent invocation
 -> final outputs are written to run files and zone targets
 -> artifact materializer updates project artifact index
 ```
+
+### Flow A2: Invoke A Project-Level Agent
+
+The encyclopedia Agent is bound to `discipline-map`, not to a learning zone:
+
+```text
+frontend explicitly requests encyclopedia invocation
+-> backend validates the project type and Agent `allowedProjectTypes`
+-> project-level prompt assembly records `overview.md` without inventing a zone
+-> the normal Session and run directory are created
+-> the selected native Agent CLI opens in a visible terminal
+-> the CLI writes root `overview.md`
+-> artifact watcher emits `artifact-updated { zone: "overview" }`
+-> frontend invalidates and rereads the discipline overview
+```
+
+Registered Agents never use the lightweight direct-provider path. That path is
+reserved for explicitly non-Agent helpers such as Ask-AI.
 
 ### Flow B: User Follow-Up Inside The Same Session
 
@@ -548,7 +566,7 @@ project files are written only through explicit target mapping
 summary files are not silently replaced by raw runtime output
 raw runs always go to runs/
 memory writes are separated from summary writes
-subproject writes stay inside the selected project subtree
+all new project writes stay inside their own top-level project directory
 ```
 
 ## Failure Model

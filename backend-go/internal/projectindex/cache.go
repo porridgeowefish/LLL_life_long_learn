@@ -10,11 +10,10 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
-// Cache holds indexed project metadata keyed by slug.
-// Subprojects use the parent slug as a prefix segment, e.g. "parent/child".
+// Cache holds flat project metadata keyed by globally unique slug.
 type Cache struct {
-	mu     sync.RWMutex
-	items  map[string]cacheEntry
+	mu    sync.RWMutex
+	items map[string]cacheEntry
 }
 
 type cacheEntry struct {
@@ -38,11 +37,7 @@ func (c *Cache) Rebuild() error {
 	c.items = make(map[string]cacheEntry, len(all))
 	now := time.Now()
 	for _, m := range all {
-		key := m.Slug
-		if m.ParentProjectID != "" {
-			key = m.ParentProjectID + "/" + m.Slug
-		}
-		c.items[key] = cacheEntry{Meta: m, Loaded: now}
+		c.items[m.Slug] = cacheEntry{Meta: m, Loaded: now}
 	}
 	return nil
 }

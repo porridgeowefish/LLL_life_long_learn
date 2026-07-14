@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/xmz14/lll/backend-go/internal/folderstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -33,6 +34,42 @@ func contentTypeFor(name string) string {
 	}
 }
 
+// handleDeleteProject permanently removes one learning project and its local
+// artifacts. The frontend owns the single user-confirmation step; the backend
+// owns validation, active-run protection, and associated reference cleanup.
+func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("id")
+	if !workspace.ValidateSlug(slug) {
+		httpx.Error(w, http.StatusBadRequest, "invalid slug")
+		return
+	}
+	if sessions.HasActiveProject(slug) {
+		httpx.Error(w, http.StatusConflict, "project_has_active_session")
+		return
+	}
+	if err := workspace.DeleteProject(slug); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			httpx.Error(w, http.StatusNotFound, "project not found")
+			return
+		}
+		httpx.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	store, err := folderstore.New()
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
+		return
+	}
+	if _, err := store.RemoveProject(slug); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
+		return
+	}
+	cache.Invalidate(slug)
+	sessions.RemoveProject(slug)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"deleted": true, "projectId": slug})
+}
+
 // validMemoryFilename limits POST writes to memory/ to safe filenames only.
 var validMemoryFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 
@@ -40,16 +77,16 @@ var validMemoryFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 var cache = projectindex.New()
 
 // createProjectRequest is the body of POST /api/projects.
-// Why/Current/Target/Standard are optional background fields that seed project.md
-// (background collection per LEARNING_PROJECT_STRUCTURE.md).
+// Why/Current/Target/Standard seed only system-learning project.md files.
+// Discipline-map creation ignores them at the workspace boundary.
 type createProjectRequest struct {
-	Title           string `json:"title"`
-	Slug            string `json:"slug,omitempty"`
-	ParentProjectID string `json:"parentProjectId,omitempty"`
-	Why             string `json:"why,omitempty"`
-	Current         string `json:"current,omitempty"`
-	Target          string `json:"target,omitempty"`
-	Standard        string `json:"standard,omitempty"`
+	Title       string                `json:"title"`
+	Slug        string                `json:"slug,omitempty"`
+	ProjectType workspace.ProjectType `json:"projectType,omitempty"`
+	Why         string                `json:"why,omitempty"`
+	Current     string                `json:"current,omitempty"`
+	Target      string                `json:"target,omitempty"`
+	Standard    string                `json:"standard,omitempty"`
 }
 
 // handleListProjects returns the indexed project tree.
@@ -61,7 +98,7 @@ func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": cache.All()})
 }
 
-// handleCreateProject creates a top-level project.
+// handleCreateProject creates a flat, independent project.
 func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	var req createProjectRequest
 	if err := httpx.ReadJSON(r, &req); err != nil {
@@ -81,11 +118,17 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug: "+slug)
 		return
 	}
+	projectType := workspace.NormalizeProjectType(req.ProjectType)
+	if !workspace.ValidateProjectType(projectType) {
+		httpx.Error(w, http.StatusBadRequest, "invalid_project_type")
+		return
+	}
 	if err := workspace.CreateProjectSkeletonWithInput(slug, title, "", workspace.ProjectInput{
-		Why:      req.Why,
-		Current:  req.Current,
-		Target:   req.Target,
-		Standard: req.Standard,
+		ProjectType: projectType,
+		Why:         req.Why,
+		Current:     req.Current,
+		Target:      req.Target,
+		Standard:    req.Standard,
 	}); err != nil {
 		if workspace.IsSlugConflict(err) {
 			httpx.Error(w, http.StatusConflict, "project already exists: "+slug)
@@ -97,59 +140,6 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	cache.Invalidate(slug)
 	state, _ := workspace.ReadProjectState(slug)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"project": state})
-}
-
-// handleCreateSubproject creates a child project under an existing parent.
-func (s *Server) handleCreateSubproject(w http.ResponseWriter, r *http.Request) {
-	parentSlug := r.PathValue("id")
-	if !workspace.ValidateSlug(parentSlug) {
-		httpx.Error(w, http.StatusBadRequest, "invalid parent slug")
-		return
-	}
-	if exists, err := workspace.ProjectExists(parentSlug); err != nil || !exists {
-		httpx.Error(w, http.StatusNotFound, "parent project not found")
-		return
-	}
-	var req createProjectRequest
-	if err := httpx.ReadJSON(r, &req); err != nil {
-		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
-		return
-	}
-	title := strings.TrimSpace(req.Title)
-	if title == "" {
-		httpx.Error(w, http.StatusBadRequest, "title is required")
-		return
-	}
-	childSlug := strings.TrimSpace(req.Slug)
-	if childSlug == "" {
-		childSlug = workspace.Slugify(title)
-	}
-	if !workspace.ValidateSlug(childSlug) {
-		httpx.Error(w, http.StatusBadRequest, "invalid child slug: "+childSlug)
-		return
-	}
-	if err := workspace.CreateSubprojectWithInput(parentSlug, childSlug, title, workspace.ProjectInput{
-		Why:      req.Why,
-		Current:  req.Current,
-		Target:   req.Target,
-		Standard: req.Standard,
-	}); err != nil {
-		if workspace.IsSlugConflict(err) {
-			httpx.Error(w, http.StatusConflict, "child project already exists: "+childSlug)
-			return
-		}
-		httpx.Error(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	cache.Invalidate(childSlug)
-	cache.Invalidate(parentSlug)
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"project": map[string]any{
-			"slug":            childSlug,
-			"title":           title,
-			"parentProjectId": parentSlug,
-		},
-	})
 }
 
 // handleGetProject returns one project's full state.
@@ -179,37 +169,15 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleProjectTree returns a tree-shaped sidebar payload.
-// This slice returns the same shape as GET /api/projects but grouped by parent.
+// handleProjectTree preserves the legacy endpoint name but returns the same
+// flat, peer-level project set used by the sidebar.
 func (s *Server) handleProjectTree(w http.ResponseWriter, r *http.Request) {
 	if err := cache.Rebuild(); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	flat := cache.All()
-	type treeNode struct {
-		workspace.ProjectMeta
-		Subprojects []workspace.ProjectMeta `json:"subprojects,omitempty"`
-	}
-	byID := map[string]*treeNode{}
-	var roots []*treeNode
-	for _, p := range flat {
-		node := &treeNode{ProjectMeta: p}
-		byID[p.Slug] = node
-	}
-	for _, p := range flat {
-		node := byID[p.Slug]
-		if p.ParentProjectID == "" {
-			roots = append(roots, node)
-		} else if parent, ok := byID[p.ParentProjectID]; ok {
-			parent.Subprojects = append(parent.Subprojects, p)
-		}
-	}
-	out := make([]workspace.ProjectMeta, 0, len(roots))
-	for _, r := range roots {
-		out = append(out, r.ProjectMeta)
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": out})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": flat})
 }
 
 // handleGetZone returns a single zone resource.
@@ -222,6 +190,15 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 	}
 	if !workspace.ValidateZoneName(zone) {
 		httpx.Error(w, http.StatusBadRequest, "invalid zone: "+zone)
+		return
+	}
+	state, err := workspace.ReadProjectState(slug)
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, "project_not_found")
+		return
+	}
+	if state.ProjectType != workspace.ProjectTypeSystemLearning {
+		httpx.Error(w, http.StatusBadRequest, "project_has_no_zones")
 		return
 	}
 	zoneName := workspace.ZoneName(zone)

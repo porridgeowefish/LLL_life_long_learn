@@ -11,39 +11,39 @@ import (
 type SessionState string
 
 const (
-	StatePreparing         SessionState = "preparing"
-	StateLaunching         SessionState = "launching"
-	StateRunning           SessionState = "running"
-	StateCompleted         SessionState = "completed"
-	StateCancelled         SessionState = "cancelled"
-	StateFailed            SessionState = "failed"
-	StateAwaitingFollowup  SessionState = "awaiting-follow-up"
+	StatePreparing        SessionState = "preparing"
+	StateLaunching        SessionState = "launching"
+	StateRunning          SessionState = "running"
+	StateCompleted        SessionState = "completed"
+	StateCancelled        SessionState = "cancelled"
+	StateFailed           SessionState = "failed"
+	StateAwaitingFollowup SessionState = "awaiting-follow-up"
 )
 
 // Turn is one append-only conversational unit.
 type Turn struct {
-	ID         int        `json:"id"`
-	Ordinal    int        `json:"ordinal"`
-	Type       string     `json:"type"` // "user" | "assistant" | "system"
-	Content    string     `json:"content"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	RunDirRel  string     `json:"runDirRel,omitempty"` // empty for system turns
+	ID        int       `json:"id"`
+	Ordinal   int       `json:"ordinal"`
+	Type      string    `json:"type"` // "user" | "assistant" | "system"
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
+	RunDirRel string    `json:"runDirRel,omitempty"` // empty for system turns
 }
 
 // Session captures one Claude terminal conversation.
 type Session struct {
-	ID           string        `json:"id"`
-	ProjectSlug  string        `json:"projectSlug"`
-	ZoneName     string        `json:"zoneName"`
-	AgentID      string        `json:"agentId"`
-	State        SessionState  `json:"state"`
-	RunDirRel    string        `json:"runDirRel"`
-	PromptPath   string        `json:"promptPath,omitempty"`
-	Turns        []Turn        `json:"turns"`
-	CreatedAt    time.Time     `json:"createdAt"`
-	FinishedAt   *time.Time    `json:"finishedAt,omitempty"`
-	ExitCode     *int          `json:"exitCode,omitempty"`
-	LastMessage  string        `json:"lastMessage,omitempty"`
+	ID          string       `json:"id"`
+	ProjectSlug string       `json:"projectSlug"`
+	ZoneName    string       `json:"zoneName"`
+	AgentID     string       `json:"agentId"`
+	State       SessionState `json:"state"`
+	RunDirRel   string       `json:"runDirRel"`
+	PromptPath  string       `json:"promptPath,omitempty"`
+	Turns       []Turn       `json:"turns"`
+	CreatedAt   time.Time    `json:"createdAt"`
+	FinishedAt  *time.Time   `json:"finishedAt,omitempty"`
+	ExitCode    *int         `json:"exitCode,omitempty"`
+	LastMessage string       `json:"lastMessage,omitempty"`
 
 	// Runtime-only fields (not serialized on disk):
 	cancel chan struct{} `json:"-"`
@@ -70,8 +70,8 @@ func (s *Session) LatestAssistantRunDir() string {
 // Store is the in-memory session registry. On-disk persistence goes to
 // <project>/runs/_index/<sessionId>.json.
 type Store struct {
-	mu       sync.RWMutex
-	byID     map[string]*Session
+	mu   sync.RWMutex
+	byID map[string]*Session
 }
 
 // New returns an empty store.
@@ -156,6 +156,35 @@ func (s *Store) ListActive() []*Session {
 		}
 	}
 	return out
+}
+
+// HasActiveProject reports whether a project still has a run that may write
+// artifacts. Project deletion uses this as a race-prevention boundary.
+func (s *Store) HasActiveProject(projectSlug string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, sess := range s.byID {
+		if sess.ProjectSlug != projectSlug {
+			continue
+		}
+		switch sess.State {
+		case StatePreparing, StateLaunching, StateRunning, StateAwaitingFollowup:
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveProject removes completed session metadata after the canonical project
+// directory (which contains the durable run records) has been deleted.
+func (s *Store) RemoveProject(projectSlug string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for id, sess := range s.byID {
+		if sess.ProjectSlug == projectSlug {
+			delete(s.byID, id)
+		}
+	}
 }
 
 // Stats returns aggregated counters for the dashboard.

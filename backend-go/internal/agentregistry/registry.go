@@ -33,15 +33,16 @@ type Primitives struct {
 
 // Agent is the runtime shape of one registry entry.
 type Agent struct {
-	ID                 string         `json:"id"`
-	Name               string         `json:"name"`
-	Icon               string         `json:"icon"`
-	Description        string         `json:"description,omitempty"`
-	UserStory          string         `json:"userStory,omitempty"`
-	Primitives         Primitives     `json:"primitives,omitempty"`
-	AllowedZones       []workspace.ZoneName `json:"allowedZones"`
-	CharterPath        string         `json:"charterPath"`
-	DefaultOutputTargets []OutputTarget `json:"defaultOutputTargets"`
+	ID                   string                  `json:"id"`
+	Name                 string                  `json:"name"`
+	Icon                 string                  `json:"icon"`
+	Description          string                  `json:"description,omitempty"`
+	UserStory            string                  `json:"userStory,omitempty"`
+	Primitives           Primitives              `json:"primitives,omitempty"`
+	AllowedZones         []workspace.ZoneName    `json:"allowedZones"`
+	AllowedProjectTypes  []workspace.ProjectType `json:"allowedProjectTypes,omitempty"`
+	CharterPath          string                  `json:"charterPath"`
+	DefaultOutputTargets []OutputTarget          `json:"defaultOutputTargets"`
 
 	// CharterText is loaded lazily and cached in-memory.
 	CharterText string `json:"-"`
@@ -57,8 +58,8 @@ var validPrimitiveName = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 // Registry is the in-memory collection of agents, keyed by ID.
 type Registry struct {
-	mu     sync.RWMutex
-	byID   map[string]*Agent
+	mu   sync.RWMutex
+	byID map[string]*Agent
 }
 
 // New returns an empty registry. Call Load() to populate from disk.
@@ -122,12 +123,17 @@ func (r *Registry) Load() error {
 }
 
 func validateAgent(a *Agent) error {
-	if len(a.AllowedZones) == 0 {
-		return errors.New("allowedZones is empty")
+	if len(a.AllowedZones) == 0 && len(a.AllowedProjectTypes) == 0 {
+		return errors.New("agent must allow at least one zone or project type")
 	}
 	for _, z := range a.AllowedZones {
 		if !workspace.ValidateZoneName(string(z)) {
 			return fmt.Errorf("unknown zone in allowedZones: %s", z)
+		}
+	}
+	for _, projectType := range a.AllowedProjectTypes {
+		if projectType == "" || !workspace.ValidateProjectType(projectType) {
+			return fmt.Errorf("unknown project type in allowedProjectTypes: %s", projectType)
 		}
 	}
 	if strings.TrimSpace(a.UserStory) == "" {

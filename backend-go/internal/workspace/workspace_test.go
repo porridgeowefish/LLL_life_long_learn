@@ -38,6 +38,28 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
+func TestDeleteProjectRemovesWholeProjectRoot(t *testing.T) {
+	dir, cleanup := withTempWorkspace(t)
+	defer cleanup()
+	if err := CreateProjectSkeleton("delete-me", "Delete Me", ""); err != nil {
+		t.Fatal(err)
+	}
+	artifact := filepath.Join(dir, "delete-me", "runs", "example", "result.md")
+	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(artifact, []byte("associated content"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := DeleteProject("delete-me"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "delete-me")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("project root still exists: %v", err)
+	}
+}
+
 func TestValidateSlug(t *testing.T) {
 	good := []string{"a", "abc", "abc-123", "rust-ownership", "场论-笔记"}
 	bad := []string{"", "ABC", "abc/def", "..", "abc.def", strings.Repeat("a", 200)}
@@ -62,7 +84,7 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 	}
 
 	// Verify folder tree.
-	wantDirs := []string{"", "memory", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets", "subprojects"}
+	wantDirs := []string{"", "memory", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets"}
 	for _, d := range wantDirs {
 		p := filepath.Join(projectsRootOverride, "recommender-systems", d)
 		if info, err := os.Stat(p); err != nil || !info.IsDir() {
@@ -93,7 +115,74 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 	}
 }
 
-func TestCreateProjectSkeleton_Subproject(t *testing.T) {
+func TestCreateDisciplineMapSkeletonHasOverviewAndNoZones(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+
+	if err := CreateProjectSkeletonWithInput("physics", "物理学", "", ProjectInput{
+		ProjectType: ProjectTypeDisciplineMap,
+		Why:         "不应写入地图",
+		Current:     "未接触",
+		Target:      "融会贯通·能教别人",
+		Standard:    "不应写入地图",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(projectsRootOverride, "physics")
+	if _, err := os.Stat(filepath.Join(root, "overview.md")); err != nil {
+		t.Fatalf("overview.md missing: %v", err)
+	}
+	for _, zone := range []string{"intro", "explain", "practice", "extend", "summary"} {
+		if _, err := os.Stat(filepath.Join(root, zone)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("discipline map unexpectedly contains %s", zone)
+		}
+	}
+	state, err := ReadProjectState("physics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ProjectType != ProjectTypeDisciplineMap || state.ActiveZone != "" {
+		t.Fatalf("unexpected map state: %+v", state)
+	}
+	projectBrief, err := os.ReadFile(filepath.Join(root, "project.md"))
+	if err != nil {
+		t.Fatalf("read map project.md: %v", err)
+	}
+	brief := string(projectBrief)
+	for _, forbidden := range []string{"Active Phase", "Current ability", "Target ability", "Completion standard", "Intro", "不应写入地图"} {
+		if strings.Contains(brief, forbidden) {
+			t.Errorf("discipline-map project.md contains system-learning context %q:\n%s", forbidden, brief)
+		}
+	}
+	for _, required := range []string{"## 项目形态", "学科地图", "## 总览目标", "## 范围备注"} {
+		if !strings.Contains(brief, required) {
+			t.Errorf("discipline-map project.md missing %q:\n%s", required, brief)
+		}
+	}
+}
+
+func TestReadLegacyProjectDefaultsToSystemLearning(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+
+	root := filepath.Join(projectsRootOverride, "legacy")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := `{"id":"legacy","slug":"legacy","title":"Legacy","status":"active","activeZone":"Explain"}`
+	if err := os.WriteFile(filepath.Join(root, "state.json"), []byte(legacy), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	state, err := ReadProjectState("legacy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.ProjectType != ProjectTypeSystemLearning {
+		t.Fatalf("legacy project type = %q", state.ProjectType)
+	}
+}
+
+func TestCreateProjectSkeleton_LegacyParentArgumentDoesNotCreateHierarchy(t *testing.T) {
 	_, cleanup := withTempWorkspace(t)
 	defer cleanup()
 
@@ -101,28 +190,20 @@ func TestCreateProjectSkeleton_Subproject(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := CreateProjectSkeleton("collaborative-filtering", "Collaborative Filtering", "recommender-systems"); err != nil {
-		t.Fatalf("create subproject: %v", err)
+		t.Fatalf("create peer project: %v", err)
 	}
 
-	// Subproject lives under parent/subprojects/.
-	subPath := filepath.Join(projectsRootOverride, "recommender-systems", "subprojects", "collaborative-filtering", "state.json")
+	// The project is top-level; the legacy argument creates no relationship.
+	subPath := filepath.Join(projectsRootOverride, "collaborative-filtering", "state.json")
 	if _, err := os.Stat(subPath); err != nil {
-		t.Fatalf("subproject state.json missing: %v", err)
+		t.Fatalf("peer project state.json missing: %v", err)
 	}
 
-	// Parent's state has childProjectIds updated.
-	parent, err := ReadProjectState("recommender-systems")
-	if err != nil {
+	if _, err := ReadProjectState("collaborative-filtering"); err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, c := range parent.ChildProjectIDs {
-		if c == "collaborative-filtering" {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("parent missing childProjectId; got %v", parent.ChildProjectIDs)
+	if _, err := os.Stat(filepath.Join(projectsRootOverride, "recommender-systems", "subprojects")); !errors.Is(err, os.ErrNotExist) {
+		t.Error("new project creation must not create subprojects directory")
 	}
 }
 
@@ -160,7 +241,7 @@ func TestIndexAll(t *testing.T) {
 	if len(all) != 3 {
 		t.Fatalf("expected 3 projects, got %d: %+v", len(all), all)
 	}
-	// Find the subproject; its parentProjectId should be set.
+	// Every indexed project is peer-level.
 	var sub *ProjectMeta
 	for i := range all {
 		if all[i].Slug == "beta-sub" {
@@ -169,9 +250,6 @@ func TestIndexAll(t *testing.T) {
 	}
 	if sub == nil {
 		t.Fatal("beta-sub missing from index")
-	}
-	if sub.ParentProjectID != "beta" {
-		t.Errorf("beta-sub parent = %q, want beta", sub.ParentProjectID)
 	}
 }
 
@@ -300,30 +378,27 @@ func TestSlugConflictErrorChain(t *testing.T) {
 	}
 }
 
-func TestNestedProjectResolvesByOwnSlug(t *testing.T) {
+func TestProjectResolvesByOwnSlugAndFlatRoot(t *testing.T) {
 	_, cleanup := withTempWorkspace(t)
 	defer cleanup()
 	if err := CreateProjectSkeleton("parent", "Parent", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := CreateSubprojectWithInput("parent", "child-topic", "Child", ProjectInput{
+	if err := CreateProjectSkeletonWithInput("child-topic", "Child", "", ProjectInput{
 		Why: "prerequisite",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	state, err := ReadProjectState("child-topic")
+	_, err := ReadProjectState("child-topic")
 	if err != nil {
 		t.Fatal(err)
-	}
-	if state.ParentProjectID != "parent" {
-		t.Fatalf("parentProjectId = %q, want parent", state.ParentProjectID)
 	}
 	root, err := ProjectRootForSlug("child-topic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if filepath.Base(filepath.Dir(root)) != "subprojects" {
-		t.Fatalf("child root %q is not nested under subprojects", root)
+	if filepath.Dir(root) != projectsRootOverride {
+		t.Fatalf("project root %q is not flat", root)
 	}
 }
 

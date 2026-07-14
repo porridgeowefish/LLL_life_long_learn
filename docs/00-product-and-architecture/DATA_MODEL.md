@@ -1,125 +1,89 @@
 # Data Model
 
-Status: draft  
-Owner: project maintainer  
-Last reviewed: 2026-06-08  
-Source of truth: conceptual persistence model for upcoming iterations.
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-15
+Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
-## Target File-First Entities
+## Project
 
-```text
-workspace_projects
-- id
-- slug
-- title
-- parent_project_id
-- status
-- active_zone
-- root_path
-- created_at
-- updated_at
+| Field | Type | Values / shape | Rule |
+|---|---|---|---|
+| `id` | string | filesystem-safe project id | required |
+| `slug` | string | filesystem-safe slug | required and unique in its scope |
+| `title` | string | learner-facing title | required |
+| `projectType` | enum string | `discipline-map` or `system-learning` | missing legacy value decodes as `system-learning` |
+| `status` | string | project lifecycle state | required |
+| `activeZone` | string or null | five-zone name | only meaningful for `system-learning` |
+| `createdAt` | RFC 3339 timestamp | timestamp | required |
+| `updatedAt` | RFC 3339 timestamp | timestamp | required |
 
-learning_zones
-- id
-- project_id
-- zone_name
-- path
-- predecessor_zone_names
-- summary_protected
+Project type is immutable in iteration 07.
 
-agent_roles
-- id
-- name
-- charter_path
-- allowed_zone_names
-- default_output_targets
+`project.md` is type-specific learner context:
 
-claude_sessions
-- id
-- project_id
-- zone_name
-- agent_role_id
-- state
-- run_path
-- prompt_path
-- created_at
-- updated_at
-- finished_at
+| Project type | Allowed context |
+|---|---|
+| `discipline-map` | project shape, overview goal, optional scope notes, learner notes |
+| `system-learning` | motivation, current ability, target ability, completion standard, active phase, learner notes |
 
-session_turns
-- id
-- session_id
-- ordinal
-- turn_type
-- source
-- content_path
-- created_at
+A discipline-map brief never stores an ability ladder, completion gate, or
+`Intro`/five-zone phase. The backend enforces this boundary even if a client
+submits system-learning-only fields.
 
-run_records
-- id
-- session_id
-- stdout_path
-- stderr_path
-- transcript_path
-- result_path
-- metadata_path
+## Discipline Overview
 
-learning_artifacts
-- id
-- project_id
-- zone_name
-- artifact_type
-- source_session_id
-- source_turn_id
-- target_path
-- created_at
-- updated_at
+| Field / artifact | Type | Rule |
+|---|---|---|
+| overview content | Markdown file | exactly one learner-facing overview per discipline map |
+| display label | string | always `学科总览`; physical filename is internal |
+| generation run | normal Session + `runs/<timestamp>-encyclopedia/` | selected native Agent CLI; project-level output path is `overview.md` |
+| table of contents | derived from Markdown H2/H3 headings | navigation only; not persisted as a second structure |
+| inline topic action | derived from every H3 key concept or branch | must not create a project until confirmation |
+| folder overview binding | `folders.json.mapProjectSlug` | optional discipline-map slug opened from the folder title; not project ownership |
+| learning-project membership | `folders.json.slugOrder[]` | system-learning classification only; never contains a bound map slug |
 
-project_memory_snapshots
-- id
-- project_id
-- memory_markdown_path
-- memory_state_path
-- updated_at
+An overview topic has no durable project identity. A project record begins only
+after learner-confirmed creation.
 
-learner_memory_snapshots
-- id
-- profile_path
-- state_path
-- updated_at
+The backend reconciles indexed discipline maps into folder objects on folder
+reads and writes. A same-name folder is promoted in place; otherwise one folder
+is created. Clearing a stale map binding preserves the folder and its membership.
 
-learning_events (implemented file-first in `progress/events.jsonl`)
-- id
-- project_slug
-- source_type
-- source_id
-- activity_delta
-- growth_delta (`delta` on disk for backward compatibility)
-- title
-- detail
-- outcome
-- created_at
-```
+## System-Learning Data
 
-## Current Reality
-
-The current implementation is still mostly in-memory and task-oriented.
-This file defines the persistence target for the next architecture direction.
-
-## Persistence Rule
-
-Use:
+System-learning projects retain the existing zone-owned protocols, including:
 
 ```text
-filesystem files as canonical truth
-in-memory indexes as runtime acceleration only
+intro assessment and output
+explain manifest and pages
+practice tasks, answer keys, submissions, and evaluations
+extend artifacts
+summary and flashcards
+progress events
+memory and run records
 ```
 
-That means:
+Each `intro/assessment.json` prerequisite may include `summary`, a 45-100
+Chinese-character introduction to the knowledge and the learner's current gap.
+New Intro output writes it; legacy records without it remain readable by
+falling back to `impact`.
+
+Exact fields remain owned by their code schemas and active iteration contracts.
+
+## Persistence Rules
 
 ```text
-project markdown and json files are durable
-run folders are durable
-artifact files are durable
-session indexes may be rebuilt from disk if needed
+filesystem files are canonical truth
+in-memory indexes are acceleration only
+project indexes are rebuilt from real state files
+overview headings never create index records
+raw run folders and curated artifacts remain separate
+project deletion removes the whole canonical project root and prunes global folder references
+active Agent sessions block deletion to prevent post-delete artifact writes
 ```
+
+## Delivery State
+
+The Go state model persists `projectType` for new projects. Missing type remains
+the legacy compatibility signal and decodes as `system-learning`.

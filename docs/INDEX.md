@@ -1,8 +1,8 @@
 # LLL Documentation Index
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
 Source of truth: this file is the entry point for people and AI agents.
 
 Read this file before implementation, then move to the linked domain documents.
@@ -51,3 +51,6 @@ When APIs change: update backend behavior and iteration API docs in the same tas
 When architecture changes: add or update an ADR.
 After delivery: update delivery notes and acceptance status.
 ```
+
+Architecture completion additionally requires the forward gate in
+[`agent-rules/10-documentation-governance.md`](./00-product-and-architecture/agent-rules/10-documentation-governance.md): classify the change, create or supersede an ADR, and synchronize every long-lived landing document in the same task.

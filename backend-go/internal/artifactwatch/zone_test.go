@@ -11,9 +11,9 @@ func TestParseZonePath(t *testing.T) {
 	}{
 		{"myproj/explain/pages/01.md", "myproj", "explain", true},
 		{"myproj/explain/manifest.json", "myproj", "explain", true},
-		{"p/subprojects/c/practice/tasks.json", "p/subprojects/c", "practice", true},
 		{"abc/intro/output.md", "abc", "intro", true},
 		{"abc/summary/summary.md", "abc", "summary", true},
+		{"physics/overview.md", "physics", "overview", true},
 		// ignored structural folders before a zone -> not a zone artifact
 		{"abc/runs/2026-x/explain/result.md", "", "", false},
 		{"abc/memory/note.md", "", "", false},
@@ -22,6 +22,7 @@ func TestParseZonePath(t *testing.T) {
 		{"README.md", "", "", false},
 		// windows backslashes
 		{"myproj\\explain\\pages\\01.md", "myproj", "explain", true},
+		{"physics\\overview.md", "physics", "overview", true},
 	}
 	for _, c := range cases {
 		slug, zone, ok := parseZonePath(c.rel)

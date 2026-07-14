@@ -1,6 +1,9 @@
-# Iteration 07 Acceptance Criteria
+# Iteration 08 Acceptance Criteria
 
 Status: accepted
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: accepted black-box outcomes for iteration 08.
 
 - [x] Home page matches the approved learning-rhythm hierarchy.
 - [x] Heat represents activity; streak statistics represent consistency; growth remains distinct.

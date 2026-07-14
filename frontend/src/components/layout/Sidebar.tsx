@@ -1,9 +1,9 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
-import { useUiStore } from '@/store';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useProjectStore, useUiStore } from '@/store';
 import { ChevronDownIcon, PlusIcon } from '@radix-ui/react-icons';
 
-import { useProjects } from '@/api/projects';
+import { useDeleteProject, useProjects } from '@/api/projects';
 import { useFolders, useSaveFolders } from '@/api/folders';
 import {
   assignProject,
@@ -15,6 +15,7 @@ import {
   type FolderLayout,
 } from '@/lib/folders';
 import { Icon, type IconName } from '@/components/primitive/Icon';
+import { clearDeletedProjectClientData } from '@/lib/projectDeletion';
 
 import s from './Sidebar.module.css';
 
@@ -27,13 +28,22 @@ const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> 
 ];
 
 export function Sidebar() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
+  const selectProject = useProjectStore((state) => state.selectProject);
   const { data: projectsData, isLoading } = useProjects();
   const projects = projectsData?.projects ?? [];
   const { data: foldersData } = useFolders();
   const layout: FolderLayout = foldersData ?? { folders: [] };
   const save = useSaveFolders();
+  const deleteProject = useDeleteProject();
 
-  const allSlugs = projects.map((p) => p.slug);
+  // Discipline maps are rendered through the same folder header model below;
+  // only concrete system-learning projects become child rows.
+  const allSlugs = projects
+    .filter((project) => project.projectType === 'system-learning')
+    .map((project) => project.slug);
   const uncategorized = uncategorizedSlugs(layout, allSlugs);
   const projectBySlug = new Map(projects.map((p) => [p.slug, p] as const));
 
@@ -74,22 +84,42 @@ export function Sidebar() {
     commit(assignProject(layout, slug, target));
   };
 
+  const removeProject = (slug: string, title: string) => {
+    const confirmed = window.confirm(
+      `永久删除学习「${title}」及其全部内容？此操作无法撤销。`,
+    );
+    if (!confirmed) return;
+    deleteProject.mutate(slug, {
+      onSuccess: () => {
+        clearDeletedProjectClientData(slug);
+        setMenuSlug(null);
+        if (selectedProjectId === slug) {
+          selectProject(null);
+        }
+        if (location.pathname.startsWith(`/project/${slug}`)) navigate('/');
+      },
+    });
+  };
+
   const renderProject = (slug: string) => {
     const p = projectBySlug.get(slug);
     if (!p) return null;
     const currentFolderId = folderOf(layout, p.slug);
     return (
-      <ProjectRow
-        key={p.slug}
-        slug={p.slug}
-        title={p.title}
-        currentFolderId={currentFolderId}
-        folders={layout.folders}
-        menuOpen={menuSlug === p.slug}
-        onToggleMenu={() => setMenuSlug(menuSlug === p.slug ? null : p.slug)}
-        onCloseMenu={() => setMenuSlug(null)}
-        onMove={(target) => moveProject(p.slug, target)}
-      />
+      <div key={p.slug}>
+        <ProjectRow
+          slug={p.slug}
+          title={p.title}
+          projectType={p.projectType}
+          currentFolderId={currentFolderId}
+          folders={layout.folders}
+          menuOpen={menuSlug === p.slug}
+          onToggleMenu={() => setMenuSlug(menuSlug === p.slug ? null : p.slug)}
+          onCloseMenu={() => setMenuSlug(null)}
+          onMove={(target) => moveProject(p.slug, target)}
+          onDelete={() => removeProject(p.slug, p.title)}
+        />
+      </div>
     );
   };
 
@@ -125,6 +155,11 @@ export function Sidebar() {
             文件夹保存失败：{(save.error as Error).message}（请确认后端已重启）
           </div>
         )}
+        {deleteProject.isError && (
+          <div className={s.saveError} role="alert">
+            删除失败：{(deleteProject.error as Error).message}
+          </div>
+        )}
 
         {isLoading && <div className={s.muted}>加载中…</div>}
         {!isLoading && projects.length === 0 && (
@@ -145,7 +180,16 @@ export function Sidebar() {
                 >
                   <ChevronDownIcon className={isOpen ? undefined : s.chevronClosed} />
                 </button>
-                {isRenaming ? (
+                {f.mapProjectSlug ? (
+                  <Link
+                    to={`/project/${f.mapProjectSlug}`}
+                    className={`${s.folderName} ${s.mapFolderName}`}
+                    title={`打开「${f.name}」学科总览`}
+                  >
+                    <span className={s.folderNameText}>{f.name}</span>
+                    <span className={s.count}>{f.slugOrder.length}</span>
+                  </Link>
+                ) : isRenaming ? (
                   <input
                     className={s.folderInput}
                     autoFocus
@@ -175,16 +219,18 @@ export function Sidebar() {
                     <span className={s.count}>{f.slugOrder.length}</span>
                   </button>
                 )}
-                <button
-                  type="button"
-                  className={s.iconBtn}
-                  title="删除文件夹"
-                  onClick={() => removeFolder(f.id, f.name)}
-                >
-                  <Icon name="x" size={13} />
-                </button>
+                {!f.mapProjectSlug && (
+                  <button
+                    type="button"
+                    className={s.iconBtn}
+                    title="删除文件夹"
+                    onClick={() => removeFolder(f.id, f.name)}
+                  >
+                    <Icon name="x" size={13} />
+                  </button>
+                )}
               </div>
-              {isOpen && <div className={s.folderBody}>{f.slugOrder.map(renderProject)}</div>}
+              {isOpen && <div className={s.folderBody}>{f.slugOrder.map((slug) => renderProject(slug))}</div>}
             </div>
           );
         })}
@@ -192,7 +238,7 @@ export function Sidebar() {
         {uncategorized.length > 0 && layout.folders.length > 0 && (
           <div className={s.subSection}>未分类</div>
         )}
-        {uncategorized.map(renderProject)}
+        {uncategorized.map((slug) => renderProject(slug))}
 
         {creating && (
           <input
@@ -220,23 +266,27 @@ export function Sidebar() {
 interface ProjectRowProps {
   slug: string;
   title: string;
+  projectType: 'discipline-map' | 'system-learning';
   currentFolderId: string | null;
   folders: ReadonlyArray<{ id: string; name: string }>;
   menuOpen: boolean;
   onToggleMenu: () => void;
   onCloseMenu: () => void;
   onMove: (folderId: string | null) => void;
+  onDelete: () => void;
 }
 
 function ProjectRow({
   slug,
   title,
+  projectType,
   currentFolderId,
   folders,
   menuOpen,
   onToggleMenu,
   onCloseMenu,
   onMove,
+  onDelete,
 }: ProjectRowProps) {
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -272,14 +322,15 @@ function ProjectRow({
       <Link to={`/project/${slug}`} className={s.link}>
         <Icon name="folder" size={15} className={s.linkIcon} />
         <span className={s.title}>{title}</span>
+        <span className={s.projectType}>{projectType === 'discipline-map' ? '地图' : '学习'}</span>
       </Link>
       <div className={s.menuWrap}>
         <button
           ref={btnRef}
           type="button"
           className={`${s.menuBtn} ${menuOpen ? s.menuBtnOpen : ''}`}
-          title="移动到文件夹"
-          aria-label="移动到文件夹"
+          title="项目操作"
+          aria-label={`项目操作：${title}`}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -317,6 +368,15 @@ function ProjectRow({
                   {f.name}
                 </button>
               ))}
+              <div className={s.menuDivider} />
+              <button
+                type="button"
+                role="menuitem"
+                className={s.menuDanger}
+                onClick={onDelete}
+              >
+                删除学习
+              </button>
             </div>
           </>
         )}

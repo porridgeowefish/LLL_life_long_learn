@@ -3,6 +3,7 @@ package promptassembly
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,6 +35,15 @@ type Request struct {
 	FollowupPriorResultPaths []string
 }
 
+// ProjectAgentRequest carries inputs for a project-level agent that is bound to
+// a project type rather than one of the five learning zones.
+type ProjectAgentRequest struct {
+	ProjectSlug string
+	AgentID     string
+	Intent      string
+	OutputPaths []string
+}
+
 // Package is the assembled prompt package.
 type Package struct {
 	PromptMd    string // the full prompt text passed to Claude
@@ -45,7 +55,9 @@ type Package struct {
 type PackageMeta struct {
 	ProjectSlug           string                       `json:"projectSlug"`
 	ProjectFile           string                       `json:"projectFile,omitempty"`
-	ZoneName              workspace.ZoneName           `json:"zoneName"`
+	ZoneName              workspace.ZoneName           `json:"zoneName,omitempty"`
+	ProjectType           workspace.ProjectType        `json:"projectType,omitempty"`
+	ProjectOutputPaths    []string                     `json:"projectOutputPaths,omitempty"`
 	AgentID               string                       `json:"agentId"`
 	PredecessorFiles      []workspace.PredecessorFile  `json:"predecessorFiles"`
 	OutputTargets         []agentregistry.OutputTarget `json:"outputTargets"`
@@ -55,6 +67,47 @@ type PackageMeta struct {
 	PracticeAttempt       int                          `json:"practiceAttempt,omitempty"`
 	PracticeQuestionCount int                          `json:"practiceQuestionCount,omitempty"`
 	GeneratedAt           time.Time                    `json:"generatedAt"`
+}
+
+// BuildProjectAgent constructs a prompt package for an agent bound directly to
+// a project type. It deliberately does not synthesize a sixth learning zone.
+func BuildProjectAgent(req ProjectAgentRequest, reg *agentregistry.Registry) (*Package, error) {
+	if !workspace.ValidateSlug(req.ProjectSlug) {
+		return nil, fmt.Errorf("invalid project slug: %q", req.ProjectSlug)
+	}
+	agent, ok := reg.Get(req.AgentID)
+	if !ok {
+		return nil, fmt.Errorf("agent not found: %s", req.AgentID)
+	}
+	state, err := workspace.ReadProjectState(req.ProjectSlug)
+	if err != nil {
+		return nil, fmt.Errorf("read project state: %w", err)
+	}
+	if !agentProjectTypeAllowed(agent, state.ProjectType) {
+		return nil, fmt.Errorf("agent %s not allowed for project type %s", agent.ID, state.ProjectType)
+	}
+	projectFile, projectBrief, err := readProjectBrief(req.ProjectSlug)
+	if err != nil {
+		return nil, fmt.Errorf("read project brief: %w", err)
+	}
+	outputPaths := sanitizeProjectOutputPaths(req.OutputPaths)
+	if len(outputPaths) == 0 {
+		return nil, errors.New("project-level agent requires an output path")
+	}
+
+	generatedAt := time.Now().UTC()
+	return &Package{
+		PromptMd:   renderProjectAgentPrompt(agent, req, state.ProjectType, projectFile, projectBrief, outputPaths),
+		RunDirName: timestampRunDir(req.AgentID, generatedAt),
+		PackageMeta: PackageMeta{
+			ProjectSlug:        req.ProjectSlug,
+			ProjectFile:        projectFile,
+			ProjectType:        state.ProjectType,
+			AgentID:            agent.ID,
+			ProjectOutputPaths: outputPaths,
+			GeneratedAt:        generatedAt,
+		},
+	}, nil
 }
 
 // Build constructs the prompt package. Returns error on validation failure.
@@ -138,6 +191,73 @@ func agentZoneAllowed(a *agentregistry.Agent, zone workspace.ZoneName) bool {
 		}
 	}
 	return false
+}
+
+func agentProjectTypeAllowed(a *agentregistry.Agent, projectType workspace.ProjectType) bool {
+	for _, allowed := range a.AllowedProjectTypes {
+		if allowed == projectType {
+			return true
+		}
+	}
+	return false
+}
+
+func sanitizeProjectOutputPaths(paths []string) []string {
+	result := make([]string, 0, len(paths))
+	seen := map[string]bool{}
+	for _, value := range paths {
+		value = filepath.ToSlash(filepath.Clean(strings.TrimSpace(value)))
+		if value == "." || value == "" || strings.HasPrefix(value, "../") || filepath.IsAbs(value) || seen[value] {
+			continue
+		}
+		seen[value] = true
+		result = append(result, value)
+	}
+	return result
+}
+
+func renderProjectAgentPrompt(
+	agent *agentregistry.Agent,
+	req ProjectAgentRequest,
+	projectType workspace.ProjectType,
+	projectFile string,
+	projectBrief string,
+	outputPaths []string,
+) string {
+	var b strings.Builder
+	b.WriteString("# Agent Identity\n\n")
+	b.WriteString(fmt.Sprintf("**%s %s** — %s\n\n", agent.Icon, agent.Name, agent.Description))
+	b.WriteString("# User Story\n\n")
+	b.WriteString(strings.TrimSpace(agent.UserStory))
+	b.WriteString("\n\n# Charter\n\n")
+	b.WriteString(strings.TrimSpace(agent.CharterText))
+	b.WriteString("\n\n# Project-Level Invocation Contract\n\n")
+	b.WriteString("- This is an explicit native Agent CLI invocation recorded as a normal session and run.\n")
+	b.WriteString("- It is bound to the project type, not to Intro / Explain / Practice / Extend / Summary.\n")
+	b.WriteString("- Read the project brief and the current output artifact before revising it.\n")
+	b.WriteString("- Write the final learner-facing Markdown directly to the declared project-root output path.\n")
+	b.WriteString("- Do not merely paste the proposed artifact into the terminal response.\n\n")
+	b.WriteString("# Project Context\n\n")
+	b.WriteString(fmt.Sprintf("- Project slug: `%s`\n", req.ProjectSlug))
+	b.WriteString(fmt.Sprintf("- Project type: `%s`\n", projectType))
+	b.WriteString(fmt.Sprintf("- Project brief file: `%s`\n", projectFile))
+	b.WriteString("\n# Project Brief\n\n")
+	if strings.TrimSpace(projectBrief) == "" {
+		b.WriteString("_(project.md is not present; do not invent missing learner background)_\n")
+	} else {
+		b.WriteString(projectBrief)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n# Project-Root Output Paths\n\n")
+	for _, outputPath := range outputPaths {
+		b.WriteString(fmt.Sprintf("- `%s`\n", outputPath))
+	}
+	if intent := strings.TrimSpace(req.Intent); intent != "" {
+		b.WriteString("\n# Additional Guidance\n\n")
+		b.WriteString(intent)
+		b.WriteString("\n")
+	}
+	return b.String()
 }
 
 func renderPrompt(

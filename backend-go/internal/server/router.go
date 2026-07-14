@@ -111,10 +111,13 @@ func (s *Server) Handler() http.Handler {
 	// Projects
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
 	mux.HandleFunc("POST /api/projects", s.handleCreateProject)
+	mux.HandleFunc("DELETE /api/projects/{id}", s.handleDeleteProject)
+	mux.HandleFunc("POST /api/project-type-advice", s.handleProjectTypeAdvice)
 	mux.HandleFunc("GET /api/projects/{id}", s.handleGetProject)
 	mux.HandleFunc("GET /api/projects/{id}/tree", s.handleProjectTree)
 	mux.HandleFunc("GET /api/projects/{id}/zones/{zone}", s.handleGetZone)
-	mux.HandleFunc("POST /api/projects/{id}/subprojects", s.handleCreateSubproject)
+	mux.HandleFunc("GET /api/projects/{id}/discipline-overview", s.handleGetDisciplineOverview)
+	mux.HandleFunc("POST /api/projects/{id}/discipline-overview/generate", s.handleGenerateDisciplineOverview)
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 
 	// Agents

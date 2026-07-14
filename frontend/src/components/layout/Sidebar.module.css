@@ -81,6 +81,12 @@
   white-space: nowrap;
 }
 
+.projectType {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.58rem;
+}
+
 .muted {
   font-size: 0.72rem;
   color: var(--muted);
@@ -169,6 +175,19 @@
   padding: 4px 2px;
   cursor: pointer;
   overflow: hidden;
+  text-decoration: none;
+}
+
+.mapFolderName {
+  border-radius: 4px;
+}
+
+.mapFolderName:hover,
+.mapFolderName:focus-visible {
+  background: var(--surface-tint);
+  color: var(--accent-ink);
+  outline: none;
+  text-decoration: none;
 }
 
 .folderNameText {
@@ -301,4 +320,18 @@
 .menuActive {
   color: var(--accent2);
   font-weight: 600;
+}
+
+.menuDivider {
+  height: 1px;
+  margin: 4px;
+  background: var(--border);
+}
+
+.menu button.menuDanger {
+  color: var(--danger, #b34a3c);
+}
+
+.menu button.menuDanger:hover {
+  background: rgba(179, 74, 60, 0.1);
 }

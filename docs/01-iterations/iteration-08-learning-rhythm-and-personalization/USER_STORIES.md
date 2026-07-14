@@ -1,6 +1,9 @@
-# Iteration 07 User Stories
+# Iteration 08 User Stories
 
 Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: delivered iteration 08 learner value.
 
 ## Learning rhythm
 

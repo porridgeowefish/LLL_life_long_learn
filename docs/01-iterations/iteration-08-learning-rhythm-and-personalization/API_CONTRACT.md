@@ -1,6 +1,9 @@
-# Iteration 07 API Contract
+# Iteration 08 API Contract
 
 Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: delivered iteration 08 API behavior; Go handlers own runtime truth.
 
 ## Activity summary
 

@@ -1,9 +1,9 @@
 # 对齐模式
 
-状态：active
-负责人：project maintainer
-最后审阅：2026-07-05
-事实源：本文定义 LLL 在实现前如何使用对齐文档。
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: 本文定义 LLL 在实现前如何使用对齐文档。
 
 ## 当前模式
 

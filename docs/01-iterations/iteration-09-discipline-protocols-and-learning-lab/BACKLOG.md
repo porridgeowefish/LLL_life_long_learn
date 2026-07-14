@@ -1,6 +1,9 @@
-# Iteration 08 Discovery Backlog
+# Iteration 09 Discovery Backlog
 
 Status: open questions
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: unresolved discovery questions for iteration 09.
 
 ## Candidate capabilities
 

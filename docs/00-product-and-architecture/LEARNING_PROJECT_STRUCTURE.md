@@ -1,541 +1,201 @@
 # Learning Project Structure
 
-Status: draft  
-Owner: project maintainer  
-Last reviewed: 2026-06-08  
-Source of truth: this document defines the long-lived structure of LLL learning projects, subprojects, agent invocation, and memory growth.
-
-## Intent
-
-LLL should treat a learning task as a local project, not a single prompt run.
-
-The project structure must support:
-
-```text
-folder-first organization
-sidebar project tree navigation
-fixed learning flow zones
-direct Claude Code terminal invocation
-multi-agent orchestration through file paths
-editable summaries
-long-term memory growth
-subproject nesting
-```
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-15
+Source of truth: approved long-lived project types, flat storage shapes, map-backed sidebar folders, and navigation semantics.
 
 ## Core Principle
 
-One learning task equals one project folder.
-
-The folder is the durable unit for:
+LLL is a folder-first local learning workbench. A project folder represents a
+real product object, not every topic that AI happens to mention.
 
 ```text
-scope
-context
-agent inputs
-agent outputs
-practice artifacts
-summary
-memory
-subprojects
+overview content describes possibilities
+project folders record learner commitments
 ```
 
-LLL is not a chat container.
-LLL is a local learning workbench organized around projects and files.
+## Project Types
 
-## Workspace Structure
+| Type | User-facing name | Primary artifact | Learning zones |
+|---|---|---|---|
+| `discipline-map` | 学科地图 | 学科总览 | none |
+| `system-learning` | 系统学习 | zone artifacts and summary | five fixed zones |
 
-Recommended top-level workspace layout:
+The learner explicitly chooses the type before creation. AI may recommend a
+type, explain the trade-off, and prefill fields, but cannot submit the choice.
+
+Existing projects without type metadata decode as `system-learning`.
+
+## Discipline-Map Project
+
+A discipline map is a long-lived organizing entry with one learner-facing
+entry. The frontend label is `学科总览`; the physical filename is an internal
+contract and must not leak into the UI.
+
+Target layout:
 
 ```text
-projects/
-  <project-slug>/
-
-memory/
-  learner-profile.md
-  learner-state.json
-  learning-preferences.md
-
-agents/
-  registry/
-  charters/
-
-templates/
-  projects/
-  prompts/
+projects/<map-slug>/
+  project.md
+  state.json
+  overview.md
+  memory/
+  runs/
+  assets/
 ```
 
-Meaning:
+Its `project.md` is a map brief, not a learning contract. It records the map
+shape, overview goal, optional scope notes, and learner notes. It must not
+contain current/target ability, completion criteria, `Active Phase`, or any
+five-zone name.
+
+The overview should establish:
 
 ```text
-projects/ stores all learning projects and subprojects
-memory/ stores global long-term learner memory
-agents/ stores agent role definitions and behavior rules
-templates/ stores reusable project skeletons and prompt templates
+the discipline's purpose and boundary
+major research areas and their relationships
+methods and evidence forms
+representative applications
+possible learning routes
 ```
 
-## Project Model
+Areas listed in the overview do not create folders, pages, jobs, or sidebar
+nodes. There is no branch-overview object in this model.
 
-Each project should contain:
+Other-project status is not written into overview prose. The overview changes
+only after an explicit learner update action.
+
+## System-Learning Project
+
+A system-learning project is a focused deep dive with five fixed zones:
 
 ```text
-one project overview
-five fixed learning zones
-one project memory area
-one runs area
-one assets area
-one subprojects area
+Intro -> Explain -> Practice -> Extend -> Summary
 ```
 
-Recommended project structure:
+Target layout:
 
 ```text
-<project-slug>/
+<learning-slug>/
   project.md
   state.json
   memory/
-    project-memory.md
-    project-state.json
   intro/
-    brief.md
-    output.md
-    notes.md
   explain/
-    brief.md
-    output.md
-    notes.md
-    map.mmd
   practice/
-    brief.md
-    tasks.json
-    submissions/
-    reflections.md
   extend/
-    brief.md
-    prompts.md
-    relation-notes.md
-    open-questions.md
   summary/
-    summary.md
-    next-steps.md
-  assets/
+  progress/
   runs/
-  subprojects/
+  assets/
 ```
 
-## Required Files
+Zone semantics and artifact protocols are owned by the agent charters and the
+current iteration contracts. The five-zone rule applies only to
+`system-learning`, not to every `WorkspaceProject`.
 
-`project.md`
+Its `project.md` retains the focused-learning contract: motivation, current
+ability, target ability, completion standard, active phase, and learner notes.
 
-Human-readable project home.
-Should describe:
+When Intro detects a prerequisite gap, `intro/assessment.json` includes a
+concise summary of what the knowledge is and what understanding is missing. The
+UI displays that summary directly and exposes no supplement action. A gap does
+not create a new project. Only a separate learner-confirmed commitment creates
+system learning.
+
+## Creating A Deep Dive From A Map
+
+The learner may choose a topic named in the map and request system learning.
+The system must:
 
 ```text
-topic
-why this topic matters
-current ability
-target ability
-completion standard
-current phase
-active subprojects
+place the action beside the corresponding concept or branch heading in the body
+prefill the project title and learning context
+show a confirmation form
+allow the learner to edit the learning contract
+write a project only after confirmation
 ```
 
-`state.json`
+The page may render a Word-style table of contents for navigation, but it must
+not duplicate selectable topics into a top card index or detach one generic
+deep-dive action from the concept being discussed.
 
-System-readable project state.
-Should track:
+All project directories remain physically flat:
 
 ```text
-project id
-title
-status
-active zone
-last updated time
-linked runs
-linked assets
-child project ids
+projects/
+  物理学/
+    overview.md
+    state.json
+  流体力学/
+    project.md
+    state.json
+    intro/
+    explain/
+    practice/
+    extend/
+    summary/
 ```
 
-`memory/project-memory.md`
+No directory exists for Newtonian mechanics, thermodynamics, or quantum
+mechanics merely because those names appear in the physics overview.
 
-Human-readable memory for this project.
-Should capture:
+## Sidebar Contract
+
+The sidebar combines real project objects with the existing folder layout. A
+discipline map is the clickable overview of its folder; it is not duplicated as
+a child project row. System-learning projects remain ordinary movable members:
 
 ```text
-what the learner already understands
-recurring confusion points
-preferred explanation style
-useful analogies
-known gaps
+物理学                    ← 点击文件夹标题打开学科总览
+├─ 流体力学               系统学习
+└─ 热力学                 系统学习
 ```
 
-`memory/project-state.json`
+It must not parse overview headings into navigation nodes. Selecting a
+map-backed folder title opens `学科总览`; selecting a system-learning child row
+opens its five-zone experience.
 
-System-readable memory snapshot for orchestration and retrieval.
+## Required Project State
 
-`summary/summary.md`
-
-The canonical editable summary.
-This file must remain learner-owned.
-Agents may propose edits, but LLL should treat this file as personally editable knowledge, not a generated terminal dump.
-
-## Learning Flow Zones
-
-Each project uses five fixed zones.
-
-### Intro
-
-Purpose:
+All project state tracks:
 
 ```text
-create curiosity
-activate prior knowledge
-show why the topic matters
-surface motivating questions
+project id, globally unique slug, title, type, status, timestamps
 ```
 
-Expected outputs:
+System-learning state additionally tracks an active zone. Discipline maps do
+not invent an active zone.
+
+Project type is immutable in iteration 07. A learner who wants another shape
+creates a related project instead of rewriting the existing folder in place.
+
+## Runs, Artifacts, And Memory
 
 ```text
-interest hook
-entry questions
-relevance to the learner
-minimal topic framing
+runs/ stores raw execution records
+overview and zone files store curated learner-facing artifacts
+memory/ stores project context used for later personalization
 ```
 
-### Explain
-
-Purpose:
-
-```text
-deliver structured understanding
-use MECE + first-principles decomposition
-build concept maps and boundaries
-```
-
-Expected outputs:
-
-```text
-structured explanation
-concept relationships
-MECE breakdown
-misconceptions
-maps and diagrams
-```
-
-### Practice
-
-Purpose:
-
-```text
-produce learning through constrained action
-reduce dependence on AI during execution
-make the learner generate output personally
-```
-
-Expected outputs:
-
-```text
-practice tasks
-submission artifacts
-self-reflection
-minimal-AI or no-AI exercises
-```
-
-Rule:
-
-```text
-Practice agents should design work, constraints, and review criteria.
-They should not directly complete the learner's work unless explicitly requested.
-```
-
-### Extend
-
-Purpose:
-
-```text
-push the learner into higher-order thinking
-focus on relations between knowledge points
-support accumulation instead of direct answer delivery
-```
-
-Target relation types:
-
-```text
-causal relations
-structural composition relations
-priority or degree relations
-isomorphic relations
-```
-
-Expected outputs:
-
-```text
-prompted comparisons
-guided questions
-relationship scaffolds
-open-ended thought paths
-```
-
-Rule:
-
-```text
-Extend agents should not directly provide the final high-level conclusion when the goal is learner accumulation.
-They should guide, constrain, and provoke.
-```
-
-### Summary
-
-Purpose:
-
-```text
-capture what was actually learned
-turn scattered outputs into reusable knowledge
-support personal editing and later revision
-```
-
-Expected outputs:
-
-```text
-editable summary
-what is understood
-what remains unclear
-next study steps
-reusable expressions
-```
-
-Rule:
-
-```text
-Summary is the learner-facing canonical knowledge layer.
-It must support direct editing in the LLL panel.
-```
-
-## Zone Dependency Graph
-
-LLL should treat the five zones as a graph with predecessor nodes.
-
-Default dependency graph:
-
-```text
-Intro -> Explain
-Explain -> Practice
-Explain -> Extend
-Practice -> Extend
-Intro + Explain + Practice + Extend -> Summary
-```
-
-Meaning:
-
-```text
-when an agent is invoked for a zone, LLL should resolve predecessor files first
-the predecessor file paths become part of the runtime prompt context
-the current zone behavior rules also become part of the runtime prompt
-```
-
-## Agent Model
-
-Agents are visible roles in the LLL panel.
-
-Each agent should have:
-
-```text
-identity
-role charter
-allowed project zones
-behavior rules
-expected outputs
-target file paths
-```
-
-Recommended starter agents:
-
-```text
-Intro Agent
-Explain Agent
-Practice Agent
-Extend Agent
-Summary Agent
-Memory Agent
-```
-
-## Agent Invocation Contract
-
-When a user invokes an agent, the system behavior should be:
-
-```text
-1. Resolve the active project and current target zone
-2. Resolve predecessor node file paths for the target zone
-3. Build a prompt containing:
-   - the selected agent identity
-   - the agent charter
-   - the predecessor file paths
-   - the current task intent
-   - the behavior rules for this zone
-   - the output specification
-   - the target output file paths
-4. Launch a real Claude Code terminal session on the local machine
-5. Auto-inject the prepared prompt into that Claude Code terminal
-6. Allow the learner to observe the authentic Claude terminal feedback directly
-7. Persist generated outputs into the project files
-8. Index the outputs back into the LLL panel for reading, review, and editing
-```
-
-Important constraint:
-
-```text
-LLL does not replace the real Claude Code execution surface.
-LLL launches and organizes it.
-The terminal is the execution surface.
-The panel is the observation and knowledge organization surface.
-```
-
-## Runs And Artifacts
-
-`runs/` should store raw execution traces for replay and audit.
-
-Recommended run structure:
-
-```text
-runs/
-  <timestamp>-<agent-name>/
-    prompt.md
-    stdout.log
-    stderr.log
-    result.md
-    run.json
-```
-
-Rule:
-
-```text
-raw runs are not the final knowledge layer
-they are execution records
-summary and project files remain the curated learning layer
-```
-
-## Subproject Rules
-
-Subprojects allow deep study inside a broader parent topic.
-
-Example:
-
-```text
-recommended systems/
-  subprojects/
-    user-collaborative-filtering/
-```
-
-Rules:
-
-```text
-each subproject is a full project with the same five-zone structure
-subprojects inherit context from the parent project
-subprojects may reference parent files as predecessor inputs
-subproject summaries may be promoted back into the parent summary
-parent projects should track active subprojects in project.md and state.json
-```
-
-Parent project meaning:
-
-```text
-map and organizing layer
-```
-
-Subproject meaning:
-
-```text
-focused deep-dive learning layer
-```
-
-## Memory System
-
-LLL should keep memory at two levels.
-
-Global learner memory:
-
-```text
-who the learner is
-what they are trying to become
-stable preferences
-recurring learning patterns
-```
-
-Project memory:
-
-```text
-what is already learned in this topic
-where confusion remains
-which examples worked
-which tasks were too easy or too hard
-```
-
-Memory should improve:
-
-```text
-task prompts
-practice calibration
-summary relevance
-extension questions
-next-step recommendations
-```
-
-Rule:
-
-```text
-memory should guide personalization, not silently override learner control
-```
-
-## Sidebar And Panel Model
-
-Recommended sidebar structure:
-
-```text
-Project
-  Overview
-  Memory
-  Intro
-  Explain
-  Practice
-  Extend
-  Summary
-  Runs
-  Assets
-  Subprojects
-```
-
-Recommended main panel behavior:
-
-```text
-open files directly
-show rendered output and raw file view
-show agent actions for the current zone
-show linked predecessor nodes
-show editable summary content
-```
-
-## Out Of Scope For This Structure
-
-This structure does not require:
-
-```text
-cloud deployment
-user accounts
-multi-tenant permissions
-remote collaboration
-complex message bus orchestration between agents
-database-first project modeling
-```
-
-## Decision Summary
-
-The LLL learning framework should be:
-
-```text
-project folders as the core unit
-five learning zones as the fixed workflow
-real Claude Code terminal invocation as execution
-panel-based observation and editing as experience
-file paths as the primary agent interface
-memory growth as the personalization engine
-subprojects as recursive deep-dive units
-```
+Raw runtime output never becomes the curated learning layer automatically.
+Memory may guide recommendations and explanations but must not override explicit
+learner choices.
+
+## Delivery State
+
+Iteration 07 is delivered: project state, skeleton creation, indexing, API
+routing, and frontend navigation are type-aware. The encyclopedia Agent runs
+through the selected native CLI. Its heading hierarchy renders as a Word-style
+table of contents, and every H3 key concept or branch receives an adjacent body
+action that opens the ordinary system-learning form with an editable prefilled
+title. The confirmed project is classified through the map-backed folder.
+
+## Decision References
+
+- [ADR-0002](./ADR/0002-local-learning-workbench-structure.md) established the folder-first workbench and five-zone learning workflow.
+- [ADR-0005](./ADR/0005-discipline-map-and-system-learning-project-types.md) limits the five-zone workflow to system-learning projects and adds discipline maps.
+- [ADR-0006](./ADR/0006-inline-prerequisite-bridges.md) is the superseded historical bridge decision.
+- [ADR-0007](./ADR/0007-flat-project-storage-and-sidebar-classification.md) removes physical subprojects and defines flat storage plus map-backed reuse of existing sidebar folders.
+- [ADR-0008](./ADR/0008-generated-prerequisite-gap-summaries.md) makes the generated assessment summary the current prerequisite response.

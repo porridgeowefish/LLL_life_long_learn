@@ -1,99 +1,104 @@
 # System Architecture
 
-Status: draft  
-Owner: project maintainer  
-Last reviewed: 2026-06-08  
-Source of truth: runtime structure for the current LLL foundation.
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-15
+Source of truth: long-lived runtime boundaries and approved target architecture; code owns current implementation details.
 
-## Current Context
+## Current Runtime
 
-LLL is currently a local-first web application with two runtime layers:
+LLL is a local-first web application:
 
 ```text
-frontend/
-Browser console for composing tasks, viewing logs, and reading rendered output.
-
-backend/
-Node HTTP service that launches Claude Code, streams events, and serves the frontend.
+frontend/          Vite + React 18 + TypeScript SPA
+backend-go/        Go HTTP server, project runtime, file stores, and agent launcher
+projects/          canonical local project and artifact data
+agents/            registry, charters, and reasoning primitives
 ```
 
-This is the implementation reality today, but it is no longer the target product shape.
+The Go binary serves `frontend/dist/` in production. The file system is durable
+truth; in-memory indexes accelerate reads and can be rebuilt.
 
-## Target Runtime Shape
-
-LLL should evolve into a local learning workbench with three interacting planes:
+## Runtime Planes
 
 ```text
 Project plane
-Filesystem-based learning projects, subprojects, zone files, assets, and memory.
+Flat typed project directories, artifacts, runs, progress, and memory.
 
 Execution plane
-Real Claude Code terminal sessions launched and tracked by the backend.
+Real local AI runtime sessions launched through explicit project contracts.
 
 Experience plane
-Frontend project tree, large learning panel, follow-up session view, and agent side rail.
+Frontend project tree, discipline overview, five-zone learning surfaces, and controls.
 ```
 
-## Target Runtime Layers
+## Project-Type Routing
 
 ```text
-frontend/
-Project tree navigation, editing, session display, artifact reading, and agent controls.
+discipline-map
+  -> open one discipline overview
+  -> render as the overview of an existing sidebar folder object
+  -> no five-zone navigation
+  -> may start creation of an ordinary system-learning project
 
-backend/
-Project indexing, prompt assembly, agent orchestration, PTY-backed Claude sessions, artifact writing, memory updates, and API/event delivery.
-
-filesystem workspace/
-Canonical local truth for projects, runs, artifacts, summaries, and memory.
+system-learning
+  -> open Intro / Explain / Practice / Extend / Summary
+  -> invoke zone-bound learning agents
+  -> render generated prerequisite-gap summaries without a second AI request or new project
 ```
 
-## Target Runtime Flow
+The sidebar combines indexed project objects with the persisted folder layout.
+A bound discipline map opens from the folder title and is omitted from child
+rows; system-learning projects remain ordinary movable folder members. It never
+derives navigation nodes or projects from overview Markdown. The map page derives
+a Word-style table of contents from the heading hierarchy and attaches a prefill
+action beside each contracted research-area heading in the explanatory body.
+
+## Execution Flow
+
+System-learning invocation:
 
 ```text
-User selects project + zone + agent
--> frontend requests agent invocation
--> backend resolves predecessor file paths and memory snapshots
--> backend assembles prompt package
--> backend launches a real Claude Code terminal session
--> backend captures session events and run files
--> frontend shows live session history and large reading/editing surface
--> backend writes curated outputs into project files
--> user may follow up in the same session
--> session turns append instead of replacing prior results
+learner selects project + zone + agent
+-> backend validates system-learning type and zone compatibility
+-> backend resolves predecessor files and memory
+-> backend assembles and launches the local AI runtime
+-> run files remain raw; curated outputs land in zone contracts
 ```
+
+Discipline-map generation or update:
+
+```text
+learner explicitly requests generation/update
+-> backend validates discipline-map type
+-> registered encyclopedia agent supplies its versioned charter
+-> normal session and prompt package are created
+-> selected native Agent CLI opens in a visible terminal
+-> runtime writes the single overview artifact
+-> filesystem watcher emits an overview artifact update and the page refetches
+-> other project creation and progress changes do not trigger regeneration
+```
+
+The encyclopedia agent is project-type-bound and has no learning zone; no sixth
+learning zone is implied.
 
 ## Architectural Rules
 
-Use:
-
 ```text
-filesystem-first project truth
-project-based learning units
-append-only session history
-real terminal visibility
-file-path-based agent coordination
-separation between raw runs and curated artifacts
+filesystem-first truth
+explicit project types
+learner-owned product-shape choice
+real project objects only in navigation
+separation of raw runs and curated artifacts
+append-only execution history where supported
+missing legacy project type defaults to system learning
 ```
 
-Do not optimize for:
+Do not optimize for cloud accounts, multi-tenant collaboration, hidden-only
+orchestration, or database-first project modeling.
 
-```text
-cloud deployment
-accounts
-multi-tenant collaboration
-hidden-only orchestration
-single-buffer result replacement
-```
+## Delivery State
 
-## Near-Term Expansion
-
-The architecture is expected to grow into:
-
-```text
-project persistence through filesystem structure
-session and turn history
-study artifact indexing
-role-specific agent invocation
-project and learner memory
-interactive follow-up through PTY-backed sessions
-```
+The two-type routing, encyclopedia-agent overview generation, flat project
+storage, stateless type-advice conversation, and map-backed folder navigation
+are implemented by iteration 07.

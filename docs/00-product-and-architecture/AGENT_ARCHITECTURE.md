@@ -1,17 +1,17 @@
 # Agent Architecture
 
-Status: draft  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-15
 Source of truth: rules for using AI runtimes as controlled study operators.
 
 ## Current Agent Role
 
-Today LLL treats Claude Code as an external task runtime:
+LLL treats the configured native AI CLI as an external task runtime:
 
 ```text
 The browser prepares a structured prompt.
-The backend executes the runtime.
+The Go backend launches the selected runtime.
 The UI observes status, logs, and final study output.
 ```
 
@@ -25,7 +25,7 @@ direct Claude Code terminal launch instead of hidden-only execution
 prompt assembly from predecessor project file paths
 zone-specific behavior rules and output contracts
 file-path-based coordination between agents
-subproject-aware agent invocation
+flat project-root resolution independent of sidebar classification
 run history and replay
 memory-aware prompt adaptation
 ```
@@ -33,6 +33,11 @@ memory-aware prompt adaptation
 ## Execution Principle
 
 LLL should not replace the real Claude Code execution surface.
+
+Every capability registered and presented as an `Agent` must use the selected
+native Agent CLI execution path. Direct HTTP model providers are reserved for
+explicitly lightweight AI helpers such as Ask-AI; they must not impersonate a
+registered Agent or bypass Session/run/terminal observability.
 
 Use:
 
@@ -72,6 +77,32 @@ opaque in-memory message buses
 hidden agent-to-agent state
 non-inspectable orchestration
 ```
+
+## Project-Type Boundary
+
+The five learning-role agents and their zone contracts apply to
+`system-learning` projects. A `discipline-map` has no learning zones.
+
+Iteration 07 provides separate advisor and map-generation capabilities, but
+neither capability becomes a sixth learning stage:
+
+```text
+choice advisor     -> recommends a project type; never creates
+encyclopedia agent -> explicitly launches the selected native CLI and writes or updates one discipline overview
+five learning agents -> operate only inside system-learning zones
+```
+
+Within a system-learning flow, Intro records a concise explanation of each
+detected prerequisite gap in `intro/assessment.json`. The UI presents it as
+diagnostic context without a second AI action. Explain then supplies necessary
+background naturally. A gap does not become a project; only a separately confirmed system-learning commitment
+has no durable map-parent relation; sidebar folders are not added to prompt context.
+
+The registered `encyclopedia` agent is project-type-bound to `discipline-map`,
+has no allowed learning zone, and owns a versioned charter that reserves
+level-three headings for independently learnable key concepts or branches.
+It is a project-level Agent, not a direct-provider shortcut: invocation still
+creates the normal Session and run package and opens the real CLI terminal.
 
 ## Safety Principle
 

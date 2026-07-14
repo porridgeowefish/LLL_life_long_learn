@@ -78,7 +78,7 @@ export function HomePage() {
           ) : projects.length === 0 ? (
             <EmptyState
               title="还没有任何学习项目"
-              description="一个学习项目对应一个你想掌握的主题。在项目里你可以调用 5 个学习智能体（Intro / Explain / Practice / Extend / Summary）来完成完整学习流程。"
+              description="创建学科地图来了解一个领域，或创建系统学习项目进入完整学习流程。"
               action={
                 <Button variant="primary" onClick={openModal}>
                   创建第一个项目

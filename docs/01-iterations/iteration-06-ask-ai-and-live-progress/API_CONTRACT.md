@@ -1,15 +1,15 @@
 # Iteration 06 API Contract
 
 Status: proposed
-Last reviewed: 2026-07-08
+Last reviewed: 2026-07-14
 
 ## Existing Endpoints (unchanged unless noted)
 
-The heavy agent generation flow is untouched:
+The heavy agent generation endpoints are unchanged:
 
 ```text
-POST /api/agents/{id}/invoke          still launches the claude CLI TUI
-POST /api/projects/{id}/explain/resume
+POST /api/agents/{id}/invoke          launches the selected CLI runtime TUI
+POST /api/projects/{id}/explain/resume resumes the selected CLI runtime
 GET  /api/events                      the app-wide SSE bus (lifecycle events only)
 POST /api/projects/{id}/confusions    reused to create the doubt that Ask-AI attaches to
 ```
@@ -33,6 +33,12 @@ On Windows, if a native Claude/Codex probe fails, the backend probes WSL with
 convert project and prompt paths with `wslpath`; the Linux side reads
 `prompt.md` directly, so Chinese prompt text does not cross the Windows argv or
 environment boundary.
+
+Codex launches always opt into its explicit unrestricted mode. Interactive and
+headless invocations include `--yolo`; Explain resume runs
+`codex resume --last --yolo` from the project root. Claude resume remains
+`claude -c`. The resume endpoint checks the selected runtime's availability
+rather than requiring Claude to be installed.
 
 ## Ask-AI Settings
 

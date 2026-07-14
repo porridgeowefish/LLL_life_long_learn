@@ -19,9 +19,10 @@ export interface PrerequisiteAssessment {
   title: string;
   assessedLevel: AssessedLevel;
   status: PrerequisiteStatus;
+  summary?: string;
   impact: string;
   evidence: string;
-  projectDraft: ProjectDraft;
+  projectDraft?: ProjectDraft; // legacy iteration-04 assessment compatibility
 }
 
 export interface IntroAssessment {

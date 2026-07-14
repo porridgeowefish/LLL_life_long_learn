@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRightIcon, ClipboardCopyIcon } from '@radix-ui/react-icons';
+import { ClipboardCopyIcon } from '@radix-ui/react-icons';
 
 import {
   useIntroAssessment,
-  useIntroOutput,
   useIntroSurvey,
   useSaveIntroSurvey,
   type IntroSurvey,
   type IntroSurveyQuestion,
-  type PrerequisiteAssessment,
 } from '@/api/learningArtifacts';
-import { useCreateSubproject } from '@/api/projects';
 import { Button } from '@/components/primitive/Button';
 import { EmptyState } from '@/components/primitive/EmptyState';
-import { Modal } from '@/components/primitive/Modal';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
 
 import s from './IntroPage.module.css';
@@ -33,8 +28,8 @@ const LEVEL_LABEL: Record<string, string> = {
 
 const STATUS_LABEL: Record<string, string> = {
   ready: '已就绪',
-  weak: '建议补齐',
-  missing: '需要补齐',
+  weak: '学习时留意',
+  missing: '需要先认识',
 };
 
 function buildSurveyPayload(questions: IntroSurveyQuestion[], answers: Record<string, string>): IntroSurvey {
@@ -65,13 +60,9 @@ function buildCopyText(survey: IntroSurvey) {
 }
 
 export function IntroPage({ projectSlug }: IntroPageProps) {
-  const navigate = useNavigate();
   const assessment = useIntroAssessment(projectSlug);
-  const introOutput = useIntroOutput(projectSlug);
   const survey = useIntroSurvey(projectSlug);
   const saveSurvey = useSaveIntroSurvey(projectSlug);
-  const createSubproject = useCreateSubproject(projectSlug);
-  const [selected, setSelected] = useState<PrerequisiteAssessment | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
 
@@ -88,15 +79,7 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
     (item) => item.status === 'weak' || item.status === 'missing',
   ) ?? [];
   const answeredCount = surveyQuestions.filter((q) => (answers[q.id] ?? q.answer ?? '').trim()).length;
-  const hasIntroOutput = Boolean(introOutput.data?.trim());
   const hasSurvey = surveyQuestions.length > 0;
-
-  const handleCreate = async () => {
-    if (!selected) return;
-    const result = await createSubproject.mutateAsync(selected.projectDraft);
-    setSelected(null);
-    navigate(`/project/${result.project.slug}/Intro`);
-  };
 
   const handleSaveSurvey = async () => {
     const payload = buildSurveyPayload(surveyQuestions, answers);
@@ -192,17 +175,7 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
 
   return (
     <div className={s.layout}>
-      {hasIntroOutput ? (
-        <>
-          {introSection}
-          {surveySection}
-        </>
-      ) : (
-        <>
-          {surveySection}
-          {introSection}
-        </>
-      )}
+      {introSection}
 
       {assessment.data && (
         <section className={s.assessment}>
@@ -213,7 +186,7 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
             </div>
             <div className={s.count}>
               <strong>{gaps.length}</strong>
-              <span>个待补缺口</span>
+              <span>个需要留意</span>
             </div>
           </div>
 
@@ -223,10 +196,9 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
           </div>
 
           <div className={s.grid}>
-            {assessment.data.prerequisites?.map((item, index) => (
+            {assessment.data.prerequisites?.map((item) => (
               <article key={item.id} className={`${s.card} ${s[item.status]}`}>
                 <div className={s.cardLead}>
-                  <span className={s.index}>{String(index + 1).padStart(2, '0')}</span>
                   <div className={s.titleGroup}>
                     <h3>{item.title}</h3>
                     <div className={s.meta}>
@@ -237,26 +209,17 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
                 </div>
 
                 <div className={s.cardBody}>
-                  <p className={s.impact}>{item.impact}</p>
+                  <p className={s.summary}>{item.summary?.trim() || item.impact}</p>
+                  {item.summary?.trim() && (
+                    <p className={s.impact}>
+                      <span>与当前学习的关系</span>
+                      {item.impact}
+                    </p>
+                  )}
                   <p className={s.evidence}>
                     <span>判断依据</span>
                     {item.evidence}
                   </p>
-                </div>
-
-                <div className={s.cardAction}>
-                  {item.status === 'weak' || item.status === 'missing' ? (
-                    <Button
-                      size="sm"
-                      variant={item.status === 'missing' ? 'primary' : 'outline'}
-                      iconRight={<ArrowRightIcon aria-hidden="true" />}
-                      onClick={() => setSelected(item)}
-                    >
-                      单独学习
-                    </Button>
-                  ) : (
-                    <span className={s.readyNote}>可直接进入讲解</span>
-                  )}
                 </div>
               </article>
             ))}
@@ -264,32 +227,7 @@ export function IntroPage({ projectSlug }: IntroPageProps) {
         </section>
       )}
 
-      <Modal
-        open={!!selected}
-        onOpenChange={(open) => { if (!open) setSelected(null); }}
-        title="创建前置学习项目"
-        description="将作为当前项目的子项目创建，内容已经根据诊断结果预填。"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setSelected(null)}>取消</Button>
-            <Button variant="primary" onClick={handleCreate} loading={createSubproject.isPending}>
-              创建并进入
-            </Button>
-          </>
-        }
-      >
-        {selected && (
-          <div className={s.preview}>
-            <strong>{selected.projectDraft.title}</strong>
-            <p>{selected.projectDraft.why}</p>
-            <dl>
-              <dt>当前水平</dt><dd>{selected.projectDraft.current}</dd>
-              <dt>目标水平</dt><dd>{selected.projectDraft.target}</dd>
-              <dt>完成标准</dt><dd>{selected.projectDraft.standard}</dd>
-            </dl>
-          </div>
-        )}
-      </Modal>
+      {surveySection}
     </div>
   );
 }

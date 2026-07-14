@@ -1,14 +1,18 @@
 # Iteration 04 User Stories
 
 Status: active
-Last reviewed: 2026-06-14
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: historical learner value delivered by iteration 04, with partial supersession noted below.
+
+> Partially superseded by iteration 07: prerequisite diagnosis remains; the child-project action does not.
 
 ## Explore
 
 - As a learner, I want 3-5 calibration questions and one application prompt so baseline claims come from evidence.
 - As a learner, I want two concrete examples so the topic becomes interesting before formal explanation.
 - As a learner, I want weak prerequisites shown with impact and evidence.
-- As a learner, I want to confirm a prefilled child project for a missing prerequisite.
+- Superseded by US-07.8: child-project confirmation no longer defines the current prerequisite experience.
 
 ## Learn
 

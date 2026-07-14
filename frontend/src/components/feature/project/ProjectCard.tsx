@@ -45,7 +45,9 @@ export function ProjectCard({ project, variant = 'tile', className, onClick }: P
       </div>
       <div className={s.meta}>
         <code className={s.slug}>{project.slug}</code>
-        {project.hasSubprojects && <Tag tone="accent">含子项目</Tag>}
+        <Tag tone={project.projectType === 'discipline-map' ? 'orange' : 'muted'}>
+          {project.projectType === 'discipline-map' ? '学科地图' : '系统学习'}
+        </Tag>
       </div>
     </Link>
   );

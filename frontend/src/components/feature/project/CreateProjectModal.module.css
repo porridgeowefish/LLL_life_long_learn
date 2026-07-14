@@ -4,6 +4,12 @@
   gap: 14px;
 }
 
+.learningFields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -85,14 +91,107 @@
 }
 
 .radio:has(input:checked) {
-  background: rgba(124, 154, 114, 0.08);
+  background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.actions {
+.typeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.typeCard {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 8px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+}
+
+.typeCard:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.typeCard input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.typeCard strong,
+.typeCard span {
+  grid-column: 2;
+}
+
+.typeCard span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.typeHeader {
+  min-height: 30px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 6px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.advisorTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, transform 150ms ease;
+}
+
+.advisorTrigger small {
+  padding-left: 6px;
+  border-left: 1px solid var(--accent-medium);
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+.advisorTrigger:hover,
+.advisorTrigger:focus-visible {
+  background: var(--accent);
+  color: var(--on-accent);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.advisorTrigger:hover small,
+.advisorTrigger:focus-visible small {
+  color: currentColor;
+}
+
+@media (max-width: 640px) {
+  .typeGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .advisorTrigger small {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .advisorTrigger {
+    transition: none;
+  }
 }

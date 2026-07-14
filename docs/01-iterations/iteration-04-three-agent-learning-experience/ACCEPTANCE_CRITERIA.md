@@ -1,7 +1,11 @@
 # Iteration 04 Acceptance Criteria
 
 Status: active
-Last reviewed: 2026-06-15
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: historical black-box acceptance for iteration 04, with partial supersession noted below.
+
+> Partially superseded by iteration 07 and ADR-0006 for prerequisite-gap actions.
 
 ```text
 all agent prompts prohibit ASCII/Unicode character diagrams and use Mermaid for diagrams
@@ -11,8 +15,8 @@ project.md creation fields are embedded in every generated prompt
 Intro does not repeat project motivation, self-rated level, target, or completion standard
 unknown answers never become claims of mastery
 intro/assessment.json matches schema version 1
-weak/missing prerequisite cards require confirmation before child creation
-created child project is directly navigable by its own slug
+weak/missing prerequisite child creation required confirmation (historical; superseded in iteration 07)
+created child project was directly navigable by its own slug (historical; no longer the default flow)
 
 Explain uses the research-question framework
 Explain output is a standalone tutorial, not an agent reply or learner diagnosis

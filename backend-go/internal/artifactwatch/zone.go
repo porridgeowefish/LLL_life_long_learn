@@ -4,11 +4,11 @@ import "strings"
 
 // zones is the set of folder names that hold generated artifacts.
 var zones = map[string]bool{
-	"intro":   true,
-	"explain": true,
+	"intro":    true,
+	"explain":  true,
 	"practice": true,
-	"extend":  true,
-	"summary": true,
+	"extend":   true,
+	"summary":  true,
 }
 
 // ignoreFolders are structural project folders that are NOT zones. If one
@@ -28,6 +28,9 @@ var ignoreFolders = map[string]bool{
 func parseZonePath(rel string) (slug, zone string, ok bool) {
 	rel = strings.ReplaceAll(rel, "\\", "/")
 	parts := strings.Split(rel, "/")
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "overview.md" {
+		return parts[0], "overview", true
+	}
 	for i, seg := range parts {
 		if ignoreFolders[seg] {
 			return "", "", false

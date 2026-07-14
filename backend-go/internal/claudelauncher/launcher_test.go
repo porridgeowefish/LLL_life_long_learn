@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -118,5 +119,79 @@ func TestResumeWrapperLaunchesClaudeContinue(t *testing.T) {
 	}
 	if strings.Contains(script, "$promptText") {
 		t.Fatalf("resume wrapper should not inject a new prompt:\n%s", script)
+	}
+}
+
+func TestCodexInteractiveCommandsAlwaysUseYolo(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeCodex)
+	native := agentruntime.Runtime{Definition: def, Bin: "codex", Available: true, Mode: "native"}
+	wsl := native
+	wsl.Mode = "wsl"
+
+	if got := interactiveExecLine(native, `D:\workspace\project`, "", ""); !strings.Contains(got, "& $agentExe --yolo $promptText") {
+		t.Fatalf("native Codex launch did not use --yolo: %s", got)
+	}
+	if got := interactiveShellExecLine(native, ""); !strings.Contains(got, `"$agent_exe" --yolo "$prompt_text"`) {
+		t.Fatalf("shell Codex launch did not use --yolo: %s", got)
+	}
+	if got := interactiveWSLExecLine(wsl, `D:\workspace\project`, `D:\workspace\prompt.md`, ""); !strings.Contains(got, "exec 'codex' --yolo") {
+		t.Fatalf("WSL Codex launch did not use --yolo: %s", got)
+	}
+	if got := headlessArgs(native, `D:\workspace\project`, "prompt"); !strings.Contains(strings.Join(got, " "), "exec --yolo -") {
+		t.Fatalf("headless Codex launch did not use --yolo: %v", got)
+	}
+	if got := headlessShellCommand(wsl, ""); !strings.Contains(got, "exec --yolo -") {
+		t.Fatalf("headless WSL Codex launch did not use --yolo: %s", got)
+	}
+}
+
+func TestResumeWrapperLaunchesSelectedCodexLastSessionInYoloMode(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeCodex)
+	rt := agentruntime.Runtime{Definition: def, Bin: "codex", Available: true, Mode: "native"}
+	script := buildResumeWrapperScript(
+		`D:\workspace\project`,
+		`D:\workspace\project\runs\resume\stderr.log`,
+		ResumeRequest{ProjectSlug: "demo", ZoneName: workspace.ZoneExplain, Runtime: &rt},
+	)
+
+	if !strings.Contains(script, "& $agentExe resume --last --yolo") {
+		t.Fatalf("Codex resume wrapper did not call codex resume --last --yolo:\n%s", script)
+	}
+	if strings.Contains(script, "& $agentExe -c") {
+		t.Fatalf("Codex resume wrapper still called Claude continue:\n%s", script)
+	}
+}
+
+func TestResumeWrapperLaunchesWSLCodexLastSessionInYoloMode(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeCodex)
+	rt := agentruntime.Runtime{Definition: def, Bin: "codex", Available: true, Mode: "wsl"}
+	script := buildResumeWrapperScript(
+		`D:\workspace\project`,
+		`D:\workspace\project\runs\resume\stderr.log`,
+		ResumeRequest{ProjectSlug: "demo", ZoneName: workspace.ZoneExplain, Runtime: &rt},
+	)
+
+	if !strings.Contains(script, "exec 'codex' resume --last --yolo") {
+		t.Fatalf("WSL Codex resume wrapper did not use the last session in yolo mode:\n%s", script)
+	}
+	if strings.Contains(script, "Get-Command 'codex'") {
+		t.Fatalf("WSL Codex resume wrapper must not require a native codex binary:\n%s", script)
+	}
+}
+
+func TestResumeWrapperKeepsWSLClaudeContinueCommand(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeClaude)
+	rt := agentruntime.Runtime{Definition: def, Bin: "claude", Available: true, Mode: "wsl"}
+	script := buildResumeWrapperScript(
+		`D:\workspace\project`,
+		`D:\workspace\project\runs\resume\stderr.log`,
+		ResumeRequest{ProjectSlug: "demo", ZoneName: workspace.ZoneExplain, Runtime: &rt},
+	)
+
+	if !strings.Contains(script, "exec 'claude' -c") {
+		t.Fatalf("WSL Claude resume wrapper did not preserve claude -c:\n%s", script)
+	}
+	if strings.Contains(script, "resume --last --yolo") {
+		t.Fatalf("WSL Claude resume wrapper received Codex flags:\n%s", script)
 	}
 }

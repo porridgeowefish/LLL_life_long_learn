@@ -74,6 +74,35 @@ func TestBuild_HappyPath(t *testing.T) {
 	}
 }
 
+func TestBuildProjectAgent_UsesProjectTypeWithoutInventingZone(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+	if err := workspace.CreateProjectSkeletonWithInput("physics", "物理学", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeDisciplineMap}); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeProjectTypeAgent(t, reg, "encyclopedia", workspace.ProjectTypeDisciplineMap)
+
+	pkg, err := BuildProjectAgent(ProjectAgentRequest{
+		ProjectSlug: "physics",
+		AgentID:     "encyclopedia",
+		OutputPaths: []string{"overview.md"},
+	}, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pkg.PackageMeta.ZoneName != "" || pkg.PackageMeta.ProjectType != workspace.ProjectTypeDisciplineMap {
+		t.Fatalf("unexpected package scope: %+v", pkg.PackageMeta)
+	}
+	for _, want := range []string{"# Project-Level Invocation Contract", "overview.md", "native Agent CLI", "# Test charter"} {
+		if !strings.Contains(pkg.PromptMd, want) {
+			t.Fatalf("prompt missing %q: %s", want, pkg.PromptMd)
+		}
+	}
+}
+
 func TestBuild_RejectsUnknownAgent(t *testing.T) {
 	dir := t.TempDir()
 	oldWS := workspace.ProjectsRootForTest()
@@ -333,7 +362,7 @@ func TestBuild_AllProductionAgentsForbidTextCharacterDiagrams(t *testing.T) {
 	const replacement = "Use a fenced Mermaid block for every diagram."
 	for _, agent := range reg.List() {
 		if len(agent.AllowedZones) == 0 {
-			t.Fatalf("agent %s has no allowed zones", agent.ID)
+			continue // project-type agents use dedicated non-zone assembly
 		}
 		pkg, err := Build(Request{
 			ProjectSlug: "test",
@@ -487,6 +516,40 @@ func writeTestAgent(t *testing.T, reg *agentregistry.Registry, id string, zones 
   "allowedZones": ["` + string(zones[0]) + `"],
   "charterPath": "` + strings.ReplaceAll(chPath, "\\", "\\\\") + `",
   "defaultOutputTargets": [{"zone": "` + string(zones[0]) + `", "filename": "output.md"}]
+}`)
+	if err := os.WriteFile(filepath.Join(regDir, id+".json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	old := agentregistry.AgentsRootForTest()
+	agentregistry.SetAgentsRootForTest(dir)
+	defer agentregistry.SetAgentsRootForTest(old)
+	if err := reg.Load(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeProjectTypeAgent(t *testing.T, reg *agentregistry.Registry, id string, projectType workspace.ProjectType) {
+	t.Helper()
+	dir := t.TempDir()
+	regDir := filepath.Join(dir, "registry")
+	if err := os.MkdirAll(regDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	charterPath := filepath.Join(dir, "charters", id+".md")
+	if err := os.MkdirAll(filepath.Dir(charterPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(charterPath, []byte("# Test charter"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	data := []byte(`{
+  "id": "` + id + `",
+  "name": "` + id + `",
+  "userStory": "project-level test story",
+  "allowedZones": [],
+  "allowedProjectTypes": ["` + string(projectType) + `"],
+  "charterPath": "` + strings.ReplaceAll(charterPath, "\\", "\\\\") + `",
+  "defaultOutputTargets": []
 }`)
 	if err := os.WriteFile(filepath.Join(regDir, id+".json"), data, 0o644); err != nil {
 		t.Fatal(err)

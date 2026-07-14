@@ -14,6 +14,7 @@ function normalize(data: unknown): FolderLayout {
     id: f.id,
     name: f.name,
     slugOrder: f.slugOrder ?? [],
+    mapProjectSlug: f.mapProjectSlug || undefined,
   })) as Folder[];
   return { folders };
 }

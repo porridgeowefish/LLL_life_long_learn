@@ -129,7 +129,7 @@ func headlessArgs(rt agentruntime.Runtime, projectRoot, prompt string) []string 
 	case agentruntime.RuntimeClaude:
 		return []string{"-p", "--permission-mode", NormalizePermissionMode("")}
 	case agentruntime.RuntimeCodex:
-		return []string{"exec", "-", "--cd", projectRoot}
+		return []string{"exec", "--yolo", "-", "--cd", projectRoot}
 	case agentruntime.RuntimeHermes:
 		return []string{"-z", prompt}
 	case agentruntime.RuntimeTrae:
@@ -152,7 +152,7 @@ func headlessShellCommand(rt agentruntime.Runtime, model string) string {
 		}
 		return strings.Join(args, " ")
 	case agentruntime.RuntimeCodex:
-		return shQuote(rt.Bin) + " exec - --cd ."
+		return shQuote(rt.Bin) + " exec --yolo - --cd ."
 	default:
 		return shQuote(rt.Bin)
 	}

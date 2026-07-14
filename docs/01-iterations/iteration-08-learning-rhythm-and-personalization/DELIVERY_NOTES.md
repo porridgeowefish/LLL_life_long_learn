@@ -1,6 +1,9 @@
-# Iteration 07 Delivery Notes
+# Iteration 08 Delivery Notes
 
 Status: delivered
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: actual iteration 08 delivery and validation record.
 
 ## Validation
 

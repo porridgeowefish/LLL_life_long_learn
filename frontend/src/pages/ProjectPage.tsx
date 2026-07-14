@@ -7,6 +7,7 @@ import { Icon } from '@/components/primitive/Icon';
 import { ZoneTimeline } from '@/components/feature/project/ZoneTimeline';
 import { OutputViewer } from '@/components/feature/project/OutputViewer';
 import { RunProgressBar } from '@/components/feature/project/RunProgressBar';
+import { DisciplineOverview } from '@/components/feature/project/DisciplineOverview';
 import { AgentInvokePanel } from '@/components/feature/agent/AgentInvokePanel';
 import { ConfusionPanel } from '@/components/feature/explain/ConfusionPanel';
 import { ExplainReader } from '@/components/feature/explain/ExplainReader';
@@ -78,6 +79,10 @@ export function ProjectPage() {
         />
       </div>
     );
+  }
+
+  if (project.projectType === 'discipline-map') {
+    return <DisciplineOverview slug={slug} title={project.title} />;
   }
 
   const handleZoneSelect = (z: ZoneName) => {

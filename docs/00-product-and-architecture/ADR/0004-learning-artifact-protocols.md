@@ -1,4 +1,4 @@
-# ADR-0003 Learning Artifact Protocols
+# ADR-0004 Learning Artifact Protocols
 
 Status: accepted
 Date: 2026-06-14

@@ -1,0 +1,12 @@
+{
+  "id": "encyclopedia",
+  "name": "学科百科智能体",
+  "icon": "🧭",
+  "description": "为学科地图生成全面、浅层、可导航的百科式学科总览。",
+  "userStory": "当学习者面对一门宽广学科时，先看清学科边界、主要研究领域、领域关系、方法、应用和学习路线，再决定深入哪个具体主题。",
+  "primitives": { "required": [], "optional": [] },
+  "allowedZones": [],
+  "allowedProjectTypes": ["discipline-map"],
+  "charterPath": "agents/charters/encyclopedia.md",
+  "defaultOutputTargets": []
+}

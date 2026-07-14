@@ -1,8 +1,8 @@
 # Iteration Delivery
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
 Source of truth: iteration subdirectories define active delivery scope.
 
 Each iteration should be independently understandable and testable.
@@ -11,8 +11,9 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 08 | Discipline thinking protocols and local learning lab (discovery backlog) | [iteration-08-discipline-protocols-and-learning-lab](./iteration-08-discipline-protocols-and-learning-lab/README.md) |
-| 07 | Learning rhythm, growth aggregation, themes, and open-source entry (implemented) | [iteration-07-learning-rhythm-and-personalization](./iteration-07-learning-rhythm-and-personalization/README.md) |
+| 09 | Learning deletion and prerequisite-summary cleanup (active) | [iteration-09-discipline-protocols-and-learning-lab](./iteration-09-discipline-protocols-and-learning-lab/README.md) |
+| 08 | Learning rhythm, growth aggregation, themes, and open-source entry (implemented) | [iteration-08-learning-rhythm-and-personalization](./iteration-08-learning-rhythm-and-personalization/README.md) |
+| 07 | Discipline map and system-learning product types (delivered) | [iteration-07-discipline-map-and-system-learning](./iteration-07-discipline-map-and-system-learning/README.md) |
 | 06 | Ask-AI inline help and live run progress (proposed) | [iteration-06-ask-ai-and-live-progress](./iteration-06-ask-ai-and-live-progress/README.md) |
 | 05 | Follow-up update mechanism (active) | [iteration-05-follow-up-update-mechanism](./iteration-05-follow-up-update-mechanism/README.md) |
 | 04 | Three-agent learning experience refactor (implemented) | [iteration-04-three-agent-learning-experience](./iteration-04-three-agent-learning-experience/README.md) |
@@ -25,9 +26,18 @@ Each iteration should be independently understandable and testable.
 ```text
 README.md
 USER_STORIES.md
-API_CONTRACT.md
-DATABASE_DESIGN.md
-TEST_PLAN.md
 ACCEPTANCE_CRITERIA.md
+TEST_PLAN.md
 DELIVERY_NOTES.md
+
+one contract:
+API_CONTRACT.md / INTERFACE_CONTRACT.md / PIPELINE_CONTRACT.md
+
+one data contract:
+DATA_DESIGN.md for file-first/schema data
+DATABASE_DESIGN.md only when a real database is part of the slice
 ```
+
+When an iteration changes product shape, domain boundaries, runtime architecture,
+or persistence, its README must include a `Documentation Impact` section listing
+the ADR and synchronized long-lived fact sources. See the governance landing table.

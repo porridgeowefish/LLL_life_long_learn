@@ -1,9 +1,9 @@
-# Iteration 07: Learning Rhythm And Personalization
+# Iteration 08: Learning Rhythm And Personalization
 
 Status: implemented
 Owner: project maintainer
-Last reviewed: 2026-07-11
-Source of truth: this directory defines the seventh LLL delivery slice.
+Last reviewed: 2026-07-14
+Source of truth: this directory defines the eighth LLL delivery slice.
 
 ## Goal
 
@@ -26,7 +26,7 @@ accessible appearance choices plus clear open-source collaboration entry points.
 - memory redesign or automatic memory updates;
 - leaderboards, social comparison, achievements, or punitive streaks;
 - precise time tracking or background surveillance;
-- discipline thinking protocols and local code execution (iteration 08 discovery).
+- discipline thinking protocols and local code execution (iteration 09 discovery).
 
 ## Product Decisions
 

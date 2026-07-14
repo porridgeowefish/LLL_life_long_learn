@@ -86,7 +86,7 @@ func Aggregate(projectSlug string, weeks int, now time.Time) (ActivitySummary, e
 			day.Growth += event.Delta
 			activity := event.ActivityDelta
 			if activity == 0 && event.SourceType == "practice-submit" {
-				activity = 1 // backward-compatible activity for pre-iter-07 submissions
+				activity = 1 // backward-compatible activity for pre-iter-08 submissions
 			}
 			if activity <= 0 {
 				if event.Delta != 0 {

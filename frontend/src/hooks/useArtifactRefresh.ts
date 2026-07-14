@@ -29,6 +29,9 @@ export function useArtifactRefresh(projectSlug: string): void {
       const p = data as { projectSlug?: string; zone?: string } | undefined;
       if (!p || p.projectSlug !== projectSlug) return;
       qc.invalidateQueries({ queryKey: ['files', projectSlug] });
+      if (p.zone === 'overview') {
+        qc.invalidateQueries({ queryKey: ['projects', projectSlug, 'discipline-overview'] });
+      }
       if (p.zone === 'practice') invalidatePractice(qc, projectSlug);
     });
     const unsubConfusion = subscribeToSSE(SSE_EVENTS.confusionUpdated, (data) => {

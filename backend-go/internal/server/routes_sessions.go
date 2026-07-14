@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
@@ -19,6 +21,8 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
+
+var launchAgentCLI = claudelauncher.Launch
 
 // sessions is the package-global session store.
 var sessions = sessionstore.New()
@@ -71,6 +75,15 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "project not found")
 		return
 	}
+	project, err := workspace.ReadProjectState(req.ProjectID)
+	if err != nil {
+		httpx.Error(w, http.StatusNotFound, "project not found")
+		return
+	}
+	if project.ProjectType != workspace.ProjectTypeSystemLearning {
+		httpx.Error(w, http.StatusBadRequest, "discipline maps do not support learning-zone agents")
+		return
+	}
 	zoneName := workspace.ZoneName(req.Zone)
 
 	// Build the prompt package.
@@ -89,33 +102,49 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create session.
+	sess := s.startAgentSession(runtime, req.ProjectID, string(zoneName), agent, pkg, permissionMode)
+
+	// Return the session to the caller immediately.
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
+		"session": sess,
+		"runDir":  pkg.RunDirName,
+	})
+}
+
+// startAgentSession is the shared execution path for zone-bound and
+// project-type-bound agents. contextName is learner-facing execution context;
+// it is not required to be one of the five learning zones.
+func (s *Server) startAgentSession(
+	runtime agentruntime.Runtime,
+	projectID string,
+	contextName string,
+	agent *agentregistry.Agent,
+	pkg *promptassembly.Package,
+	permissionMode string,
+) *sessionstore.Session {
 	sessID := newSessionID()
 	sess := &sessionstore.Session{
 		ID:          sessID,
-		ProjectSlug: req.ProjectID,
-		ZoneName:    string(zoneName),
+		ProjectSlug: projectID,
+		ZoneName:    contextName,
 		AgentID:     agent.ID,
 		State:       sessionstore.StatePreparing,
 		CreatedAt:   time.Now().UTC(),
 	}
 	sessions.Create(sess)
-	// Initial system turn.
 	sessions.AppendTurn(sessID, "system", "session created", "")
-	_, _, _ = awardLearningEvent(req.ProjectID, progressstore.Event{
+	_, _, _ = awardLearningEvent(projectID, progressstore.Event{
 		ID: "agent-invoke:" + sessID, SourceType: "agent-invoke", SourceID: agent.ID,
-		ActivityDelta: 1, Title: "开始学习", Detail: string(zoneName) + " · " + agent.Name,
+		ActivityDelta: 1, Title: "开始学习", Detail: contextName + " · " + agent.Name,
 	})
 	if broadcaster != nil {
 		broadcaster.Emit("session-created", map[string]any{"sessionId": sessID, "session": sess})
 	}
 
-	// Fire the launcher in a background goroutine.
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		sessions.SetCancel(sessID, make(chan struct{}))
-		// Wire cancel from the session's channel.
 		go func() {
 			if ch := getSessionCancelChannel(sessID); ch != nil {
 				select {
@@ -125,9 +154,9 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}()
-		_, launchErr := claudelauncher.Launch(ctx, claudelauncher.LaunchRequest{
-			ProjectSlug:    req.ProjectID,
-			ZoneName:       zoneName,
+		_, launchErr := launchAgentCLI(ctx, claudelauncher.LaunchRequest{
+			ProjectSlug:    projectID,
+			ZoneName:       workspace.ZoneName(contextName),
 			Agent:          agent,
 			PromptPackage:  pkg,
 			PermissionMode: permissionMode,
@@ -139,17 +168,12 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 			RunProgress:    s.runProgress,
 		})
 		if launchErr != nil {
-			os.WriteFile(filepath.Join(
-				mustProjectRoot(req.ProjectID), pkg.RunDirName, "stderr.log"),
+			_ = os.WriteFile(filepath.Join(
+				mustProjectRoot(projectID), "runs", pkg.RunDirName, "stderr.log"),
 				[]byte("launch error: "+launchErr.Error()), 0o644)
 		}
 	}()
-
-	// Return the session to the caller immediately.
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"session": sess,
-		"runDir":  pkg.RunDirName,
-	})
+	return sess
 }
 
 // getSessionCancelChannel returns the cancel channel for a session (or nil).
@@ -195,13 +219,18 @@ func (s *Server) handleListActiveSessions(w http.ResponseWriter, r *http.Request
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sessions": list})
 }
 
-// handleResumeExplainSession opens Claude Code's most recent conversation via
-// `claude -c` from the project root. It is intentionally scoped to Explain:
+// handleResumeExplainSession opens the selected runtime's most recent
+// conversation from the project root. It is intentionally scoped to Explain:
 // the UI uses this when the learner is reading generated Explain material and
 // wants to reopen the closed native TUI to keep asking questions.
 func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Request) {
-	if !s.ClaudeAvailable {
-		httpx.Error(w, http.StatusServiceUnavailable, "claude binary not available")
+	runtime, _ := s.runtimeSnapshot()
+	if runtime.ID != agentruntime.RuntimeClaude && runtime.ID != agentruntime.RuntimeCodex {
+		httpx.Error(w, http.StatusBadRequest, string(runtime.ID)+" does not support interactive resume")
+		return
+	}
+	if !runtime.Available {
+		httpx.Error(w, http.StatusServiceUnavailable, string(runtime.ID)+" binary not available")
 		return
 	}
 	projectID := r.PathValue("id")
@@ -223,6 +252,7 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 		Store:       sessions,
 		Events:      broadcaster,
 		ClaudeBin:   s.ClaudeBin,
+		Runtime:     &runtime,
 		RunDirName:  runDirName,
 	})
 	if err != nil {

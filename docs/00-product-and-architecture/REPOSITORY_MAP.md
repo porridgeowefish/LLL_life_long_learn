@@ -160,7 +160,7 @@ some docs still describe legacy/fallback material as if it were active
 Implemented in code:
 
 ```text
-evidence-based Intro assessment and prerequisite child-project creation
+evidence-based Intro assessment with generated prerequisite summaries
 manifest-owned Explain pages with follow-up parent links
 six Practice question types with private answer-key checking
 project-local idempotent growth events

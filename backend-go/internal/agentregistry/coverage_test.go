@@ -88,6 +88,34 @@ func TestPrimitivesCoverage_ExplainDeclaresAll(t *testing.T) {
 	}
 }
 
+func TestEncyclopediaAgentIsRegisteredForDisciplineMaps(t *testing.T) {
+	reg := agentregistry.New()
+	if err := reg.Load(); err != nil {
+		t.Fatalf("registry load: %v", err)
+	}
+	agent, ok := reg.Get("encyclopedia")
+	if !ok {
+		t.Fatal("encyclopedia agent not registered")
+	}
+	if len(agent.AllowedZones) != 0 {
+		t.Fatalf("encyclopedia agent must not be a five-zone agent: %v", agent.AllowedZones)
+	}
+	if len(agent.AllowedProjectTypes) != 1 || agent.AllowedProjectTypes[0] != "discipline-map" {
+		t.Fatalf("unexpected project types: %v", agent.AllowedProjectTypes)
+	}
+	for _, required := range []string{
+		"百科式而非教程式",
+		"## 主要研究领域",
+		"### <可独立深入学习的领域一>",
+		"标题就是学科目录的事实源",
+		"每个三级标题旁增加",
+	} {
+		if !strings.Contains(agent.CharterText, required) {
+			t.Errorf("encyclopedia charter missing %q", required)
+		}
+	}
+}
+
 // TestPrimitivesCoverage_LimitsEnforced asserts the explain agent stays
 // within the MaxRequiredPrimitives cap, preventing regression where the
 // agent slowly absorbs every mechanism and recreates a "god skill".
@@ -184,7 +212,7 @@ func TestIteration04CharterContracts(t *testing.T) {
 		t.Fatalf("registry load: %v", err)
 	}
 	checks := map[string][]string{
-		"intro": {"3-5 个短校准问题", "intro/survey.json", "intro/assessment.json", "不得无证据"},
+		"intro": {"3-5 个短校准问题", "intro/survey.json", "intro/assessment.json", "不得无证据", "每一项都必须写 `summary`"},
 		"explain": {
 			"研究目的",
 			"explain/manifest.json",

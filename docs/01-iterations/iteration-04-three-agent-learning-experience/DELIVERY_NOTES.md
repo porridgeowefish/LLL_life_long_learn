@@ -1,7 +1,9 @@
 # Iteration 04 Delivery Notes
 
 Status: implemented
-Last reviewed: 2026-06-15
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: actual iteration 04 delivery record and later supersession note.
 
 Implemented:
 
@@ -21,6 +23,12 @@ source-faithful lychee SVG in the top bar and favicon without changing the Claud
 Summary Agent structured flashcards aligned with backend storage and frontend rendering
 concept-focused flashcard deck with filters, keyboard navigation, Markdown, and grading
 ```
+
+## Later supersession
+
+Iteration 07 and ADR-0006 retain evidence-based assessment but replace
+prerequisite child-project creation with inline `快速补充`. The delivery list
+above remains unchanged because it records what iteration 04 actually shipped.
 
 Validation completed on 2026-06-14:
 

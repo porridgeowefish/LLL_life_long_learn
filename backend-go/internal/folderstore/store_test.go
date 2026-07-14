@@ -24,7 +24,7 @@ func TestReplaceSanitizes(t *testing.T) {
 
 	out, err := s.Replace(Layout{Folders: []Folder{
 		{ID: "a", Name: "  编程  ", SlugOrder: []string{"go", "rust", "go"}}, // trim name; dedupe within
-		{Name: ""},                       // dropped (unnamed)
+		{Name: ""}, // dropped (unnamed)
 		{Name: "社科", SlugOrder: []string{"econ", "history"}},
 		{ID: "a", Name: "冲突ID", SlugOrder: []string{"go"}}, // dup id -> new id; "go" already seen -> dropped
 	}})
@@ -68,5 +68,76 @@ func TestEmptyLayoutRoundTripsAsArray(t *testing.T) {
 	// Layout() must expose a non-nil slice so JSON is [], not null.
 	if got := s.Layout().Folders; got == nil {
 		t.Errorf("Layout().Folders want non-nil slice, got nil")
+	}
+}
+
+func TestSyncMapFoldersPromotesExistingFolderAndKeepsChildren(t *testing.T) {
+	setTempWorkspace(t)
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Replace(Layout{Folders: []Folder{
+		{ID: "math", Name: "应用数学", SlugOrder: []string{"monte-carlo", "applied-math"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := s.SyncMapFolders([]MapFolderSpec{{Slug: "applied-math", Title: "应用数学"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Folders) != 1 {
+		t.Fatalf("same-name folder should be reused, got %d folders", len(out.Folders))
+	}
+	got := out.Folders[0]
+	if got.MapProjectSlug != "applied-math" {
+		t.Fatalf("map binding=%q", got.MapProjectSlug)
+	}
+	if len(got.SlugOrder) != 1 || got.SlugOrder[0] != "monte-carlo" {
+		t.Fatalf("map project must not render as its own child: %v", got.SlugOrder)
+	}
+}
+
+func TestSyncMapFoldersCreatesMissingFolder(t *testing.T) {
+	setTempWorkspace(t)
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.SyncMapFolders([]MapFolderSpec{{Slug: "physics", Title: "物理学"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Folders) != 1 || out.Folders[0].MapProjectSlug != "physics" || out.Folders[0].Name != "物理学" {
+		t.Fatalf("unexpected map folder: %+v", out.Folders)
+	}
+}
+
+func TestRemoveProjectPrunesMembershipAndMapBinding(t *testing.T) {
+	setTempWorkspace(t)
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.Replace(Layout{Folders: []Folder{
+		{ID: "map", Name: "Physics", MapProjectSlug: "physics", SlugOrder: []string{"mechanics", "optics"}},
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := s.RemoveProject("physics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Folders[0].MapProjectSlug != "" || len(out.Folders[0].SlugOrder) != 2 {
+		t.Fatalf("map cleanup lost folder data: %+v", out.Folders[0])
+	}
+	out, err = s.RemoveProject("mechanics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Folders[0].SlugOrder) != 1 || out.Folders[0].SlugOrder[0] != "optics" {
+		t.Fatalf("membership not pruned: %+v", out.Folders[0])
 	}
 }

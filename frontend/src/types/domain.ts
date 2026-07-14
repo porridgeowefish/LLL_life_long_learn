@@ -3,6 +3,7 @@
 // Keep these the single source of truth; api.ts DTOs extend / pick from them.
 
 export type ZoneName = 'Intro' | 'Explain' | 'Practice' | 'Extend' | 'Summary';
+export type ProjectType = 'discipline-map' | 'system-learning';
 
 export const ALL_ZONES: ZoneName[] = [
   'Intro',
@@ -44,12 +45,11 @@ export interface ProjectState {
   id: string;
   title: string;
   slug: string;
-  parentProjectId?: string;
+  projectType: ProjectType;
   status: string;
-  activeZone: ZoneName | '';
+  activeZone?: ZoneName;
   createdAt: string;
   updatedAt: string;
-  childProjectIds?: string[];
   lastArtifacts?: ArtifactRef[];
   generatedZones?: ZoneName[];
 }
@@ -58,8 +58,8 @@ export interface ProjectMeta {
   id: string;
   slug: string;
   title: string;
-  parentProjectId?: string;
-  hasSubprojects: boolean;
+  projectType: ProjectType;
+  overviewAvailable: boolean;
 }
 
 export interface PredecessorFile {

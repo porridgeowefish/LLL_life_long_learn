@@ -48,6 +48,18 @@ describe('useArtifactRefresh', () => {
     expect(spy).not.toHaveBeenCalled();
   });
 
+  it('invalidates the discipline overview when the root artifact changes', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    renderHook(() => useArtifactRefresh('physics'), { wrapper: wrapper(client) });
+
+    act(() => handlers['artifact-updated']({ projectSlug: 'physics', zone: 'overview' }));
+
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['projects', 'physics', 'discipline-overview'],
+    });
+  });
+
   it('invalidates confusions on confusion-updated', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const spy = vi.spyOn(client, 'invalidateQueries');

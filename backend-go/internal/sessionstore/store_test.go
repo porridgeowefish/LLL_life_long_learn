@@ -40,6 +40,24 @@ func TestAppendTurn_AppendOnlyInvariant(t *testing.T) {
 	}
 }
 
+func TestProjectSessionLifecycleHelpers(t *testing.T) {
+	store := New()
+	store.Create(&Session{ID: "active", ProjectSlug: "p1", State: StateRunning})
+	store.Create(&Session{ID: "done", ProjectSlug: "p1", State: StateCompleted})
+	store.Create(&Session{ID: "other", ProjectSlug: "p2", State: StateCompleted})
+	if !store.HasActiveProject("p1") {
+		t.Fatal("active project session was not detected")
+	}
+	store.SetState("active", StateCompleted)
+	if store.HasActiveProject("p1") {
+		t.Fatal("completed project reported as active")
+	}
+	store.RemoveProject("p1")
+	if len(store.List("p1")) != 0 || len(store.List("p2")) != 1 {
+		t.Fatalf("project session cleanup failed: p1=%d p2=%d", len(store.List("p1")), len(store.List("p2")))
+	}
+}
+
 func TestHasFollowups(t *testing.T) {
 	store := New()
 	sess := &Session{ID: "s1"}

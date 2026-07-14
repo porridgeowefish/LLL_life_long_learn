@@ -1,6 +1,9 @@
-# Iteration 07 Data Design
+# Iteration 08 Data Design
 
 Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: delivered iteration 08 file-first data delta; persisted schemas own runtime truth.
 
 Existing project-local `progress/events.jsonl` remains canonical. New optional
 fields extend the existing event record:

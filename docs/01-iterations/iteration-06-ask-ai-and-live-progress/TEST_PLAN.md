@@ -1,7 +1,7 @@
 # Iteration 06 Test Plan
 
 Status: proposed
-Last reviewed: 2026-07-08
+Last reviewed: 2026-07-14
 
 ## Automated
 
@@ -57,6 +57,9 @@ Last reviewed: 2026-07-08
 
 ### General
 
+- Codex command builders: native/WSL interactive and headless launches include
+  `--yolo`; native/WSL resume uses `codex resume --last --yolo`; Claude resume
+  remains `claude -c`.
 - Run all Go tests, Vitest, production frontend build, and `git diff --check`.
 
 ## Terminal Smoke
@@ -126,6 +129,9 @@ Last reviewed: 2026-07-08
 - On a Windows host where Claude/Codex are installed only inside WSL, confirm
   runtime detection reports WSL mode and launch opens the CLI in the project
   root. The prompt must be read from `prompt.md`, not passed through argv/env.
+- With Codex selected, confirm a new run starts without the Windows sandbox
+  setup prompt and “继续上次会话” restores the latest project conversation via
+  `codex resume --last --yolo`.
 - Corrupt `confusions.json`, `folders.json`, or a practice `draft.json` in a
   disposable project; confirm a `.corrupt-*.json` backup is written and the app
   falls back to an empty safe state.

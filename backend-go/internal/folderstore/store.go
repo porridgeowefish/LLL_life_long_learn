@@ -19,9 +19,18 @@ import (
 
 // Folder is one user-created grouping of project slugs (references only).
 type Folder struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	SlugOrder []string `json:"slugOrder"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	SlugOrder      []string `json:"slugOrder"`
+	MapProjectSlug string   `json:"mapProjectSlug,omitempty"`
+}
+
+// MapFolderSpec connects a discipline-map project to the same folder model
+// already used by the sidebar. The map is the folder's overview; it is never a
+// child row inside its own folder.
+type MapFolderSpec struct {
+	Slug  string
+	Title string
 }
 
 // Layout is the full workspace-global folder layout.
@@ -82,9 +91,7 @@ func (s *Store) save() error {
 func (s *Store) Layout() Layout {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	out := Layout{Folders: make([]Folder, len(s.data.Folders))}
-	copy(out.Folders, s.data.Folders)
-	return out
+	return cloneLayout(s.data)
 }
 
 // Replace swaps the entire layout. It sanitizes: drops unnamed folders, caps
@@ -97,6 +104,14 @@ func (s *Store) Replace(in Layout) (Layout, error) {
 	out := Layout{Folders: make([]Folder, 0, len(in.Folders))}
 	seenID := map[string]bool{}
 	seenSlug := map[string]bool{}
+	seenMapSlug := map[string]bool{}
+	mapSlugs := map[string]bool{}
+	for _, f := range in.Folders {
+		mapSlug := strings.TrimSpace(f.MapProjectSlug)
+		if workspace.ValidateSlug(mapSlug) {
+			mapSlugs[mapSlug] = true
+		}
+	}
 	for _, f := range in.Folders {
 		name := strings.TrimSpace(f.Name)
 		if name == "" {
@@ -111,23 +126,134 @@ func (s *Store) Replace(in Layout) (Layout, error) {
 		}
 		seenID[id] = true
 
+		mapSlug := strings.TrimSpace(f.MapProjectSlug)
+		if !workspace.ValidateSlug(mapSlug) || seenMapSlug[mapSlug] {
+			mapSlug = ""
+		} else {
+			seenMapSlug[mapSlug] = true
+		}
+
 		slugs := make([]string, 0, len(f.SlugOrder))
 		for _, sl := range f.SlugOrder {
 			sl = strings.TrimSpace(sl)
-			if sl == "" || seenSlug[sl] {
+			if sl == "" || seenSlug[sl] || mapSlugs[sl] {
 				continue
 			}
 			seenSlug[sl] = true
 			slugs = append(slugs, sl)
 		}
-		out.Folders = append(out.Folders, Folder{ID: id, Name: name, SlugOrder: slugs})
+		out.Folders = append(out.Folders, Folder{
+			ID: id, Name: name, SlugOrder: slugs, MapProjectSlug: mapSlug,
+		})
 	}
 
 	s.data = out
 	if err := s.save(); err != nil {
 		return Layout{}, err
 	}
-	return out, nil
+	return cloneLayout(out), nil
+}
+
+// RemoveProject drops every workspace-global reference to a deleted project.
+// A folder backed by a deleted discipline map is kept as an ordinary folder so
+// its learner-owned name and remaining members are not lost.
+func (s *Store) RemoveProject(slug string) (Layout, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i := range s.data.Folders {
+		if s.data.Folders[i].MapProjectSlug == slug {
+			s.data.Folders[i].MapProjectSlug = ""
+		}
+		filtered := s.data.Folders[i].SlugOrder[:0]
+		for _, member := range s.data.Folders[i].SlugOrder {
+			if member != slug {
+				filtered = append(filtered, member)
+			}
+		}
+		s.data.Folders[i].SlugOrder = filtered
+	}
+	if err := s.save(); err != nil {
+		return Layout{}, err
+	}
+	return cloneLayout(s.data), nil
+}
+
+// SyncMapFolders makes discipline maps first-class sidebar folders. Existing
+// same-name folders are promoted in place so the learner's current
+// classification is reused instead of duplicated. Stale map bindings become
+// ordinary folders and are never deleted with learner-owned membership.
+func (s *Store) SyncMapFolders(specs []MapFolderSpec) (Layout, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	valid := make([]MapFolderSpec, 0, len(specs))
+	active := map[string]bool{}
+	for _, spec := range specs {
+		slug := strings.TrimSpace(spec.Slug)
+		title := strings.TrimSpace(spec.Title)
+		if !workspace.ValidateSlug(slug) || title == "" || active[slug] {
+			continue
+		}
+		active[slug] = true
+		valid = append(valid, MapFolderSpec{Slug: slug, Title: title})
+	}
+
+	for i := range s.data.Folders {
+		if s.data.Folders[i].MapProjectSlug != "" && !active[s.data.Folders[i].MapProjectSlug] {
+			s.data.Folders[i].MapProjectSlug = ""
+		}
+	}
+
+	for _, spec := range valid {
+		index := -1
+		for i := range s.data.Folders {
+			if s.data.Folders[i].MapProjectSlug == spec.Slug {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			for i := range s.data.Folders {
+				if s.data.Folders[i].MapProjectSlug == "" && strings.EqualFold(strings.TrimSpace(s.data.Folders[i].Name), spec.Title) {
+					index = i
+					break
+				}
+			}
+		}
+		if index < 0 {
+			s.data.Folders = append(s.data.Folders, Folder{
+				ID: newID(), Name: spec.Title, SlugOrder: []string{}, MapProjectSlug: spec.Slug,
+			})
+			continue
+		}
+		s.data.Folders[index].Name = spec.Title
+		s.data.Folders[index].MapProjectSlug = spec.Slug
+	}
+
+	for i := range s.data.Folders {
+		filtered := s.data.Folders[i].SlugOrder[:0]
+		for _, slug := range s.data.Folders[i].SlugOrder {
+			if !active[slug] {
+				filtered = append(filtered, slug)
+			}
+		}
+		s.data.Folders[i].SlugOrder = filtered
+	}
+
+	if err := s.save(); err != nil {
+		return Layout{}, err
+	}
+	return cloneLayout(s.data), nil
+}
+
+func cloneLayout(in Layout) Layout {
+	out := Layout{Folders: make([]Folder, len(in.Folders))}
+	for i, folder := range in.Folders {
+		out.Folders[i] = folder
+		out.Folders[i].SlugOrder = append([]string{}, folder.SlugOrder...)
+	}
+	return out
 }
 
 func newID() string {

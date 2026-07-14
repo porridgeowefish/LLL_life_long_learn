@@ -1,6 +1,9 @@
-# Iteration 07 Test Plan
+# Iteration 08 Test Plan
 
 Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
+Source of truth: iteration 08 verification plan and delivery evidence.
 
 ## Backend
 

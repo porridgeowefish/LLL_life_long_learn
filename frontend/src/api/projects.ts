@@ -8,7 +8,11 @@ import { http } from './client';
 import { qk } from './queryKeys';
 import type {
   CreateProjectRequest,
-  CreateSubprojectRequest,
+  DeleteProjectResponse,
+  DisciplineOverviewGenerationResponse,
+  DisciplineOverviewResponse,
+  ProjectTypeAdviceRequest,
+  ProjectTypeAdviceResponse,
   ProjectResponse,
   ProjectsListResponse,
   ZoneResponse,
@@ -57,23 +61,57 @@ export function useCreateProject() {
       http.post<ProjectResponse>('/api/projects', payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.projects.all() });
+      qc.invalidateQueries({ queryKey: qk.folders.all() });
       qc.invalidateQueries({ queryKey: qk.health() });
     },
   });
 }
 
-export function useCreateSubproject(parentSlug: string) {
+export function useDeleteProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (payload: CreateSubprojectRequest) =>
-      http.post<ProjectResponse>(
-        `/api/projects/${encodeURIComponent(parentSlug)}/subprojects`,
-        payload,
+    mutationFn: (slug: string) =>
+      http.delete<DeleteProjectResponse>(`/api/projects/${encodeURIComponent(slug)}`),
+    onSuccess: (_response, slug) => {
+      qc.removeQueries({ predicate: (query) => query.queryKey.includes(slug) });
+      qc.invalidateQueries({ queryKey: qk.projects.all() });
+      qc.invalidateQueries({ queryKey: qk.folders.all() });
+      qc.invalidateQueries({ queryKey: qk.sessions.recent() });
+      qc.invalidateQueries({ queryKey: qk.sessions.active() });
+      qc.invalidateQueries({ queryKey: qk.health() });
+    },
+  });
+}
+
+export function useProjectTypeAdvice() {
+  return useMutation({
+    mutationFn: (payload: ProjectTypeAdviceRequest) =>
+      http.post<ProjectTypeAdviceResponse>('/api/project-type-advice', payload),
+  });
+}
+
+export function useDisciplineOverview(slug: string | undefined) {
+  return useQuery({
+    queryKey: ['projects', slug ?? '__missing__', 'discipline-overview'],
+    enabled: !!slug,
+    queryFn: () =>
+      http.get<DisciplineOverviewResponse>(
+        `/api/projects/${encodeURIComponent(slug!)}/discipline-overview`,
+      ),
+  });
+}
+
+export function useGenerateDisciplineOverview(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      http.post<DisciplineOverviewGenerationResponse>(
+        `/api/projects/${encodeURIComponent(slug)}/discipline-overview/generate`,
+        {},
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.projects.all() });
-      qc.invalidateQueries({ queryKey: qk.projects.detail(parentSlug) });
-      qc.invalidateQueries({ queryKey: qk.projects.tree(parentSlug) });
+      qc.invalidateQueries({ queryKey: qk.sessions.active() });
+      qc.invalidateQueries({ queryKey: qk.sessions.recent() });
     },
   });
 }

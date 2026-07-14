@@ -1,0 +1,122 @@
+.modal {
+  height: min(560px, calc(100dvh - 32px));
+}
+
+.dialog {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(180px, 1fr) auto auto;
+  gap: 12px;
+}
+
+.messages {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 4px 4px;
+}
+
+.assistantMessage,
+.userMessage {
+  width: fit-content;
+  max-width: min(88%, 62ch);
+  padding: 9px 11px;
+  border-radius: var(--radius);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.assistantMessage {
+  align-self: flex-start;
+  background: var(--surface-sunken);
+  color: var(--fg);
+}
+
+.userMessage {
+  align-self: flex-end;
+  background: var(--surface-tint);
+  color: var(--accent-ink);
+}
+
+.thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.recommendation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+
+.recommendation > div {
+  display: grid;
+  gap: 2px;
+}
+
+.recommendation strong {
+  font-size: 0.8rem;
+}
+
+.recommendation span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.composer textarea {
+  min-height: 62px;
+  max-height: 130px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 9px 10px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  outline: none;
+}
+
+.composer textarea:focus {
+  border-color: var(--accent);
+}
+
+.error {
+  color: var(--pink);
+  font-size: 0.74rem;
+}
+
+@media (max-width: 560px) {
+  .recommendation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .composer {
+    grid-template-columns: 1fr;
+  }
+
+  .composer button {
+    justify-self: end;
+  }
+}

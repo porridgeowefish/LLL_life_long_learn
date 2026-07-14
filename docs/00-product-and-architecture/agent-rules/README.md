@@ -1,8 +1,8 @@
 # Agent Rules Index
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
+Status: active
+Owner: project maintainer
+Last reviewed: 2026-07-14
 Source of truth: this directory owns detailed atomic AI agent rules for LLL.
 
 ## Design Goal
@@ -33,6 +33,11 @@ New task start:
 Docs update or new project rule:
 00-startup-and-source-of-truth.md
 10-documentation-governance.md
+
+New iteration, iteration renumbering, product/domain change, or ADR:
+00-startup-and-source-of-truth.md
+10-documentation-governance.md
+40-testing-and-verification.md
 
 API or frontend/backend wiring:
 00-startup-and-source-of-truth.md

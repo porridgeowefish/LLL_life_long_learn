@@ -17,12 +17,18 @@ import (
 // ZoneName is the canonical name of one of the five learning zones.
 type ZoneName string
 
+// ProjectType distinguishes broad orientation maps from focused learning work.
+type ProjectType string
+
 const (
 	ZoneIntro    ZoneName = "Intro"
 	ZoneExplain  ZoneName = "Explain"
 	ZonePractice ZoneName = "Practice"
 	ZoneExtend   ZoneName = "Extend"
 	ZoneSummary  ZoneName = "Summary"
+
+	ProjectTypeDisciplineMap  ProjectType = "discipline-map"
+	ProjectTypeSystemLearning ProjectType = "system-learning"
 )
 
 // AllZones enumerates the five fixed zones in canonical order.
@@ -45,17 +51,16 @@ var zoneFilenames = map[ZoneName]string{
 
 // ProjectState is the persistent per-project state.
 type ProjectState struct {
-	ID              string        `json:"id"`
-	Title           string        `json:"title"`
-	Slug            string        `json:"slug"`
-	ParentProjectID string        `json:"parentProjectId,omitempty"`
-	Status          string        `json:"status"`
-	ActiveZone      ZoneName      `json:"activeZone"`
-	CreatedAt       time.Time     `json:"createdAt"`
-	UpdatedAt       time.Time     `json:"updatedAt"`
-	ChildProjectIDs []string      `json:"childProjectIds,omitempty"`
-	LastArtifacts   []ArtifactRef `json:"lastArtifacts,omitempty"`
-	GeneratedZones  []ZoneName    `json:"-"`
+	ID             string        `json:"id"`
+	Title          string        `json:"title"`
+	Slug           string        `json:"slug"`
+	ProjectType    ProjectType   `json:"projectType"`
+	Status         string        `json:"status"`
+	ActiveZone     ZoneName      `json:"activeZone,omitempty"`
+	CreatedAt      time.Time     `json:"createdAt"`
+	UpdatedAt      time.Time     `json:"updatedAt"`
+	LastArtifacts  []ArtifactRef `json:"lastArtifacts,omitempty"`
+	GeneratedZones []ZoneName    `json:"-"`
 }
 
 // ArtifactRef links a session/turn to a curated zone file.
@@ -77,11 +82,25 @@ type PredecessorFile struct {
 
 // ProjectMeta is the lightweight summary used in the tree listing.
 type ProjectMeta struct {
-	ID              string `json:"id"`
-	Slug            string `json:"slug"`
-	Title           string `json:"title"`
-	ParentProjectID string `json:"parentProjectId,omitempty"`
-	HasSubprojects  bool   `json:"hasSubprojects"`
+	ID                string      `json:"id"`
+	Slug              string      `json:"slug"`
+	Title             string      `json:"title"`
+	ProjectType       ProjectType `json:"projectType"`
+	OverviewAvailable bool        `json:"overviewAvailable"`
+}
+
+// NormalizeProjectType preserves legacy projects and clients by treating an
+// absent project type as the historical system-learning shape.
+func NormalizeProjectType(t ProjectType) ProjectType {
+	if t == "" {
+		return ProjectTypeSystemLearning
+	}
+	return t
+}
+
+func ValidateProjectType(t ProjectType) bool {
+	t = NormalizeProjectType(t)
+	return t == ProjectTypeDisciplineMap || t == ProjectTypeSystemLearning
 }
 
 // ValidateSlug returns true if s is a valid project slug.
@@ -113,9 +132,6 @@ func projectRoot(slug string) (string, error) {
 	if _, err := os.Stat(filepath.Join(root, "state.json")); err == nil {
 		return filepath.Abs(root)
 	}
-	if nested, ok := findNestedProjectRoot(activeProjectsRoot(), slug); ok {
-		return filepath.Abs(nested)
-	}
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return "", err
@@ -129,34 +145,6 @@ func projectRoot(slug string) (string, error) {
 		return "", fmt.Errorf("slug escapes projects root: %q", slug)
 	}
 	return abs, nil
-}
-
-// findNestedProjectRoot locates an existing child project by leaf slug.
-func findNestedProjectRoot(root, slug string) (string, bool) {
-	var found string
-	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || found != "" || !d.IsDir() || d.Name() != slug || path == filepath.Join(root, slug) {
-			return nil
-		}
-		if _, statErr := os.Stat(filepath.Join(path, "state.json")); statErr == nil {
-			found = path
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return found, found != ""
-}
-
-// subprojectRoot returns the path to a child project under a parent.
-func subprojectRoot(parentSlug, childSlug string) (string, error) {
-	if !ValidateSlug(childSlug) {
-		return "", fmt.Errorf("invalid child slug: %q", childSlug)
-	}
-	parent, err := projectRoot(parentSlug)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(parent, "subprojects", childSlug), nil
 }
 
 // activeProjectsRoot returns the override (test) or the real PROJECTS_ROOT.
@@ -180,11 +168,33 @@ func ProjectExists(slug string) (bool, error) {
 	return err == nil, err
 }
 
+// DeleteProject removes a learning project and every artifact stored below its
+// canonical project root. Callers must separately clean workspace-global
+// references (for example folders) and reject deletion while a run is active.
+func DeleteProject(slug string) error {
+	if !ValidateSlug(slug) {
+		return errors.New("invalid project slug")
+	}
+	root, err := ProjectRootForSlug(slug)
+	if err != nil {
+		return err
+	}
+	exists, err := ProjectExists(slug)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return os.ErrNotExist
+	}
+	return os.RemoveAll(root)
+}
+
 // CreateProjectSkeleton writes the canonical folder tree plus initial
 // state.json, project.md, and memory files. Returns os.ErrExist-equivalent
 // (via *SlugConflictError) if the project already exists.
 // CreateProjectSkeleton creates a project with empty background fields.
-// Kept for backward compatibility with tests and subproject handler.
+// parentSlug is ignored; it remains only for source compatibility. All new
+// project directories are top-level and have no parent relationship.
 func CreateProjectSkeleton(slug, title string, parentSlug string) error {
 	return CreateProjectSkeletonWithInput(slug, title, parentSlug, ProjectInput{})
 }
@@ -192,13 +202,7 @@ func CreateProjectSkeleton(slug, title string, parentSlug string) error {
 // CreateProjectSkeletonWithInput is the rich-form creator: writes project.md
 // seeded with the user's why / current / target / standard fields.
 func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in ProjectInput) error {
-	var root string
-	var err error
-	if parentSlug != "" {
-		root, err = subprojectRoot(parentSlug, slug)
-	} else {
-		root, err = projectRoot(slug)
-	}
+	root, err := projectRoot(slug)
 	if err != nil {
 		return err
 	}
@@ -210,10 +214,15 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 		return err
 	}
 
-	// Folder tree.
-	dirs := []string{
-		"", "memory", "intro", "explain", "practice", "extend", "summary",
-		"progress", "runs", "runs/_index", "assets", "subprojects",
+	projectType := NormalizeProjectType(in.ProjectType)
+	if !ValidateProjectType(projectType) {
+		return fmt.Errorf("invalid project type: %q", in.ProjectType)
+	}
+
+	// Folder tree. Discipline maps deliberately do not own learning zones.
+	dirs := []string{"", "memory", "runs", "runs/_index", "assets"}
+	if projectType == ProjectTypeSystemLearning {
+		dirs = append(dirs, "intro", "explain", "practice", "extend", "summary", "progress")
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
@@ -225,20 +234,20 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	parsed, _ := time.Parse(time.RFC3339, now)
 
 	state := &ProjectState{
-		ID:         slug,
-		Title:      title,
-		Slug:       slug,
-		Status:     "active",
-		ActiveZone: ZoneIntro,
-		CreatedAt:  parsed,
-		UpdatedAt:  parsed,
+		ID:          slug,
+		Title:       title,
+		Slug:        slug,
+		ProjectType: projectType,
+		Status:      "active",
+		CreatedAt:   parsed,
+		UpdatedAt:   parsed,
 	}
-	if parentSlug != "" {
-		state.ParentProjectID = parentSlug
+	if projectType == ProjectTypeSystemLearning {
+		state.ActiveZone = ZoneIntro
 	}
 
 	// state.json (atomic)
-	if err := WriteProjectState(slug, state, parentSlug); err != nil {
+	if err := WriteProjectState(slug, state, ""); err != nil {
 		return err
 	}
 
@@ -266,37 +275,22 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 		return err
 	}
 
-	// summary/summary.md — empty learner-owned file
-	if err := AtomicWriteFile(filepath.Join(root, "summary", "summary.md"), []byte(""), 0o644); err != nil {
-		return err
-	}
-
-	// If subproject, register in parent's state.
-	if parentSlug != "" {
-		parent, err := ReadProjectState(parentSlug)
-		if err != nil {
-			return fmt.Errorf("read parent state: %w", err)
+	if projectType == ProjectTypeSystemLearning {
+		// summary/summary.md — empty learner-owned file
+		if err := AtomicWriteFile(filepath.Join(root, "summary", "summary.md"), []byte(""), 0o644); err != nil {
+			return err
 		}
-		parent.ChildProjectIDs = appendUnique(parent.ChildProjectIDs, slug)
-		parent.UpdatedAt = parsed
-		if err := WriteProjectState(parentSlug, parent, ""); err != nil {
-			return fmt.Errorf("update parent state: %w", err)
+	} else {
+		overview := fmt.Sprintf("# %s：学科总览\n\n当前总览尚未生成。点击“生成学科总览”，了解学科边界、主要领域、研究方法、典型应用与可能的学习路线。\n", title)
+		if err := AtomicWriteFile(filepath.Join(root, "overview.md"), []byte(overview), 0o644); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// CreateSubprojectWithInput applies the same learner background contract to a
-// child project as CreateProjectSkeletonWithInput does to a root project.
-func CreateSubprojectWithInput(parentSlug, slug, title string, in ProjectInput) error {
-	return CreateProjectSkeletonWithInput(slug, title, parentSlug, in)
-}
-
-// ReadProjectState reads and decodes a project's state.json.
-// For subprojects, pass the full slug path joined as "parent/child"
-// — but for now this slice only supports top-level reads here.
-// Callers needing subprojects should use IndexAll or ResolveByPath.
+// ReadProjectState reads and decodes one top-level project's state.json.
 func ReadProjectState(slug string) (*ProjectState, error) {
 	root, err := projectRoot(slug)
 	if err != nil {
@@ -309,6 +303,10 @@ func ReadProjectState(slug string) (*ProjectState, error) {
 	var s ProjectState
 	if err := json.Unmarshal(data, &s); err != nil {
 		return nil, fmt.Errorf("decode state.json: %w", err)
+	}
+	s.ProjectType = NormalizeProjectType(s.ProjectType)
+	if s.ProjectType == ProjectTypeDisciplineMap {
+		s.ActiveZone = ""
 	}
 	s.GeneratedZones = detectGeneratedZones(root)
 	return &s, nil
@@ -413,16 +411,9 @@ func validTaskSet(path string) bool {
 	return json.Unmarshal(data, &legacy) == nil && len(legacy) > 0
 }
 
-// WriteProjectState persists state.json atomically. parentSlug is non-empty
-// when writing a subproject's state so the file lands in subprojects/<child>/.
+// WriteProjectState persists state.json atomically in the flat project root.
 func WriteProjectState(slug string, state *ProjectState, parentSlug string) error {
-	var root string
-	var err error
-	if parentSlug != "" {
-		root, err = subprojectRoot(parentSlug, slug)
-	} else {
-		root, err = projectRoot(slug)
-	}
+	root, err := projectRoot(slug)
 	if err != nil {
 		return err
 	}
@@ -434,11 +425,10 @@ func WriteProjectState(slug string, state *ProjectState, parentSlug string) erro
 	return AtomicWriteFile(filepath.Join(root, "state.json"), data, 0o644)
 }
 
-// IndexAll walks PROJECTS_ROOT recursively and returns every project
-// (top-level + nested subprojects) as a flat list with parent IDs populated.
+// IndexAll returns top-level peer projects.
 func IndexAll() ([]ProjectMeta, error) {
 	var out []ProjectMeta
-	if err := walkProjects(activeProjectsRoot(), "", &out); err != nil {
+	if err := walkProjects(activeProjectsRoot(), &out); err != nil {
 		return nil, err
 	}
 	// Stable sort by slug for deterministic listing.
@@ -446,7 +436,7 @@ func IndexAll() ([]ProjectMeta, error) {
 	return out, nil
 }
 
-func walkProjects(dir string, parentID string, out *[]ProjectMeta) error {
+func walkProjects(dir string, out *[]ProjectMeta) error {
 	entries, err := os.ReadDir(dir)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -476,28 +466,14 @@ func walkProjects(dir string, parentID string, out *[]ProjectMeta) error {
 		if err := json.Unmarshal(data, &s); err != nil {
 			continue
 		}
-		hasSub := false
-		if _, err := os.Stat(filepath.Join(childDir, "subprojects")); err == nil {
-			if subs, err := os.ReadDir(filepath.Join(childDir, "subprojects")); err == nil {
-				for _, se := range subs {
-					if se.IsDir() {
-						if _, err := os.Stat(filepath.Join(childDir, "subprojects", se.Name(), "state.json")); err == nil {
-							hasSub = true
-							break
-						}
-					}
-				}
-			}
-		}
+		s.ProjectType = NormalizeProjectType(s.ProjectType)
 		*out = append(*out, ProjectMeta{
-			ID:              s.ID,
-			Slug:            s.Slug,
-			Title:           s.Title,
-			ParentProjectID: parentID,
-			HasSubprojects:  hasSub,
+			ID:                s.ID,
+			Slug:              s.Slug,
+			Title:             s.Title,
+			ProjectType:       s.ProjectType,
+			OverviewAvailable: s.ProjectType == ProjectTypeDisciplineMap && nonEmptyFile(filepath.Join(childDir, "overview.md")),
 		})
-		// Recurse into subprojects/.
-		_ = walkProjects(filepath.Join(childDir, "subprojects"), s.ID, out)
 	}
 	return nil
 }
@@ -676,16 +652,35 @@ func defaultProjectMdBody() string {
 	return defaultProjectMdBodyForInput(ProjectInput{})
 }
 
-// ProjectInput captures the rich background fields collected at creation time.
-// Why/Current/Target/Standard seed the project.md sections that follow the title.
+// ProjectInput captures creation-time context. Why/Current/Target/Standard seed
+// only system-learning project briefs; discipline-map briefs ignore them.
 type ProjectInput struct {
-	Why      string // motivation: why this topic matters
-	Current  string // current ability self-assessment
-	Target   string // target ability self-assessment
-	Standard string // completion criteria the learner commits to
+	ProjectType ProjectType
+	Why         string // motivation: why this topic matters
+	Current     string // current ability self-assessment
+	Target      string // target ability self-assessment
+	Standard    string // completion criteria the learner commits to
 }
 
 func defaultProjectMdBodyForInput(in ProjectInput) string {
+	if NormalizeProjectType(in.ProjectType) == ProjectTypeDisciplineMap {
+		return `## 项目形态
+
+学科地图
+
+## 总览目标
+
+建立这门学科的统一入口，了解学科边界、主要研究领域、领域关系、研究方法、典型应用与可选学习路线。
+
+## 范围备注
+
+_尚未填写：特别关注或暂不覆盖的方向。_
+
+## 备注
+
+_由学习者维护；智能体未经确认不得覆盖本文件。_`
+	}
+
 	why := strings.TrimSpace(in.Why)
 	if why == "" {
 		why = "_尚未填写：为什么这个主题值得学。_"
@@ -727,9 +722,7 @@ Intro
 _Learner-owned. Agents will not overwrite this file without confirmation._`, why, current, target, standard)
 }
 
-// FindProjectBySlug scans IndexAll and returns the meta + the path-prefix
-// (e.g. "" for top-level, "parent/child" for nested). Useful when callers
-// have just a leaf slug and need to know if it's a subproject.
+// FindProjectBySlug scans the flat project index.
 func FindProjectBySlug(slug string) (ProjectMeta, string, bool) {
 	all, err := IndexAll()
 	if err != nil {
@@ -737,11 +730,7 @@ func FindProjectBySlug(slug string) (ProjectMeta, string, bool) {
 	}
 	for _, p := range all {
 		if p.Slug == slug {
-			path := ""
-			if p.ParentProjectID != "" {
-				path = filepath.Join(p.ParentProjectID, "subprojects", p.Slug)
-			}
-			return p, path, true
+			return p, "", true
 		}
 	}
 	return ProjectMeta{}, "", false
