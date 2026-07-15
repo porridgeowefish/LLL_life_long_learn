@@ -144,18 +144,20 @@ mechanics merely because those names appear in the physics overview.
 ## Sidebar Contract
 
 The sidebar combines real project objects with the existing folder layout. A
-discipline map is the clickable overview of its folder; it is not duplicated as
-a child project row. System-learning projects remain ordinary movable members:
+discipline map is the bound overview of its folder and renders as one explicit
+overview row. System-learning projects remain ordinary movable members:
 
 ```text
-物理学                    ← 点击文件夹标题打开学科总览
+物理学                    ← 文件夹标题仅展开/收起
+├─ 物理学学科总览         总览
 ├─ 流体力学               系统学习
 └─ 热力学                 系统学习
 ```
 
 It must not parse overview headings into navigation nodes. Selecting a
-map-backed folder title opens `学科总览`; selecting a system-learning child row
-opens its five-zone experience.
+explicit `××学科总览` row opens the map; selecting a system-learning child row
+opens its five-zone experience. The map row is derived from `mapProjectSlug`
+and never enters `slugOrder`.
 
 ## Required Project State
 

@@ -10,7 +10,7 @@ export interface Folder {
   id: string;
   name: string;
   slugOrder: string[];
-  /** Discipline-map project rendered as this folder's overview entry. */
+  /** Discipline-map project rendered as this folder's explicit overview row. */
   mapProjectSlug?: string;
 }
 

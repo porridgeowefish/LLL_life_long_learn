@@ -1,6 +1,8 @@
 package server
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/folderstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -327,6 +330,21 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	if err := workspace.AtomicWriteFile(abs, body, 0o644); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if dir == "extend" && file == "flower.json" {
+		digest := sha256.Sum256(body)
+		_, _, err := awardLearningEvent(slug, progressstore.Event{
+			ID:            "extend-flower:" + hex.EncodeToString(digest[:12]),
+			SourceType:    "extend-flower",
+			SourceID:      rel,
+			ActivityDelta: 1,
+			Title:         "编辑知识花朵",
+			Detail:        "补充或调整花瓣内容",
+		})
+		if err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "record flower activity: "+err.Error())
+			return
+		}
 	}
 	cache.Invalidate(slug)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})

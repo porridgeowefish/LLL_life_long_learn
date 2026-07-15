@@ -20,9 +20,6 @@ interface ProjectTypeAdvisorDialogProps {
   draft: {
     title?: string;
     why?: string;
-    current: string;
-    target: string;
-    standard?: string;
   };
   onAdopt: (projectType: ProjectType) => void;
 }
@@ -124,8 +121,14 @@ export function ProjectTypeAdvisorDialog({
             </div>
           ))}
           {advice.isPending && (
-            <div className={s.thinking} role="status">
-              <Icon name="bot" size={15} /> 正在判断最合适的学习形态…
+            <div className={s.thinking} role="status" aria-live="polite">
+              <div className={s.thinkingCopy}>
+                <Icon name="bot" size={15} />
+                <span><strong>正在梳理你的学习意图</strong><small>先辨别你需要一张全景地图，还是一条深入路线，请稍等片刻。</small></span>
+              </div>
+              <div className={s.thinkingTrack} role="progressbar" aria-label="AI 正在生成建议" aria-valuetext="正在分析">
+                <i />
+              </div>
             </div>
           )}
         </div>

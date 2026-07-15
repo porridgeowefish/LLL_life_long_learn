@@ -44,8 +44,8 @@ export function LearningRhythm({ projects }: Props) {
 
       <div className={s.rhythmBody} aria-busy={activity.isLoading}>
         <aside className={s.streak}>
-          <strong>{summary?.currentStreak ?? 0}</strong>
-          <span>天 · 当前连续学习</span>
+          <div className={s.streakValue}><strong>{summary?.currentStreak ?? 0} 天</strong></div>
+          <span>当前连续学习</span>
           <p><b>保持自己的节律</b>稳定回来学习，比追求单日高强度更重要。</p>
         </aside>
         <div className={s.calendarScroll}>
@@ -150,5 +150,6 @@ function fallbackTitle(type: string) {
   if (type === 'practice-evaluation') return '练习评估';
   if (type.startsWith('practice')) return '完成练习';
   if (type.startsWith('flashcard')) return '复习闪卡';
+  if (type === 'extend-flower') return '编辑知识花朵';
   return '学习行动';
 }

@@ -178,18 +178,6 @@
   text-decoration: none;
 }
 
-.mapFolderName {
-  border-radius: 4px;
-}
-
-.mapFolderName:hover,
-.mapFolderName:focus-visible {
-  background: var(--surface-tint);
-  color: var(--accent-ink);
-  outline: none;
-  text-decoration: none;
-}
-
 .folderNameText {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -317,6 +305,14 @@
   background: rgba(124, 154, 114, 0.12);
 }
 
+.menuLabel {
+  padding: 5px 8px 3px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .menuActive {
   color: var(--accent2);
   font-weight: 600;
@@ -334,4 +330,30 @@
 
 .menu button.menuDanger:hover {
   background: rgba(179, 74, 60, 0.1);
+}
+
+.deleteSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  color: var(--pink);
+  background: color-mix(in srgb, var(--pink) 8%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--pink) 28%, var(--border));
+  border-radius: var(--radius);
+}
+
+.deleteSummary div {
+  display: grid;
+  gap: 2px;
+}
+
+.deleteSummary strong {
+  color: var(--fg);
+  font-size: 0.82rem;
+}
+
+.deleteSummary span {
+  color: var(--muted);
+  font-size: 0.7rem;
 }

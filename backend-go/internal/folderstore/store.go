@@ -26,8 +26,8 @@ type Folder struct {
 }
 
 // MapFolderSpec connects a discipline-map project to the same folder model
-// already used by the sidebar. The map is the folder's overview; it is never a
-// child row inside its own folder.
+// already used by the sidebar. The map is the folder's overview binding; the
+// frontend renders it as an explicit overview row before ordinary child rows.
 type MapFolderSpec struct {
 	Slug  string
 	Title string

@@ -177,7 +177,7 @@ export function CreateProjectModal({
             autoComplete="off"
             {...register('title')}
           />
-          <div className={s.hint}>用作项目目录名（自动 slugify），后续可改显示标题。</div>
+          <div className={s.hint}>我们会根据标题自动创建本地项目目录，后续仍可修改显示标题。</div>
           {errors.title && <div className={s.error}>{errors.title.message}</div>}
         </div>
 
@@ -250,9 +250,6 @@ export function CreateProjectModal({
           draft={{
             title: currentDraft.title,
             why: currentDraft.why,
-            current: currentDraft.current,
-            target: currentDraft.target,
-            standard: currentDraft.standard,
           }}
           onAdopt={(projectType) => setValue('projectType', projectType, { shouldValidate: true })}
         />

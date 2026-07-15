@@ -12,7 +12,7 @@ WorkspaceProject
 The durable local project object. It has exactly one project type.
 
 DisciplineMap
-A WorkspaceProject that owns one discipline overview and is bound to a sidebar folder header.
+A WorkspaceProject that owns one discipline overview and is bound to a sidebar folder.
 
 ProjectFolder
 The single navigation/classification container. It may bind one DisciplineMap
@@ -52,13 +52,13 @@ A scoped engineering delivery slice for the product itself.
 WorkspaceProject
 ├─ DisciplineMap
 │  ├─ owns exactly one learner-facing discipline overview
-│  └─ may bind one ProjectFolder as that folder's overview
+│  └─ may bind one ProjectFolder and render as its explicit overview row
 └─ SystemLearningProject
    └─ owns Intro / Explain / Practice / Extend / Summary
 
 ProjectFolder
-├─ may open one bound DisciplineMap overview from its title
-└─ classifies zero or more SystemLearningProjects without owning them
+├─ may expose one bound DisciplineMap as an explicit overview row
+└─ classifies zero or more SystemLearningProjects without owning either project type
 
 OverviewTopic
 ├─ is represented by an H3 key concept or branch in the overview body

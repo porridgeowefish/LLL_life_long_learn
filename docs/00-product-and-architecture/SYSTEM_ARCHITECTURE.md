@@ -37,7 +37,7 @@ Frontend project tree, discipline overview, five-zone learning surfaces, and con
 ```text
 discipline-map
   -> open one discipline overview
-  -> render as the overview of an existing sidebar folder object
+  -> render as an explicit overview row in an existing sidebar folder object
   -> no five-zone navigation
   -> may start creation of an ordinary system-learning project
 

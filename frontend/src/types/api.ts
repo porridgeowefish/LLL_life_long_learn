@@ -61,9 +61,6 @@ export interface CreateProjectRequest {
 export interface ProjectTypeAdviceRequest {
   title?: string;
   why?: string;
-  current: string;
-  target: string;
-  standard?: string;
   messages: Array<{
     role: 'user' | 'assistant';
     content: string;

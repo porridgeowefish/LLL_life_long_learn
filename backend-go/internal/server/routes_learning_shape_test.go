@@ -75,6 +75,28 @@ func TestProjectTypeAdviceCanAskClarifyingQuestion(t *testing.T) {
 	}
 }
 
+func TestProjectTypeAdviceTreatsMissingDraftFieldsAsUnknown(t *testing.T) {
+	setupLearningShapeTest(t)
+	var capturedSystem, capturedInput string
+	completeLearningShapeAI = func(_ context.Context, _ askaiprovider.Provider, system string, messages []askaiprovider.Message) (string, error) {
+		capturedSystem = system
+		capturedInput = messages[0].Content
+		return `{"reply":"你更想先看全貌，还是直接掌握一个具体问题？","recommendation":"undetermined","reason":"","tradeoff":"","confidence":"low"}`, nil
+	}
+	req := httptest.NewRequest(http.MethodPost, "/api/project-type-advice", strings.NewReader(`{"title":"博弈论","messages":[{"role":"user","content":"帮我选"}]}`))
+	rec := httptest.NewRecorder()
+	newTestServer(t).handleProjectTypeAdvice(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if strings.Contains(capturedInput, `"current"`) || strings.Contains(capturedInput, `"standard"`) {
+		t.Fatalf("missing learner fields leaked into advisor draft: %s", capturedInput)
+	}
+	if !strings.Contains(capturedSystem, "缺失字段就是未知") {
+		t.Fatalf("advisor system prompt lacks missing-data guard: %s", capturedSystem)
+	}
+}
+
 func TestProjectTypeAdviceFallsBackToNaturalLanguage(t *testing.T) {
 	setupLearningShapeTest(t)
 	completeLearningShapeAI = func(context.Context, askaiprovider.Provider, string, []askaiprovider.Message) (string, error) {

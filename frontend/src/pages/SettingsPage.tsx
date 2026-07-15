@@ -111,7 +111,7 @@ export function SettingsPage() {
 const THEME_OPTIONS: Array<{ id: ThemePreference; name: string; description: string; swatches: string[] }> = [
   { id: 'lychee-paper', name: '荔枝暖纸', description: '温暖、安静的默认阅读主题', swatches: ['#faf8f4', '#fffdf9', '#60775a'] },
   { id: 'mountain-mist', name: '远山雾蓝', description: '清凉克制，适合长时间专注', swatches: ['#f4f7f7', '#fbfdfd', '#557987'] },
-  { id: 'wisteria-gray', name: '紫藤柔灰', description: '柔和人文，降低界面刺激', swatches: ['#f7f5f7', '#fefcfe', '#796a80'] },
+  { id: 'wisteria-gray', name: '云海天蓝', description: '白色为主、天蓝点缀的轻盈主题', swatches: ['#f7fbff', '#ffffff', '#69aeda'] },
   { id: 'night-ink', name: '夜读墨绿', description: '低光环境下的舒缓深色主题', swatches: ['#202521', '#292f2a', '#a7b99f'] },
 ];
 

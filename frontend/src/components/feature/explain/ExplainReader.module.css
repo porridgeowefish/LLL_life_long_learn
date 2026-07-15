@@ -117,8 +117,7 @@
 
 .selectionBar {
   position: fixed;
-  z-index: 10;
-  transform: translateX(-50%);
+  z-index: 100;
   display: flex;
   max-width: calc(100vw - 16px);
   flex-wrap: wrap;

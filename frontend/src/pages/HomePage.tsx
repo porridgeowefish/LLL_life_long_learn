@@ -36,7 +36,7 @@ export function HomePage() {
       <div className={s.scroll}>
         <header className={s.header}>
           <div>
-            <h1 className={s.title}>学习总览</h1>
+            <h1 className={s.title}>学习主页</h1>
             <p className={s.subtitle}>
               本地学习工作台 · 当前工作区 <code>{health?.workspace ?? '…'}</code>
             </p>

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Sidebar } from './Sidebar';
 
@@ -48,37 +48,48 @@ vi.mock('@/store', () => ({
 }));
 
 describe('Sidebar discipline maps', () => {
+  beforeEach(() => deleteProject.mockReset());
+
   it('renders a map as the folder overview and not as a child project row', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>);
 
-    const overviewLink = screen.getByRole('link', { name: /概率论与数理统计/ });
+    const overviewLink = screen.getByRole('link', { name: /概率论与数理统计学科总览/ });
     expect(overviewLink.getAttribute('href')).toBe('/project/probability');
     expect(screen.getByRole('link', { name: /蒙特卡洛模拟/ })).toBeTruthy();
-    expect(screen.queryByText('地图')).toBeNull();
+    expect(screen.getByText('总览')).toBeTruthy();
   });
 
-  it('calls the delete command only after one confirmation', () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+  it('calls the delete command only after the in-app confirmation', () => {
     render(<MemoryRouter><Sidebar /></MemoryRouter>);
 
-    fireEvent.click(screen.getByRole('button', { name: /项目操作/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '删除学习' }));
+    fireEvent.click(screen.getByRole('button', { name: '项目操作：蒙特卡洛模拟' }));
+    expect(screen.getByText('移动到文件夹')).toBeTruthy();
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除学习单元' }));
 
-    expect(confirm).toHaveBeenCalledTimes(1);
-    expect(deleteProject).toHaveBeenCalledWith('monte-carlo', expect.any(Object));
-    confirm.mockRestore();
-  });
-
-  it('does not call the delete command when confirmation is cancelled', () => {
-    deleteProject.mockClear();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<MemoryRouter><Sidebar /></MemoryRouter>);
-
-    fireEvent.click(screen.getByRole('button', { name: /项目操作/ }));
-    fireEvent.click(screen.getByRole('menuitem', { name: '删除学习' }));
-
-    expect(confirm).toHaveBeenCalledTimes(1);
     expect(deleteProject).not.toHaveBeenCalled();
-    confirm.mockRestore();
+    expect(screen.getByRole('heading', { name: '删除学习单元？' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+    expect(deleteProject).toHaveBeenCalledWith('monte-carlo', expect.any(Object));
+  });
+
+  it('does not call the delete command when the dialog is cancelled', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole('button', { name: '项目操作：蒙特卡洛模拟' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除学习单元' }));
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    expect(deleteProject).not.toHaveBeenCalled();
+  });
+
+  it('confirms deletion of a discipline project through the same in-app surface', () => {
+    render(<MemoryRouter><Sidebar /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole('button', { name: '项目操作：概率论与数理统计学科总览' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '删除学科项目' }));
+
+    expect(screen.getByRole('heading', { name: '删除学科项目？' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '确认删除' }));
+    expect(deleteProject).toHaveBeenCalledWith('probability', expect.any(Object));
   });
 });

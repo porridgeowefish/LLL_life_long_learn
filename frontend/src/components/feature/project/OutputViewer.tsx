@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import { useMarkdown } from '@/hooks/useMarkdown';
 import { qk } from '@/api/queryKeys';
@@ -8,6 +9,7 @@ import { useCreateConfusion } from '@/api/confusions';
 import { ZONE_FILENAME, type ZoneName } from '@/types/domain';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { Tag } from '@/components/primitive/Tag';
+import { selectionToolbarPosition } from '@/lib/floatingPosition';
 
 import s from './OutputViewer.module.css';
 
@@ -19,7 +21,9 @@ interface OutputViewerProps {
 // Selection toolbar actions for Explain zone text selection.
 interface SelectionToolbar {
   text: string;
-  rect: { top: number; left: number };
+  anchor: { top: number; bottom: number; centerX: number };
+  top: number;
+  left: number;
 }
 
 export function OutputViewer({ slug, zone }: OutputViewerProps) {
@@ -36,10 +40,25 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
   const text = data ?? '';
   const { html, mermaid } = useMarkdown(text);
   const hostRef = useRef<HTMLDivElement>(null);
+  const markdownRef = useRef<HTMLDivElement>(null);
 
   // Selection toolbar state — only for Explain zone.
   const [toolbar, setToolbar] = useState<SelectionToolbar | null>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const createConfusion = useCreateConfusion();
+
+  useLayoutEffect(() => {
+    if (!toolbar || !toolbarRef.current) return;
+    const measured = toolbarRef.current.getBoundingClientRect();
+    const next = selectionToolbarPosition(
+      toolbar.anchor,
+      { width: measured.width, height: measured.height },
+      viewportSize(),
+    );
+    if (Math.abs(next.top - toolbar.top) > 1 || Math.abs(next.left - toolbar.left) > 1) {
+      setToolbar({ ...toolbar, ...next });
+    }
+  }, [toolbar]);
 
   // After HTML is set, replace each mermaid placeholder with a rendered SVG.
   useEffect(() => {
@@ -75,12 +94,32 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
       return;
     }
     const range = sel.getRangeAt(0);
+    if (!markdownRef.current?.contains(range.commonAncestorContainer)) {
+      setToolbar(null);
+      return;
+    }
     const rect = range.getBoundingClientRect();
+    const anchor = {
+      top: rect.top,
+      bottom: rect.bottom,
+      centerX: rect.left + rect.width / 2,
+    };
+    const position = selectionToolbarPosition(
+      anchor,
+      { width: 240, height: 40 },
+      viewportSize(),
+    );
     setToolbar({
       text: sel.toString().trim(),
-      rect: { top: rect.top + window.scrollY, left: rect.left + rect.width / 2 },
+      anchor,
+      ...position,
     });
   }, [zone]);
+
+  useEffect(() => {
+    window.addEventListener('pointerup', handleMouseUp);
+    return () => window.removeEventListener('pointerup', handleMouseUp);
+  }, [handleMouseUp]);
 
   const handleMarkConfusion = () => {
     if (!toolbar) return;
@@ -118,15 +157,18 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
         <code className={s.path}>{zone.toLowerCase()}/{filename}</code>
       </header>
       <div
+        ref={markdownRef}
         className={s.markdown}
-        onMouseUp={handleMouseUp}
         // eslint-disable-next-line react/no-danger -- HTML is sanitised via DOMPurify in useMarkdown.
         dangerouslySetInnerHTML={{ __html: html }}
       />
-      {toolbar && (
+      {toolbar && createPortal((
         <div
+          ref={toolbarRef}
           className={s.selectionBar}
-          style={{ top: toolbar.rect.top - 40, left: toolbar.rect.left }}
+          style={{ top: toolbar.top, left: toolbar.left }}
+          role="toolbar"
+          aria-label="选中文本操作"
         >
           <button
             className={s.selBtn}
@@ -153,7 +195,14 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
             取消
           </button>
         </div>
-      )}
+      ), document.body)}
     </article>
   );
+}
+
+function viewportSize() {
+  return {
+    w: window.innerWidth || document.documentElement.clientWidth || 0,
+    h: window.innerHeight || document.documentElement.clientHeight || 0,
+  };
 }

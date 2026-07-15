@@ -7,7 +7,8 @@
 .filters button.activeRange { color: var(--accent-ink); border-color: var(--accent); background: var(--surface-tint); }
 .rhythmBody { display: grid; grid-template-columns: 154px minmax(0, 1fr); border-top: 1px solid var(--border); }
 .streak { padding: 19px; background: var(--surface-tint); border-right: 1px solid var(--border); }
-.streak > strong { display: block; color: var(--accent-ink); font: 500 2.8rem/1 Georgia, serif; }
+.streakValue { color: var(--accent-ink); }
+.streakValue strong { font: 700 2rem/1.1 'DM Sans', 'PingFang SC', sans-serif; letter-spacing: -.04em; }
 .streak > span { color: var(--muted); font-size: .69rem; }
 .streak p { margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--border); color: var(--muted); font-size: .69rem; line-height: 1.6; }
 .streak b { display: block; color: var(--orange); }

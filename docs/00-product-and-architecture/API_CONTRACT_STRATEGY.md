@@ -57,7 +57,8 @@ overview is refreshed from the filesystem artifact event.
 
 Folder APIs preserve the existing folder/membership payload and optionally bind
 `mapProjectSlug`. The backend reconciles indexed discipline maps into folder
-overviews, while map slugs never enter child `slugOrder` membership.
+overviews. The frontend renders each binding as an explicit `××学科总览` row,
+while map slugs never enter child `slugOrder` membership.
 
 Exact request, response, and error semantics are owned by the implemented Go
 and TypeScript types and explained by iteration 07 `API_CONTRACT.md`.

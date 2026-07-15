@@ -44,6 +44,9 @@ A long-lived organizing project with one learner-facing `学科总览`. It prese
 the discipline's major questions, research areas, methods, relationships,
 boundaries, applications, and possible learning routes.
 
+In the sidebar it is shown as an explicit `××学科总览` row inside its bound
+discipline folder. The folder title only expands or collapses the folder.
+
 Topics named in the overview are possibilities, not project objects. They do
 not enter the sidebar or filesystem until the learner creates a project.
 

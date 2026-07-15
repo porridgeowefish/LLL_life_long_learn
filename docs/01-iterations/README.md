@@ -11,6 +11,7 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
+| 10 | Interaction feedback and usability cleanup (implemented) | [iteration-10-interaction-feedback-and-polish](./iteration-10-interaction-feedback-and-polish/README.md) |
 | 09 | Learning deletion and prerequisite-summary cleanup (active) | [iteration-09-discipline-protocols-and-learning-lab](./iteration-09-discipline-protocols-and-learning-lab/README.md) |
 | 08 | Learning rhythm, growth aggregation, themes, and open-source entry (implemented) | [iteration-08-learning-rhythm-and-personalization](./iteration-08-learning-rhythm-and-personalization/README.md) |
 | 07 | Discipline map and system-learning product types (delivered) | [iteration-07-discipline-map-and-system-learning](./iteration-07-discipline-map-and-system-learning/README.md) |

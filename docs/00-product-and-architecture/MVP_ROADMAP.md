@@ -18,6 +18,7 @@ Source of truth: high-level delivery order and status summary; iteration directo
 | 07 | Discipline-map/system-learning types; prerequisite bridge later superseded | delivered |
 | 08 | Learning rhythm, personalization, themes, and open-source entry | implemented |
 | 09 | Learning deletion and generated prerequisite-gap summaries | implemented |
+| 10 | Interaction feedback, greenhouse guidance, and contribution integrity | implemented |
 
 Detailed scope, contracts, tests, and delivery evidence live under
 `docs/01-iterations/` and override this summary when they differ.
@@ -27,12 +28,12 @@ Detailed scope, contracts, tests, and delivery evidence live under
 Iteration 07 changes the project model from one universal five-zone shape to:
 
 ```text
-discipline map      -> one folder overview, may start ordinary learning projects classified inside that folder
+discipline map      -> one explicit overview row in its folder, may start ordinary learning projects classified inside that folder
 system learning     -> five-zone learning workflow
 ```
 
 Iteration 08 remains an already delivered slice despite its later number.
-Iteration 09 is not a delivery contract.
+Iterations 09 and 10 are not delivery contracts.
 
 ## Definition Of MVP
 

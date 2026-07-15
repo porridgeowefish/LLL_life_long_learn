@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
 
@@ -18,6 +18,7 @@ import {
   selectionToTextAnchor,
   type TextAnchor,
 } from '@/lib/summaryHighlights';
+import { selectionToolbarPosition } from '@/lib/floatingPosition';
 
 import s from './ExplainReader.module.css';
 
@@ -189,6 +190,43 @@ function ExplainPage({
     window.open(base + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
   };
 
+  const updateSelection = useCallback(() => {
+    const selected = window.getSelection();
+    if (!selected || selected.isCollapsed || !selected.toString().trim()) {
+      setSelection(null);
+      return;
+    }
+    const markdown = markdownRef.current;
+    const range = selected.getRangeAt(0);
+    if (!markdown || !markdown.contains(range.commonAncestorContainer)) {
+      setSelection(null);
+      return;
+    }
+    const anchor = selectionToTextAnchor(markdown, range);
+    if (!anchor) return;
+    const rect = selectionRect(range);
+    if (!rect) {
+      setSelection(null);
+      return;
+    }
+    const rectBox = toSelectionBox(rect);
+    const toolbar = toolbarPosition(rectBox);
+    setSelection({
+      ...anchor,
+      top: toolbar.top,
+      left: toolbar.left,
+      screenTop: rectBox.top,
+      screenLeft: rectBox.left + rectBox.width / 2,
+      rect: rectBox,
+      overlaps: overlapsExisting(anchor, pageConfusions),
+    });
+  }, [pageConfusions]);
+
+  useEffect(() => {
+    window.addEventListener('pointerup', updateSelection);
+    return () => window.removeEventListener('pointerup', updateSelection);
+  }, [updateSelection]);
+
   useEffect(() => {
     if (!hostRef.current || mermaid.length === 0) return;
     let cancelled = false;
@@ -234,37 +272,6 @@ function ExplainPage({
     <article
       className={isSummary ? `${s.page} ${s.summary}` : s.page}
       ref={hostRef}
-      onMouseUp={() => {
-        const selected = window.getSelection();
-        if (!selected || selected.isCollapsed || !selected.toString().trim()) {
-          setSelection(null);
-          return;
-        }
-        const markdown = markdownRef.current;
-        const range = selected.getRangeAt(0);
-        if (!markdown || !markdown.contains(range.commonAncestorContainer)) {
-          setSelection(null);
-          return;
-        }
-        const anchor = selectionToTextAnchor(markdown, range);
-        if (!anchor) return;
-        const rect = selectionRect(range);
-        if (!rect) {
-          setSelection(null);
-          return;
-        }
-        const rectBox = toSelectionBox(rect);
-        const toolbar = toolbarPosition(rectBox);
-        setSelection({
-          ...anchor,
-          top: toolbar.top,
-          left: toolbar.left,
-          screenTop: rectBox.top,
-          screenLeft: rectBox.left + rectBox.width / 2,
-          rect: rectBox,
-          overlaps: overlapsExisting(anchor, pageConfusions),
-        });
-      }}
     >
       {!isSummary && <code>{file}</code>}
       <div
@@ -273,7 +280,13 @@ function ExplainPage({
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {selection && createPortal((
-        <div ref={selectionBarRef} className={s.selectionBar} style={{ top: selection.top, left: selection.left }}>
+        <div
+          ref={selectionBarRef}
+          className={s.selectionBar}
+          style={{ top: selection.top, left: selection.left }}
+          role="toolbar"
+          aria-label="选中文本操作"
+        >
           <button
             type="button"
             disabled={selection.overlaps}
@@ -429,20 +442,11 @@ function toSelectionBox(rect: DOMRect): SelectionBox {
 function toolbarPosition(rect: SelectionBox, measured?: { width: number; height: number }) {
   const toolbarWidth = measured?.width ?? 360;
   const toolbarHeight = measured?.height ?? 46;
-  const halfToolbarWidth = toolbarWidth / 2;
-  const margin = 8;
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-  const spaceAbove = rect.top - margin;
-  const spaceBelow = viewportHeight - rect.bottom - margin;
-  const preferredTop = spaceBelow >= toolbarHeight || spaceBelow > spaceAbove
-    ? rect.bottom + margin
-    : rect.top - toolbarHeight - margin;
-  return {
-    top: Math.min(Math.max(preferredTop, margin), Math.max(margin, viewportHeight - toolbarHeight - margin)),
-    left: Math.min(
-      Math.max(rect.left + rect.width / 2, halfToolbarWidth + margin),
-      Math.max(halfToolbarWidth + margin, viewportWidth - halfToolbarWidth - margin),
-    ),
-  };
+  return selectionToolbarPosition(
+    { top: rect.top, bottom: rect.bottom, centerX: rect.left + rect.width / 2 },
+    { width: toolbarWidth, height: toolbarHeight },
+    { w: viewportWidth, h: viewportHeight },
+  );
 }

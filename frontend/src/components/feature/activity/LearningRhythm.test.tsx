@@ -20,7 +20,7 @@ describe('LearningRhythm', () => {
 
   it('shows consistency, investment and growth as separate metrics', () => {
     render(<LearningRhythm projects={[{ id: 'math', slug: 'math', title: '数学', projectType: 'system-learning', overviewAvailable: false }]} />);
-    expect(screen.getByText('天 · 当前连续学习').previousElementSibling).toHaveTextContent('2');
+    expect(screen.getByText('当前连续学习').previousElementSibling).toHaveTextContent('2 天');
     expect(screen.getByText('有效学习行动')).toBeTruthy();
     expect(screen.getByText('18')).toBeTruthy();
     fireEvent.click(screen.getByLabelText(/7月10日/));

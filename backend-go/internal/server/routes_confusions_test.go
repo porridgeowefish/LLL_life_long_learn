@@ -10,6 +10,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/practicestore"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -303,6 +304,35 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		if !tt.ok && w.Code != http.StatusForbidden {
 			t.Errorf("write %s: expected 403, got %d — %s", tt.path, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestWriteFlowerRecordsOneActivityPerDistinctSavedContent(t *testing.T) {
+	srv, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	for _, body := range []string{`{"petalContent":{"known":"A"}}`, `{"petalContent":{"known":"A"}}`, `{"petalContent":{"known":"A\nB"}}`} {
+		req := httptest.NewRequest("POST", "/files/projects/testproj/extend/flower.json", strings.NewReader(body))
+		req.SetPathValue("id", "testproj")
+		w := httptest.NewRecorder()
+		srv.handleWriteFile(w, req)
+		if w.Code != http.StatusOK {
+			t.Fatalf("write flower: expected 200, got %d — %s", w.Code, w.Body.String())
+		}
+	}
+	store, err := progressstore.New("testproj")
+	if err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.ReadEvents()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 {
+		t.Fatalf("expected two distinct flower activity events, got %d: %+v", len(events), events)
+	}
+	if events[0].SourceType != "extend-flower" || events[0].ActivityDelta != 1 {
+		t.Fatalf("unexpected flower activity: %+v", events[0])
 	}
 }
 

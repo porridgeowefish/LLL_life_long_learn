@@ -40,7 +40,7 @@ submits system-learning-only fields.
 | generation run | normal Session + `runs/<timestamp>-encyclopedia/` | selected native Agent CLI; project-level output path is `overview.md` |
 | table of contents | derived from Markdown H2/H3 headings | navigation only; not persisted as a second structure |
 | inline topic action | derived from every H3 key concept or branch | must not create a project until confirmation |
-| folder overview binding | `folders.json.mapProjectSlug` | optional discipline-map slug opened from the folder title; not project ownership |
+| folder overview binding | `folders.json.mapProjectSlug` | optional discipline-map slug rendered as the folder's explicit overview row; not `slugOrder` membership or project ownership |
 | learning-project membership | `folders.json.slugOrder[]` | system-learning classification only; never contains a bound map slug |
 
 An overview topic has no durable project identity. A project record begins only

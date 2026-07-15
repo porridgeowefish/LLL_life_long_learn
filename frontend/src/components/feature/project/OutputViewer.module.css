@@ -182,15 +182,17 @@
 }
 
 .selectionBar {
-  position: absolute;
+  position: fixed;
   display: flex;
+  max-width: calc(100vw - 16px);
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 2px;
   padding: 4px 6px;
   border-radius: 6px;
   background: var(--fg);
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
-  z-index: 20;
-  transform: translateX(-50%);
+  z-index: 100;
 }
 
 .selBtn {

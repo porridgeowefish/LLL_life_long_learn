@@ -15,12 +15,14 @@ import {
   type FolderLayout,
 } from '@/lib/folders';
 import { Icon, type IconName } from '@/components/primitive/Icon';
+import { Modal } from '@/components/primitive/Modal';
+import { Button } from '@/components/primitive/Button';
 import { clearDeletedProjectClientData } from '@/lib/projectDeletion';
 
 import s from './Sidebar.module.css';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
-  { to: '/', label: '学习总览', icon: 'zap' },
+  { to: '/', label: '主页', icon: 'zap' },
   { to: '/agents', label: '智能体管理', icon: 'bot' },
   { to: '/memory', label: '记忆系统', icon: 'brain' },
   { to: '/greenhouse', label: '知识温室', icon: 'brain' },
@@ -58,6 +60,11 @@ export function Sidebar() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [menuSlug, setMenuSlug] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'folder'; id: string; title: string }
+    | { kind: 'project'; slug: string; title: string; projectType: 'discipline-map' | 'system-learning' }
+    | null
+  >(null);
 
   const commit = (next: FolderLayout) => save.mutate(next);
 
@@ -75,9 +82,7 @@ export function Sidebar() {
   };
 
   const removeFolder = (id: string, name: string) => {
-    if (window.confirm(`删除文件夹「${name}」？其中的项目会回到未分类。`)) {
-      commit(deleteFolder(layout, id));
-    }
+    setDeleteTarget({ kind: 'folder', id, title: name });
   };
 
   const moveProject = (slug: string, target: string | null) => {
@@ -85,14 +90,24 @@ export function Sidebar() {
   };
 
   const removeProject = (slug: string, title: string) => {
-    const confirmed = window.confirm(
-      `永久删除学习「${title}」及其全部内容？此操作无法撤销。`,
-    );
-    if (!confirmed) return;
+    const project = projectBySlug.get(slug);
+    if (!project) return;
+    setDeleteTarget({ kind: 'project', slug, title, projectType: project.projectType });
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.kind === 'folder') {
+      commit(deleteFolder(layout, deleteTarget.id));
+      setDeleteTarget(null);
+      return;
+    }
+    const { slug } = deleteTarget;
     deleteProject.mutate(slug, {
       onSuccess: () => {
         clearDeletedProjectClientData(slug);
         setMenuSlug(null);
+        setDeleteTarget(null);
         if (selectedProjectId === slug) {
           selectProject(null);
         }
@@ -180,16 +195,7 @@ export function Sidebar() {
                 >
                   <ChevronDownIcon className={isOpen ? undefined : s.chevronClosed} />
                 </button>
-                {f.mapProjectSlug ? (
-                  <Link
-                    to={`/project/${f.mapProjectSlug}`}
-                    className={`${s.folderName} ${s.mapFolderName}`}
-                    title={`打开「${f.name}」学科总览`}
-                  >
-                    <span className={s.folderNameText}>{f.name}</span>
-                    <span className={s.count}>{f.slugOrder.length}</span>
-                  </Link>
-                ) : isRenaming ? (
+                {isRenaming ? (
                   <input
                     className={s.folderInput}
                     autoFocus
@@ -230,7 +236,29 @@ export function Sidebar() {
                   </button>
                 )}
               </div>
-              {isOpen && <div className={s.folderBody}>{f.slugOrder.map((slug) => renderProject(slug))}</div>}
+              {isOpen && (
+                <div className={s.folderBody}>
+                  {f.mapProjectSlug && (() => {
+                    const mapProject = projectBySlug.get(f.mapProjectSlug);
+                    if (!mapProject) return null;
+                    return (
+                      <ProjectRow
+                        slug={mapProject.slug}
+                        title={`${f.name}学科总览`}
+                        projectType="discipline-map"
+                        currentFolderId={f.id}
+                        folders={layout.folders}
+                        menuOpen={menuSlug === mapProject.slug}
+                        onToggleMenu={() => setMenuSlug(menuSlug === mapProject.slug ? null : mapProject.slug)}
+                        onCloseMenu={() => setMenuSlug(null)}
+                        onMove={() => undefined}
+                        onDelete={() => removeProject(mapProject.slug, mapProject.title)}
+                      />
+                    );
+                  })()}
+                  {f.slugOrder.map((slug) => renderProject(slug))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -259,6 +287,35 @@ export function Sidebar() {
         )}
       </div>
       <div className={s.foot}>v0.1 · React 18 + TS</div>
+      <Modal
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title={deleteTarget?.kind === 'folder'
+          ? '删除文件夹？'
+          : deleteTarget?.projectType === 'discipline-map'
+            ? '删除学科项目？'
+            : '删除学习单元？'}
+        description={deleteTarget?.kind === 'folder'
+          ? '只删除侧栏分类，其中的学习内容会回到「未分类」。'
+          : '这个操作会永久删除本地文件、学习记录和相关会话，无法撤销。'}
+        size="sm"
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>取消</Button>
+            <Button variant="danger" loading={deleteProject.isPending} onClick={confirmDelete}>
+              确认删除
+            </Button>
+          </>
+        )}
+      >
+        <div className={s.deleteSummary}>
+          <Icon name="x" size={18} />
+          <div>
+            <strong>{deleteTarget?.title}</strong>
+            <span>{deleteTarget?.kind === 'folder' ? '学习内容不会被删除' : '删除后不能恢复'}</span>
+          </div>
+        </div>
+      </Modal>
     </aside>
   );
 }
@@ -322,7 +379,7 @@ function ProjectRow({
       <Link to={`/project/${slug}`} className={s.link}>
         <Icon name="folder" size={15} className={s.linkIcon} />
         <span className={s.title}>{title}</span>
-        <span className={s.projectType}>{projectType === 'discipline-map' ? '地图' : '学习'}</span>
+        <span className={s.projectType}>{projectType === 'discipline-map' ? '总览' : '学习'}</span>
       </Link>
       <div className={s.menuWrap}>
         <button
@@ -343,39 +400,44 @@ function ProjectRow({
           <>
             <div className={s.menuBackdrop} onClick={onCloseMenu} />
             <div ref={menuRef} className={s.menu} role="menu" style={menuPos ?? undefined}>
+              {projectType === 'system-learning' && (
+                <>
+                  <div className={s.menuLabel}>移动到文件夹</div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={currentFolderId === null ? s.menuActive : ''}
+                    onClick={() => {
+                      onMove(null);
+                      onCloseMenu();
+                    }}
+                  >
+                    未分类
+                  </button>
+                  {folders.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      role="menuitem"
+                      className={currentFolderId === f.id ? s.menuActive : ''}
+                      onClick={() => {
+                        onMove(f.id);
+                        onCloseMenu();
+                      }}
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                  <div className={s.menuDivider} />
+                </>
+              )}
               <button
-                type="button"
-                role="menuitem"
-                className={currentFolderId === null ? s.menuActive : ''}
-                onClick={() => {
-                  onMove(null);
-                  onCloseMenu();
-                }}
-              >
-                未分类
-              </button>
-              {folders.map((f) => (
-                <button
-                  key={f.id}
                   type="button"
                   role="menuitem"
-                  className={currentFolderId === f.id ? s.menuActive : ''}
-                  onClick={() => {
-                    onMove(f.id);
-                    onCloseMenu();
-                  }}
-                >
-                  {f.name}
-                </button>
-              ))}
-              <div className={s.menuDivider} />
-              <button
-                type="button"
-                role="menuitem"
-                className={s.menuDanger}
-                onClick={onDelete}
+                  className={s.menuDanger}
+                  onClick={onDelete}
               >
-                删除学习
+                {projectType === 'discipline-map' ? '删除学科项目' : '删除学习单元'}
               </button>
             </div>
           </>
