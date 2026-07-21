@@ -24,6 +24,42 @@ LLL（荔枝读书）是一个**本地优先的 AI 学习工作台**：把一个
 
 把一次性对话升级为持久、可改进的学习记录；学习形态由学习者掌握，既支持学科全景探索，也支持聚焦的技能深挖，两者不再混淆。文档与代码冲突时，以可运行的代码和当轮迭代文档为真，不靠 AI 推断兜底。
 
+## 部署
+
+### 前置要求
+
+- Node.js（用于构建前端）
+- Go ≥ 1.22（用于后端）
+
+### 构建与运行
+
+```bash
+cd D:\2_Study\LLL
+npm install --prefix frontend   # 首次需安装前端依赖
+npm run build                   # 构建前端到 frontend/dist/，并编译后端到 dist/lll.exe
+npm run start                   # 运行 dist/lll.exe，生产模式托管 frontend/dist/（含 SPA fallback）
+```
+
+浏览器打开 `http://localhost:8787/`；健康检查 `GET http://localhost:8787/api/health` 返回 200 即代表服务正常。
+
+> 开发时也可用 `npm run run`（即 `go run ./backend-go/cmd/lll`）直接从源码运行后端。
+
+### 桌面快捷方式（Windows）
+
+```bash
+npm run desktop:install
+```
+
+在桌面创建 `LifeLongLearn` 快捷方式。启动时会：若前端或后端源码比 `dist/lll.exe` / `frontend/dist/index.html` 新，则自动重新构建；随后后台启动 `dist/lll.exe`，等待 `/api/health` 就绪后打开浏览器并退出。若 `8787` 端口被本工作区旧的 LLL 进程占用，会先清理再启动新实例。
+
+### 停止后台服务
+
+```bash
+npm run stop
+```
+
+也可在前端界面点击 Exit 按钮停止。
+
 ## Agent 部署（推荐）
 
 把下面这段提示词整段复制给 AI Agent（如 Claude Code），它即可在本地完成 LLL 的安装、构建与运行：
