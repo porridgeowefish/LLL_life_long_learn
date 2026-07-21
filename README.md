@@ -1,95 +1,27 @@
-# LLL
 
-Status: active  
-Owner: project maintainer  
-Last reviewed: 2026-06-04  
-Source of truth: this README is a project entry point; domain facts live in `docs/`.
+## 产品介绍
 
-LLL is a local AI learning lab for orchestrating study tasks, launching agent sessions, and turning model output into readable study artifacts.
+LLL（荔枝读书）是一个**本地优先的 AI 学习工作台**：把一个主题变成一份可持久保存、可持续迭代的学习产物，而不是一次性的对话答案。
 
-## What Exists Today
+### 解决的问题
 
-- Backend runtime:
-  `backend-go/`
-- Frontend app:
-  `frontend/`
-- Agent definitions:
-  `agents/`
-- Documentation system:
-  `docs/`
-- Local runtime/project data:
-  `projects/`
+自学时，学习上下文、笔记与复习散落在不同工具里，连续性差；宽泛的学科探索与聚焦的技能深挖被塞进同一种内容形态——需要学科全景时只得到一篇教程，准备深挖时又缺少承诺式的学习流程；通用 AI 对话只给一次性答案，留不下可改进的学习记录。
 
-## Repository Map
+![alt text](image.png)
 
-```text
-backend-go/                   Go backend runtime and API
-frontend/                     Vite + React workbench
-frontend/legacy/              Legacy static frontend, archive/reference only
-frontend-designs/             Mock/design reference, not executable truth
-agents/                       Agent registry, charters, primitives
-docs/                         Product, architecture, iteration, and archive documents
-projects/                     Local learner projects and run artifacts
-research/                     Raw study / reference materials
-AGENTS.md                     Shared instructions for AI coding agents
-CLAUDE.md                     Thin Claude-specific loader
-```
+### 核心方案
 
-## Quick Start
+- **两种学习形态，由学习者显式选择**：「学科地图」用学科总览与学习计划呈现一门学科的全景、章节架构和可选学习路线；「系统学习项目」走「介绍 → 讲解 → 练习 → 拓展 → 总结」五区闭环。
+- **AI 作为顾问与受控的学习操作者**：Claude Code 原生 Agent 生成并修订讲解、练习与总结，每个 Agent 都通过原生 CLI 显式启动，执行过程可经本地真实会话检视；AI 不替你做产品决策、不静默创建项目。
+- **本地优先、扁平存储**：学习上下文与产物落在本地项目文件夹，数据自主、可长期积累。
+### 形态一：学科地图
+![alt text](image-1.png)
 
-```bash
-cd D:\2_Study\LLL
-npm run build
-go run ./backend-go/cmd/lll
-```
+### 形态二：系统学习
+![alt text](image-2.png)
 
-Then open:
+### 价值
 
-```text
-http://localhost:8787/
-```
+把一次性对话升级为持久、可改进的学习记录；学习形态由学习者掌握，既支持学科全景探索，也支持聚焦的技能深挖，两者不再混淆。文档与代码冲突时，以可运行的代码和当轮迭代文档为真，不靠 AI 推断兜底。
 
-## Desktop Launcher
 
-```bash
-npm run desktop:install
-```
-
-This creates a `LifeLongLearn` shortcut on the Windows desktop. The shortcut
-refreshes the production build when frontend or backend sources are newer than
-`dist/lll.exe` / `frontend/dist/index.html`, starts `dist/lll.exe` in the
-background, waits for `/api/health`, opens the browser, then exits. If port
-`8787` is held by a stale LLL process from this workspace, the launcher clears
-it before starting a fresh server.
-
-To stop the background server without using the frontend Exit button:
-
-```bash
-npm run stop
-```
-
-## Contributing
-
-Bug reports, focused feature proposals, and Pull Requests are welcome. Read
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) before submitting a change. The repository
-maintainer must enable public Issue creation in GitHub settings for the in-app
-"报告问题" entry to accept new reports.
-
-## Reading Order
-
-1. `docs/INDEX.md`
-2. `AGENTS.md`
-3. `docs/00-product-and-architecture/README.md`
-4. The current iteration under `docs/01-iterations/`
-
-## Fact Priority
-
-When project documents disagree, use this order:
-
-```text
-1. Implemented code and runnable behavior
-2. Current iteration documents in docs/01-iterations/
-3. Long-lived architecture documents in docs/00-product-and-architecture/
-4. Historical material in docs/99-archive/
-5. Raw study materials in research/raw/
-```
