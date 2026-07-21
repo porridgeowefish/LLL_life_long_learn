@@ -88,7 +88,6 @@ These should be treated as archive or migration reference, not fallback product:
 
 ```text
 frontend/legacy/               old static frontend implementation
-frontend-designs/v2/           older mock set
 docs/99-archive/               retired docs
 ```
 
@@ -96,7 +95,6 @@ Current stance:
 
 ```text
 frontend/legacy/ is no longer a product fallback
-frontend-designs/v2/ is historical reference only
 ```
 
 If we keep them, we keep them for comparison or migration history, not as a second UI to maintain.

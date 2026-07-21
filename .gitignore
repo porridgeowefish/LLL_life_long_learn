@@ -18,3 +18,15 @@ research/raw/
 projects/
 videos/
 *.tsbuildinfo
+
+# Personal study notes — keep local only, never commit
+/learning/
+
+# Go build artifacts — never commit stale built binaries (see LESSONS_LEARNED)
+*.exe
+/lll
+/lll.exe
+
+# IDE / editor personal config
+.vscode/
+.idea/
