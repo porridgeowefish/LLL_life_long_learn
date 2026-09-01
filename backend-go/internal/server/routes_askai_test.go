@@ -2,15 +2,20 @@
 package server
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/confusionstore"
+	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -19,6 +24,9 @@ func setupAskAiTestProject(t *testing.T) {
 	dir := t.TempDir()
 	old := workspace.ProjectsRootForTest()
 	workspace.SetProjectsRootForTest(dir)
+	if err := workspace.CreateProjectSkeletonWithInput("proj", "测试", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
 	restoreCfg := askaiconfig.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
 	t.Cleanup(func() {
 		workspace.SetProjectsRootForTest(old)
@@ -36,30 +44,39 @@ func writeAskAiConfig(t *testing.T, p askaiconfig.Provider) {
 
 func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 	setupAskAiTestProject(t)
+	var receivedSystem string
 	// Fake OpenAI-compatible provider pointed at a stub SSE server.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Messages []askaiprovider.Message `json:"messages"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&request)
+		if len(request.Messages) > 0 {
+			receivedSystem = request.Messages[0].Content
+		}
 		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"secret-chain\"}}]}\n\n")
 		fmt.Fprint(w, "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n")
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m"})
+	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m", Reasoning: true})
 
 	// Create a confusion to attach the ask exchange to.
-	store, err := confusionstore.New("proj")
+	store, err := annotationstore.New("proj")
 	if err != nil {
 		t.Fatal(err)
 	}
-	conf, err := store.Create(confusionstore.Confusion{QuoteSnapshot: "sel"})
+	conf, err := store.Create(annotationstore.CreateInput{QuoteSnapshot: "sel"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	srv2 := newTestServer(t)
 	body := `{"content":"why?"}`
-	req := httptest.NewRequest(http.MethodPost, "/api/projects/proj/confusions/"+conf.ID+"/ask-stream", strings.NewReader(body))
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/proj/assets/body/annotations/"+conf.AnnotationID+"/ask-stream", strings.NewReader(body))
 	req.SetPathValue("id", "proj")
-	req.SetPathValue("confusionId", conf.ID)
+	req.SetPathValue("confusionId", conf.AnnotationID)
 	rec := httptest.NewRecorder()
 	srv2.handleAskAiStream(rec, req)
 
@@ -70,10 +87,16 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 	if !strings.Contains(out, `"type":"done"`) {
 		t.Errorf("missing done frame: %s", out)
 	}
+	if strings.Contains(out, "secret-chain") || strings.Contains(out, `"type":"thinking"`) {
+		t.Errorf("raw thinking leaked to annotation stream: %s", out)
+	}
+	if !strings.Contains(receivedSystem, "sel") || !strings.Contains(receivedSystem, conf.AssetVersionID) {
+		t.Errorf("annotation quote/version missing from system context: %s", receivedSystem)
+	}
 
 	// The assistant reply should be persisted.
-	again, _ := confusionstore.New("proj")
-	got, _ := again.Get(conf.ID)
+	again, _ := annotationstore.New("proj")
+	got, _ := again.Get(conf.AnnotationID)
 	var assistant string
 	for _, m := range got.Ask.Messages {
 		if m.Role == "assistant" {
@@ -84,6 +107,62 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 		t.Errorf("assistant not persisted; got %q", assistant)
 	}
 }
+
+type askRoundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f askRoundTripFunc) RoundTrip(request *http.Request) (*http.Response, error) { return f(request) }
+
+type failingAskBody struct {
+	data []byte
+	done bool
+}
+
+func (b *failingAskBody) Read(target []byte) (int, error) {
+	if !b.done {
+		b.done = true
+		return copy(target, b.data), nil
+	}
+	return 0, errors.New("stream disconnected")
+}
+
+func (b *failingAskBody) Close() error { return nil }
+
+func TestAskAiStreamPersistsPartialFailure(t *testing.T) {
+	setupAskAiTestProject(t)
+	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: "http://provider.invalid", APIKey: "k", Model: "m"})
+	oldClient := http.DefaultClient
+	http.DefaultClient = &http.Client{Transport: askRoundTripFunc(func(*http.Request) (*http.Response, error) {
+		body := []byte("data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n")
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: &failingAskBody{data: body}}, nil
+	})}
+	t.Cleanup(func() { http.DefaultClient = oldClient })
+
+	store, _ := annotationstore.New("proj")
+	annotation, _ := store.Create(annotationstore.CreateInput{QuoteSnapshot: "selected"})
+	request := httptest.NewRequest(http.MethodPost, "/api/projects/proj/assets/body/annotations/"+annotation.AnnotationID+"/ask-stream", bytes.NewBufferString(`{"content":"why?"}`))
+	request.SetPathValue("id", "proj")
+	request.SetPathValue("confusionId", annotation.AnnotationID)
+	recorder := httptest.NewRecorder()
+	newTestServer(t).handleAskAiStream(recorder, request)
+	updated, err := store.Get(annotation.AnnotationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, message := range updated.Ask.Messages {
+		if message.Role == "assistant" && message.Content == "Partial" && message.Status == "failed" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("partial failed answer was not persisted: %#v", updated.Ask)
+	}
+	if !strings.Contains(recorder.Body.String(), "已保留收到的部分内容") {
+		t.Fatalf("safe partial failure frame missing: %s", recorder.Body.String())
+	}
+}
+
+var _ io.ReadCloser = (*failingAskBody)(nil)
 
 // newTestServer returns a *Server without probing Claude.
 func newTestServer(t *testing.T) *Server {

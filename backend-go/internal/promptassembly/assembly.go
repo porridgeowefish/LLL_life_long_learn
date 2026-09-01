@@ -55,6 +55,7 @@ type Package struct {
 type PackageMeta struct {
 	ProjectSlug           string                       `json:"projectSlug"`
 	ProjectFile           string                       `json:"projectFile,omitempty"`
+	LearningScopeFile     string                       `json:"learningScopeFile,omitempty"`
 	ZoneName              workspace.ZoneName           `json:"zoneName,omitempty"`
 	ProjectType           workspace.ProjectType        `json:"projectType,omitempty"`
 	ProjectOutputPaths    []string                     `json:"projectOutputPaths,omitempty"`
@@ -138,6 +139,10 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read project brief: %w", err)
 	}
+	learningScopeFile, learningScope, err := readLearningScope(req.ProjectSlug)
+	if err != nil {
+		return nil, fmt.Errorf("read learning scope: %w", err)
+	}
 	introSurvey, err := readIntroSurvey(req.ProjectSlug, agent.ID)
 	if err != nil {
 		return nil, fmt.Errorf("read intro survey: %w", err)
@@ -155,7 +160,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	}
 	outputTargets := outputTargetsFor(agent, req)
 
-	promptMd := renderPrompt(agent, req, preds, memSnap, projectFile, projectBrief, introSurvey)
+	promptMd := renderPrompt(agent, req, preds, memSnap, projectFile, projectBrief, learningScopeFile, learningScope, introSurvey)
 
 	runDirName := timestampRunDir(req.AgentID, time.Now().UTC())
 
@@ -165,6 +170,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 		PackageMeta: PackageMeta{
 			ProjectSlug:           req.ProjectSlug,
 			ProjectFile:           projectFile,
+			LearningScopeFile:     learningScopeFile,
 			ZoneName:              req.ZoneName,
 			AgentID:               agent.ID,
 			PredecessorFiles:      preds,
@@ -267,6 +273,8 @@ func renderPrompt(
 	mem *memorystore.Snapshot,
 	projectFile string,
 	projectBrief string,
+	learningScopeFile string,
+	learningScope string,
 	introSurvey string,
 ) string {
 	var b strings.Builder
@@ -318,7 +326,7 @@ func renderPrompt(
 		b.WriteString("# Intro Iteration Contract\n\n")
 		b.WriteString("- 如果用户在终端里质疑、补充或修正 Intro 判断，把已有 Intro 产物视为可改进草稿。\n")
 		b.WriteString("- 先直接回应用户疑问，再按证据更新 `intro/output.md` 与 `intro/assessment.json`。\n")
-		b.WriteString("- 只改 Intro 产物；不要改 Explain、Practice、Extend 或 Summary 产物。\n")
+		b.WriteString("- 只改 Intro 产物；standalone draft 范围可在校准完成后写入 `learning-scope.json`，不得改 Explain、Practice、Extend 或 Summary 产物。\n")
 		b.WriteString("- 本轮不新增前端追问入口，也不实现快照；必要更新直接原地写入 Intro 文件。\n\n")
 	}
 	if agent.ID == "practice" && req.PracticeAttempt > 0 {
@@ -373,6 +381,27 @@ func renderPrompt(
 		b.WriteString("- Ask only topic-specific diagnostic questions needed to locate prerequisite gaps, such as terminology, causal understanding, and a concrete application.\n")
 		b.WriteString("- A broad current-level label is context, not proof of mastery. Diagnose specific knowledge without repeating the project-creation interview.\n")
 		b.WriteString("- If `intro/survey.json` below contains learner answers, use those answers as evidence and write `intro/output.md` plus `intro/assessment.json`.\n")
+	}
+
+	b.WriteString("\n# Learning Scope\n\n")
+	b.WriteString(fmt.Sprintf("- Scope file: `%s`\n", learningScopeFile))
+	if strings.TrimSpace(learningScope) == "" {
+		b.WriteString("- `learning-scope.json` is absent because this is a legacy project. Use the project title as a conservative draft boundary; do not broaden it speculatively.\n")
+	} else {
+		b.WriteString("The following JSON is the authoritative content boundary for this project:\n\n")
+		b.WriteString("```json\n")
+		b.WriteString(strings.TrimSpace(learningScope))
+		b.WriteString("\n```\n")
+	}
+	b.WriteString("\n## Scope Enforcement\n\n")
+	b.WriteString("- `inScope` and `ownedConcepts` are the concepts this project may teach in full depth.\n")
+	b.WriteString("- `prerequisites` and `reusedConcepts` may appear only as the minimum support needed for this topic; do not turn them into parallel core modules.\n")
+	b.WriteString("- `outOfScope` must not become a core page, exercise objective, extension branch, or summary claim for this project.\n")
+	b.WriteString("- If a useful adjacent concept is outside the boundary, name the boundary briefly instead of teaching that sibling topic here.\n")
+	if agent.ID == "intro" {
+		b.WriteString("- When `source.type` is `discipline-map` and status is `ready`, preserve this objective boundary. Intro only calibrates prerequisite readiness, depth, examples, scaffolding, and practice difficulty.\n")
+		b.WriteString("- When `source.type` is `standalone` and status is `draft`, use the completed survey to finalize `learning-scope.json`: keep the learner's chosen title, set status to `ready`, and fill goal/inScope/outOfScope/prerequisites/ownedConcepts/reusedConcepts conservatively.\n")
+		b.WriteString("- Never expand a map-origin scope from learner calibration. A broader scope requires an explicit project-level decision outside Intro.\n")
 	}
 
 	if agent.ID == "intro" {
@@ -497,6 +526,22 @@ func readIntroSurvey(projectSlug string, agentID string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(data)), nil
+}
+
+func readLearningScope(projectSlug string) (string, string, error) {
+	projectRoot, err := workspace.ProjectRootForSlug(projectSlug)
+	if err != nil {
+		return "", "", err
+	}
+	path := filepath.Join(projectRoot, "learning-scope.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return path, "", nil
+		}
+		return "", "", err
+	}
+	return path, strings.TrimSpace(string(data)), nil
 }
 
 // MakeRunDirName constructs a timestamped run directory name for a given agentID.

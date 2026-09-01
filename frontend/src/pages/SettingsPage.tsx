@@ -45,7 +45,7 @@ export function SettingsPage() {
         <header className={s.header}>
           <div>
             <h1 className={s.title}>统一配置</h1>
-            <p className={s.subtitle}>选择底层 Agent CLI。模型、账号和密钥继续在各 CLI 自己的配置里管理。</p>
+            <p className={s.subtitle}>管理底层 Agent CLI、外观与搜索引擎。API 教师模型在独立页面配置。</p>
           </div>
           <Button
             variant="outline"
@@ -83,21 +83,21 @@ export function SettingsPage() {
           </div>
         )}
 
-        <AskAiSection />
+        <SearchEngineSection />
 
         <section className={s.notes}>
           <div className={s.note}>
             <span className={s.noteIcon}><Icon name="check" size={14} /></span>
             <div>
-              <h3>学习 Agent 不变</h3>
-              <p>Intro / Explain / Practice / Extend / Summary 仍然负责学习流程，只是执行它们的 CLI 可切换。</p>
+              <h3>助教运行时</h3>
+              <p>验证、沉淀、复盘和材料制作等重活仍交给 CLI；这里选择它们默认使用的运行时。</p>
             </div>
           </div>
           <div className={s.note}>
             <span className={s.noteIcon}><Icon name="terminal" size={14} /></span>
             <div>
               <h3>命令名可覆盖</h3>
-              <p>需要自定义路径时，在系统环境变量里设置对应的 *_BIN；平台不会要求你在页面里填写模型参数。</p>
+              <p>需要自定义 CLI 路径时，在系统环境变量里设置对应的 *_BIN；API 模型参数在「API 模型」中填写。</p>
             </div>
           </div>
         </section>
@@ -105,6 +105,32 @@ export function SettingsPage() {
         <OpenSourceSection />
       </div>
     </div>
+  );
+}
+
+function SearchEngineSection() {
+  const settings = useAskAiSettings();
+  const save = useSaveAskAiSettings();
+  const current = settings.data;
+  if (!current) return null;
+  const updateSearch = (searchEngine: 'google' | 'bing') => {
+    save.mutate({ ...current, searchEngine });
+  };
+  return (
+    <section className={s.appearance} aria-labelledby="search-engine-title">
+      <div>
+        <h2 id="search-engine-title">搜索引擎</h2>
+        <p>需要网页检索时使用。教师与 Ask AI 的模型绑定统一在「API 模型」页面管理。</p>
+      </div>
+      <label className={s.askEngine}>
+        默认搜索引擎
+        <select value={current.searchEngine} onChange={(event) => updateSearch(event.target.value as 'google' | 'bing')}>
+          <option value="google">Google</option>
+          <option value="bing">Bing</option>
+        </select>
+      </label>
+      {save.isError && <div className={s.error}>保存失败：{(save.error as Error).message}</div>}
+    </section>
   );
 }
 
@@ -217,7 +243,7 @@ function newProvider(): AskProvider {
   };
 }
 
-function AskAiSection() {
+export function AskAiSection() {
   const { data, isLoading, isError, error } = useAskAiSettings();
   const save = useSaveAskAiSettings();
   const probe = useProbeAskAi();
@@ -233,6 +259,7 @@ function AskAiSection() {
       default: data.default,
       searchEngine: data.searchEngine,
       providers: data.providers.map((p) => ({ ...p })),
+      bindings: { ...(data.bindings ?? {}) },
     });
   }, [data]);
 
@@ -392,6 +419,17 @@ function ProviderRow({
           value={provider.model}
           onChange={(e) => onPatch({ model: e.target.value })}
           placeholder="gpt-4o / claude-sonnet-4"
+        />
+      </label>
+      <label className={s.askField}>
+        上下文窗口（tokens，可选）
+        <input
+          value={provider.contextWindowTokens || ''}
+          onChange={(e) => onPatch({ contextWindowTokens: e.target.value ? Number(e.target.value) : undefined })}
+          placeholder="留空按 256K 安全阈值"
+          type="number"
+          min={16384}
+          step={1024}
         />
       </label>
       <label className={s.askField}>

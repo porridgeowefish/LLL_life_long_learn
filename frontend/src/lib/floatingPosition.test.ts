@@ -43,4 +43,17 @@ describe('selectionToolbarPosition', () => {
     expect(p).toEqual({ top: 232, left: 92 });
     expect(p.left + 260).toBeLessThanOrEqual(360 - 8);
   });
+
+  it('clamps inside an offset visual viewport instead of the larger layout viewport', () => {
+    const p = selectionToolbarPosition(
+      { top: 640, bottom: 664, centerX: 950 },
+      { width: 280, height: 44 },
+      { left: 420, top: 180, w: 600, h: 520 },
+    );
+
+    expect(p).toEqual({ top: 588, left: 732 });
+    expect(p.left).toBeGreaterThanOrEqual(420 + 8);
+    expect(p.left + 280).toBeLessThanOrEqual(420 + 600 - 8);
+    expect(p.top + 44).toBeLessThan(640);
+  });
 });

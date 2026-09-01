@@ -117,13 +117,17 @@
 
 .selectionBar {
   position: fixed;
-  z-index: 100;
+  z-index: 200;
   display: flex;
+  width: max-content;
   max-width: calc(100vw - 16px);
-  flex-wrap: wrap;
+  box-sizing: border-box;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 4px;
   padding: 5px;
+  overflow-x: auto;
+  white-space: nowrap;
   border-radius: 6px;
   background: var(--fg);
   box-shadow: var(--shadow);
@@ -135,6 +139,8 @@
   color: #fff;
   padding: 3px 7px;
   font-size: 0.72rem;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .selectionBar button:hover {

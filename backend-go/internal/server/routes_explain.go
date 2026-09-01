@@ -13,7 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
+	"github.com/xmz14/lll/backend-go/internal/agentexecution"
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
@@ -353,7 +354,11 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 	// with a short backoff before giving up. (ctx here is context.Background,
 	// so a plain Sleep between attempts is safe.)
 	for attempt := 1; attempt <= 3; attempt++ {
-		err = claudelauncher.LaunchHeadless(ctx, slug, "infographic-crafter", s.ClaudeBin, cfg.ImagePromptModel, pkg, &runtime)
+		execution := s.agentExecution
+		if execution == nil {
+			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+		}
+		err = execution.StartHeadless(ctx, agentexecution.HeadlessRequest{ProjectSlug: slug, AgentID: "infographic-crafter", Model: cfg.ImagePromptModel, PromptPackage: pkg})
 		if err == nil {
 			break
 		}

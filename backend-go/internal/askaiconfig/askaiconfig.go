@@ -13,21 +13,28 @@ import (
 
 // Provider is one configured Ask-AI model source.
 type Provider struct {
-	ID        string `json:"id"`
-	Kind      string `json:"kind"`      // "openai" | "anthropic"
-	Name      string `json:"name"`
-	BaseURL   string `json:"baseURL"`
-	APIKey    string `json:"apiKey"`
-	Model     string `json:"model"`
-	Reasoning bool   `json:"reasoning,omitempty"` // openai-compatible: parse reasoning_content
-	Thinking  bool   `json:"thinking,omitempty"`  // anthropic: extended thinking
+	ID                  string `json:"id"`
+	Kind                string `json:"kind"` // "openai" | "anthropic"
+	Name                string `json:"name"`
+	BaseURL             string `json:"baseURL"`
+	APIKey              string `json:"apiKey"`
+	Model               string `json:"model"`
+	ContextWindowTokens int    `json:"contextWindowTokens,omitempty"`
+	Reasoning           bool   `json:"reasoning,omitempty"` // openai-compatible: disclosed summary only
+	Thinking            bool   `json:"thinking,omitempty"`  // provider capability; raw thinking is never exposed
 }
 
 // Config is the askAiProviders section.
 type Config struct {
-	Default      string     `json:"default"`
-	SearchEngine string     `json:"searchEngine"` // "google" | "bing"
-	Providers    []Provider `json:"providers"`
+	Default      string             `json:"default"`
+	SearchEngine string             `json:"searchEngine"` // "google" | "bing"
+	Providers    []Provider         `json:"providers"`
+	Bindings     map[string]Binding `json:"bindings,omitempty"`
+}
+
+type Binding struct {
+	ProviderID string `json:"providerId"`
+	Model      string `json:"model"`
 }
 
 // Enabled reports whether at least one provider with key+baseURL+model exists.
@@ -64,6 +71,27 @@ func (c *Config) Find(id string) *Provider {
 		return &c.Providers[0]
 	}
 	return nil
+}
+
+// Resolve returns a copy of the provider selected for a logical AI service.
+// Legacy configurations without bindings continue to use Find("").
+func (c *Config) Resolve(service string) *Provider {
+	if c == nil {
+		return nil
+	}
+	binding, ok := c.Bindings[service]
+	provider := c.Find(binding.ProviderID)
+	if !ok {
+		provider = c.Find("")
+	}
+	if provider == nil {
+		return nil
+	}
+	resolved := *provider
+	if ok && strings.TrimSpace(binding.Model) != "" {
+		resolved.Model = strings.TrimSpace(binding.Model)
+	}
+	return &resolved
 }
 
 // pathFn resolves the config file path. It is a var so tests can redirect it.
@@ -113,6 +141,9 @@ func Load() (*Config, error) {
 		cfg.Providers[i].BaseURL = strings.TrimSpace(cfg.Providers[i].BaseURL)
 		cfg.Providers[i].APIKey = strings.TrimSpace(cfg.Providers[i].APIKey)
 		cfg.Providers[i].Model = strings.TrimSpace(cfg.Providers[i].Model)
+		if cfg.Providers[i].ContextWindowTokens < 0 {
+			cfg.Providers[i].ContextWindowTokens = 0
+		}
 	}
 	return &cfg, nil
 }

@@ -17,13 +17,13 @@
 // and was eating `\Sigma` etc.) and gives us full control over the math
 // extraction order.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import katex from 'katex';
 
-interface MermaidBlock {
+export interface MermaidBlock {
   id: string;
   code: string;
 }
@@ -44,6 +44,23 @@ marked.setOptions({
 interface ExtractedMath {
   stripped: string;
   placeholders: Map<string, string>; // id → rendered KaTeX HTML
+}
+
+function extractSVG(md: string): { stripped: string; placeholders: Map<string, string> } {
+  const placeholders = new Map<string, string>();
+  let index = 0;
+  const stripped = md.replace(/```svg\s*\n([\s\S]*?)```/gi, (_, source: string) => {
+    const id = `INLINEVECTOR${index++}X`;
+    const clean = DOMPurify.sanitize(source.trim(), {
+      USE_PROFILES: { svg: true, svgFilters: true, html: false },
+      FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed', 'style', 'animate', 'set'],
+      FORBID_ATTR: ['onload', 'onclick', 'onerror', 'onbegin', 'style'],
+      ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i,
+    });
+    placeholders.set(id, clean);
+    return `<div class="inline-svg" data-inline-svg="${id}">${id}</div>`;
+  });
+  return { stripped, placeholders };
 }
 
 // extractMath scans markdown for $$...$$ and $...$, renders each via
@@ -96,7 +113,7 @@ function extractMath(md: string): ExtractedMath {
 
 function extractMermaid(md: string): { mdStripped: string; blocks: MermaidBlock[] } {
   const blocks: MermaidBlock[] = [];
-  const re = /```mermaid\n([\s\S]*?)```/g;
+  const re = /```[ \t]*mermaid[ \t]*\r?\n([\s\S]*?)```/gi;
   let i = 0;
   const mdStripped = md.replace(re, (_, code: string) => {
     const id = `mermaid-${i++}`;
@@ -138,12 +155,26 @@ DOMPurify.addHook('uponSanitizeAttribute', (_node, data) => {
   }
 });
 
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName?.toLowerCase() !== 'img') return;
+  const src = node.getAttribute('src') ?? '';
+  if (/^(?:https?:)?\/\//i.test(src)) {
+    node.removeAttribute('src');
+    node.setAttribute('data-remote-image-blocked', 'true');
+  }
+});
+
 export function renderMarkdown(input: string): MarkdownRender {
   // Step 1: extract math BEFORE marked touches anything.
   const { stripped, placeholders } = extractMath(input);
 
-  // Step 2: extract mermaid blocks (placeholder form).
-  const { mdStripped, blocks } = extractMermaid(stripped);
+  // Step 2: fenced SVG is treated as display media, sanitized before it can
+  // enter the general Markdown HTML pipeline. External fetches and active SVG
+  // features are forbidden; local fragment references remain available.
+  const svg = extractSVG(stripped);
+
+  // Step 3: extract mermaid blocks (placeholder form).
+  const { mdStripped, blocks } = extractMermaid(svg.stripped);
 
   // Step 3: parse remaining markdown.
   const rawHtml = marked.parse(mdStripped) as string;
@@ -155,37 +186,21 @@ export function renderMarkdown(input: string): MarkdownRender {
   for (const [id, html] of placeholders) {
     withMath = withMath.split(id).join(html);
   }
+  for (const [id, clean] of svg.placeholders) {
+    withMath = withMath.split(id).join(clean);
+  }
 
   // Step 5: sanitize. KaTeX tags/attrs are whitelisted so the MathML
   // half of the output (used for screen readers + copy) survives.
   const safe = DOMPurify.sanitize(withMath, {
-    ADD_ATTR: ['data-mermaid-id', ...KATEX_ATTRS],
+    ADD_ATTR: ['data-mermaid-id', 'data-inline-svg', 'viewBox', ...KATEX_ATTRS],
     ADD_TAGS: KATEX_TAGS,
+    FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed'],
   });
 
   return { html: safe, mermaid: blocks };
 }
 
 export function useMarkdown(input: string): MarkdownRender {
-  const [mermaidReady, setMermaidReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!mermaidReady) {
-      void import('mermaid').then((mod) => {
-        if (cancelled) return;
-        mod.default.initialize({
-          startOnLoad: false,
-          theme: 'neutral',
-          securityLevel: 'strict',
-        });
-        setMermaidReady(true);
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
-  }, [mermaidReady]);
-
   return useMemo<MarkdownRender>(() => renderMarkdown(input), [input]);
 }

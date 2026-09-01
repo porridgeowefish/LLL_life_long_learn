@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: long-lived domain objects, relationships, and ownership boundaries for LLL.
 
 ## Core Objects
@@ -12,20 +12,56 @@ WorkspaceProject
 The durable local project object. It has exactly one project type.
 
 DisciplineMap
-A WorkspaceProject that owns one discipline overview and is bound to a sidebar folder.
+A WorkspaceProject that owns one discipline overview plus one learner-owned task plan and is bound to a sidebar folder.
 
 ProjectFolder
 The single navigation/classification container. It may bind one DisciplineMap
 as its overview and may reference zero or more SystemLearningProjects by slug.
 
 SystemLearningProject
-A WorkspaceProject that owns the five-zone learning workflow.
+A WorkspaceProject that currently owns the legacy five-zone workflow and, in
+the iteration-13 target, owns one conversation-first LearningUnit.
 
 LearningZone
-One fixed phase inside a SystemLearningProject: Intro, Explain, Practice, Extend, or Summary.
+A legacy fixed phase: Intro, Explain, Practice, Extend, or Summary. It remains
+readable for migration and rollback but is not an active target object.
+
+LearningUnit
+The iteration-13 system-learning aggregate: one TeacherConversation, three
+core TeachingAssets, generated artifacts, SourceMaterials, AssistantTasks, and
+asset annotations.
+
+TeacherConversation
+The one canonical learner-teacher dialogue that forms a LearningUnit.
+
+TeachingAsset
+One editable, versioned accumulated asset: intro, body, practice, or a declared
+generated artifact.
+
+SourceMaterial
+A learner-provided local source with immutable revisions, privacy decisions,
+and optional assistant-produced derived content.
+
+AssistantTask
+A durable approved supporting-work objective, separate from its CLI RunAttempts.
+
+AssetAnnotation
+A quote- and version-anchored note or Ask-AI thread on a TeachingAsset.
 
 OverviewTopic
-A subject named inside a discipline overview. It is content, not a project or sidebar node.
+A subject named inside a discipline overview with one objective TopicBoundary.
+It is content, not a project or sidebar node.
+
+TopicBoundary
+The map-owned goal, inclusion, exclusion, prerequisite, concept ownership, and
+reuse contract for one actionable topic.
+
+LearningScope
+The system-learning project's durable objective content boundary. It is either
+a map-topic snapshot or a standalone draft later finalized by Intro.
+
+DisciplineLearningPlan
+An ordered learner-owned list of selected overview topics and per-task status. It is not project membership and does not create projects.
 
 AgentRole
 A visible role with a charter, behavior rules, allowed execution targets, and output targets.
@@ -51,7 +87,7 @@ A scoped engineering delivery slice for the product itself.
 ```text
 WorkspaceProject
 ├─ DisciplineMap
-│  ├─ owns exactly one learner-facing discipline overview
+│  ├─ owns exactly one learner-facing discipline overview and task plan
 │  └─ may bind one ProjectFolder and render as its explicit overview row
 └─ SystemLearningProject
    └─ owns Intro / Explain / Practice / Extend / Summary
@@ -61,14 +97,25 @@ ProjectFolder
 └─ classifies zero or more SystemLearningProjects without owning either project type
 
 OverviewTopic
-├─ is represented by an H3 key concept or branch in the overview body
-└─ may prefill a future SystemLearningProject from its adjacent action after learner confirmation
+├─ is represented by an H4 learnable topic in the new overview contract
+├─ owns exactly one TopicBoundary in the generated topic catalog
+└─ may snapshot that boundary into a future SystemLearningProject after learner confirmation
+
+SystemLearningProject
+└─ owns exactly one LearningScope consumed by all five learning zones
+
+DisciplineLearningPlan
+├─ orders exact OverviewTopic titles according to learner choice
+└─ records planned / in-progress / completed without creating or owning projects
 ```
 
 An `OverviewTopic` never becomes a project merely because AI wrote its name.
 Project identity begins only after an explicit creation action succeeds.
 The Word-style table of contents is a derived navigation view of the same
 heading hierarchy, not another topic collection or ownership tree.
+Legacy overviews without H4 keep their existing H3 topics actionable.
+They must regenerate before creating a map-scoped deep dive because no canonical
+topic boundary exists to snapshot.
 
 ## Ownership Boundaries
 
@@ -93,3 +140,11 @@ the learner confirms a durable learning commitment. The created project
 remains physically flat; there is no map-parent field, subproject object, or
 recursive ownership. Its ordinary folder membership may place it beneath the
 map-backed folder in navigation.
+
+ADR-0012 adds a planned canonical LearningUnit inside the same flat
+SystemLearningProject root. Migration adapts Intro, Explain, Practice, and
+Explain Ask-AI data to assets and annotations. Summary and Extend remain legacy
+records only. Project type, map provenance, folder classification, and scope
+snapshot identity do not change. Until iteration 13 is delivered, LearningUnit
+objects are target contracts owned by its iteration documents rather than
+runnable code.

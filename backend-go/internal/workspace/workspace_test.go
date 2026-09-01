@@ -132,6 +132,12 @@ func TestCreateDisciplineMapSkeletonHasOverviewAndNoZones(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "overview.md")); err != nil {
 		t.Fatalf("overview.md missing: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(root, "learning-plan.json")); err != nil {
+		t.Fatalf("learning-plan.json missing: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "discipline-topics.json")); err != nil {
+		t.Fatalf("discipline-topics.json missing: %v", err)
+	}
 	for _, zone := range []string{"intro", "explain", "practice", "extend", "summary"} {
 		if _, err := os.Stat(filepath.Join(root, zone)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("discipline map unexpectedly contains %s", zone)
@@ -158,6 +164,34 @@ func TestCreateDisciplineMapSkeletonHasOverviewAndNoZones(t *testing.T) {
 		if !strings.Contains(brief, required) {
 			t.Errorf("discipline-map project.md missing %q:\n%s", required, brief)
 		}
+	}
+}
+
+func TestCreateSystemLearningSkeletonStartsWithDraftLearningScope(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+
+	if err := CreateProjectSkeletonWithInput("probability", "概率论", "", ProjectInput{
+		ProjectType: ProjectTypeSystemLearning,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(projectsRootOverride, "probability", "learning-scope.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var scope struct {
+		Status string `json:"status"`
+		Title  string `json:"title"`
+		Source struct {
+			Type string `json:"type"`
+		} `json:"source"`
+	}
+	if err := json.Unmarshal(data, &scope); err != nil {
+		t.Fatal(err)
+	}
+	if scope.Status != "draft" || scope.Title != "概率论" || scope.Source.Type != "standalone" {
+		t.Fatalf("unexpected learning scope: %+v", scope)
 	}
 }
 

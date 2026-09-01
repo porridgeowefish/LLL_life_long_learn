@@ -25,7 +25,7 @@ const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> 
   { to: '/', label: '主页', icon: 'zap' },
   { to: '/agents', label: '智能体管理', icon: 'bot' },
   { to: '/memory', label: '记忆系统', icon: 'brain' },
-  { to: '/greenhouse', label: '知识温室', icon: 'brain' },
+  { to: '/models', label: 'API 模型', icon: 'bot' },
   { to: '/settings', label: '统一配置', icon: 'terminal' },
 ];
 

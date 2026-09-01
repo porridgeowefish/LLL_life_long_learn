@@ -33,7 +33,8 @@ export interface RunProgressState {
  */
 export function useRunProgress(projectSlug: string): RunProgressState {
   const activeSessionId = useSessionStore((s) => s.activeSessionId);
-  const { data: activeSessionsData } = useActiveSessions();
+  const setActiveSession = useSessionStore((s) => s.setActiveSession);
+  const { data: activeSessionsData, refetch: refetchActiveSessions } = useActiveSessions();
   const activeRun = (activeSessionsData?.sessions ?? []).find(
     (s) => s.projectSlug === projectSlug,
   );
@@ -73,14 +74,21 @@ export function useRunProgress(projectSlug: string): RunProgressState {
     });
     const doneEvents = [SSE_EVENTS.sessionCompleted, SSE_EVENTS.sessionFailed];
     const unsubsDone = doneEvents.map((evt) =>
-      subscribeToSSE(evt, () => setCompleted(true)),
+      subscribeToSSE(evt, (data) => {
+        const p = data as { runId?: string; sessionId?: string } | undefined;
+        const finishedRunId = p?.runId ?? p?.sessionId ?? '';
+        if (!runId || finishedRunId !== runId) return;
+        setCompleted(true);
+        if (activeSessionId === runId) setActiveSession(null);
+        void refetchActiveSessions();
+      }),
     );
     return () => {
       unsubArtifact();
       unsubRunProgress();
       unsubsDone.forEach((u) => u());
     };
-  }, [projectSlug, runId]);
+  }, [activeSessionId, projectSlug, refetchActiveSessions, runId, setActiveSession]);
 
   // Active whenever a run is known (backend active-session OR just-invoked
   // client id) and not completed/dismissed. No event needed — the bar can show

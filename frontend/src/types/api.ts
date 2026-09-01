@@ -56,6 +56,13 @@ export interface CreateProjectRequest {
   current?: string;
   target?: string;
   standard?: string;
+  scopeSource?: LearningScopeSource;
+}
+
+export interface LearningScopeSource {
+  type: 'discipline-map';
+  mapSlug: string;
+  topicId: string;
 }
 
 export interface ProjectTypeAdviceRequest {
@@ -78,6 +85,42 @@ export interface ProjectTypeAdviceResponse {
 export interface DisciplineOverviewResponse {
   title: string;
   content: string;
+}
+
+export interface DisciplineTopicScope {
+  id: string;
+  title: string;
+  chapterTitle: string;
+  goal: string;
+  inScope: string[];
+  outOfScope: string[];
+  prerequisites: string[];
+  ownedConcepts: string[];
+  reusedConcepts: string[];
+}
+
+export interface DisciplineTopicsResponse {
+  schemaVersion: 1;
+  topics: DisciplineTopicScope[];
+  updatedAt: string;
+}
+
+export type DisciplineLearningTaskStatus = 'planned' | 'in-progress' | 'completed';
+
+export interface DisciplineLearningTask {
+  id: string;
+  topicId?: string;
+  topicTitle: string;
+  status: DisciplineLearningTaskStatus;
+  addedAt: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
+export interface DisciplineLearningPlanResponse {
+  schemaVersion: 1;
+  items: DisciplineLearningTask[];
+  updatedAt: string;
 }
 
 export interface DisciplineOverviewGenerationResponse {

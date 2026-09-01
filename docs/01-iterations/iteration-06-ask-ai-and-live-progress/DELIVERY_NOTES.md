@@ -16,6 +16,15 @@ Phase C (Theme 2 enhancement) Claude Code hooks -> granular progress + reliable 
 
 ## Patch Round (2026-07-08) - compatibility, Ask-AI UX, and UI polish
 
+### Maintenance fix (2026-07-20) - terminal exit synchronization
+
+```text
+all interactive runtime wrappers      report successful/failed CLI exit through authenticated run status
+terminal launcher                     retains the spawned process handle so direct window close also finishes the session
+resume launches                       register the same run-status token as initial launches
+frontend progress                     correlates completion by run id, clears the local fallback, refetches active sessions
+```
+
 ### What landed
 
 ```text

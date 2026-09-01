@@ -7,6 +7,7 @@ import { useSessionStore } from '@/store/slices/session';
 
 let handlers: Record<string, (data: unknown) => void> = {};
 let activeSessions: Session[] = [];
+const refetchActiveSessions = vi.fn();
 
 vi.mock('@/hooks/useSSE', () => ({
   subscribeToSSE: (name: string, h: (data: unknown) => void) => {
@@ -17,7 +18,7 @@ vi.mock('@/hooks/useSSE', () => ({
   },
 }));
 vi.mock('@/api/sessions', () => ({
-  useActiveSessions: () => ({ data: { sessions: activeSessions } }),
+  useActiveSessions: () => ({ data: { sessions: activeSessions }, refetch: refetchActiveSessions }),
 }));
 
 function sessionOf(id: string, slug: string): Session {
@@ -28,6 +29,7 @@ describe('useRunProgress', () => {
   beforeEach(() => {
     handlers = {};
     activeSessions = [];
+    refetchActiveSessions.mockReset();
     useSessionStore.setState({ activeSessionId: null });
   });
 
@@ -69,8 +71,18 @@ describe('useRunProgress', () => {
     useSessionStore.setState({ activeSessionId: 's1' });
     const { result } = renderHook(() => useRunProgress('myproj'));
     expect(result.current.active).toBe(true);
-    act(() => handlers['session-completed']({}));
+    act(() => handlers['session-completed']({ runId: 's1' }));
     expect(result.current.active).toBe(false);
+    expect(useSessionStore.getState().activeSessionId).toBeNull();
+    expect(refetchActiveSessions).toHaveBeenCalled();
+  });
+
+  it('ignores completion events for a different run', () => {
+    useSessionStore.setState({ activeSessionId: 's1' });
+    const { result } = renderHook(() => useRunProgress('myproj'));
+    act(() => handlers['session-completed']({ runId: 'other' }));
+    expect(result.current.active).toBe(true);
+    expect(useSessionStore.getState().activeSessionId).toBe('s1');
   });
 
   it('dismiss hides the bar', () => {

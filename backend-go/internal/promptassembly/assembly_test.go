@@ -50,6 +50,8 @@ func TestBuild_HappyPath(t *testing.T) {
 		"Explain Rust ownership in 200 words.",
 		"intro",
 		"output.md",
+		"# Learning Scope",
+		"`inScope` and `ownedConcepts`",
 	}
 	for _, c := range checks {
 		if !strings.Contains(pkg.PromptMd, c) {
@@ -71,6 +73,59 @@ func TestBuild_HappyPath(t *testing.T) {
 	}
 	if !strings.Contains(string(js), `"agentId": "explain"`) {
 		t.Errorf("package meta missing agentId: %s", js)
+	}
+}
+
+func TestBuild_MapScopeIsAuthoritativeAndIntroCannotExpandIt(t *testing.T) {
+	dir := t.TempDir()
+	oldWS := workspace.ProjectsRootForTest()
+	workspace.SetProjectsRootForTest(dir)
+	defer workspace.SetProjectsRootForTest(oldWS)
+
+	if err := workspace.CreateProjectSkeleton("mechanics", "经典力学", ""); err != nil {
+		t.Fatal(err)
+	}
+	root, err := workspace.ProjectRootForSlug("mechanics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := `{
+  "schemaVersion": 1,
+  "status": "ready",
+  "title": "经典力学",
+  "goal": "解释宏观低速物体运动",
+  "inScope": ["牛顿运动定律"],
+  "outOfScope": ["热力学"],
+  "prerequisites": ["向量"],
+  "ownedConcepts": ["惯性参考系"],
+  "reusedConcepts": ["微积分"],
+  "source": {"type":"discipline-map","mapSlug":"physics","topicId":"classical-mechanics"},
+  "updatedAt": "2026-07-28T00:00:00Z"
+}`
+	if err := os.WriteFile(filepath.Join(root, "learning-scope.json"), []byte(scope), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	reg := agentregistry.New()
+	writeTestAgent(t, reg, "intro", []workspace.ZoneName{workspace.ZoneIntro})
+	pkg, err := Build(Request{
+		ProjectSlug: "mechanics",
+		ZoneName:    workspace.ZoneIntro,
+		AgentID:     "intro",
+	}, reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`"outOfScope": ["热力学"]`,
+		"Intro only calibrates prerequisite readiness, depth, examples, scaffolding, and practice difficulty",
+		"Never expand a map-origin scope",
+	} {
+		if !strings.Contains(pkg.PromptMd, want) {
+			t.Fatalf("prompt missing %q: %s", want, pkg.PromptMd)
+		}
+	}
+	if pkg.PackageMeta.LearningScopeFile == "" {
+		t.Fatal("package meta must record learning-scope.json")
 	}
 }
 

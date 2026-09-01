@@ -11,6 +11,7 @@ Last reviewed: 2026-06-15
 - Intro calibration does not repeat motivation, current level, target level, or completion standard already present in the project brief.
 - Intro prompt instructs the agent to generate `intro/survey.json` for frontend answering instead of asking calibration questions in the CLI/TUI.
 - Intro prompt embeds saved `intro/survey.json` answers when continuing to produce `intro/output.md` and `intro/assessment.json`.
+- An `artifact-updated` event refreshes both the changed artifact and the project detail, so the derived zone timeline updates without a full-page reload.
 - Explain prompt contract rejects conversational learner-address language and diagnostic provenance in tutorial prose.
 - Explain prompt contract confines first-principles reasoning to 2-4 final core-viewpoint sentences.
 - Legacy tasks default to three-star subjective behavior.

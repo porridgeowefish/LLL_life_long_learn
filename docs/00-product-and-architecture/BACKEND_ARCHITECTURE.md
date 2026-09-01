@@ -1,8 +1,8 @@
 # Backend Architecture
 
-Status: draft  
-Owner: project maintainer  
-Last reviewed: 2026-07-14
+Status: draft
+Owner: project maintainer
+Last reviewed: 2026-08-31
 Source of truth: this document defines the target backend architecture for the local learning workbench.
 
 ## Intent
@@ -79,6 +79,33 @@ user-facing follow-up entry
 ## Runtime Layers
 
 The backend should be organized into the following layers.
+
+### AgentExecution Domain Service
+
+`backend-go/internal/agentexecution` is the sole application-facing boundary
+for starting an Agent. Routes, teachers, assistant-task dispatchers, source
+processors, and future features must not call `claudelauncher` directly.
+
+The service exposes execution intents rather than terminal commands:
+
+```text
+StartProject  -> encyclopedia and project/zone agents
+StartTask     -> teacher-delegated work in an isolated attempt workspace
+Resume        -> reopen a supported interactive CLI conversation
+StartHeadless -> explicitly non-interactive background work
+```
+
+`claudelauncher` is an infrastructure adapter below this boundary. All visible
+executions converge on one interactive-terminal implementation that resolves
+the selected runtime, enters the requested workspace, reads the durable UTF-8
+prompt file, injects it as the initial turn, opens the real CLI, and reports
+exit state. Domain-specific lifecycle markers are optional parameters; they do
+not create a second launcher.
+
+This means adding a future Agent capability requires choosing an execution
+intent and supplying workspace/prompt contracts. It does not require copying
+PowerShell, executable resolution, prompt injection, or terminal lifecycle
+logic into a handler.
 
 ### 1. API Gateway Layer
 
@@ -423,16 +450,35 @@ The encyclopedia Agent is bound to `discipline-map`, not to a learning zone:
 ```text
 frontend explicitly requests encyclopedia invocation
 -> backend validates the project type and Agent `allowedProjectTypes`
--> project-level prompt assembly records `overview.md` without inventing a zone
+-> project-level prompt assembly records `overview.md` and `discipline-topics.json` without inventing a zone
 -> the normal Session and run directory are created
 -> the selected native Agent CLI opens in a visible terminal
--> the CLI writes root `overview.md`
--> artifact watcher emits `artifact-updated { zone: "overview" }`
--> frontend invalidates and rereads the discipline overview
+-> the CLI writes root `overview.md` and `discipline-topics.json`
+-> learner actions atomically update root `learning-plan.json`
+-> artifact watcher emits `artifact-updated` for `overview`, `discipline-topics`, or `learning-plan`
+-> frontend invalidates and rereads the affected discipline-map view
 ```
 
 Registered Agents never use the lightweight direct-provider path. That path is
 reserved for explicitly non-Agent helpers such as Ask-AI.
+
+### Flow A3: Create A Scoped System-Learning Project
+
+```text
+standalone create
+-> workspace writes draft learning-scope.json
+-> Intro finalizes it after learner calibration
+
+map deep dive
+-> client sends map slug + topic ID
+-> backend validates the discipline map and topic catalog
+-> backend copies the canonical topic boundary into ready learning-scope.json
+-> later map regeneration does not mutate the copied scope
+
+every zone invocation
+-> prompt assembly reads and embeds learning-scope.json
+-> Agent applies owned / reused / prerequisite / excluded semantics
+```
 
 ### Flow B: User Follow-Up Inside The Same Session
 
@@ -597,6 +643,50 @@ recoverability hint when possible
 audit trace in run metadata
 ```
 
+## Iteration 13 Target Application Architecture
+
+ADR-0012 changes how new behavior is placed in the existing Go process. Route
+files remain adapters and must not own provider loops, queue admission, source
+privacy, or multi-file asset commits.
+
+Target responsibilities:
+
+| Layer | Responsibility |
+|---|---|
+| HTTP/SSE transport | decode, size-limit, call one application operation, encode stable result |
+| Teacher application | prompt/context assembly, provider-neutral streaming, tool loop, stop generation |
+| Annotation application | quote-grounded Ask AI without teacher prompt or tools |
+| Assistant application | authorization, idempotent task creation, same-type exclusion, query projection |
+| Dispatcher | rebuildable queue, global/per-unit slots, leases, input sealing, visible executor launch, restart reconciliation |
+| Asset application | learner edits, external-edit import, versions, three-way merge, per-asset commit journal |
+| Source application | upload, hash, revision, disclosure, parse task, tombstone, permanent deletion |
+| Migration application | inventory, backup, staged conversion, journal, cutover and rollback reader |
+| Infrastructure | file repositories, provider SDK adapters, native CLI adapter, clock, ULID, SSE broadcaster |
+
+The first package extraction may preserve existing stores behind repository
+adapters. New iteration-13 routes may not call `os`, provider packages, CLI
+launchers, or global session stores directly. Application services receive
+interfaces and are testable with deterministic fakes.
+
+The local task queue has no daemon or broker. Durable `task.json` files are
+scanned on startup. A workspace-scoped admission lock protects same-unit,
+same-type check-and-create. Default running limits are five globally and two
+per unit. Task identity and executor-run identity remain separate.
+
+Teacher streaming and global invalidation are different channels. A teacher
+turn returns response-local SSE content frames; the existing app-shell SSE
+connection publishes only small durable-resource invalidations. REST reads
+repair reconnects and missed events.
+
+Visible native-CLI execution remains the heavy-work surface. Executors receive
+one immutable sealed input and write only their attempt workspace. Go validates
+the generic manifest and owns every formal asset, source, conversation, and
+task-state write.
+
+This is an accepted target, not current implementation. The current route-owned
+session and five-zone flows remain executable until each iteration-13 wave
+replaces them behind compatibility readers.
+
 ## Non-Goals
 
 This backend design does not include:
@@ -606,7 +696,7 @@ cloud deployment
 user accounts
 team collaboration
 remote multi-device sync
-provider abstraction beyond current Claude Code direction
+cloud multi-tenant provider administration
 database-first persistence as the canonical truth
 ```
 

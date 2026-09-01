@@ -11,6 +11,8 @@ import type {
   DeleteProjectResponse,
   DisciplineOverviewGenerationResponse,
   DisciplineOverviewResponse,
+  DisciplineTopicsResponse,
+  DisciplineLearningPlanResponse,
   ProjectTypeAdviceRequest,
   ProjectTypeAdviceResponse,
   ProjectResponse,
@@ -98,6 +100,42 @@ export function useDisciplineOverview(slug: string | undefined) {
       http.get<DisciplineOverviewResponse>(
         `/api/projects/${encodeURIComponent(slug!)}/discipline-overview`,
       ),
+  });
+}
+
+export function useDisciplineTopics(slug: string | undefined) {
+  return useQuery({
+    queryKey: ['projects', slug ?? '__missing__', 'discipline-topics'],
+    enabled: !!slug,
+    queryFn: () =>
+      http.get<DisciplineTopicsResponse>(
+        `/api/projects/${encodeURIComponent(slug!)}/discipline-topics`,
+      ),
+  });
+}
+
+export function useDisciplineLearningPlan(slug: string | undefined) {
+  return useQuery({
+    queryKey: ['projects', slug ?? '__missing__', 'discipline-learning-plan'],
+    enabled: !!slug,
+    queryFn: () =>
+      http.get<DisciplineLearningPlanResponse>(
+        `/api/projects/${encodeURIComponent(slug!)}/learning-plan`,
+      ),
+  });
+}
+
+export function useSaveDisciplineLearningPlan(slug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (plan: DisciplineLearningPlanResponse) =>
+      http.put<DisciplineLearningPlanResponse>(
+        `/api/projects/${encodeURIComponent(slug)}/learning-plan`,
+        plan,
+      ),
+    onSuccess: (plan) => {
+      qc.setQueryData(['projects', slug, 'discipline-learning-plan'], plan);
+    },
   });
 }
 

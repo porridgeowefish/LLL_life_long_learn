@@ -52,6 +52,11 @@ Last reviewed: 2026-07-14
 - `/api/runs/{runId}/status`: rejects requests with missing/wrong `X-Run-Token`.
 - `/api/runs/{runId}/status` with `done:true`: transitions the session to
   `completed` and emits `session-completed`.
+- Every interactive runtime wrapper reports its zero/non-zero CLI exit through
+  the authenticated run-status endpoint; frontend completion handling is
+  correlated to the current run and clears the local active-session fallback.
+- Closing the terminal process directly marks the associated session finished
+  and emits exactly one correlated completion/failure event.
 - `RunProgressBar`: determinate when `pagesPlanned` known, indeterminate +
   activity text otherwise, hidden on completed/failed.
 

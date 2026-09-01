@@ -160,5 +160,9 @@ export interface HealthResponse {
     available: boolean;
   };
   agentRuntime?: AgentRuntimeHealth;
+  learningWorkspace?: {
+    mode: 'teacher' | 'legacy';
+    failedProjects: string[];
+  };
   stats: HealthStats;
 }

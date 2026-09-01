@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 import { useMarkdown } from '@/hooks/useMarkdown';
+import { mountMermaidBlocks } from '@/lib/mermaidRenderer';
 import { useProjectFile, useFileWrite } from '@/api/files';
 import { Button } from './Button';
 
@@ -158,25 +159,7 @@ export function MarkdownEditor({
   // Mermaid rendering after HTML injection (same pattern as OutputViewer).
   useEffect(() => {
     if (!previewRef.current || mermaid.length === 0) return;
-    let cancelled = false;
-    void import('mermaid').then(async (mod) => {
-      if (cancelled) return;
-      for (const block of mermaid) {
-        const el = previewRef.current?.querySelector(
-          `[data-mermaid-id="${block.id}"]`,
-        );
-        if (!el) continue;
-        try {
-          const result = await mod.default.render(`${block.id}-svg`, block.code);
-          (el as HTMLElement).innerHTML = result.svg;
-        } catch (err) {
-          (el as HTMLElement).textContent = `Mermaid error: ${(err as Error).message}`;
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    return mountMermaidBlocks(previewRef.current, mermaid, 'markdown-editor');
   }, [html, mermaid]);
 
   return (

@@ -31,6 +31,15 @@ func parseZonePath(rel string) (slug, zone string, ok bool) {
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "overview.md" {
 		return parts[0], "overview", true
 	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "learning-plan.json" {
+		return parts[0], "learning-plan", true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "discipline-topics.json" {
+		return parts[0], "discipline-topics", true
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "learning-scope.json" {
+		return parts[0], "learning-scope", true
+	}
 	for i, seg := range parts {
 		if ignoreFolders[seg] {
 			return "", "", false

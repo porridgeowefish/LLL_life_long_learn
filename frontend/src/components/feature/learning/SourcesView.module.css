@@ -1,0 +1,29 @@
+.sources { height: 100%; overflow: auto; padding: 48px max(24px, calc((100% - 860px) / 2)); background: var(--bg); }
+.sources > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; padding-bottom: 28px; }
+.sources header span { color: var(--accent-ink); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
+.sources h2 { margin: 7px 0; font: 500 25px/1.3 Georgia, 'Songti SC', serif; }
+.sources header p { color: var(--muted); font-size: 12px; }
+.sources header button { flex: 0 0 auto; padding: 8px 14px; border: 0; border-radius: 8px; color: var(--on-accent); background: var(--accent); font-size: 12px; }
+.list { overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-sm); }
+.list article { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 12px; padding: 15px 17px; border-bottom: 1px solid var(--border); }
+.list article:last-child { border-bottom: 0; }
+.fileIcon { display: grid; place-items: center; width: 36px; height: 40px; border-radius: 5px; color: var(--accent-ink); background: var(--surface-tint); font-size: 8px; font-weight: 800; letter-spacing: .03em; }
+.list strong, .list span { display: block; }
+.list strong { font-size: 13px; font-weight: 620; }
+.list span, .list time { color: var(--muted); font-size: 10px; }
+.empty { padding: 70px 24px; color: var(--muted); text-align: center; }
+.error { margin-bottom: 14px; color: var(--pink); font-size: 12px; }
+.confirm { margin-bottom: 16px; padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-sm); }
+.confirm strong { font-size: 13px; }
+.confirm p { margin: 5px 0 13px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.confirm label { display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 11px; }
+.confirmActions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 15px; }
+.confirmActions button { padding: 7px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); background: transparent; font-size: 11px; }
+.confirmActions .primary { border-color: var(--accent); color: var(--on-accent); background: var(--accent); }
+.trailing { display: flex; align-items: center; gap: 12px; }
+.trailing details { position: relative; }
+.trailing summary { cursor: pointer; color: var(--muted); font-size: 10px; list-style: none; }
+.trailing details > div { position: absolute; z-index: 5; top: 20px; right: 0; min-width: 120px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: var(--shadow-lg); }
+.trailing button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--fg); background: transparent; text-align: left; font-size: 10px; }
+.trailing button:hover { background: var(--surface-raised); }
+.trailing .danger { color: var(--pink); }

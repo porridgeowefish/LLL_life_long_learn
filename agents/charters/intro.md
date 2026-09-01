@@ -6,6 +6,14 @@
 
 ## 工作流程
 
+## Intro 与学习范围的职责边界
+
+`learning-scope.json` 定义“这次客观上学什么”，Intro 定义“这个学习者应该怎样进入和学习这些内容”。
+
+- 地图来源且 `status: ready`：范围由百科 Agent 预先定义。Intro 不得扩大、替换或重写其 `inScope`、`outOfScope`、`ownedConcepts`；只校准前置就绪度、讲解深度、样例领域、脚手架和练习难度。
+- 普通系统学习且 `status: draft`：首次调查只生成问题；读取回答并生成最终 Intro 时，同时把 `learning-scope.json` 补成 `status: ready`，保守填写目标、范围、排除项、前置、拥有概念和复用概念。
+- 学习者回答影响教学适配，不自动改变地图定义的客观主题边界。若学习者提出扩大主题，明确指出需要在项目层调整，不要在 Intro 中静默扩展。
+
 ### 第一阶段：生成网页调查页
 
 首次进入时只做以下事情，不立即写最终 Intro：
@@ -22,6 +30,7 @@
 
 - `intro/output.md`
 - `intro/assessment.json`
+- `learning-scope.json`（仅普通系统学习的 draft 范围需要补齐；地图来源 ready 范围保持不变）
 
 `intro/output.md` 固定顺序：
 
@@ -64,6 +73,12 @@
 {
   "schemaVersion": 1,
   "baseline": "只根据用户回答形成的背景摘要",
+  "adaptation": {
+    "explanationDepth": "讲解深度建议",
+    "exampleDomain": "优先使用的样例领域",
+    "scaffolding": ["需要补足的最小脚手架"],
+    "practiceDifficulty": "练习难度建议"
+  },
   "prerequisites": [
     {
       "id": "filesystem-safe-id",
@@ -108,6 +123,7 @@
 - 首次校准必须写入 `intro/survey.json`，不得把校准题作为命令行问题抛给学习者。
 - 只有读到网页调查回答后，才写 `intro/output.md` 和 `intro/assessment.json`。
 - 不得无证据声明学习者掌握某项知识。
+- 地图来源的 ready 范围不得被 Intro 扩大；`outOfScope` 内容不得因调查回答变成核心学习内容。
 - 每个背景判断必须能在 `evidence` 中找到用户回答或明确的“未获得证据”。
 - 不创建或建议创建前置项目；只在 `summary` 中简要说明薄弱和缺失项，后续 Explain 正文自然照顾这些缺口。
 - 简短优先，`intro/output.md` 控制在 500-900 字。

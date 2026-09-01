@@ -11,14 +11,10 @@
 
 html {
   font-size: 15px;
-  /* Render at 125% so the intended scale is reached at 100% browser zoom
-     (instead of the user having to zoom to 125% manually). The design mixes
-     rem (typography) and px (layout/spacing), so only a uniform root zoom
-     scales text and containers together — bumping font-size alone would
-     overflow the px-based fixed-height cards/textareas. Must live on <html>
-     (the root), not <body> or #root: only root-level zoom keeps vh-based
-     heights and fixed/sticky elements (modals, sidebar) correct. */
-  zoom: 1.25;
+  /* Keep browser 100% at its native scale. The learning workspace already
+     owns its compact typography; root zoom previously enlarged the entire
+     shell and pushed the teacher composer below the first viewport. */
+  zoom: 1;
 }
 
 body {
@@ -29,6 +25,32 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+.mermaid-placeholder {
+  max-width: 100%;
+  margin: 18px 0;
+  overflow-x: auto;
+}
+
+.mermaid-placeholder > svg {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.mermaid-fallback {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  background: var(--surface-sunken);
+  font-size: 12px;
+}
+
+.mermaid-fallback summary { cursor: pointer; }
+.mermaid-fallback pre { margin: 12px 0 0; overflow: auto; white-space: pre; }
 
 a {
   color: var(--accent);

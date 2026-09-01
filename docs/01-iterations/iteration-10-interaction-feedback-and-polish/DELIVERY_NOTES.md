@@ -18,6 +18,17 @@ Source of truth: delivery evidence and residual risk for iteration 10.
   accessible interaction states.
 - Bottom-edge text selections now use a viewport-level action toolbar that
   flips above the selection and clamps within narrow screens.
+- Wrapped text selections now anchor the action toolbar to the visual line
+  nearest the pointer-release position, so the toolbar does not cover another
+  selected line and reverse-direction selection behaves consistently.
+- Right-edge selections keep the action toolbar at its intrinsic one-row width;
+  the complete toolbar shifts left as a unit instead of collapsing its buttons
+  into a vertical strip or disappearing.
+- Selection toolbars now clamp against the browser's visual viewport, including
+  its offset during zoom or viewport panning, rather than the larger layout
+  viewport. A selection that leaves the browser at the bottom is finalized from
+  window-exit, cancellation, mouseup, or selection-change signals, so it no
+  longer depends on receiving a single in-document pointerup event.
 
 ## Verification
 

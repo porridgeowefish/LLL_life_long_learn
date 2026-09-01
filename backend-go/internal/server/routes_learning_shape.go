@@ -14,6 +14,8 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/learningscope"
+	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -31,6 +33,22 @@ type projectTypeAdvice struct {
 	Reason         string                 `json:"reason,omitempty"`
 	Tradeoff       string                 `json:"tradeoff,omitempty"`
 	Confidence     string                 `json:"confidence,omitempty"`
+}
+
+type disciplineLearningTask struct {
+	ID          string `json:"id"`
+	TopicID     string `json:"topicId,omitempty"`
+	TopicTitle  string `json:"topicTitle"`
+	Status      string `json:"status"`
+	AddedAt     string `json:"addedAt"`
+	StartedAt   string `json:"startedAt,omitempty"`
+	CompletedAt string `json:"completedAt,omitempty"`
+}
+
+type disciplineLearningPlan struct {
+	SchemaVersion int                      `json:"schemaVersion"`
+	Items         []disciplineLearningTask `json:"items"`
+	UpdatedAt     string                   `json:"updatedAt"`
 }
 
 func configuredAskAIProvider() (askaiprovider.Provider, error) {
@@ -241,6 +259,182 @@ func (s *Server) handleGetDisciplineOverview(w http.ResponseWriter, r *http.Requ
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"title": state.Title, "content": string(data)})
 }
 
+func (s *Server) handleGetDisciplineTopics(w http.ResponseWriter, r *http.Request) {
+	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	catalog, err := readDisciplineTopics(root)
+	if os.IsNotExist(err) {
+		httpx.WriteJSON(w, http.StatusOK, learningscope.EmptyCatalog())
+		return
+	}
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "read_discipline_topics")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, catalog)
+}
+
+func readDisciplineTopics(root string) (learningscope.Catalog, error) {
+	catalog, err := learningscope.ReadCatalog(filepath.Join(root, "discipline-topics.json"))
+	if err != nil {
+		return learningscope.Catalog{}, err
+	}
+	overview, err := os.ReadFile(filepath.Join(root, "overview.md"))
+	if err != nil {
+		return learningscope.Catalog{}, err
+	}
+	if err := learningscope.ValidateAgainstOverview(catalog, string(overview)); err != nil {
+		return learningscope.Catalog{}, err
+	}
+	return catalog, nil
+}
+
+func (s *Server) handleGetDisciplineLearningPlan(w http.ResponseWriter, r *http.Request) {
+	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	plan, err := readDisciplineLearningPlan(filepath.Join(root, "learning-plan.json"))
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "read_learning_plan")
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, plan)
+}
+
+func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.Request) {
+	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
+	if !ok {
+		return
+	}
+	var plan disciplineLearningPlan
+	if err := httpx.ReadJSON(r, &plan); err != nil {
+		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
+		return
+	}
+	if err := validateDisciplineLearningPlan(&plan); err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	now := time.Now().UTC().Format(time.RFC3339)
+	for i := range plan.Items {
+		item := &plan.Items[i]
+		if item.Status == "in-progress" && item.StartedAt == "" {
+			item.StartedAt = now
+		}
+		if item.Status == "completed" {
+			if item.StartedAt == "" {
+				item.StartedAt = now
+			}
+			if item.CompletedAt == "" {
+				item.CompletedAt = now
+			}
+		}
+	}
+	plan.SchemaVersion = 1
+	plan.UpdatedAt = now
+	raw, err := json.MarshalIndent(plan, "", "  ")
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "encode_learning_plan")
+		return
+	}
+	if err := workspace.AtomicWriteFile(filepath.Join(root, "learning-plan.json"), raw, 0o644); err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "write_learning_plan")
+		return
+	}
+	for _, item := range plan.Items {
+		if item.Status != "completed" {
+			continue
+		}
+		if _, _, err := awardLearningEvent(r.PathValue("id"), progressstore.Event{
+			ID:            "learning-task-complete:" + item.ID + ":" + item.CompletedAt,
+			SourceType:    "learning-task-complete",
+			SourceID:      item.ID,
+			Outcome:       "completed",
+			ActivityDelta: 1,
+			Title:         "完成学习任务",
+			Detail:        item.TopicTitle,
+		}); err != nil {
+			httpx.Error(w, http.StatusInternalServerError, "record_learning_task_activity")
+			return
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, plan)
+}
+
+func readDisciplineLearningPlan(path string) (disciplineLearningPlan, error) {
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return disciplineLearningPlan{SchemaVersion: 1, Items: []disciplineLearningTask{}}, nil
+	}
+	if err != nil {
+		return disciplineLearningPlan{}, err
+	}
+	var plan disciplineLearningPlan
+	if err := json.Unmarshal(data, &plan); err != nil {
+		return disciplineLearningPlan{}, err
+	}
+	if plan.Items == nil {
+		plan.Items = []disciplineLearningTask{}
+	}
+	return plan, nil
+}
+
+func validateDisciplineLearningPlan(plan *disciplineLearningPlan) error {
+	if len(plan.Items) > 200 {
+		return errors.New("learning_plan_too_large")
+	}
+	seenIDs := map[string]bool{}
+	seenTopics := map[string]bool{}
+	for i := range plan.Items {
+		item := &plan.Items[i]
+		item.ID = strings.TrimSpace(item.ID)
+		item.TopicID = strings.TrimSpace(item.TopicID)
+		item.TopicTitle = strings.TrimSpace(item.TopicTitle)
+		if item.ID == "" || len(item.ID) > 120 || len(item.TopicID) > 120 ||
+			item.TopicTitle == "" || len(item.TopicTitle) > 180 {
+			return errors.New("invalid_learning_task")
+		}
+		if !validLearningTaskTime(item.AddedAt, false) ||
+			!validLearningTaskTime(item.StartedAt, true) ||
+			!validLearningTaskTime(item.CompletedAt, true) {
+			return errors.New("invalid_learning_task_time")
+		}
+		if seenIDs[item.ID] || seenTopics[item.TopicTitle] {
+			return errors.New("duplicate_learning_task")
+		}
+		seenIDs[item.ID] = true
+		seenTopics[item.TopicTitle] = true
+		switch item.Status {
+		case "planned":
+			if item.StartedAt != "" || item.CompletedAt != "" {
+				return errors.New("invalid_learning_task_status_time")
+			}
+		case "in-progress":
+			if item.CompletedAt != "" {
+				return errors.New("invalid_learning_task_status_time")
+			}
+		case "completed":
+		default:
+			return errors.New("invalid_learning_task_status")
+		}
+	}
+	return nil
+}
+
+func validLearningTaskTime(value string, optional bool) bool {
+	if value == "" {
+		return optional
+	}
+	if len(value) > 40 {
+		return false
+	}
+	_, err := time.Parse(time.RFC3339, value)
+	return err == nil
+}
+
 func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http.Request) {
 	state, _, ok := requireDisciplineMap(w, r.PathValue("id"))
 	if !ok {
@@ -259,7 +453,7 @@ func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http
 	pkg, err := promptassembly.BuildProjectAgent(promptassembly.ProjectAgentRequest{
 		ProjectSlug: state.Slug,
 		AgentID:     encyclopedia.ID,
-		OutputPaths: []string{"overview.md"},
+		OutputPaths: []string{"overview.md", "discipline-topics.json"},
 	}, agents)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())

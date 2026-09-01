@@ -29,6 +29,41 @@
   font-size: 0.78rem;
 }
 
+.viewTabs {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.viewTabs button {
+  position: relative;
+  padding: 7px 1px 9px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.viewTabs button:hover,
+.viewTabs button:focus-visible,
+.viewTabs .viewTabActive {
+  color: var(--accent-ink);
+}
+
+.viewTabs .viewTabActive::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--accent);
+  content: '';
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -135,6 +170,11 @@
   color: var(--muted);
 }
 
+.tocTopic button {
+  padding-left: 48px;
+  color: var(--muted);
+}
+
 .documentBody {
   padding-top: 30px;
 }
@@ -145,13 +185,38 @@
 
 .markdown h1,
 .markdown h2,
-.markdown h3 {
+.markdown h3,
+.markdown h4 {
   margin: 1.35em 0 0.55em;
   font-family: 'Lora', Georgia, serif;
 }
 
 .markdown h1 {
   margin-top: 0;
+}
+
+.markdown table {
+  width: 100%;
+  margin: 18px 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.markdown th,
+.markdown td {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown th {
+  background: var(--surface-sunken);
+  font-weight: 700;
+}
+
+.markdown tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--surface-sunken) 55%, transparent);
 }
 
 .markdown .actionableHeading {
@@ -186,6 +251,31 @@
     transform 120ms ease;
 }
 
+.markdown .inlinePlan {
+  flex: none;
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--muted);
+  font-family: 'DM Sans', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 650;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.markdown .inlinePlan:hover,
+.markdown .inlinePlan:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.markdown .inlinePlan:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
 .markdown .inlineDeepDive::after {
   content: '↗';
   font-size: 0.72rem;
@@ -215,6 +305,147 @@
 .error {
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.planPage {
+  width: min(100%, 980px);
+  margin: 0 auto;
+  padding: 28px 32px 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.planHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+}
+
+.planHeader h2 {
+  margin: 4px 0 6px;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.35rem;
+}
+
+.planHeader p,
+.planEyebrow,
+.planProgress span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.planEyebrow {
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+.planProgress {
+  display: grid;
+  min-width: 82px;
+  justify-items: end;
+}
+
+.planProgress strong {
+  font-family: var(--font-mono);
+  font-size: 1.3rem;
+}
+
+.taskList {
+  display: grid;
+  gap: 10px;
+  margin: 22px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.taskList li {
+  display: grid;
+  grid-template-columns: 34px minmax(150px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.taskOrder {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.taskBody {
+  display: grid;
+  gap: 3px;
+}
+
+.taskBody strong {
+  font-size: 0.86rem;
+}
+
+.taskBody span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.taskActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.taskActions button {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+}
+
+.taskActions button:hover:not(:disabled),
+.taskActions button:focus-visible:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.taskActions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.taskActions .taskPrimary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.taskActions .taskDanger {
+  color: var(--pink);
+}
+
+.taskCompleted {
+  opacity: 0.72;
+}
+
+.taskCompleted .taskBody strong {
+  text-decoration: line-through;
 }
 
 .emptyOverview {
@@ -276,8 +507,29 @@
     padding: 20px 18px 36px;
   }
 
+  .planPage {
+    padding: 20px 18px 28px;
+  }
+
+  .planHeader {
+    align-items: stretch;
+  }
+
+  .taskList li {
+    grid-template-columns: 30px 1fr;
+  }
+
+  .taskActions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
   .tocSubsection button {
     padding-left: 12px;
+  }
+
+  .tocTopic button {
+    padding-left: 24px;
   }
 
 }

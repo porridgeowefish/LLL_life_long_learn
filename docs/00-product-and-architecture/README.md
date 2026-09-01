@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: `docs/INDEX.md` routes readers here; each linked document owns its topic.
 
 This directory stores long-lived documents that answer:
@@ -50,3 +50,9 @@ If they conflict:
 Current implementation follows docs/01-iterations/ for scope.
 Long-term changes must be captured in ADR or updated architecture docs.
 ```
+
+The accepted next architectural target is
+[ADR-0012](./ADR/0012-teacher-assistant-learning-workspace.md): one API teacher
+conversation per system-learning unit, asynchronous visible-CLI assistance,
+versioned teaching assets, and explicit source material. Iteration 13 owns the
+proposed contracts; current code remains the delivery truth until implemented.

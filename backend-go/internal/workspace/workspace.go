@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 )
 
@@ -276,13 +277,32 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	if projectType == ProjectTypeSystemLearning {
+		scope := learningscope.NewDraft(title, parsed)
+		if in.LearningScope != nil {
+			scope = *in.LearningScope
+		}
+		scopeBytes, err := learningscope.MarshalScope(scope)
+		if err != nil {
+			return fmt.Errorf("encode learning scope: %w", err)
+		}
+		if err := AtomicWriteFile(filepath.Join(root, "learning-scope.json"), scopeBytes, 0o644); err != nil {
+			return err
+		}
 		// summary/summary.md — empty learner-owned file
 		if err := AtomicWriteFile(filepath.Join(root, "summary", "summary.md"), []byte(""), 0o644); err != nil {
 			return err
 		}
 	} else {
-		overview := fmt.Sprintf("# %s：学科总览\n\n当前总览尚未生成。点击“生成学科总览”，了解学科边界、主要领域、研究方法、典型应用与可能的学习路线。\n", title)
+		overview := fmt.Sprintf("# %s：学科总览\n\n当前总览尚未生成。点击“生成学科总览”，了解学科边界、主要领域、研究方法和典型应用。\n", title)
 		if err := AtomicWriteFile(filepath.Join(root, "overview.md"), []byte(overview), 0o644); err != nil {
+			return err
+		}
+		plan := []byte("{\n  \"schemaVersion\": 1,\n  \"items\": [],\n  \"updatedAt\": \"\"\n}\n")
+		if err := AtomicWriteFile(filepath.Join(root, "learning-plan.json"), plan, 0o644); err != nil {
+			return err
+		}
+		topics := []byte("{\n  \"schemaVersion\": 1,\n  \"topics\": [],\n  \"updatedAt\": \"\"\n}\n")
+		if err := AtomicWriteFile(filepath.Join(root, "discipline-topics.json"), topics, 0o644); err != nil {
 			return err
 		}
 	}
@@ -655,11 +675,12 @@ func defaultProjectMdBody() string {
 // ProjectInput captures creation-time context. Why/Current/Target/Standard seed
 // only system-learning project briefs; discipline-map briefs ignore them.
 type ProjectInput struct {
-	ProjectType ProjectType
-	Why         string // motivation: why this topic matters
-	Current     string // current ability self-assessment
-	Target      string // target ability self-assessment
-	Standard    string // completion criteria the learner commits to
+	ProjectType   ProjectType
+	Why           string // motivation: why this topic matters
+	Current       string // current ability self-assessment
+	Target        string // target ability self-assessment
+	Standard      string // completion criteria the learner commits to
+	LearningScope *learningscope.Scope
 }
 
 func defaultProjectMdBodyForInput(in ProjectInput) string {

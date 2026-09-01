@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/agentexecution"
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
@@ -21,8 +22,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
-
-var launchAgentCLI = claudelauncher.Launch
 
 // sessions is the package-global session store.
 var sessions = sessionstore.New()
@@ -154,18 +153,14 @@ func (s *Server) startAgentSession(
 				}
 			}
 		}()
-		_, launchErr := launchAgentCLI(ctx, claudelauncher.LaunchRequest{
-			ProjectSlug:    projectID,
-			ZoneName:       workspace.ZoneName(contextName),
-			Agent:          agent,
-			PromptPackage:  pkg,
-			PermissionMode: permissionMode,
-			Session:        sess,
-			Store:          sessions,
-			Events:         broadcaster,
-			ClaudeBin:      s.ClaudeBin,
-			Runtime:        &runtime,
-			RunProgress:    s.runProgress,
+		execution := s.agentExecution
+		if execution == nil {
+			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+		}
+		_, launchErr := execution.StartProject(ctx, agentexecution.ProjectRequest{
+			ProjectSlug: projectID, ContextName: contextName, Agent: agent, PromptPackage: pkg,
+			PermissionMode: permissionMode, Session: sess, SessionStore: sessions,
+			Events: broadcaster, RunProgress: s.runProgress,
 		})
 		if launchErr != nil {
 			_ = os.WriteFile(filepath.Join(
@@ -245,15 +240,13 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 	}
 	sess := latestProjectZoneSession(projectID, string(workspace.ZoneExplain))
 	runDirName := promptassembly.MakeRunDirName("explain-resume", time.Now().UTC())
-	result, err := claudelauncher.LaunchResume(context.Background(), claudelauncher.ResumeRequest{
-		ProjectSlug: projectID,
-		ZoneName:    workspace.ZoneExplain,
-		Session:     sess,
-		Store:       sessions,
-		Events:      broadcaster,
-		ClaudeBin:   s.ClaudeBin,
-		Runtime:     &runtime,
-		RunDirName:  runDirName,
+	execution := s.agentExecution
+	if execution == nil {
+		execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+	}
+	result, err := execution.Resume(context.Background(), agentexecution.ResumeRequest{
+		ProjectSlug: projectID, ContextName: string(workspace.ZoneExplain), Session: sess,
+		SessionStore: sessions, Events: broadcaster, RunDirName: runDirName, RunProgress: s.runProgress,
 	})
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "resume explain session: "+err.Error())
@@ -343,18 +336,14 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		_, _ = claudelauncher.Launch(ctx, claudelauncher.LaunchRequest{
-			ProjectSlug:    sess.ProjectSlug,
-			ZoneName:       workspace.ZoneName(sess.ZoneName),
-			Agent:          agent,
-			PromptPackage:  pkg,
-			PermissionMode: permissionMode,
-			Session:        sess,
-			Store:          sessions,
-			Events:         broadcaster,
-			ClaudeBin:      s.ClaudeBin,
-			Runtime:        &runtime,
-			RunProgress:    s.runProgress,
+		execution := s.agentExecution
+		if execution == nil {
+			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+		}
+		_, _ = execution.StartProject(ctx, agentexecution.ProjectRequest{
+			ProjectSlug: sess.ProjectSlug, ContextName: sess.ZoneName, Agent: agent, PromptPackage: pkg,
+			PermissionMode: permissionMode, Session: sess, SessionStore: sessions,
+			Events: broadcaster, RunProgress: s.runProgress,
 		})
 	}()
 

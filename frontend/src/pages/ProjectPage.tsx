@@ -1,191 +1,32 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 
 import { useProject } from '@/api/projects';
-import { EmptyState } from '@/components/primitive/EmptyState';
-import { Icon } from '@/components/primitive/Icon';
-import { ZoneTimeline } from '@/components/feature/project/ZoneTimeline';
-import { OutputViewer } from '@/components/feature/project/OutputViewer';
-import { RunProgressBar } from '@/components/feature/project/RunProgressBar';
+import { useHealth } from '@/api/health';
 import { DisciplineOverview } from '@/components/feature/project/DisciplineOverview';
-import { AgentInvokePanel } from '@/components/feature/agent/AgentInvokePanel';
-import { ConfusionPanel } from '@/components/feature/explain/ConfusionPanel';
-import { ExplainReader } from '@/components/feature/explain/ExplainReader';
-import { IntroPage } from '@/components/feature/intro/IntroPage';
-import { PracticeFlow } from '@/components/feature/practice/PracticeFlow';
-import { ExtendPage } from '@/components/feature/extend/ExtendPage';
-import { SummaryPage } from '@/components/feature/summary/SummaryPage';
-import { useArtifactRefresh } from '@/hooks/useArtifactRefresh';
-import { useRunProgress } from '@/hooks/useRunProgress';
+import { LearningWorkspace } from '@/components/feature/learning/LearningWorkspace';
+import { LegacyProjectView } from '@/components/feature/project/LegacyProjectView';
+import { EmptyState } from '@/components/primitive/EmptyState';
 import { useProjectStore } from '@/store/slices/project';
-import { useUiStore } from '@/store/slices/ui';
-import { ZONE_DISPLAY, type ZoneName } from '@/types/domain';
 
 import s from './ProjectPage.module.css';
 
 export function ProjectPage() {
-  const { id, zone: zoneParam } = useParams<{ id: string; zone?: string }>();
-  const navigate = useNavigate();
-
+  const { id } = useParams<{ id: string }>();
   const slug = id ?? '';
   const { data, isLoading, error } = useProject(slug);
-  const project = data?.project;
+  const health = useHealth();
+  const selectProject = useProjectStore((state) => state.selectProject);
 
-  const storedZone = useProjectStore((s) => s.currentZone);
-  const setZone = useProjectStore((s) => s.setZone);
-  const selectProject = useProjectStore((s) => s.selectProject);
+  useEffect(() => { if (slug) selectProject(slug); }, [selectProject, slug]);
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const summaryPanelCollapsed = useUiStore((state) => state.summaryPanelCollapsed);
-  const setSummaryPanelCollapsed = useUiStore((state) => state.setSummaryPanelCollapsed);
+  if (!slug) return <div className={s.host}><EmptyState title="未指定学习单元" description="回到主页选择一个学习单元。" /></div>;
+  if (isLoading || health.isLoading) return <div className={s.host}>加载中…</div>;
+  if (error || !data?.project) return <div className={s.host}><EmptyState title={`学习单元「${slug}」不存在`} description={(error as Error)?.message ?? '请从主页选择一个已有项目。'} /></div>;
 
-  useArtifactRefresh(slug);
-  const runProgress = useRunProgress(slug);
-
-  useEffect(() => {
-    if (slug) selectProject(slug);
-  }, [slug, selectProject]);
-
-  const zone: ZoneName = ((zoneParam as ZoneName) ||
-    storedZone ||
-    project?.activeZone ||
-    'Explain') as ZoneName;
-
-  useEffect(() => {
-    if (zone && zone !== storedZone) setZone(zone);
-  }, [zone, storedZone, setZone]);
-
-  if (!slug) {
-    return (
-      <div className={s.host}>
-        <EmptyState
-          title="未指定项目"
-          description="URL 中缺少项目 slug，回到总览选择一个项目。"
-        />
-      </div>
-    );
+  if (data.project.projectType === 'discipline-map') return <DisciplineOverview slug={slug} title={data.project.title} />;
+  if (health.data?.learningWorkspace?.failedProjects?.includes(slug)) {
+    return <LegacyProjectView project={data.project} />;
   }
-
-  if (isLoading) {
-    return <div className={s.host}>加载中…</div>;
-  }
-
-  if (error || !project) {
-    return (
-      <div className={s.host}>
-        <EmptyState
-          title={`项目 "${slug}" 不存在`}
-          description={(error as Error)?.message ?? '请从总览页选择一个已存在的项目。'}
-        />
-      </div>
-    );
-  }
-
-  if (project.projectType === 'discipline-map') {
-    return <DisciplineOverview slug={slug} title={project.title} />;
-  }
-
-  const handleZoneSelect = (z: ZoneName) => {
-    navigate(`/project/${slug}/${z}`);
-  };
-
-  // Zone-specific content renderer.
-  const renderZoneContent = () => {
-    switch (zone) {
-      case 'Explain':
-        return (
-          <div className={`${s.zoneLayout} ${summaryPanelCollapsed ? s.zoneLayoutCollapsed : ''}`}>
-            <div className={s.zoneMain}>
-              <ExplainReader projectSlug={slug} />
-            </div>
-            <div className={s.zoneSide}>
-              <ConfusionPanel
-                projectSlug={slug}
-                collapsed={summaryPanelCollapsed}
-                onCollapsedChange={setSummaryPanelCollapsed}
-              />
-            </div>
-          </div>
-        );
-      case 'Intro':
-        return <IntroPage projectSlug={slug} />;
-      case 'Practice':
-        return <PracticeFlow projectSlug={slug} />;
-      case 'Extend':
-        return <ExtendPage projectSlug={slug} projectTitle={project.title} />;
-      case 'Summary':
-        return <SummaryPage projectSlug={slug} />;
-      default:
-        return <OutputViewer slug={slug} zone={zone} />;
-    }
-  };
-
-  return (
-    <div className={`${s.host} ${sidebarCollapsed ? s.hostAsideHidden : ''}`}>
-      {!sidebarCollapsed && (
-        <aside className={s.aside}>
-          <div className={s.asideHead}>
-            <div className={s.asideHeadBody}>
-              <h3 className={s.projTitle}>{project.title}</h3>
-              <code className={s.projSlug}>{project.slug}</code>
-            </div>
-            <button
-              type="button"
-              className={s.asideToggle}
-              onClick={() => setSidebarCollapsed(true)}
-              title="折叠侧栏"
-              aria-label="折叠侧栏"
-            >
-              <Icon name="x" size={12} />
-            </button>
-          </div>
-          <ZoneTimeline
-            currentZone={zone}
-            hasOutput={new Set(project.generatedZones ?? [])}
-            onSelect={handleZoneSelect}
-          />
-        </aside>
-      )}
-
-      <main className={s.main}>
-        {sidebarCollapsed && (
-          <button
-            type="button"
-            className={s.expandAside}
-            onClick={() => setSidebarCollapsed(false)}
-            title="展开侧栏"
-          >
-            <Icon name="plus" size={12} /> 阶段
-          </button>
-        )}
-
-        <header className={s.header}>
-          <div className={s.headerTop}>
-            <div className={s.headerBody}>
-              <h1 className={s.title}>{project.title}</h1>
-              <p className={s.subtitle}>
-                当前阶段：<strong>{ZONE_DISPLAY[zone]}</strong>
-              </p>
-            </div>
-            {zone !== 'Practice' && zone !== 'Extend' && (
-              <div className={s.headerActions}>
-                <AgentInvokePanel slug={slug} zone={zone} />
-              </div>
-            )}
-          </div>
-          <RunProgressBar
-            active={runProgress.active}
-            activity={runProgress.activity}
-            pagesDone={runProgress.pagesDone}
-            pagesPlanned={runProgress.pagesPlanned}
-            onDismiss={runProgress.dismiss}
-          />
-        </header>
-
-        <div className={s.scroll}>
-          {renderZoneContent()}
-        </div>
-      </main>
-    </div>
-  );
+  return <LearningWorkspace project={data.project} />;
 }

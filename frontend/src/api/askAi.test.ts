@@ -23,6 +23,7 @@ describe('streamAskAi', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       body: fakeBody([
+        'data: {"type":"thinking","content":"hidden"}\n\n',
         'data: {"type":"text","content":"Hel"}\n\n',
         'data: {"type":"text","content":"lo"}\n\ndata: {"type":"done"}\n\n',
       ]),

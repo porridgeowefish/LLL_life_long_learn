@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: ADR numbering, status, and supersession index for LLL.
 
 ## Rules
@@ -28,6 +28,9 @@ Architecture work is incomplete until the governance landing table is satisfied.
 | [0007](./0007-flat-project-storage-and-sidebar-classification.md) | Flat Project Storage And Sidebar Classification | accepted, partially superseded | flat storage retained; folder-title navigation replaced by 0009 |
 | [0008](./0008-generated-prerequisite-gap-summaries.md) | Generated Prerequisite Gap Summaries | accepted | supersedes the on-demand bridge in 0006 |
 | [0009](./0009-explicit-discipline-overview-entry.md) | Explicit Discipline Overview Entry | accepted | supersedes only the clickable-folder-title presentation in 0005 and 0007 |
+| [0010](./0010-hierarchical-discipline-maps-and-learning-plans.md) | Hierarchical Discipline Maps And Learner-Owned Task Plans | accepted | supersedes the flat H3-only overview contract in 0005 |
+| [0011](./0011-learning-scope-snapshots-and-intro-calibration.md) | Learning Scope Snapshots And Intro Calibration | accepted | extends 0005 and 0010 with durable topic boundaries |
+| [0012](./0012-teacher-assistant-learning-workspace.md) | Teacher-Assistant Learning Workspace | accepted | supersedes the active five-zone presentation and direct-generation workflow while retaining maps, flat storage, scope provenance, and visible native CLI execution |
 
 ## Numbering Repair
 

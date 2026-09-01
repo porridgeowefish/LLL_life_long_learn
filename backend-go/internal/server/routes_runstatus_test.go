@@ -79,3 +79,20 @@ func TestRunStatusRejectsInvalidBody(t *testing.T) {
 		t.Errorf("invalid body: want 400, got %d", rec.Code)
 	}
 }
+
+func TestRunStatusAcceptsFailedRuntimeExit(t *testing.T) {
+	srv := &Server{runProgress: runprogress.New()}
+	tok := srv.runProgress.Register("failed-run")
+	req := httptest.NewRequest(http.MethodPost, "/api/runs/failed-run/status", strings.NewReader(`{"failed":true}`))
+	req.SetPathValue("runId", "failed-run")
+	req.Header.Set("X-Run-Token", tok)
+	rec := httptest.NewRecorder()
+	srv.handleRunStatus(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("want 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	got, ok := srv.runProgress.Get("failed-run")
+	if !ok || !got.Failed {
+		t.Fatalf("failed exit not recorded: %+v ok=%v", got, ok)
+	}
+}

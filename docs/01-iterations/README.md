@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-08-27
 Source of truth: iteration subdirectories define active delivery scope.
 
 Each iteration should be independently understandable and testable.
@@ -11,6 +11,9 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
+| 13 | Teacher-assistant learning workspace, assets, and source materials (planned) | [iteration-13-teacher-assistant-learning-workspace](./iteration-13-teacher-assistant-learning-workspace/README.md) |
+| 12 | Durable map-topic boundaries and unified learning scope (implemented) | [iteration-12-learning-scope-contract](./iteration-12-learning-scope-contract/README.md) |
+| 11 | Hierarchical discipline maps and learner-owned task planning (implemented) | [iteration-11-hierarchical-discipline-planning](./iteration-11-hierarchical-discipline-planning/README.md) |
 | 10 | Interaction feedback and usability cleanup (implemented) | [iteration-10-interaction-feedback-and-polish](./iteration-10-interaction-feedback-and-polish/README.md) |
 | 09 | Learning deletion and prerequisite-summary cleanup (active) | [iteration-09-discipline-protocols-and-learning-lab](./iteration-09-discipline-protocols-and-learning-lab/README.md) |
 | 08 | Learning rhythm, growth aggregation, themes, and open-source entry (implemented) | [iteration-08-learning-rhythm-and-personalization](./iteration-08-learning-rhythm-and-personalization/README.md) |

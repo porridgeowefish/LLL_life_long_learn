@@ -62,6 +62,17 @@ func TestFindByIDThenDefaultThenFirst(t *testing.T) {
 	}
 }
 
+func TestResolveServiceBindingOverridesModel(t *testing.T) {
+	cfg := &Config{Default: "a", Providers: []Provider{{ID: "a", Model: "fast"}, {ID: "b", Model: "base"}}, Bindings: map[string]Binding{"teacher": {ProviderID: "b", Model: "teacher-model"}}}
+	resolved := cfg.Resolve("teacher")
+	if resolved == nil || resolved.ID != "b" || resolved.Model != "teacher-model" {
+		t.Fatalf("unexpected binding resolution: %#v", resolved)
+	}
+	if cfg.Providers[1].Model != "base" {
+		t.Fatal("Resolve mutated stored provider")
+	}
+}
+
 func TestSavePreservesOtherKeys(t *testing.T) {
 	path := useTempConfig(t)
 	os.WriteFile(path, []byte(`{"imageApiKey":"keep-me","agentRuntime":"claude"}`), 0o644)

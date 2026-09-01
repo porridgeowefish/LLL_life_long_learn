@@ -41,6 +41,9 @@ func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 		// hook firing after a server restart does not fail the request.
 		sessions.SetFinished(runId, sessionstore.StateCompleted, 0)
 		broadcaster.Emit("session-completed", map[string]any{"runId": runId})
+	} else if in.Failed {
+		sessions.SetFinished(runId, sessionstore.StateFailed, 1)
+		broadcaster.Emit("session-failed", map[string]any{"runId": runId, "error": "runtime exited with a non-zero status"})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": updated})
 }

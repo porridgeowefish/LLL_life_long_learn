@@ -27,7 +27,7 @@ describe('useArtifactRefresh', () => {
     handlers = {};
   });
 
-  it('invalidates files + practice on artifact-updated for the slug', () => {
+  it('invalidates files, project progress, and practice on artifact-updated for the slug', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const spy = vi.spyOn(client, 'invalidateQueries');
     renderHook(() => useArtifactRefresh('myproj'), { wrapper: wrapper(client) });
@@ -36,6 +36,7 @@ describe('useArtifactRefresh', () => {
 
     const keys = spy.mock.calls.map((c) => (c[0] as { queryKey: unknown }).queryKey);
     expect(keys).toContainEqual(['files', 'myproj']);
+    expect(keys).toContainEqual(['projects', 'myproj']);
     expect(keys).toContainEqual(['practice', 'tasks', 'myproj']);
   });
 
@@ -57,6 +58,30 @@ describe('useArtifactRefresh', () => {
 
     expect(spy).toHaveBeenCalledWith({
       queryKey: ['projects', 'physics', 'discipline-overview'],
+    });
+  });
+
+  it('invalidates the discipline learning plan when its root artifact changes', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    renderHook(() => useArtifactRefresh('physics'), { wrapper: wrapper(client) });
+
+    act(() => handlers['artifact-updated']({ projectSlug: 'physics', zone: 'learning-plan' }));
+
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['projects', 'physics', 'discipline-learning-plan'],
+    });
+  });
+
+  it('invalidates discipline topic boundaries when the encyclopedia updates them', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const spy = vi.spyOn(client, 'invalidateQueries');
+    renderHook(() => useArtifactRefresh('physics'), { wrapper: wrapper(client) });
+
+    act(() => handlers['artifact-updated']({ projectSlug: 'physics', zone: 'discipline-topics' }));
+
+    expect(spy).toHaveBeenCalledWith({
+      queryKey: ['projects', 'physics', 'discipline-topics'],
     });
   });
 

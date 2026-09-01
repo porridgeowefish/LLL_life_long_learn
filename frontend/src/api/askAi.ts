@@ -5,7 +5,7 @@ import { ApiError } from './client';
 import { extractSSEData } from '@/lib/parseAskAiStream';
 
 export interface AskFrame {
-  type: 'text' | 'thinking' | 'done' | 'error';
+  type: 'text' | 'done' | 'error';
   content: string;
 }
 
@@ -16,6 +16,7 @@ export interface AskProvider {
   baseURL: string;
   apiKey: string; // masked ("••••") from GET; plaintext only on user input
   model: string;
+  contextWindowTokens?: number;
   reasoning?: boolean;
   thinking?: boolean;
 }
@@ -24,6 +25,7 @@ export interface AskConfig {
   default: string;
   searchEngine: 'google' | 'bing';
   providers: AskProvider[];
+  bindings?: Record<string, { providerId: string; model?: string }>;
 }
 
 export interface StreamBody {
@@ -46,7 +48,7 @@ export async function streamAskAi(
   let res: Response;
   try {
     res = await fetch(
-      `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/confusions/${encodeURIComponent(confusionId)}/ask-stream`,
+      `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/body/annotations/${encodeURIComponent(confusionId)}/ask-stream`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,6 +90,7 @@ export async function streamAskAi(
     for (const payload of payloads) {
       try {
         const raw = JSON.parse(payload) as Partial<AskFrame>;
+        if ((raw as { type?: string }).type === 'thinking') continue;
         // Normalize: the declared type requires `content: string`; a `done`
         // frame may arrive without one. Coerce missing content to ''.
         const frame: AskFrame = { type: raw.type ?? 'text', content: raw.content ?? '' };
@@ -102,7 +105,7 @@ export async function streamAskAi(
 /** Trigger the close->summarize flow (backend returns 202 immediately). */
 export async function summarizeAsk(projectSlug: string, confusionId: string): Promise<void> {
   await fetch(
-    `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/confusions/${encodeURIComponent(confusionId)}/ask/summarize`,
+    `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/body/annotations/${encodeURIComponent(confusionId)}/ask/summarize`,
     { method: 'POST' },
   );
 }

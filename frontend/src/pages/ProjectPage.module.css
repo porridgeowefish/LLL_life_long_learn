@@ -144,6 +144,14 @@
   color: var(--muted);
 }
 
+.migrationWarning {
+  margin-top: 6px;
+  max-width: 760px;
+  color: #8a5a22;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
 .scroll {
   overflow-y: auto;
   min-height: 0;

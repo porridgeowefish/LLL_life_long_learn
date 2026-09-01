@@ -36,6 +36,9 @@ describe('OutputViewer selection toolbar', () => {
     Object.defineProperty(range, 'getBoundingClientRect', {
       value: () => new DOMRect(300, 700, 320, 24),
     });
+    Object.defineProperty(range, 'getClientRects', {
+      value: () => [new DOMRect(300, 700, 320, 24)],
+    });
 
     vi.spyOn(window, 'getSelection').mockReturnValue({
       isCollapsed: false,
@@ -44,10 +47,60 @@ describe('OutputViewer selection toolbar', () => {
       removeAllRanges: vi.fn(),
     } as unknown as Selection);
 
-    fireEvent.pointerUp(window);
+    fireEvent.pointerUp(window, { clientX: 500, clientY: 712 });
 
     const toolbar = await screen.findByRole('toolbar', { name: '选中文本操作' });
     await waitFor(() => expect(Number.parseFloat(toolbar.style.top)).toBeLessThan(700));
+    expect(toolbar.style.width).toBe('max-content');
     expect(toolbar.parentElement).toBe(document.body);
+  });
+
+  it('anchors a cross-line selection to the pointer release line', async () => {
+    render(<OutputViewer slug="demo" zone="Explain" />);
+    const paragraph = screen.getByText('bottom text');
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    Object.defineProperty(range, 'getClientRects', {
+      value: () => [
+        new DOMRect(700, 300, 200, 24),
+        new DOMRect(80, 340, 320, 24),
+      ],
+    });
+
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      toString: () => 'bottom text',
+      getRangeAt: () => range,
+      removeAllRanges: vi.fn(),
+    } as unknown as Selection);
+
+    fireEvent.pointerUp(window, { clientX: 200, clientY: 352 });
+
+    const toolbar = await screen.findByRole('toolbar', { name: '选中文本操作' });
+    await waitFor(() => expect(Number.parseFloat(toolbar.style.top)).toBeGreaterThan(340));
+    expect(Number.parseFloat(toolbar.style.left)).toBeLessThan(300);
+  });
+
+  it('shows the toolbar when a bottom-edge drag leaves the window before pointerup', async () => {
+    render(<OutputViewer slug="demo" zone="Explain" />);
+    const paragraph = screen.getByText('bottom text');
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    Object.defineProperty(range, 'getClientRects', {
+      value: () => [new DOMRect(300, 710, 320, 24)],
+    });
+
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      toString: () => 'bottom text',
+      getRangeAt: () => range,
+      removeAllRanges: vi.fn(),
+    } as unknown as Selection);
+
+    fireEvent.pointerDown(paragraph);
+    fireEvent.mouseOut(window, { relatedTarget: null });
+
+    const toolbar = await screen.findByRole('toolbar', { name: '选中文本操作' });
+    await waitFor(() => expect(Number.parseFloat(toolbar.style.top)).toBeLessThan(710));
   });
 });

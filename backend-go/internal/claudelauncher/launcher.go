@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -46,12 +47,18 @@ type LaunchRequest struct {
 	Events         EventEmitter
 	ClaudeBin      string
 	Runtime        *agentruntime.Runtime
-	// RunProgress, when non-nil and the runtime is Claude Code, triggers
-	// per-run hook injection: the launcher registers the run, writes a
-	// run-scoped claude-settings.json whose PostToolUse/Stop hooks POST to
-	// /api/runs/{runId}/status, and passes it via `claude --settings <file>`.
-	// Nil = no hooks (non-Claude runtimes keep the Phase-A indeterminate bar).
+	// RunProgress registers every interactive runtime for authenticated exit
+	// reporting. Claude additionally receives a run-scoped settings file whose
+	// PostToolUse/Stop hooks provide granular progress.
 	RunProgress *runprogress.Store
+	runToken    string
+	// taskExecutorPath/taskExitPath are optional durable markers used by the
+	// assistant-task dispatcher. They are deliberately part of the same
+	// interactive launcher used by project agents, rather than a second CLI
+	// execution implementation.
+	taskExecutorPath string
+	taskExitPath     string
+	taskEnv          map[string]string
 }
 
 // ResumeRequest carries the minimal context needed to reopen Claude Code's
@@ -65,6 +72,8 @@ type ResumeRequest struct {
 	ClaudeBin   string
 	Runtime     *agentruntime.Runtime
 	RunDirName  string
+	RunProgress *runprogress.Store
+	runToken    string
 }
 
 const defaultPermissionMode = "auto"
@@ -93,9 +102,60 @@ type RunResult struct {
 	PackageJSONPath string
 }
 
+// LaunchTaskTerminal opens the configured Agent CLI in a real, visible
+// terminal for one assistant-task attempt. The durable UTF-8 prompt file is
+// loaded by the visible wrapper and injected as the CLI's initial interactive
+// turn. The CLI works solely in attemptWorkspace and reports through
+// result-manifest.json.
+func LaunchTaskTerminal(rt agentruntime.Runtime, attemptWorkspace, promptPath, wrapperPath string, env map[string]string, onExit func(int)) error {
+	if !rt.Available {
+		return fmt.Errorf("agent runtime %s is unavailable", rt.ID)
+	}
+	attemptDir := filepath.Dir(promptPath)
+	req := LaunchRequest{
+		ProjectSlug:      "助教任务",
+		ZoneName:         workspace.ZoneName("助教工作区"),
+		Agent:            &agentregistry.Agent{ID: "assistant-task", Name: "助教", Icon: "A"},
+		PermissionMode:   "bypassPermissions",
+		Runtime:          &rt,
+		taskExecutorPath: filepath.Join(attemptDir, "executor.json"),
+		taskExitPath:     filepath.Join(attemptDir, "exit.json"),
+		taskEnv:          env,
+	}
+	return launchInteractiveTerminal(interactiveTerminalRequest{
+		WorkDir:      attemptWorkspace,
+		PromptPath:   promptPath,
+		WrapperPath:  wrapperPath,
+		ErrorLogPath: filepath.Join(attemptDir, "terminal.log"),
+		Launch:       req,
+		OnExit:       onExit,
+	})
+}
+
+func buildTaskWrapperPowerShell(rt agentruntime.Runtime, workDir, promptPath string, env map[string]string) string {
+	attemptDir := filepath.Dir(promptPath)
+	return buildTUIWrapperScript(workDir, promptPath, filepath.Join(attemptDir, "terminal.log"), "", LaunchRequest{
+		ProjectSlug: "助教任务", ZoneName: workspace.ZoneName("助教工作区"),
+		Agent:          &agentregistry.Agent{ID: "assistant-task", Name: "助教", Icon: "A"},
+		PermissionMode: "bypassPermissions", Runtime: &rt,
+		taskExecutorPath: filepath.Join(attemptDir, "executor.json"), taskExitPath: filepath.Join(attemptDir, "exit.json"), taskEnv: env,
+	})
+}
+
+func buildTaskWrapperShell(rt agentruntime.Runtime, workDir, promptPath string, env map[string]string) string {
+	attemptDir := filepath.Dir(promptPath)
+	return buildTUIWrapperShellScript(workDir, promptPath, filepath.Join(attemptDir, "terminal.log"), "", LaunchRequest{
+		ProjectSlug: "助教任务", ZoneName: workspace.ZoneName("助教工作区"),
+		Agent:          &agentregistry.Agent{ID: "assistant-task", Name: "助教", Icon: "A"},
+		PermissionMode: "bypassPermissions", Runtime: &rt,
+		taskExecutorPath: filepath.Join(attemptDir, "executor.json"), taskExitPath: filepath.Join(attemptDir, "exit.json"), taskEnv: env,
+	})
+}
+
 // Launch spawns the selected agent runtime in an interactive PowerShell window.
-// The function returns immediately after the wrapper is started — it does
-// NOT wait for Claude to exit. The user closes the window when done.
+// The function returns immediately after the wrapper is started, while a
+// background process-handle waiter reconciles the session when the terminal
+// exits or is closed.
 func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	if req.Agent == nil || req.PromptPackage == nil || req.Session == nil {
 		return nil, errors.New("missing required launch input")
@@ -156,7 +216,8 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	// docs/01-iterations/iteration-06-ask-ai-and-live-progress/DELIVERY_NOTES.md.
 	var settingsFile string
 	if req.RunProgress != nil && runtime.ID == agentruntime.RuntimeClaude {
-		sf, _, herr := writeHookSettings(runDirAbs, req.Session.ID, req.RunProgress)
+		sf, token, herr := writeHookSettings(runDirAbs, req.Session.ID, req.RunProgress)
+		req.runToken = token
 		if herr != nil {
 			// Non-fatal: hooks are best-effort. The run still proceeds; the
 			// frontend falls back to the Phase-A indeterminate bar.
@@ -164,6 +225,8 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 		} else {
 			settingsFile = sf
 		}
+	} else if req.RunProgress != nil {
+		req.runToken = req.RunProgress.Register(req.Session.ID)
 	}
 
 	// Build the PowerShell wrapper script. For runtimes that support an
@@ -208,9 +271,8 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	// the frontend polls via TanStack Query.
 	_ = os.WriteFile(filepath.Join(runDirAbs, "result.md"), []byte(""), 0o644)
 
-	// Fire-and-forget: do NOT wait for the wrapper. Return immediately so
-	// the HTTP handler can respond to the frontend while the learner is
-	// still chatting.
+	// Do not block the request on the wrapper; exit tracking continues in the
+	// background so the HTTP handler can return while the learner is chatting.
 	return &RunResult{
 		ExitCode:        0,
 		StdoutLogPath:   stdoutPath,
@@ -231,6 +293,9 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 		return nil, errors.New("missing project slug")
 	}
 	rt := selectedResumeRuntime(req)
+	if req.Session != nil && req.RunProgress != nil {
+		req.runToken = req.RunProgress.Register(req.Session.ID)
+	}
 	if rt.ID != agentruntime.RuntimeClaude && rt.ID != agentruntime.RuntimeCodex {
 		return nil, fmt.Errorf("runtime %s does not support interactive resume", rt.ID)
 	}
@@ -307,24 +372,40 @@ func LaunchResume(ctx context.Context, req ResumeRequest) (*RunResult, error) {
 }
 
 func writeAndLaunchInteractiveWrapper(runDirAbs, projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) (string, error) {
+	wrapperPath := filepath.Join(runDirAbs, "wrapper.sh")
 	if runtime.GOOS == "windows" {
-		psCmd := buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile, req)
-		wrapperPs1Path := filepath.Join(runDirAbs, "wrapper.ps1")
-		if err := os.WriteFile(wrapperPs1Path, []byte("\ufeff"+psCmd), 0o644); err != nil {
-			return wrapperPs1Path, fmt.Errorf("write wrapper.ps1: %w", err)
-		}
-		return wrapperPs1Path, launchVisibleWindow("powershell.exe",
-			[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
-			projectRoot,
-		)
+		wrapperPath = filepath.Join(runDirAbs, "wrapper.ps1")
 	}
+	err := launchInteractiveTerminal(interactiveTerminalRequest{
+		WorkDir: projectRoot, PromptPath: promptMdPath, WrapperPath: wrapperPath,
+		ErrorLogPath: stderrPath, SettingsFile: settingsFile, Launch: req,
+		OnExit: func(exitCode int) { finishInteractiveSession(req.Store, req.Events, req.Session.ID, exitCode) },
+	})
+	return wrapperPath, err
+}
 
-	shCmd := buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsFile, req)
-	wrapperShPath := filepath.Join(runDirAbs, "wrapper.sh")
-	if err := os.WriteFile(wrapperShPath, []byte(shCmd), 0o755); err != nil {
-		return wrapperShPath, fmt.Errorf("write wrapper.sh: %w", err)
+// interactiveTerminalRequest is the infrastructure contract behind every
+// visible Agent execution. Domain callers go through agentexecution.Service;
+// project agents and assistant tasks converge here.
+type interactiveTerminalRequest struct {
+	WorkDir, PromptPath, WrapperPath, ErrorLogPath, SettingsFile string
+	Launch                                                       LaunchRequest
+	OnExit                                                       func(int)
+}
+
+func launchInteractiveTerminal(req interactiveTerminalRequest) error {
+	if runtime.GOOS == "windows" {
+		script := buildTUIWrapperScript(req.WorkDir, req.PromptPath, req.ErrorLogPath, req.SettingsFile, req.Launch)
+		if err := workspace.AtomicWriteFile(req.WrapperPath, []byte("\ufeff"+script), 0o644); err != nil {
+			return fmt.Errorf("write interactive wrapper: %w", err)
+		}
+		return launchVisibleWindow("powershell.exe", []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", req.WrapperPath}, req.WorkDir, req.OnExit)
 	}
-	return wrapperShPath, launchVisibleWindow("/bin/sh", []string{wrapperShPath}, projectRoot)
+	script := buildTUIWrapperShellScript(req.WorkDir, req.PromptPath, req.ErrorLogPath, req.SettingsFile, req.Launch)
+	if err := workspace.AtomicWriteFile(req.WrapperPath, []byte(script), 0o755); err != nil {
+		return fmt.Errorf("write interactive wrapper: %w", err)
+	}
+	return launchVisibleWindow("/bin/sh", []string{req.WrapperPath}, req.WorkDir, req.OnExit)
 }
 
 func writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stderrPath string, req ResumeRequest) (string, error) {
@@ -337,6 +418,11 @@ func writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stderrPath string, req 
 		return wrapperPs1Path, launchVisibleWindow("powershell.exe",
 			[]string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", wrapperPs1Path},
 			projectRoot,
+			func(exitCode int) {
+				if req.Session != nil {
+					finishInteractiveSession(req.Store, req.Events, req.Session.ID, exitCode)
+				}
+			},
 		)
 	}
 
@@ -345,16 +431,50 @@ func writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stderrPath string, req 
 	if err := os.WriteFile(wrapperShPath, []byte(shCmd), 0o755); err != nil {
 		return wrapperShPath, fmt.Errorf("write wrapper.sh: %w", err)
 	}
-	return wrapperShPath, launchVisibleWindow("/bin/sh", []string{wrapperShPath}, projectRoot)
+	return wrapperShPath, launchVisibleWindow("/bin/sh", []string{wrapperShPath}, projectRoot,
+		func(exitCode int) {
+			if req.Session != nil {
+				finishInteractiveSession(req.Store, req.Events, req.Session.ID, exitCode)
+			}
+		})
+}
+
+func finishInteractiveSession(store *sessionstore.Store, events EventEmitter, sessionID string, exitCode int) {
+	if store == nil || sessionID == "" {
+		return
+	}
+	state := sessionstore.StateCompleted
+	eventName := "session-completed"
+	if exitCode != 0 {
+		state = sessionstore.StateFailed
+		eventName = "session-failed"
+	}
+	now := time.Now().UTC()
+	changed := false
+	store.Update(sessionID, func(sess *sessionstore.Session) {
+		switch sess.State {
+		case sessionstore.StatePreparing, sessionstore.StateLaunching, sessionstore.StateRunning, sessionstore.StateAwaitingFollowup:
+			sess.State = state
+			sess.FinishedAt = &now
+			sess.ExitCode = &exitCode
+			changed = true
+		}
+	})
+	if changed && events != nil {
+		events.Emit(eventName, map[string]any{"runId": sessionID, "exitCode": exitCode})
+	}
 }
 
 func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) string {
 	rt := selectedRuntime(req)
 	execLine := interactiveShellExecLine(rt, settingsFile)
-	return strings.Join([]string{
+	lines := []string{
 		`#!/bin/sh`,
 		`set +e`,
 		fmt.Sprintf(`cd %s || exit 1`, shQuote(projectRoot)),
+	}
+	lines = append(lines, taskShellPrelude(req)...)
+	lines = append(lines,
 		fmt.Sprintf(`log_file=%s`, shQuote(stderrPath)),
 		`log_err() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$1" >> "$log_file"; }`,
 		`log_err "spawn env PATH=$PATH"`,
@@ -374,12 +494,15 @@ func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsF
 		`printf 'Starting %s. The initial prompt is loaded from prompt.md.\n\n' "$agent_bin"`,
 		execLine,
 		`code=$?`,
+		taskShellFinished(req),
+		runStatusShellLine(sessionID(req.Session), req.runToken),
 		`printf '\n=============================================\n'`,
 		`printf 'Agent CLI exited with code %s. Press Enter to close.\n' "$code"`,
 		`printf '=============================================\n'`,
 		`read -r _`,
 		`exit "$code"`,
-	}, "\n")
+	)
+	return strings.Join(lines, "\n")
 }
 
 func buildResumeWrapperShellScript(projectRoot, stderrPath string, req ResumeRequest) string {
@@ -400,6 +523,7 @@ func buildResumeWrapperShellScript(projectRoot, stderrPath string, req ResumeReq
 		fmt.Sprintf(`printf 'Resuming with %s...\n\n'`, command),
 		execLine,
 		`code=$?`,
+		runStatusShellLine(sessionID(req.Session), req.runToken),
 		`printf '\nAgent CLI exited with code %s. Press Enter to close.\n' "$code"`,
 		`read -r _`,
 		`exit "$code"`,
@@ -430,9 +554,12 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile s
 	if runtime.PromptDelivery == agentruntime.PromptClipboard {
 		promptNotice = "已把初始 prompt 放入剪贴板；进入 CLI 后按 Ctrl+V 再回车。"
 	}
-	return strings.Join([]string{
+	lines := []string{
 		`$ErrorActionPreference='Continue'`,
 		fmt.Sprintf(`Set-Location -LiteralPath '%s'`, projectRoot),
+	}
+	lines = append(lines, taskPowerShellPrelude(req)...)
+	lines = append(lines,
 		`$env:FORCE_COLOR='1'`,
 		// Diagnostic helper: append a timestamped line to the log so a
 		// failure is visible even if the window closes too fast. The caller
@@ -485,14 +612,67 @@ func buildTUIWrapperScript(projectRoot, promptMdPath, stderrPath, settingsFile s
 		// Launch the selected runtime. Temporarily raise ErrorActionPreference
 		// to 'Stop' so a missing binary / launch failure becomes a CAUGHT,
 		// logged terminating error instead of the silent skip we had before.
-		`$ErrorActionPreference='Stop'; $code = 0; try { ` + execLine + `; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "runtime exec failed: $_"; Write-Host "⚠️  Agent CLI 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		`$ErrorActionPreference='Stop'; $code = 0; try { `+execLine+`; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "runtime exec failed: $_"; Write-Host "⚠️  Agent CLI 启动失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		taskPowerShellFinished(req),
+		runStatusPowerShellLine(sessionID(req.Session), req.runToken),
 		`Write-Host ''`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`Write-Host " Agent CLI 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')`,
 		`exit $code`,
-	}, "; ")
+	)
+	return strings.Join(lines, "; ")
+}
+
+func taskPowerShellPrelude(req LaunchRequest) []string {
+	var lines []string
+	keys := make([]string, 0, len(req.taskEnv))
+	for key := range req.taskEnv {
+		if strings.HasPrefix(key, "LLL_") {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		lines = append(lines, fmt.Sprintf(`$env:%s = '%s'`, key, psSingleQuote(req.taskEnv[key])))
+	}
+	if req.taskExecutorPath != "" {
+		lines = append(lines, fmt.Sprintf(`$started = @{schemaVersion=1; pid=$PID; startedAt=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json -Compress; [System.IO.File]::WriteAllText('%s', $started, [System.Text.UTF8Encoding]::new($false))`, psSingleQuote(req.taskExecutorPath)))
+	}
+	return lines
+}
+
+func taskPowerShellFinished(req LaunchRequest) string {
+	if req.taskExitPath == "" {
+		return ""
+	}
+	return fmt.Sprintf(`$finished = @{schemaVersion=1; pid=$PID; exitCode=$code; finishedAt=[DateTime]::UtcNow.ToString('o')} | ConvertTo-Json -Compress; [System.IO.File]::WriteAllText('%s', $finished, [System.Text.UTF8Encoding]::new($false))`, psSingleQuote(req.taskExitPath))
+}
+
+func taskShellPrelude(req LaunchRequest) []string {
+	var lines []string
+	keys := make([]string, 0, len(req.taskEnv))
+	for key := range req.taskEnv {
+		if strings.HasPrefix(key, "LLL_") {
+			keys = append(keys, key)
+		}
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		lines = append(lines, "export "+key+"="+shQuote(req.taskEnv[key]))
+	}
+	if req.taskExecutorPath != "" {
+		lines = append(lines, `printf '{"schemaVersion":1,"pid":%s,"startedAt":"%s"}\n' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > `+shQuote(req.taskExecutorPath))
+	}
+	return lines
+}
+
+func taskShellFinished(req LaunchRequest) string {
+	if req.taskExitPath == "" {
+		return ":"
+	}
+	return `printf '{"schemaVersion":1,"pid":%s,"exitCode":%s,"finishedAt":"%s"}\n' "$$" "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ` + shQuote(req.taskExitPath)
 }
 
 func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest) string {
@@ -522,6 +702,7 @@ func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest)
 		fmt.Sprintf(`Write-Host '正在执行 %s，恢复最近一次会话...' -ForegroundColor Green`, command),
 		`Write-Host ''`,
 		`$ErrorActionPreference='Stop'; $code = 0; try { `+execLine+`; if ($LASTEXITCODE) { $code = $LASTEXITCODE } } catch { Log-Err "resume failed: $_"; Write-Host "⚠️  Agent 继续会话失败：$_" -ForegroundColor Red; $code = 1 }; $ErrorActionPreference='Continue'`,
+		runStatusPowerShellLine(sessionID(req.Session), req.runToken),
 		`Write-Host ''`,
 		`Write-Host "=============================================" -ForegroundColor Cyan`,
 		`Write-Host " Agent CLI 已退出 (退出码 $code). 按任意键关闭窗口" -ForegroundColor Cyan`,
@@ -530,6 +711,29 @@ func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest)
 		`exit $code`,
 	)
 	return strings.Join(lines, "; ")
+}
+
+func sessionID(sess *sessionstore.Session) string {
+	if sess == nil {
+		return ""
+	}
+	return sess.ID
+}
+
+func runStatusPowerShellLine(runID, token string) string {
+	if runID == "" || token == "" {
+		return ""
+	}
+	url := "http://127.0.0.1:8787/api/runs/" + runID + "/status"
+	return fmt.Sprintf(`$statusBody = if ($code -eq 0) { '{"done":true}' } else { '{"failed":true}' }; try { Invoke-RestMethod -Method Post -Uri '%s' -Headers @{'X-Run-Token'='%s'} -ContentType 'application/json' -Body $statusBody | Out-Null } catch { Log-Err "report runtime exit failed: $_" }`, url, token)
+}
+
+func runStatusShellLine(runID, token string) string {
+	if runID == "" || token == "" {
+		return ":"
+	}
+	url := "http://127.0.0.1:8787/api/runs/" + runID + "/status"
+	return fmt.Sprintf(`if [ "$code" -eq 0 ]; then status_body='{"done":true}'; else status_body='{"failed":true}'; fi; curl -s -o /dev/null -X POST %s -H %s -H 'Content-Type: application/json' -d "$status_body" || log_err "report runtime exit failed"`, shQuote(url), shQuote("X-Run-Token: "+token))
 }
 
 func selectedClaudeBin(bin string) string {

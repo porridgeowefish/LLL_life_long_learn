@@ -12,6 +12,9 @@ frontend Sidebar: explicit overview row, in-app confirm/cancel, move-menu label
 frontend LearningRhythm: joined count/day presentation
 frontend project advisor: missing profile fields remain absent
 frontend floating position: bottom-edge selection flips upward and narrow viewports clamp horizontally
+frontend selection geometry: wrapped selections anchor to the pointer-release line in either drag direction
+frontend selection toolbar: right-edge placement preserves one-row intrinsic width instead of shrink-to-fit collapse
+frontend selection toolbar: visual-viewport offsets constrain every edge; window-exit selection still opens without pointerup
 backend file write: distinct flower bytes award once each; identical bytes deduplicate
 frontend full test and production build
 backend full Go test

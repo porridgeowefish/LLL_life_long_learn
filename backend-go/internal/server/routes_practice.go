@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
+	"github.com/xmz14/lll/backend-go/internal/agentexecution"
+	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
@@ -389,7 +390,11 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 	}
 	go func() {
 		defer practiceEvaluationJobs.Delete(jobKey)
-		_ = claudelauncher.LaunchHeadless(context.Background(), slug, agent.ID, s.ClaudeBin, "", pkg, &runtime)
+		execution := s.agentExecution
+		if execution == nil {
+			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+		}
+		_ = execution.StartHeadless(context.Background(), agentexecution.HeadlessRequest{ProjectSlug: slug, AgentID: agent.ID, PromptPackage: pkg})
 	}()
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "queued", "attempt": attemptID})
 }

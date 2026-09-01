@@ -105,10 +105,13 @@ func TestEncyclopediaAgentIsRegisteredForDisciplineMaps(t *testing.T) {
 	}
 	for _, required := range []string{
 		"百科式而非教程式",
-		"## 主要研究领域",
-		"### <可独立深入学习的领域一>",
+		"先规划知识架构",
+		"## 主要研究领域与知识架构",
+		"### <大章节一>",
+		"#### <可独立深入学习的细分主题一>",
+		"百科 Agent 不生成学习顺序或任务清单",
 		"标题就是学科目录的事实源",
-		"每个三级标题旁增加",
+		"每个四级标题旁增加",
 	} {
 		if !strings.Contains(agent.CharterText, required) {
 			t.Errorf("encyclopedia charter missing %q", required)

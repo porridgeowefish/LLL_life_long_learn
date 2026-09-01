@@ -10,9 +10,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/folderstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -83,13 +85,20 @@ var cache = projectindex.New()
 // Why/Current/Target/Standard seed only system-learning project.md files.
 // Discipline-map creation ignores them at the workspace boundary.
 type createProjectRequest struct {
-	Title       string                `json:"title"`
-	Slug        string                `json:"slug,omitempty"`
-	ProjectType workspace.ProjectType `json:"projectType,omitempty"`
-	Why         string                `json:"why,omitempty"`
-	Current     string                `json:"current,omitempty"`
-	Target      string                `json:"target,omitempty"`
-	Standard    string                `json:"standard,omitempty"`
+	Title       string                      `json:"title"`
+	Slug        string                      `json:"slug,omitempty"`
+	ProjectType workspace.ProjectType       `json:"projectType,omitempty"`
+	Why         string                      `json:"why,omitempty"`
+	Current     string                      `json:"current,omitempty"`
+	Target      string                      `json:"target,omitempty"`
+	Standard    string                      `json:"standard,omitempty"`
+	ScopeSource *learningScopeSourceRequest `json:"scopeSource,omitempty"`
+}
+
+type learningScopeSourceRequest struct {
+	Type    string `json:"type"`
+	MapSlug string `json:"mapSlug"`
+	TopicID string `json:"topicId"`
 }
 
 // handleListProjects returns the indexed project tree.
@@ -126,12 +135,26 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_project_type")
 		return
 	}
+	var scope *learningscope.Scope
+	if req.ScopeSource != nil {
+		if projectType != workspace.ProjectTypeSystemLearning {
+			httpx.Error(w, http.StatusBadRequest, "scope_source_requires_system_learning")
+			return
+		}
+		resolved, err := resolveMapLearningScope(*req.ScopeSource)
+		if err != nil {
+			httpx.Error(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		scope = &resolved
+	}
 	if err := workspace.CreateProjectSkeletonWithInput(slug, title, "", workspace.ProjectInput{
-		ProjectType: projectType,
-		Why:         req.Why,
-		Current:     req.Current,
-		Target:      req.Target,
-		Standard:    req.Standard,
+		ProjectType:   projectType,
+		Why:           req.Why,
+		Current:       req.Current,
+		Target:        req.Target,
+		Standard:      req.Standard,
+		LearningScope: scope,
 	}); err != nil {
 		if workspace.IsSlugConflict(err) {
 			httpx.Error(w, http.StatusConflict, "project already exists: "+slug)
@@ -143,6 +166,33 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	cache.Invalidate(slug)
 	state, _ := workspace.ReadProjectState(slug)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"project": state})
+}
+
+func resolveMapLearningScope(source learningScopeSourceRequest) (learningscope.Scope, error) {
+	source.Type = strings.TrimSpace(source.Type)
+	source.MapSlug = strings.TrimSpace(source.MapSlug)
+	source.TopicID = strings.TrimSpace(source.TopicID)
+	if source.Type != learningscope.SourceDisciplineMap ||
+		!workspace.ValidateSlug(source.MapSlug) || source.TopicID == "" {
+		return learningscope.Scope{}, errors.New("invalid_scope_source")
+	}
+	state, err := workspace.ReadProjectState(source.MapSlug)
+	if err != nil || state.ProjectType != workspace.ProjectTypeDisciplineMap {
+		return learningscope.Scope{}, errors.New("invalid_scope_source")
+	}
+	root, err := workspace.ProjectRootForSlug(source.MapSlug)
+	if err != nil {
+		return learningscope.Scope{}, errors.New("invalid_scope_source")
+	}
+	catalog, err := readDisciplineTopics(root)
+	if err != nil {
+		return learningscope.Scope{}, errors.New("discipline_topics_unavailable")
+	}
+	topic, ok := learningscope.FindTopic(catalog, source.TopicID)
+	if !ok {
+		return learningscope.Scope{}, errors.New("discipline_topic_not_found")
+	}
+	return learningscope.SnapshotFromTopic(source.MapSlug, topic, time.Now()), nil
 }
 
 // handleGetProject returns one project's full state.

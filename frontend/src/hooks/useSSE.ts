@@ -63,6 +63,9 @@ function ensureConnection() {
     SSE_EVENTS.runProgress,
     SSE_EVENTS.sessionCompleted,
     SSE_EVENTS.sessionFailed,
+    SSE_EVENTS.assistantTaskUpdated,
+    SSE_EVENTS.learningAssetUpdated,
+    SSE_EVENTS.sourceUpdated,
   ];
   for (const name of fanoutNames) {
     es.addEventListener(name, (e) => {

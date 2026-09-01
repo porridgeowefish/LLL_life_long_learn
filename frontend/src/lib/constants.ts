@@ -19,9 +19,13 @@ export const SSE_EVENTS = {
   terminalOutput: 'terminal-output',
   artifactUpdated: 'artifact-updated',
   confusionUpdated: 'confusion-updated',
+  annotationUpdated: 'annotation-updated',
   runProgress: 'run-progress',
   sessionCompleted: 'session-completed',
   sessionFailed: 'session-failed',
+  assistantTaskUpdated: 'assistant-task-updated',
+  learningAssetUpdated: 'learning-asset-updated',
+  sourceUpdated: 'source-updated',
 } as const;
 
 export type SSEEventName = (typeof SSE_EVENTS)[keyof typeof SSE_EVENTS];

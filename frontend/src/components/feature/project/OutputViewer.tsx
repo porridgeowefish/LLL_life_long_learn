@@ -3,13 +3,18 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { createPortal } from 'react-dom';
 
 import { useMarkdown } from '@/hooks/useMarkdown';
+import { mountMermaidBlocks } from '@/lib/mermaidRenderer';
 import { qk } from '@/api/queryKeys';
 import { http } from '@/api/client';
 import { useCreateConfusion } from '@/api/confusions';
 import { ZONE_FILENAME, type ZoneName } from '@/types/domain';
 import { EmptyState } from '@/components/primitive/EmptyState';
 import { Tag } from '@/components/primitive/Tag';
-import { selectionToolbarPosition } from '@/lib/floatingPosition';
+import {
+  selectionToolbarPosition,
+  visibleViewportBounds,
+} from '@/lib/floatingPosition';
+import { selectionEndpointRect } from '@/lib/selectionGeometry';
 
 import s from './OutputViewer.module.css';
 
@@ -45,6 +50,7 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
   // Selection toolbar state — only for Explain zone.
   const [toolbar, setToolbar] = useState<SelectionToolbar | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const selectingRef = useRef(false);
   const createConfusion = useCreateConfusion();
 
   useLayoutEffect(() => {
@@ -53,7 +59,7 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
     const next = selectionToolbarPosition(
       toolbar.anchor,
       { width: measured.width, height: measured.height },
-      viewportSize(),
+      visibleViewportBounds(),
     );
     if (Math.abs(next.top - toolbar.top) > 1 || Math.abs(next.left - toolbar.left) > 1) {
       setToolbar({ ...toolbar, ...next });
@@ -63,30 +69,11 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
   // After HTML is set, replace each mermaid placeholder with a rendered SVG.
   useEffect(() => {
     if (!hostRef.current || mermaid.length === 0) return;
-    let cancelled = false;
-    void import('mermaid').then(async (mod) => {
-      if (cancelled) return;
-      const mermaidApi = mod.default;
-      for (const block of mermaid) {
-        const placeholder = hostRef.current?.querySelector(
-          `[data-mermaid-id="${block.id}"]`,
-        );
-        if (!placeholder) continue;
-        try {
-          const result = await mermaidApi.render(`${block.id}-svg`, block.code);
-          (placeholder as HTMLElement).innerHTML = result.svg;
-        } catch (err) {
-          (placeholder as HTMLElement).textContent = `Mermaid render error: ${(err as Error).message}`;
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    return mountMermaidBlocks(hostRef.current, mermaid, 'output-viewer');
   }, [html, mermaid]);
 
   // Listen for text selection in Explain zone → show floating toolbar.
-  const handleMouseUp = useCallback(() => {
+  const updateSelection = useCallback((point?: { x: number; y: number }) => {
     if (zone !== 'Explain') return;
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
@@ -98,7 +85,11 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
       setToolbar(null);
       return;
     }
-    const rect = range.getBoundingClientRect();
+    const rect = selectionEndpointRect(range, point);
+    if (!rect) {
+      setToolbar(null);
+      return;
+    }
     const anchor = {
       top: rect.top,
       bottom: rect.bottom,
@@ -107,7 +98,7 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
     const position = selectionToolbarPosition(
       anchor,
       { width: 240, height: 40 },
-      viewportSize(),
+      visibleViewportBounds(),
     );
     setToolbar({
       text: sel.toString().trim(),
@@ -117,9 +108,73 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
   }, [zone]);
 
   useEffect(() => {
-    window.addEventListener('pointerup', handleMouseUp);
-    return () => window.removeEventListener('pointerup', handleMouseUp);
-  }, [handleMouseUp]);
+    let selectionTimer = 0;
+    const finishAtPoint = (event: MouseEvent | PointerEvent) => {
+      selectingRef.current = false;
+      window.clearTimeout(selectionTimer);
+      updateSelection({ x: event.clientX, y: event.clientY });
+    };
+    const finishWithoutPoint = () => {
+      selectingRef.current = false;
+      window.clearTimeout(selectionTimer);
+      updateSelection();
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!markdownRef.current?.contains(event.target as Node)) return;
+      selectingRef.current = true;
+      setToolbar(null);
+    };
+    const handleWindowExit = (event: MouseEvent) => {
+      if (selectingRef.current && event.relatedTarget === null) finishWithoutPoint();
+    };
+    const handleSelectionChange = () => {
+      if (selectingRef.current) return;
+      window.clearTimeout(selectionTimer);
+      selectionTimer = window.setTimeout(finishWithoutPoint, 120);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', finishAtPoint);
+    window.addEventListener('mouseup', finishAtPoint);
+    window.addEventListener('pointercancel', finishWithoutPoint);
+    window.addEventListener('mouseout', handleWindowExit);
+    window.addEventListener('blur', finishWithoutPoint);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      window.clearTimeout(selectionTimer);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', finishAtPoint);
+      window.removeEventListener('mouseup', finishAtPoint);
+      window.removeEventListener('pointercancel', finishWithoutPoint);
+      window.removeEventListener('mouseout', handleWindowExit);
+      window.removeEventListener('blur', finishWithoutPoint);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [updateSelection]);
+
+  useEffect(() => {
+    const reposition = () => {
+      setToolbar((current) => {
+        if (!current || !toolbarRef.current) return current;
+        const measured = toolbarRef.current.getBoundingClientRect();
+        const next = selectionToolbarPosition(
+          current.anchor,
+          { width: measured.width, height: measured.height },
+          visibleViewportBounds(),
+        );
+        return { ...current, ...next };
+      });
+    };
+    const visual = window.visualViewport;
+    window.addEventListener('resize', reposition);
+    visual?.addEventListener('resize', reposition);
+    visual?.addEventListener('scroll', reposition);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      visual?.removeEventListener('resize', reposition);
+      visual?.removeEventListener('scroll', reposition);
+    };
+  }, []);
 
   const handleMarkConfusion = () => {
     if (!toolbar) return;
@@ -166,7 +221,12 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
         <div
           ref={toolbarRef}
           className={s.selectionBar}
-          style={{ top: toolbar.top, left: toolbar.left }}
+          style={{
+            top: toolbar.top,
+            left: toolbar.left,
+            width: 'max-content',
+            maxWidth: Math.max(0, visibleViewportBounds().w - 16),
+          }}
           role="toolbar"
           aria-label="选中文本操作"
         >
@@ -198,11 +258,4 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
       ), document.body)}
     </article>
   );
-}
-
-function viewportSize() {
-  return {
-    w: window.innerWidth || document.documentElement.clientWidth || 0,
-    h: window.innerHeight || document.documentElement.clientHeight || 0,
-  };
 }

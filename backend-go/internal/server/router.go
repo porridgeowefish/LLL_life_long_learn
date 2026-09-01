@@ -12,12 +12,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/agentexecution"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
+	"github.com/xmz14/lll/backend-go/internal/assistanttask"
+	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
+	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
+	"github.com/xmz14/lll/backend-go/internal/iteration13migration"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 )
 
 // Server bundles runtime dependencies shared across handlers.
@@ -31,7 +37,21 @@ type Server struct {
 	runProgress     *runprogress.Store
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
+	teacher         *teacherservice.Service
+	agentExecution  agentExecutionService
+	dispatcher      *assistanttask.Dispatcher
+	activeTeacher   map[string]*activeTeacherRun
+	activeByProject map[string]*activeTeacherRun
+	migrationReady  bool
+	migrationFailed []string
 	mu              sync.RWMutex
+}
+
+type agentExecutionService interface {
+	StartProject(context.Context, agentexecution.ProjectRequest) (*claudelauncher.RunResult, error)
+	StartTask(context.Context, agentexecution.TaskRequest) error
+	Resume(context.Context, agentexecution.ResumeRequest) (*claudelauncher.RunResult, error)
+	StartHeadless(context.Context, agentexecution.HeadlessRequest) error
 }
 
 // broadcaster is the package-global SSE event bus.
@@ -54,6 +74,8 @@ func New() *Server {
 	if err := agents.Load(); err != nil {
 		println("agent-registry: load warning:", err.Error())
 	}
+	migration := iteration13migration.RunAll()
+	conversationstore.ReconcileAllInterruptedResponses()
 
 	// Load image configuration
 	imgCfg, err := imageconfig.Load()
@@ -80,7 +102,8 @@ func New() *Server {
 		println("artifactwatch: start warning:", werr.Error())
 	}
 
-	return &Server{
+	teacher := teacherservice.New(nil)
+	server := &Server{
 		ClaudeBin:       bin,
 		ClaudeAvailable: available,
 		Runtime:         selectedRuntime,
@@ -89,7 +112,25 @@ func New() *Server {
 		ImageAvailable:  imgAvailable,
 		runProgress:     runprogress.New(),
 		watcher:         watcher,
+		teacher:         teacher,
+		activeTeacher:   map[string]*activeTeacherRun{},
+		activeByProject: map[string]*activeTeacherRun{},
+		migrationReady:  migration.Ready,
+		migrationFailed: migration.FailedProjects,
 	}
+	execution := agentexecution.New(func() agentruntime.Runtime {
+		runtime, _ := server.runtimeSnapshot()
+		return runtime
+	})
+	server.agentExecution = execution
+	dispatcher := assistanttask.NewDispatcher(execution, broadcaster)
+	server.dispatcher = dispatcher
+	teacher.OnTask = func(projectSlug string, task assistanttask.Task) {
+		broadcaster.Emit("assistant-task-updated", map[string]any{"projectSlug": projectSlug, "task": task})
+		dispatcher.Notify()
+	}
+	dispatcher.Start()
+	return server
 }
 
 // Handler returns the root HTTP handler with all routes mounted.
@@ -104,6 +145,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings/ask-ai", s.handleGetAskAiSettings)
 	mux.HandleFunc("PUT /api/settings/ask-ai", s.handlePutAskAiSettings)
 	mux.HandleFunc("POST /api/settings/ask-ai/probe", s.handleProbeAskAi)
+	mux.HandleFunc("GET /api/settings/ai-services", s.handleGetAIServices)
+	mux.HandleFunc("PUT /api/settings/ai-services", s.handlePutAIServices)
+	mux.HandleFunc("POST /api/settings/ai-services/probe", s.handleProbeAIServices)
 	mux.HandleFunc("GET /api/settings/appearance", s.handleGetAppearance)
 	mux.HandleFunc("PUT /api/settings/appearance", s.handlePutAppearance)
 	mux.HandleFunc("GET /api/activity", s.handleGetActivity)
@@ -117,8 +161,31 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/tree", s.handleProjectTree)
 	mux.HandleFunc("GET /api/projects/{id}/zones/{zone}", s.handleGetZone)
 	mux.HandleFunc("GET /api/projects/{id}/discipline-overview", s.handleGetDisciplineOverview)
+	mux.HandleFunc("GET /api/projects/{id}/discipline-topics", s.handleGetDisciplineTopics)
+	mux.HandleFunc("GET /api/projects/{id}/learning-plan", s.handleGetDisciplineLearningPlan)
+	mux.HandleFunc("PUT /api/projects/{id}/learning-plan", s.handlePutDisciplineLearningPlan)
 	mux.HandleFunc("POST /api/projects/{id}/discipline-overview/generate", s.handleGenerateDisciplineOverview)
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
+	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/turns", s.handleTeacherTurn)
+	mux.HandleFunc("GET /api/projects/{id}/conversation/responses/active", s.handleActiveTeacherResponse)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/responses/{responseId}/stop", s.handleStopTeacherResponse)
+	mux.HandleFunc("GET /api/projects/{id}/assistant-tasks", s.handleListAssistantTasks)
+	mux.HandleFunc("GET /api/projects/{id}/assistant-tasks/{taskId}", s.handleGetAssistantTask)
+	mux.HandleFunc("GET /api/projects/{id}/assets", s.handleListLearningAssets)
+	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}", s.handleGetLearningAsset)
+	mux.HandleFunc("PUT /api/projects/{id}/assets/{assetKey}", s.handlePutLearningAsset)
+	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}/versions", s.handleListLearningAssetVersions)
+	mux.HandleFunc("GET /api/projects/{id}/sources", s.handleListSources)
+	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
+	mux.HandleFunc("DELETE /api/projects/{id}/sources/{sourceId}", s.handleDeleteSource)
+	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/permanent-delete", s.handlePermanentDeleteSource)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}", s.handleReadSourceFile)
+	mux.HandleFunc("GET /api/projects/{id}/generated", s.handleListGeneratedArtifacts)
+	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}", s.handleGetGeneratedArtifact)
+	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/open", s.handleOpenGeneratedArtifact)
+	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/files/{path...}", s.handleReadGeneratedArtifactFile)
 
 	// Agents
 	mux.HandleFunc("GET /api/agents", s.handleListAgents)
@@ -143,6 +210,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/projects/{id}/confusions/{confusionId}", s.handleDeleteConfusion)
 	mux.HandleFunc("POST /api/projects/{id}/confusions/{confusionId}/ask-stream", s.handleAskAiStream)
 	mux.HandleFunc("POST /api/projects/{id}/confusions/{confusionId}/ask/summarize", s.handleAskAiSummarize)
+	mux.HandleFunc("GET /api/projects/{id}/assets/body/annotations", s.handleListAnnotations)
+	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations", s.handleCreateAnnotation)
+	mux.HandleFunc("PATCH /api/projects/{id}/assets/body/annotations/{annotationId}", s.handleUpdateAnnotation)
+	mux.HandleFunc("DELETE /api/projects/{id}/assets/body/annotations/{annotationId}", s.handleDeleteAnnotation)
+	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask-stream", s.handleAnnotationAskAiStream)
+	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask/summarize", s.handleAnnotationAskAiSummarize)
 
 	// Project folders (workspace-global virtual grouping of projects)
 	mux.HandleFunc("GET /api/folders", s.handleGetFolders)
@@ -197,6 +270,9 @@ func (s *Server) SetShutdownFunc(fn func()) {
 
 // Close releases background resources (the artifact file watcher).
 func (s *Server) Close() {
+	if s.dispatcher != nil {
+		s.dispatcher.Close()
+	}
 	if s.watcher != nil {
 		_ = s.watcher.Close()
 	}
@@ -278,6 +354,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 			"selected":  rt.ID,
 			"runtime":   rt,
 			"providers": options,
+		},
+		"learningWorkspace": map[string]any{
+			"mode":           map[bool]string{true: "teacher", false: "legacy"}[s.migrationReady],
+			"failedProjects": append([]string{}, s.migrationFailed...),
 		},
 		"stats": map[string]any{
 			"projects":       projCount,

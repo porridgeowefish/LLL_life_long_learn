@@ -190,7 +190,8 @@ Header: X-Run-Token: <per-run random token>
   "activity": "wrote pages/02-overview.md",  // optional, latest activity
   "pagesDone": 2,                   // optional
   "pagesPlanned": 5,                // optional
-  "done": false                     // optional; true marks the run completed
+  "done": false,                    // optional; true marks the run completed
+  "failed": false                   // optional; true marks a non-zero runtime exit
 }
 ```
 
@@ -201,6 +202,13 @@ rejected, so only the launched run can report.
 `done:true` transitions the session to `completed`, emits `session-completed`,
 and hides the progress bar (this fixes the "sessions never complete" bug for
 Claude runs).
+
+Every interactive runtime wrapper reports `done:true` or `failed:true` when the
+CLI process exits. Completion is therefore not limited to Claude hooks; Codex
+and the other supported interactive runtimes clear the same session state.
+The launcher also retains the terminal process handle and reconciles the
+session when that process exits, covering a window closed directly before the
+wrapper can send its HTTP report.
 
 ## SSE Events
 

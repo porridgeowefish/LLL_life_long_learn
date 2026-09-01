@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: approved long-lived project types, flat storage shapes, map-backed sidebar folders, and navigation semantics.
 
 ## Core Principle
@@ -40,6 +40,8 @@ projects/<map-slug>/
   project.md
   state.json
   overview.md
+  discipline-topics.json
+  learning-plan.json
   memory/
   runs/
   assets/
@@ -59,6 +61,13 @@ methods and evidence forms
 representative applications
 possible learning routes
 ```
+
+The encyclopedia Agent first plans the complete architecture, then writes H3
+major chapters and H4 learnable topics to `overview.md` plus their machine-readable
+boundaries to `discipline-topics.json`. It does not choose a
+learning order. The learner adds H4 topics to the ordered `learning-plan.json`
+task list, changes task status, and views that list in a second tab on the same
+discipline-map page.
 
 Areas listed in the overview do not create folders, pages, jobs, or sidebar
 nodes. There is no branch-overview object in this model.
@@ -80,6 +89,7 @@ Target layout:
 <learning-slug>/
   project.md
   state.json
+  learning-scope.json
   memory/
   intro/
   explain/
@@ -98,6 +108,11 @@ current iteration contracts. The five-zone rule applies only to
 Its `project.md` retains the focused-learning contract: motivation, current
 ability, target ability, completion standard, active phase, and learner notes.
 
+Its `learning-scope.json` is the objective boundary consumed by every learning
+Agent. A map-origin project receives a ready creation-time snapshot. A
+standalone project starts draft and Intro finalizes it after calibration.
+Map regeneration never mutates an existing project scope.
+
 When Intro detects a prerequisite gap, `intro/assessment.json` includes a
 concise summary of what the knowledge is and what understanding is missing. The
 UI displays that summary directly and exposes no supplement action. A gap does
@@ -110,11 +125,13 @@ The learner may choose a topic named in the map and request system learning.
 The system must:
 
 ```text
-place the action beside the corresponding concept or branch heading in the body
+place the action beside the corresponding H4 learnable-topic heading in the body
 prefill the project title and learning context
+send the map slug and canonical topic ID
 show a confirmation form
 allow the learner to edit the learning contract
 write a project only after confirmation
+copy the canonical topic boundary into learning-scope.json
 ```
 
 The page may render a Word-style table of contents for navigation, but it must
@@ -185,14 +202,45 @@ Raw runtime output never becomes the curated learning layer automatically.
 Memory may guide recommendations and explanations but must not override explicit
 learner choices.
 
+## Iteration 13 Target Learning Unit
+
+ADR-0012 preserves the physically flat `system-learning` project and changes
+its active internal experience after migration. One project owns one teacher
+conversation and becomes one learning unit. Its active top-level destinations
+are `教师 / 资产 / 资料`; the five legacy zone directories remain only for
+backup, compatibility reads, and rollback.
+
+The canonical additions are:
+
+```text
+unit.json
+conversation/{conversation.json,events.jsonl,compact.json}
+assets/{intro,body,practice,generated}
+sources/<source-id>/revisions/<revision-id>/{original,derived}
+assistant-tasks/<task-id>/{task.json,input-manifest.json,attempts}
+migrations/iteration-13/{migration.json,journal.jsonl,backup}
+```
+
+Intro, Explain, Practice, and Explain Ask-AI migrate into intro, body, practice,
+and body annotations. Summary and Extend are not active assets and do not enter
+new model context. A migration backup is created before canonical writes.
+
+Discipline maps remain separate project objects. Their topic catalog and a
+learning unit's scope snapshot remain provenance and initial guidance; neither
+creates extra conversations or filesystem nesting.
+
 ## Delivery State
 
-Iteration 07 is delivered: project state, skeleton creation, indexing, API
+Iterations 07, 11, and 12 are delivered: project state, skeleton creation, indexing, API
 routing, and frontend navigation are type-aware. The encyclopedia Agent runs
-through the selected native CLI. Its heading hierarchy renders as a Word-style
-table of contents, and every H3 key concept or branch receives an adjacent body
-action that opens the ordinary system-learning form with an editable prefilled
-title. The confirmed project is classified through the map-backed folder.
+through the selected native CLI. Its H2/H3/H4 heading hierarchy renders as a
+Word-style table of contents, every H4 learnable topic receives an adjacent body
+action, and a separate top-level plan view presents the learner-owned task order.
+Legacy H3-only overviews remain actionable. The confirmed project is classified
+through the map-backed folder.
+Each new map topic also has a validated structured boundary, and confirmed
+deep dives persist a stable scope snapshot consumed by the five learning Agents.
+Iteration 13 is an accepted target and is not yet implemented.
 
 ## Decision References
 
@@ -201,3 +249,6 @@ title. The confirmed project is classified through the map-backed folder.
 - [ADR-0006](./ADR/0006-inline-prerequisite-bridges.md) is the superseded historical bridge decision.
 - [ADR-0007](./ADR/0007-flat-project-storage-and-sidebar-classification.md) removes physical subprojects and defines flat storage plus map-backed reuse of existing sidebar folders.
 - [ADR-0008](./ADR/0008-generated-prerequisite-gap-summaries.md) makes the generated assessment summary the current prerequisite response.
+- [ADR-0010](./ADR/0010-hierarchical-discipline-maps-and-learning-plans.md) adds hierarchical maps and the learner-owned task plan.
+- [ADR-0011](./ADR/0011-learning-scope-snapshots-and-intro-calibration.md) adds topic-boundary catalogs, scope snapshots, and the Intro calibration boundary.
+- [ADR-0012](./ADR/0012-teacher-assistant-learning-workspace.md) replaces the active five-zone presentation with one teacher conversation, versioned assets, sources, and asynchronous CLI assistance.

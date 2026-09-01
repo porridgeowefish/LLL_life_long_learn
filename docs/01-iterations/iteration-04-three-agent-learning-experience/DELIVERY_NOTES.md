@@ -5,6 +5,12 @@ Owner: project maintainer
 Last reviewed: 2026-07-14
 Source of truth: actual iteration 04 delivery record and later supersession note.
 
+Maintenance fixes:
+
+- 2026-07-20: fixed stale zone-timeline progress after an artifact is generated
+  while the project page is open. The artifact SSE refresh now invalidates the
+  project-detail query that owns the derived `generatedZones` field.
+
 Implemented:
 
 ```text

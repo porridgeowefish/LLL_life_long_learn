@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: high-level delivery order and status summary; iteration directories own detailed scope.
 
 ## Delivery Order
@@ -19,6 +19,9 @@ Source of truth: high-level delivery order and status summary; iteration directo
 | 08 | Learning rhythm, personalization, themes, and open-source entry | implemented |
 | 09 | Learning deletion and generated prerequisite-gap summaries | implemented |
 | 10 | Interaction feedback, greenhouse guidance, and contribution integrity | implemented |
+| 11 | Hierarchical discipline maps and learner-owned task planning | implemented |
+| 12 | Durable topic boundaries and unified learning-scope snapshots | implemented |
+| 13 | Conversation-first API teacher, asynchronous CLI assistant, assets, and sources | planned |
 
 Detailed scope, contracts, tests, and delivery evidence live under
 `docs/01-iterations/` and override this summary when they differ.
@@ -34,6 +37,17 @@ system learning     -> five-zone learning workflow
 
 Iteration 08 remains an already delivered slice despite its later number.
 Iterations 09 and 10 are not delivery contracts.
+
+Iteration 12 keeps one system-learning engine while adding an objective
+`learning-scope.json`: maps preplan and snapshot the boundary; standalone
+projects start draft; Intro calibrates the learner without broadening map scope.
+
+Iteration 13 keeps both project types and flat storage but replaces the active
+system-learning five-zone presentation after migration. One API teacher
+conversation forms a learning unit; approved heavy work runs asynchronously in
+the visible native CLI; accumulated learning enters versioned assets; learner
+files enter an explicit source library. The current five-zone experience stays
+executable until the cutover gate passes.
 
 ## Definition Of MVP
 

@@ -8,8 +8,75 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
+
+type recordingEvents struct {
+	names []string
+}
+
+func (r *recordingEvents) Emit(name string, _ any) {
+	r.names = append(r.names, name)
+}
+
+func TestTUIWrapperReportsRuntimeExitForEveryProvider(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeCodex)
+	rt := agentruntime.Runtime{Definition: def, Bin: "codex", Available: true, Mode: "native"}
+	script := buildTUIWrapperScript(
+		`D:\workspace\project`,
+		`D:\workspace\project\runs\prompt.md`,
+		`D:\workspace\project\runs\stderr.log`,
+		"",
+		LaunchRequest{
+			ProjectSlug: "demo",
+			ZoneName:    workspace.ZoneExplain,
+			Agent:       &agentregistry.Agent{ID: "explain", Name: "Explain"},
+			Session:     &sessionstore.Session{ID: "run-123"},
+			Runtime:     &rt,
+			runToken:    "token-abc",
+		},
+	)
+	if !strings.Contains(script, "/api/runs/run-123/status") || !strings.Contains(script, "X-Run-Token'='token-abc") {
+		t.Fatalf("wrapper did not report the runtime exit with its run token:\n%s", script)
+	}
+	if !strings.Contains(script, `'{"done":true}'`) || !strings.Contains(script, `'{"failed":true}'`) {
+		t.Fatalf("wrapper did not distinguish successful and failed exits:\n%s", script)
+	}
+}
+
+func TestTerminalProcessExitFinishesSessionOnce(t *testing.T) {
+	store := sessionstore.New()
+	store.Create(&sessionstore.Session{ID: "run-123", State: sessionstore.StateRunning})
+	events := &recordingEvents{}
+
+	finishInteractiveSession(store, events, "run-123", 0)
+	finishInteractiveSession(store, events, "run-123", 0)
+
+	sess, _ := store.Get("run-123")
+	if sess.State != sessionstore.StateCompleted || sess.FinishedAt == nil || sess.ExitCode == nil || *sess.ExitCode != 0 {
+		t.Fatalf("terminal exit did not finish session: %+v", sess)
+	}
+	if len(events.names) != 1 || events.names[0] != "session-completed" {
+		t.Fatalf("completion should emit once, got %v", events.names)
+	}
+}
+
+func TestClosedTerminalMarksNonZeroExitFailed(t *testing.T) {
+	store := sessionstore.New()
+	store.Create(&sessionstore.Session{ID: "run-456", State: sessionstore.StateRunning})
+	events := &recordingEvents{}
+
+	finishInteractiveSession(store, events, "run-456", 1)
+
+	sess, _ := store.Get("run-456")
+	if sess.State != sessionstore.StateFailed {
+		t.Fatalf("non-zero terminal exit state = %s, want failed", sess.State)
+	}
+	if len(events.names) != 1 || events.names[0] != "session-failed" {
+		t.Fatalf("failure event mismatch: %v", events.names)
+	}
+}
 
 func TestNormalizePermissionModeDefaultsToAuto(t *testing.T) {
 	if got := NormalizePermissionMode(""); got != "auto" {
@@ -17,6 +84,39 @@ func TestNormalizePermissionModeDefaultsToAuto(t *testing.T) {
 	}
 	if got := NormalizePermissionMode(" acceptEdits "); got != "acceptEdits" {
 		t.Fatalf("NormalizePermissionMode trims explicit mode = %q", got)
+	}
+}
+
+func TestAssistantTaskWrapperOpensInteractiveCLIWithPromptAndDurableExecutorMarkers(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeCodex)
+	rt := agentruntime.Runtime{Definition: def, Bin: "codex", Available: true, Mode: "native"}
+	script := buildTaskWrapperPowerShell(rt, `D:\attempt\workspace`, `D:\attempt\prompt.md`, nil)
+	if !strings.Contains(script, "Set-Location -LiteralPath 'D:\\attempt\\workspace'") {
+		t.Fatalf("task CLI does not open in its workspace:\n%s", script)
+	}
+	if !strings.Contains(script, "Get-Content -Raw -Encoding UTF8 -LiteralPath 'D:\\attempt\\prompt.md'") || !strings.Contains(script, "& $agentExe --yolo $promptText") {
+		t.Fatalf("task prompt is not injected into the interactive CLI:\n%s", script)
+	}
+	if !strings.Contains(script, "Get-Command 'codex'") {
+		t.Fatalf("task did not reuse the standard runtime resolver:\n%s", script)
+	}
+	if strings.Contains(script, "exec --yolo") {
+		t.Fatalf("assistant task still launches Codex in non-interactive exec mode:\n%s", script)
+	}
+	if !strings.Contains(script, "executor.json") || !strings.Contains(script, "exit.json") || !strings.Contains(script, "WriteAllText") {
+		t.Fatalf("task wrapper does not persist restart markers:\n%s", script)
+	}
+}
+
+func TestAssistantTaskWrapperDoesNotUseClaudePrintMode(t *testing.T) {
+	def, _ := agentruntime.DefinitionByID(agentruntime.RuntimeClaude)
+	rt := agentruntime.Runtime{Definition: def, Bin: "claude", Available: true, Mode: "native"}
+	script := buildTaskWrapperPowerShell(rt, `D:\attempt\workspace`, `D:\attempt\prompt.md`, nil)
+	if !strings.Contains(script, "$permissionMode = 'bypassPermissions'") || !strings.Contains(script, "& $agentExe --permission-mode $permissionMode $promptText") {
+		t.Fatalf("Claude task is not opened interactively with its prompt:\n%s", script)
+	}
+	if strings.Contains(script, " -p ") {
+		t.Fatalf("assistant task still launches Claude in non-interactive print mode:\n%s", script)
 	}
 }
 

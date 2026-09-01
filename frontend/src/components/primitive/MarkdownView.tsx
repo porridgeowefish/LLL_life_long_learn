@@ -1,33 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 
 import { useMarkdown } from '@/hooks/useMarkdown';
+import { mountMermaidBlocks } from '@/lib/mermaidRenderer';
 
-export function MarkdownView({ source, className }: { source: string; className?: string }) {
+export const MarkdownView = forwardRef<HTMLDivElement, { source: string; className?: string }>(function MarkdownView({ source, className }, forwardedRef) {
   const { html, mermaid } = useMarkdown(source);
   const hostRef = useRef<HTMLDivElement>(null);
+  useImperativeHandle(forwardedRef, () => hostRef.current as HTMLDivElement, []);
 
   useEffect(() => {
     if (!hostRef.current || mermaid.length === 0) return;
-    let cancelled = false;
-    void import('mermaid').then(async (mod) => {
-      if (cancelled) return;
-      for (const block of mermaid) {
-        const target = hostRef.current?.querySelector(`[data-mermaid-id="${block.id}"]`);
-        if (!target) continue;
-        try {
-          const result = await mod.default.render(`${block.id}-mdview-svg`, block.code);
-          (target as HTMLElement).innerHTML = result.svg;
-        } catch (err) {
-          (target as HTMLElement).textContent = `Mermaid render error: ${(err as Error).message}`;
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    return mountMermaidBlocks(hostRef.current, mermaid, 'markdown-view');
   }, [html, mermaid]);
 
   return (
     <div ref={hostRef} className={className} dangerouslySetInnerHTML={{ __html: html }} />
   );
-}
+});

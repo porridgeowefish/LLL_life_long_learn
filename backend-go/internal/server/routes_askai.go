@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
-	"github.com/xmz14/lll/backend-go/internal/confusionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -44,6 +45,7 @@ func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) 
 		"default":      cfg.Default,
 		"searchEngine": cfg.SearchEngine,
 		"providers":    maskProviders(cfg.Providers),
+		"bindings":     cfg.Bindings,
 	})
 }
 
@@ -57,6 +59,9 @@ func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) 
 	old, _ := askaiconfig.Load()
 	oldByKey := map[string]askaiconfig.Provider{}
 	if old != nil {
+		if in.Bindings == nil {
+			in.Bindings = old.Bindings
+		}
 		for _, p := range old.Providers {
 			oldByKey[p.ID] = p
 		}
@@ -125,7 +130,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	store, err := confusionstore.New(slug)
+	store, err := openAnnotationStore(slug)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -141,20 +146,23 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	pc := cfg.Find(in.ProviderID)
+	if in.ProviderID == "" {
+		pc = cfg.Resolve("annotationAskAI")
+	}
 	if pc == nil {
 		httpx.Error(w, http.StatusBadRequest, "provider not found")
 		return
 	}
 
 	// Append the user turn immediately so it persists even if the stream aborts.
-	updatedConfusion, err := store.AppendAskMessage(cid, confusionstore.AskMessage{Role: "user", Content: in.Content})
+	updatedAnnotation, err := store.AppendMessage(cid, annotationstore.Message{Role: "learner", Content: in.Content})
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	messageID := cid
-	if updatedConfusion.Ask != nil && len(updatedConfusion.Ask.Messages) > 0 {
-		messageID = updatedConfusion.Ask.Messages[len(updatedConfusion.Ask.Messages)-1].ID
+	if updatedAnnotation.Ask != nil && len(updatedAnnotation.Ask.Messages) > 0 {
+		messageID = updatedAnnotation.Ask.Messages[len(updatedAnnotation.Ask.Messages)-1].ID
 	}
 	_, _, _ = awardLearningEvent(slug, progressstore.Event{
 		ID:         "ask-ai:" + messageID,
@@ -166,17 +174,16 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	var msgs []askaiprovider.Message
 	if conf.Ask != nil {
 		for _, m := range conf.Ask.Messages {
-			msgs = append(msgs, askaiprovider.Message{Role: m.Role, Content: m.Content})
+			role := m.Role
+			if role == "learner" {
+				role = "user"
+			}
+			msgs = append(msgs, askaiprovider.Message{Role: role, Content: m.Content})
 		}
 	}
 	msgs = append(msgs, askaiprovider.Message{Role: "user", Content: in.Content})
 
-	system := ""
-	if in.PageArtifactID != "" {
-		if ctx, err := loadPageContext(slug, in.PageArtifactID); err == nil {
-			system = "You are helping a learner studying the following page. Answer in context.\n\n" + ctx
-		}
-	}
+	system := "你是正文批注旁的轻量答疑助手。只回答当前问题，不使用教师的五角色流程，也不调用任何工具。以下内容是学习者明确选中并主动提问的引用；版本 ID 只用于说明引用来源。\n\n引用：" + conf.QuoteSnapshot + "\n正文版本：" + conf.AssetVersionID
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -188,9 +195,12 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 
-	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
+	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: false, Thinking: false}
 	var sb strings.Builder
 	writeFrame := func(f askaiprovider.Frame) {
+		if f.Type == "thinking" {
+			return
+		}
 		b, _ := json.Marshal(f)
 		fmt.Fprintf(w, "data: %s\n\n", b)
 		flusher.Flush()
@@ -199,11 +209,22 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if err := askaiprovider.Stream(r.Context(), prov, system, msgs, writeFrame); err != nil {
-		writeFrame(askaiprovider.Frame{Type: "error", Content: err.Error()})
+		status := "failed"
+		if errors.Is(err, context.Canceled) {
+			status = "interrupted"
+		}
+		if sb.Len() > 0 {
+			_, _ = store.AppendMessage(cid, annotationstore.Message{Role: "assistant", Content: sb.String(), Status: status})
+			emitAnnotationUpdated(slug, "ask", cid)
+		}
+		writeFrame(askaiprovider.Frame{Type: "error", Content: "回答暂时中断，已保留收到的部分内容。"})
 		return
 	}
 	// Persist the assistant reply (best-effort).
-	_, _ = store.AppendAskMessage(cid, confusionstore.AskMessage{Role: "assistant", Content: sb.String()})
+	if sb.Len() > 0 {
+		_, _ = store.AppendMessage(cid, annotationstore.Message{Role: "assistant", Content: sb.String(), Status: "completed"})
+	}
+	emitAnnotationUpdated(slug, "ask", cid)
 }
 
 // loadPageContext reads a project-relative artifact (e.g. "explain/pages/01.md")
@@ -232,7 +253,7 @@ func (s *Server) handleAskAiSummarize(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
-	store, err := confusionstore.New(slug)
+	store, err := openAnnotationStore(slug)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -252,15 +273,15 @@ func (s *Server) handleAskAiSummarize(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "pending"})
 }
 
-func summarizeAskExchange(slug, cid, quote string, ask *confusionstore.Ask) {
+func summarizeAskExchange(slug, cid, quote string, ask *annotationstore.Ask) {
 	cfg, err := askaiconfig.Load()
 	if err != nil || !cfg.Enabled() {
-		store, _ := confusionstore.New(slug)
+		store, _ := openAnnotationStore(slug)
 		store.SetAskSummary(cid, "总结生成失败：未配置 Ask-AI 模型源。", "failed")
 		broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
 		return
 	}
-	pc := cfg.Find("")
+	pc := cfg.Resolve("annotationAskAI")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -275,7 +296,7 @@ func summarizeAskExchange(slug, cid, quote string, ask *confusionstore.Ask) {
 		}
 	}
 	summary, err := askaiprovider.Complete(ctx, prov, system, msgs)
-	store, _ := confusionstore.New(slug)
+	store, _ := openAnnotationStore(slug)
 	if err != nil || strings.TrimSpace(summary) == "" {
 		store.SetAskSummary(cid, "总结生成失败。", "failed")
 	} else {

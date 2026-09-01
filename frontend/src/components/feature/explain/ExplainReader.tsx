@@ -12,21 +12,30 @@ import { AskAiPanel } from './AskAiPanel';
 import { useAskAiSettings } from '@/api/askAi';
 import { useAskAiStore } from '@/store/slices/askAi';
 import { useMarkdown } from '@/hooks/useMarkdown';
+import { mountMermaidBlocks } from '@/lib/mermaidRenderer';
 import {
   applyHighlights,
   overlapsExisting,
   selectionToTextAnchor,
   type TextAnchor,
 } from '@/lib/summaryHighlights';
-import { selectionToolbarPosition } from '@/lib/floatingPosition';
+import {
+  selectionToolbarPosition,
+  visibleViewportBounds,
+} from '@/lib/floatingPosition';
+import {
+  selectionEndpointRect,
+  type SelectionRect,
+} from '@/lib/selectionGeometry';
 
 import s from './ExplainReader.module.css';
 
 interface ExplainReaderProps {
   projectSlug: string;
+  embedded?: boolean;
 }
 
-export function ExplainReader({ projectSlug }: ExplainReaderProps) {
+export function ExplainReader({ projectSlug, embedded = false }: ExplainReaderProps) {
   const manifestQuery = useExplainManifest(projectSlug);
   const pages = useMemo(
     () => [...(manifestQuery.data?.pages ?? [])].sort((a, b) => a.order - b.order),
@@ -59,6 +68,9 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
   }
 
   if (manifestQuery.error || pages.length === 0) {
+    if (embedded) {
+      return <EmptyState title="多页正文暂时无法加载" description="页面目录或正文读取失败，请刷新后重试。" />;
+    }
     return <OutputViewer slug={projectSlug} zone="Explain" />;
   }
 
@@ -137,6 +149,7 @@ export function ExplainReader({ projectSlug }: ExplainReaderProps) {
           projectSlug={projectSlug}
           file={current.file}
           isSummary={currentIndex === pages.length - 1}
+          showSourcePath={!embedded}
         />
       </main>
 
@@ -152,10 +165,12 @@ function ExplainPage({
   projectSlug,
   file,
   isSummary,
+  showSourcePath = true,
 }: {
   projectSlug: string;
   file: string;
   isSummary?: boolean;
+  showSourcePath?: boolean;
 }) {
   const page = useExplainPage(projectSlug, file);
   const { html, mermaid } = useMarkdown(page.data ?? '');
@@ -174,13 +189,14 @@ function ExplainPage({
     [allConfusions, artifactID],
   );
   const selectionBarRef = useRef<HTMLDivElement>(null);
+  const selectingRef = useRef(false);
   const [selection, setSelection] = useState<
     (TextAnchor & {
       top: number;
       left: number;
       screenTop: number;
       screenLeft: number;
-      rect: SelectionBox;
+      rect: SelectionRect;
       overlaps: boolean;
     }) | null
   >(null);
@@ -190,7 +206,7 @@ function ExplainPage({
     window.open(base + encodeURIComponent(text), '_blank', 'noopener,noreferrer');
   };
 
-  const updateSelection = useCallback(() => {
+  const updateSelection = useCallback((point?: { x: number; y: number }) => {
     const selected = window.getSelection();
     if (!selected || selected.isCollapsed || !selected.toString().trim()) {
       setSelection(null);
@@ -204,46 +220,71 @@ function ExplainPage({
     }
     const anchor = selectionToTextAnchor(markdown, range);
     if (!anchor) return;
-    const rect = selectionRect(range);
+    const rect = selectionEndpointRect(range, point);
     if (!rect) {
       setSelection(null);
       return;
     }
-    const rectBox = toSelectionBox(rect);
-    const toolbar = toolbarPosition(rectBox);
+    const toolbar = toolbarPosition(rect);
     setSelection({
       ...anchor,
       top: toolbar.top,
       left: toolbar.left,
-      screenTop: rectBox.top,
-      screenLeft: rectBox.left + rectBox.width / 2,
-      rect: rectBox,
+      screenTop: rect.top,
+      screenLeft: rect.left + rect.width / 2,
+      rect,
       overlaps: overlapsExisting(anchor, pageConfusions),
     });
   }, [pageConfusions]);
 
   useEffect(() => {
-    window.addEventListener('pointerup', updateSelection);
-    return () => window.removeEventListener('pointerup', updateSelection);
+    let selectionTimer = 0;
+    const finishAtPoint = (event: MouseEvent | PointerEvent) => {
+      selectingRef.current = false;
+      window.clearTimeout(selectionTimer);
+      updateSelection({ x: event.clientX, y: event.clientY });
+    };
+    const finishWithoutPoint = () => {
+      selectingRef.current = false;
+      window.clearTimeout(selectionTimer);
+      updateSelection();
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!markdownRef.current?.contains(event.target as Node)) return;
+      selectingRef.current = true;
+      setSelection(null);
+    };
+    const handleWindowExit = (event: MouseEvent) => {
+      if (selectingRef.current && event.relatedTarget === null) finishWithoutPoint();
+    };
+    const handleSelectionChange = () => {
+      if (selectingRef.current) return;
+      window.clearTimeout(selectionTimer);
+      selectionTimer = window.setTimeout(finishWithoutPoint, 120);
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', finishAtPoint);
+    window.addEventListener('mouseup', finishAtPoint);
+    window.addEventListener('pointercancel', finishWithoutPoint);
+    window.addEventListener('mouseout', handleWindowExit);
+    window.addEventListener('blur', finishWithoutPoint);
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      window.clearTimeout(selectionTimer);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', finishAtPoint);
+      window.removeEventListener('mouseup', finishAtPoint);
+      window.removeEventListener('pointercancel', finishWithoutPoint);
+      window.removeEventListener('mouseout', handleWindowExit);
+      window.removeEventListener('blur', finishWithoutPoint);
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
   }, [updateSelection]);
 
   useEffect(() => {
     if (!hostRef.current || mermaid.length === 0) return;
-    let cancelled = false;
-    void import('mermaid').then(async (mod) => {
-      if (cancelled) return;
-      for (const block of mermaid) {
-        const target = hostRef.current?.querySelector(`[data-mermaid-id="${block.id}"]`);
-        if (!target) continue;
-        try {
-          const result = await mod.default.render(`${block.id}-explain-svg`, block.code);
-          (target as HTMLElement).innerHTML = result.svg;
-        } catch (error) {
-          (target as HTMLElement).textContent = `Mermaid render error: ${(error as Error).message}`;
-        }
-      }
-    });
-    return () => { cancelled = true; };
+    return mountMermaidBlocks(hostRef.current, mermaid, 'explain-reader');
   }, [html, mermaid]);
 
   useEffect(() => {
@@ -265,6 +306,29 @@ function ExplainPage({
     }
   }, [selection]);
 
+  useEffect(() => {
+    const reposition = () => {
+      setSelection((current) => {
+        if (!current || !selectionBarRef.current) return current;
+        const measured = selectionBarRef.current.getBoundingClientRect();
+        const next = toolbarPosition(
+          current.rect,
+          { width: measured.width, height: measured.height },
+        );
+        return { ...current, ...next };
+      });
+    };
+    const visual = window.visualViewport;
+    window.addEventListener('resize', reposition);
+    visual?.addEventListener('resize', reposition);
+    visual?.addEventListener('scroll', reposition);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      visual?.removeEventListener('resize', reposition);
+      visual?.removeEventListener('scroll', reposition);
+    };
+  }, []);
+
   if (page.isLoading) return <div className={s.loading}>加载页面…</div>;
   if (page.error) return <EmptyState title="页面文件不存在" description={file} />;
 
@@ -273,7 +337,7 @@ function ExplainPage({
       className={isSummary ? `${s.page} ${s.summary}` : s.page}
       ref={hostRef}
     >
-      {!isSummary && <code>{file}</code>}
+      {!isSummary && showSourcePath && <code>{file}</code>}
       <div
         ref={markdownRef}
         className={s.markdown}
@@ -283,7 +347,12 @@ function ExplainPage({
         <div
           ref={selectionBarRef}
           className={s.selectionBar}
-          style={{ top: selection.top, left: selection.left }}
+          style={{
+            top: selection.top,
+            left: selection.left,
+            width: 'max-content',
+            maxWidth: Math.max(0, visibleViewportBounds().w - 16),
+          }}
           role="toolbar"
           aria-label="选中文本操作"
         >
@@ -399,54 +468,12 @@ function useEffectiveReading(
   }, [artifactID, contentRef, recordReading, title]);
 }
 
-interface SelectionBox {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-  width: number;
-  height: number;
-}
-
-function selectionRect(range: Range): DOMRect | null {
-  const rects = Array.from(range.getClientRects()).filter((rect) =>
-    rect.width > 0 && rect.height > 0 &&
-    Number.isFinite(rect.top) && Number.isFinite(rect.left),
-  );
-  if (rects.length > 0) {
-    return rects.reduce((best, rect) => {
-      if (rect.top < best.top) return rect;
-      if (Math.abs(rect.top - best.top) < 1 && rect.left < best.left) return rect;
-      return best;
-    }, rects[0]);
-  }
-
-  const rect = range.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0 || !Number.isFinite(rect.top) || !Number.isFinite(rect.left)) {
-    return null;
-  }
-  return rect;
-}
-
-function toSelectionBox(rect: DOMRect): SelectionBox {
-  return {
-    top: rect.top,
-    right: rect.right,
-    bottom: rect.bottom,
-    left: rect.left,
-    width: rect.width,
-    height: rect.height,
-  };
-}
-
-function toolbarPosition(rect: SelectionBox, measured?: { width: number; height: number }) {
+function toolbarPosition(rect: SelectionRect, measured?: { width: number; height: number }) {
   const toolbarWidth = measured?.width ?? 360;
   const toolbarHeight = measured?.height ?? 46;
-  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
   return selectionToolbarPosition(
     { top: rect.top, bottom: rect.bottom, centerX: rect.left + rect.width / 2 },
     { width: toolbarWidth, height: toolbarHeight },
-    { w: viewportWidth, h: viewportHeight },
+    visibleViewportBounds(),
   );
 }

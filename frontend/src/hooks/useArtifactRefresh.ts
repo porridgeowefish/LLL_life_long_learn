@@ -29,8 +29,18 @@ export function useArtifactRefresh(projectSlug: string): void {
       const p = data as { projectSlug?: string; zone?: string } | undefined;
       if (!p || p.projectSlug !== projectSlug) return;
       qc.invalidateQueries({ queryKey: ['files', projectSlug] });
+      // generatedZones is derived by GET /api/projects/:slug from the files on
+      // disk. Refresh the project detail as well as the artifact itself so the
+      // sidebar timeline reflects newly generated content without a reload.
+      qc.invalidateQueries({ queryKey: qk.projects.detail(projectSlug) });
       if (p.zone === 'overview') {
         qc.invalidateQueries({ queryKey: ['projects', projectSlug, 'discipline-overview'] });
+      }
+      if (p.zone === 'learning-plan') {
+        qc.invalidateQueries({ queryKey: ['projects', projectSlug, 'discipline-learning-plan'] });
+      }
+      if (p.zone === 'discipline-topics') {
+        qc.invalidateQueries({ queryKey: ['projects', projectSlug, 'discipline-topics'] });
       }
       if (p.zone === 'practice') invalidatePractice(qc, projectSlug);
     });

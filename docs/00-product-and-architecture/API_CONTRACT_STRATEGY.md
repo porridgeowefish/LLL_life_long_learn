@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-15
+Last reviewed: 2026-08-30
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -67,6 +67,24 @@ The iteration 07 on-demand prerequisite bridge is removed by iteration 09 and
 ADR-0008. Prerequisite summaries are generated as part of
 `intro/assessment.json`; there is no separate prerequisite-helper endpoint.
 
+## Iteration 11 Discipline Planning
+
+Discipline-map generation records `overview.md` and `discipline-topics.json`; AI does not choose a task
+order. `GET/PUT /api/projects/{id}/learning-plan` read and atomically replace the
+learner-owned ordered task list in `learning-plan.json`. Older maps without the
+file read as an empty list. Root-file artifact events independently refresh the
+overview and plan queries. Completing a task records an idempotent activity event
+for that completion timestamp. Exact behavior is owned by iteration 11.
+
+## Iteration 12 Learning Scope
+
+`GET /api/projects/{id}/discipline-topics` reads the validated topic-boundary
+catalog. A system-learning create request may send `scopeSource` with
+`discipline-map`, map slug, and topic ID. The backend resolves the canonical
+topic and writes a creation-time `learning-scope.json` snapshot; the client
+never supplies boundary content. Standalone creation writes a draft scope.
+Exact shapes and stable errors are owned by iteration 12.
+
 ## Iteration 09 Project Deletion
 
 `DELETE /api/projects/{id}` permanently removes a project resource after the
@@ -75,6 +93,28 @@ with `409 project_has_active_session` while an Agent may still write artifacts.
 Successful deletion includes canonical project files plus workspace-global
 folder references and in-memory session metadata. Exact semantics are owned by
 iteration 09 `API_CONTRACT.md`.
+
+## Iteration 13 Conversation And Task Boundary
+
+Iteration 13 adds one provider-neutral teacher-turn stream, durable conversation
+reads, task and asset reads, editable core assets, body annotations, and source
+operations. The frontend consumes normalized block events and never consumes a
+provider SDK stream directly.
+
+The teacher sees one `delegate_learning_work` tool with logical type, objective,
+source references, and proposal message identity. Application services inject
+physical paths, approval identity, task/run IDs, input ranges, and executor
+policy. CLI execution uses a sealed envelope and generic result manifest rather
+than public HTTP payloads.
+
+Global SSE carries identifier-only invalidation for conversation, task, asset,
+and source changes. REST remains the recovery truth. There is intentionally no
+public assistant-task create, cancel, or retry endpoint in the initial contract.
+Legacy confusion routes adapt to canonical body annotations during migration.
+
+Exact proposed shapes and stable errors are owned by iteration 13
+`INTERFACE_CONTRACT.md`. Current Go routes remain executable truth until the
+slice is implemented.
 
 ## Compatibility
 

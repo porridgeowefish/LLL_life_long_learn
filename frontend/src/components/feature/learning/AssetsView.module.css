@@ -1,0 +1,49 @@
+.assets { height: 100%; display: flex; flex-direction: column; background: var(--bg); }
+.assetTabs { flex: 0 0 auto; display: flex; justify-content: center; gap: 5px; padding: 18px 20px 11px; }
+.assetTabs button { padding: 7px 14px; border: 0; border-radius: 999px; color: var(--muted); background: transparent; font-size: 12px; }
+.assetTabs .active { color: var(--fg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 820px); align-content: start; align-items: start; justify-content: center; gap: 18px; overflow: auto; padding: 10px 24px 32px; }
+.withNotes { grid-template-columns: minmax(0, 760px) minmax(230px, 310px); align-items: start; }
+.document { position: relative; width: 100%; min-width: 0; min-height: 620px; height: max-content; align-self: start; box-sizing: border-box; padding: 34px 48px 70px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow-sm); }
+.document header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
+.document header span { color: var(--muted); font-size: 10px; letter-spacing: .08em; }
+.document h2 { margin-top: 5px; font: 500 26px/1.25 Georgia, 'Songti SC', serif; }
+.actions { display: flex; gap: 7px; }
+.actions button { padding: 6px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); background: transparent; font-size: 11px; }
+.actions .primary { border-color: var(--accent); color: var(--on-accent); background: var(--accent); }
+.markdown { padding-top: 28px; line-height: 1.8; }
+.markdown :global(p), .markdown :global(ul), .markdown :global(ol), .markdown :global(pre) { margin: 0 0 15px; }
+.markdown :global(h1), .markdown :global(h2), .markdown :global(h3) { margin: 28px 0 12px; }
+.markdown :global(pre) { overflow: auto; padding: 14px; color: var(--code-fg); background: var(--code-bg); border-radius: 8px; }
+.markdown :global(img), .markdown :global(svg) { max-width: 100%; height: auto; }
+.markdown :global(table) { width: 100%; margin: 18px 0; border-collapse: collapse; font-size: .94em; }
+.markdown :global(th), .markdown :global(td) { padding: 9px 11px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+.markdown :global(th) { background: var(--surface-sunken); font-weight: 700; }
+.editor { width: 100%; min-height: 530px; margin-top: 24px; resize: vertical; border: 0; outline: 0; color: var(--fg); background: transparent; font: 13px/1.7 'Cascadia Code', Consolas, monospace; }
+.empty { padding: 80px 20px; color: var(--muted); text-align: center; line-height: 1.7; }
+.error { margin: 16px 0; padding: 10px; color: var(--pink); background: color-mix(in srgb, var(--pink) 8%, transparent); font-size: 12px; }
+.contractContent { margin: 22px -20px -42px; overflow: visible; border-top: 1px solid var(--border); }
+.contractContent > :global(div) { min-height: 0; }
+.generatedLayout { grid-template-columns: minmax(220px, 280px) minmax(0, 820px); align-items: start; }
+.generatedList { display: grid; gap: 8px; position: sticky; top: 0; }
+.generatedList button { display: grid; gap: 5px; width: 100%; padding: 13px 14px; border: 1px solid transparent; border-radius: 9px; color: var(--fg); background: transparent; text-align: left; }
+.generatedList button:hover, .generatedList .generatedActive { border-color: var(--border); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
+.generatedList strong { font-size: 12px; line-height: 1.4; }
+.generatedList span { display: -webkit-box; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.5; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.generatedEmpty, .generatedPreviewNote { padding: 22px; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.generatedDescription { margin: 22px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.openArtifact { padding: 7px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); font-size: 11px; text-decoration: none; }
+.practice { padding-top: 24px; }
+.practiceList { display: grid; gap: 14px; }
+.exercise { padding: 18px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-translucent); }
+.exerciseNo { display: block; margin-bottom: 10px; color: var(--accent-ink); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
+.practiceField { margin: 9px 0; }
+.practiceField > strong { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; letter-spacing: .05em; }
+.fieldMarkdown { line-height: 1.75; }
+.fieldMarkdown :global(p) { margin: 0; }
+.optionList { display: grid; gap: 7px; }
+.option { display: flex; gap: 9px; align-items: baseline; padding: 7px 9px; border-radius: 7px; background: var(--surface-sunken); }
+.option b { color: var(--accent-ink); font-size: 11px; }
+@media (max-width: 1050px) { .withNotes { grid-template-columns: minmax(0, 780px); } }
+@media (max-width: 900px) { .generatedLayout { grid-template-columns: minmax(0, 820px); } .generatedList { position: static; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
+@media (max-width: 700px) { .layout { padding: 8px; } .document { padding: 24px 22px 60px; } }

@@ -150,7 +150,6 @@ export function AskAiPanel() {
         signal: ac.signal,
         onFrame: (f) => {
           if (f.type === 'text') store.appendDelta('text', f.content);
-          else if (f.type === 'thinking') store.appendDelta('thinking', f.content);
           else if (f.type === 'error') {
             store.appendDelta('text', formatAskAiError(new Error(f.content)));
             store.finishStream();
@@ -197,12 +196,6 @@ export function AskAiPanel() {
             <div key={m.id} className={s.user}>{m.content}</div>
           ) : (
             <div key={m.id} className={s.assistant}>
-              {m.thinking ? (
-                <details className={s.thinking}>
-                  <summary>思考过程</summary>
-                  <div className={s.thinkingBody}>{m.thinking}</div>
-                </details>
-              ) : null}
               <MarkdownView source={m.content || (store.streaming ? '…' : '')} className={s.answer} />
             </div>
           ),

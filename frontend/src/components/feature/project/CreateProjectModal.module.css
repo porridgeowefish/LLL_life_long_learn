@@ -10,6 +10,57 @@
   gap: 14px;
 }
 
+.templateBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+
+.templateBlock > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.templateBlock strong {
+  font-size: 0.8rem;
+  color: var(--fg);
+}
+
+.templateBlock span {
+  font-size: 0.7rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.templateRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.templateButton {
+  padding: 5px 9px;
+  border: 1px solid var(--accent-medium);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--accent-ink);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.templateButton:hover,
+.templateButton:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
 .field {
   display: flex;
   flex-direction: column;

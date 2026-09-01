@@ -38,37 +38,28 @@ function withProviders(ui: ReactNode) {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-describe('SettingsPage — Ask-AI section', () => {
+describe('SettingsPage — search engine section', () => {
   beforeEach(() => {
     saveMutate.mockReset();
     probeMutate.mockReset();
   });
 
-  it('renders the configured providers', async () => {
+  it('keeps search engine configuration in unified settings', async () => {
     render(withProviders(<SettingsPage />));
-    // Wait for the draft effect to seed. Provider names render as input values.
-    expect(await screen.findByDisplayValue('GPT-4o')).toBeTruthy();
-    expect(screen.getByDisplayValue('Claude')).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: '搜索引擎' })).toBeTruthy();
+    expect(screen.getByLabelText('默认搜索引擎')).toHaveValue('google');
+    expect(screen.queryByDisplayValue('GPT-4o')).toBeNull();
   });
 
-  it('edits a provider field and saves via the mutation', async () => {
+  it('changes only the search engine and preserves model connections', async () => {
     render(withProviders(<SettingsPage />));
-    // Wait for seeding.
-    await screen.findByDisplayValue('GPT-4o');
-
-    // Edit the first provider's model field (two "Model" inputs exist; pick [0]).
-    const modelInputs = screen.getAllByLabelText('Model');
-    fireEvent.change(modelInputs[0], { target: { value: 'gpt-4o-mini' } });
-
-    // Click 保存.
-    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+    fireEvent.change(await screen.findByLabelText('默认搜索引擎'), { target: { value: 'bing' } });
 
     await waitFor(() => expect(saveMutate).toHaveBeenCalledTimes(1));
     const saved = saveMutate.mock.calls[0][0] as AskConfig;
-    expect(saved.providers[0].model).toBe('gpt-4o-mini');
-    // Untouched fields are preserved.
+    expect(saved.searchEngine).toBe('bing');
     expect(saved.default).toBe('p1');
-    expect(saved.searchEngine).toBe('google');
+    expect(saved.providers[0].model).toBe('gpt-4o');
     expect(saved.providers[1].name).toBe('Claude');
   });
 });
