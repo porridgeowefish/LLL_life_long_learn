@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "unitId": "unit_01M1M50A2TEAR050YSWYP00J1D",
+  "conversationId": "conv_01M1M50A2TDGYM3ND5DTGZJ2RJ",
+  "projectSlug": "sunhuai-xiangmu",
+  "activeAssetKeys": [
+    "intro",
+    "body",
+    "practice"
+  ],
+  "createdAt": "2026-09-03T17:27:58.8105677Z",
+  "updatedAt": "2026-09-03T17:27:58.8105677Z"
+}

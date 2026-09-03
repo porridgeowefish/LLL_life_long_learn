@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-09-04",
+  "commit": "95e7ee8",
+  "description": "Iteration-14 pre-refactor quality baseline. Coverage thresholds during the refactor must not fall below these values minus one percentage point.",
+  "go": {
+    "statementCoveragePct": 29.35,
+    "covered": 2255,
+    "total": 7683,
+    "command": "go test ./backend-go/... -count=1 -coverprofile=.artifacts/quality/coverage/go.out"
+  },
+  "frontend": {
+    "statementCoveragePct": 40.24,
+    "covered": 3992,
+    "total": 9920,
+    "testFiles": 44,
+    "tests": 149,
+    "command": "npm --prefix frontend run test -- --coverage"
+  },
+  "counts": {
+    "goProdLines": 18992,
+    "goTestFiles": 41,
+    "frontendSrcFiles": 209,
+    "frontendTestFiles": 44
+  }
+}

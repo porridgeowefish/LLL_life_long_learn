@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "unitId": "unit_01M1M509V6D1HVJDAN85W2MPMM",
+  "conversationId": "conv_01M1M509V68T3QGYE36KGCTR69",
+  "projectSlug": "lingo-duihua",
+  "activeAssetKeys": [
+    "intro",
+    "body",
+    "practice"
+  ],
+  "createdAt": "2026-09-03T17:27:58.5665604Z",
+  "updatedAt": "2026-09-03T17:27:58.5665604Z"
+}

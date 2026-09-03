@@ -37,7 +37,7 @@ plan.
 
 | Wave | State | Evidence |
 |---|---|---|
-| 0 — contract and baseline freeze | pending | none |
+| 0 — contract and baseline freeze | delivered | `tests/fixtures/` synthetic families (canonical/legacy-zones/memory-era/corrupt) generated through production stores via `backend-go/internal/testfixtures`; `contract_freeze_test.go` pins 89 frozen routes, key JSON shapes, SSE hello/event names, error paths, and fixture non-mutation; baseline `tests/baseline.json` (Go 29.35%, frontend 40.24%); `.gitignore` gains `.artifacts/` |
 | 1 — config and quality foundation | pending | none |
 | 2 — bootstrap and transport | pending | none |
 | 3 — preferences, sources, assets | pending | none |

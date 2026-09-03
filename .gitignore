@@ -3,6 +3,7 @@ node_modules/
 Thumbs.db
 dist/
 coverage/
+.artifacts/
 .env
 .env.*
 !.env.example
