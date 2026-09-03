@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/memorystore"
+	"github.com/xmz14/lll/backend-go/internal/preferencestore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -62,7 +62,7 @@ type PackageMeta struct {
 	AgentID               string                       `json:"agentId"`
 	PredecessorFiles      []workspace.PredecessorFile  `json:"predecessorFiles"`
 	OutputTargets         []agentregistry.OutputTarget `json:"outputTargets"`
-	MemorySnapshot        *memorystore.Snapshot        `json:"memorySnapshot,omitempty"`
+	PreferenceSnapshot    *preferencestore.Snapshot    `json:"preferenceSnapshot,omitempty"`
 	FollowupPrior         []string                     `json:"followupPriorResultPaths,omitempty"`
 	ParentPageID          string                       `json:"parentPageId,omitempty"`
 	PracticeAttempt       int                          `json:"practiceAttempt,omitempty"`
@@ -96,9 +96,13 @@ func BuildProjectAgent(req ProjectAgentRequest, reg *agentregistry.Registry) (*P
 		return nil, errors.New("project-level agent requires an output path")
 	}
 
+	preferenceSnapshot, err := preferencestore.Read()
+	if err != nil {
+		return nil, fmt.Errorf("read preferences: %w", err)
+	}
 	generatedAt := time.Now().UTC()
 	return &Package{
-		PromptMd:   renderProjectAgentPrompt(agent, req, state.ProjectType, projectFile, projectBrief, outputPaths),
+		PromptMd:   renderProjectAgentPrompt(agent, req, state.ProjectType, projectFile, projectBrief, outputPaths, &preferenceSnapshot),
 		RunDirName: timestampRunDir(req.AgentID, generatedAt),
 		PackageMeta: PackageMeta{
 			ProjectSlug:        req.ProjectSlug,
@@ -106,6 +110,7 @@ func BuildProjectAgent(req ProjectAgentRequest, reg *agentregistry.Registry) (*P
 			ProjectType:        state.ProjectType,
 			AgentID:            agent.ID,
 			ProjectOutputPaths: outputPaths,
+			PreferenceSnapshot: &preferenceSnapshot,
 			GeneratedAt:        generatedAt,
 		},
 	}, nil
@@ -131,9 +136,9 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve predecessors: %w", err)
 	}
-	memSnap, err := memorystore.Read(req.ProjectSlug)
+	preferenceSnapshot, err := preferencestore.Read()
 	if err != nil {
-		return nil, fmt.Errorf("read memory: %w", err)
+		return nil, fmt.Errorf("read preferences: %w", err)
 	}
 	projectFile, projectBrief, err := readProjectBrief(req.ProjectSlug)
 	if err != nil {
@@ -160,7 +165,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 	}
 	outputTargets := outputTargetsFor(agent, req)
 
-	promptMd := renderPrompt(agent, req, preds, memSnap, projectFile, projectBrief, learningScopeFile, learningScope, introSurvey)
+	promptMd := renderPrompt(agent, req, preds, &preferenceSnapshot, projectFile, projectBrief, learningScopeFile, learningScope, introSurvey)
 
 	runDirName := timestampRunDir(req.AgentID, time.Now().UTC())
 
@@ -175,7 +180,7 @@ func Build(req Request, reg *agentregistry.Registry) (*Package, error) {
 			AgentID:               agent.ID,
 			PredecessorFiles:      preds,
 			OutputTargets:         outputTargets,
-			MemorySnapshot:        memSnap,
+			PreferenceSnapshot:    &preferenceSnapshot,
 			FollowupPrior:         req.FollowupPriorResultPaths,
 			ParentPageID:          req.ParentPageID,
 			PracticeAttempt:       req.PracticeAttempt,
@@ -229,6 +234,7 @@ func renderProjectAgentPrompt(
 	projectFile string,
 	projectBrief string,
 	outputPaths []string,
+	preferences *preferencestore.Snapshot,
 ) string {
 	var b strings.Builder
 	b.WriteString("# Agent Identity\n\n")
@@ -254,6 +260,7 @@ func renderProjectAgentPrompt(
 		b.WriteString(projectBrief)
 		b.WriteString("\n")
 	}
+	appendPreferences(&b, preferences)
 	b.WriteString("\n# Project-Root Output Paths\n\n")
 	for _, outputPath := range outputPaths {
 		b.WriteString(fmt.Sprintf("- `%s`\n", outputPath))
@@ -270,7 +277,7 @@ func renderPrompt(
 	agent *agentregistry.Agent,
 	req Request,
 	preds []workspace.PredecessorFile,
-	mem *memorystore.Snapshot,
+	preferences *preferencestore.Snapshot,
 	projectFile string,
 	projectBrief string,
 	learningScopeFile string,
@@ -431,17 +438,7 @@ func renderPrompt(
 		}
 	}
 
-	b.WriteString("\n# Memory Snapshot\n\n")
-	if mem != nil {
-		if mem.ProjectMemoryExists {
-			b.WriteString(fmt.Sprintf("- Project memory: `%s` (exists — read for context)\n", mem.ProjectMemoryPath))
-		} else {
-			b.WriteString(fmt.Sprintf("- Project memory: `%s` (not yet present)\n", mem.ProjectMemoryPath))
-		}
-		if mem.ProjectStateExists {
-			b.WriteString(fmt.Sprintf("- Project state: `%s`\n", mem.ProjectStatePath))
-		}
-	}
+	appendPreferences(&b, preferences)
 
 	if len(req.FollowupPriorResultPaths) > 0 {
 		b.WriteString("\n# Follow-up Context\n\n")
@@ -482,6 +479,19 @@ func renderPrompt(
 	}
 
 	return b.String()
+}
+
+func appendPreferences(b *strings.Builder, preferences *preferencestore.Snapshot) {
+	b.WriteString("\n# Global Learner Preferences (read-only)\n\n")
+	if preferences == nil || !preferences.Exists || strings.TrimSpace(preferences.Content) == "" {
+		b.WriteString("_(no global preferences supplied)_\n")
+		return
+	}
+	b.WriteString("Use this user-authored context when relevant. Never modify the canonical preferences file or infer new preferences.\n\n")
+	b.WriteString(preferences.Content)
+	if !strings.HasSuffix(preferences.Content, "\n") {
+		b.WriteString("\n")
+	}
 }
 
 func outputTargetsFor(agent *agentregistry.Agent, req Request) []agentregistry.OutputTarget {

@@ -283,7 +283,7 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		path string
 		ok   bool
 	}{
-		{"memory/notes.md", true},
+		{"memory/notes.md", false},
 		{"summary/report.md", true},
 		{"explain/notes.md", true},
 		{"intro/survey.json", true},

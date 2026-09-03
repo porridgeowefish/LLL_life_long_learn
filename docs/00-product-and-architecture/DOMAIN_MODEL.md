@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: long-lived domain objects, relationships, and ownership boundaries for LLL.
 
 ## Core Objects
@@ -19,15 +19,14 @@ The single navigation/classification container. It may bind one DisciplineMap
 as its overview and may reference zero or more SystemLearningProjects by slug.
 
 SystemLearningProject
-A WorkspaceProject that currently owns the legacy five-zone workflow and, in
-the iteration-13 target, owns one conversation-first LearningUnit.
+A WorkspaceProject that owns one conversation-first LearningUnit.
 
 LearningZone
 A legacy fixed phase: Intro, Explain, Practice, Extend, or Summary. It remains
 readable for migration and rollback but is not an active target object.
 
 LearningUnit
-The iteration-13 system-learning aggregate: one TeacherConversation, three
+The active system-learning aggregate: one TeacherConversation, three
 core TeachingAssets, generated artifacts, SourceMaterials, AssistantTasks, and
 asset annotations.
 
@@ -58,25 +57,31 @@ reuse contract for one actionable topic.
 
 LearningScope
 The system-learning project's durable objective content boundary. It is either
-a map-topic snapshot or a standalone draft later finalized by Intro.
+a map-topic snapshot or a standalone draft/finalized boundary.
 
 DisciplineLearningPlan
 An ordered learner-owned list of selected overview topics and per-task status. It is not project membership and does not create projects.
 
 AgentRole
-A visible role with a charter, behavior rules, allowed execution targets, and output targets.
+A visible native-CLI role with a charter, allowed inputs, and declared outputs.
+
+Teacher
+The low-latency API teaching role. It owns dialogue and one disclosed
+delegation tool, but never executes CLI work or writes project files directly.
 
 RuntimeSession
-One live or completed local AI runtime conversation linked to a project and execution target.
+One live or completed native-CLI execution linked to a project and task target.
 
 RunRecord
 The raw execution trace for a session, including prompt and terminal output files.
 
 LearningArtifact
-Curated project output, such as a discipline overview or a zone-owned artifact.
+Curated project output, such as a discipline overview, teaching asset, or
+declared generated deliverable.
 
-MemorySnapshot
-Learner-level or project-level memory used to improve later runs.
+LearnerPreferences
+The single workspace-global, learner-authored `preferences.md`. AI services may
+consume a read-only snapshot but cannot create, update, or infer persisted preferences.
 
 Iteration
 A scoped engineering delivery slice for the product itself.
@@ -90,7 +95,7 @@ WorkspaceProject
 │  ├─ owns exactly one learner-facing discipline overview and task plan
 │  └─ may bind one ProjectFolder and render as its explicit overview row
 └─ SystemLearningProject
-   └─ owns Intro / Explain / Practice / Extend / Summary
+   └─ owns exactly one LearningUnit
 
 ProjectFolder
 ├─ may expose one bound DisciplineMap as an explicit overview row
@@ -102,7 +107,12 @@ OverviewTopic
 └─ may snapshot that boundary into a future SystemLearningProject after learner confirmation
 
 SystemLearningProject
-└─ owns exactly one LearningScope consumed by all five learning zones
+├─ owns exactly one LearningScope
+└─ owns one LearningUnit
+   ├─ owns one TeacherConversation
+   ├─ owns versioned TeachingAssets and AssetAnnotations
+   ├─ references SourceMaterials
+   └─ owns zero or more AssistantTasks, each with RunAttempts
 
 DisciplineLearningPlan
 ├─ orders exact OverviewTopic titles according to learner choice
@@ -123,14 +133,14 @@ topic boundary exists to snapshot.
 Frontend owns explicit type choice, navigation, reading, editing, and confirmation UI.
 Backend owns project indexing, type validation, filesystem boundaries, sessions, and artifact writes.
 Project files own durable local learning state.
-Iteration documents own not-yet-implemented delivery contracts.
+The current iteration owns the active delivery contract.
 Code and runnable schemas own current behavior.
 ```
 
 ## Compatibility
 
 Projects without a persisted project type are interpreted as
-`system-learning`. Project type is immutable in iteration 07; changing type
+`system-learning`. Project type is immutable; changing type
 creates a new related project instead of mutating the existing object.
 
 A prerequisite gap is transient learning context, not a project object. Intro
@@ -141,10 +151,14 @@ remains physically flat; there is no map-parent field, subproject object, or
 recursive ownership. Its ordinary folder membership may place it beneath the
 map-backed folder in navigation.
 
-ADR-0012 adds a planned canonical LearningUnit inside the same flat
+ADR-0012 defines the canonical LearningUnit inside the same flat
 SystemLearningProject root. Migration adapts Intro, Explain, Practice, and
 Explain Ask-AI data to assets and annotations. Summary and Extend remain legacy
 records only. Project type, map provenance, folder classification, and scope
-snapshot identity do not change. Until iteration 13 is delivered, LearningUnit
-objects are target contracts owned by its iteration documents rather than
-runnable code.
+snapshot identity do not change. LearningUnit objects are implemented contracts
+owned by code and the current iteration documents.
+
+Project memory is not an active domain object. New projects do not create a
+`memory/` directory. Existing per-project memory files remain untouched as
+legacy user data but are excluded from prompt assembly and frontend navigation.
+ADR-0013 defines the replacement global preference boundary.

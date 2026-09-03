@@ -164,6 +164,18 @@ repositories, so that teacher turns, task admission, source parsing, and asset
 commits are testable without constructing HTTP requests or launching a real
 provider.
 
+### US-13-18 — Read a stable rich stream
+
+As a learner, I want text to appear promptly without incomplete Mermaid being
+rendered repeatedly, so that long teacher answers remain responsive and do not
+shake between diagram success and failure states.
+
+### US-13-19 — Own one global preference file
+
+As a learner, I want one visible cross-project preference document that only I
+edit, so that teacher personalization is understandable and AI cannot silently
+turn conversation inferences into durable labels.
+
 ## Story Boundaries
 
 These stories do not authorize multi-user collaboration, cloud sync, an

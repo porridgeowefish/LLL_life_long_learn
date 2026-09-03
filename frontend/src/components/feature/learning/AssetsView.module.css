@@ -2,9 +2,9 @@
 .assetTabs { flex: 0 0 auto; display: flex; justify-content: center; gap: 5px; padding: 18px 20px 11px; }
 .assetTabs button { padding: 7px 14px; border: 0; border-radius: 999px; color: var(--muted); background: transparent; font-size: 12px; }
 .assetTabs .active { color: var(--fg); background: var(--surface-raised); box-shadow: var(--shadow-sm); }
-.layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 820px); align-content: start; align-items: start; justify-content: center; gap: 18px; overflow: auto; padding: 10px 24px 32px; }
-.withNotes { grid-template-columns: minmax(0, 760px) minmax(230px, 310px); align-items: start; }
-.document { position: relative; width: 100%; min-width: 0; min-height: 620px; height: max-content; align-self: start; box-sizing: border-box; padding: 34px 48px 70px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow-sm); }
+.layout { flex: 1; min-height: 0; width: 100%; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; gap: 18px; overflow: auto; padding: 10px 18px 24px; }
+.withNotes { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+.document { position: relative; width: 100%; min-width: 0; min-height: calc(100vh - 156px); height: max-content; align-self: start; box-sizing: border-box; padding: 28px 36px 58px; border: 1px solid var(--border); background: var(--card); box-shadow: var(--shadow-sm); }
 .document header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
 .document header span { color: var(--muted); font-size: 10px; letter-spacing: .08em; }
 .document h2 { margin-top: 5px; font: 500 26px/1.25 Georgia, 'Songti SC', serif; }
@@ -24,6 +24,8 @@
 .error { margin: 16px 0; padding: 10px; color: var(--pink); background: color-mix(in srgb, var(--pink) 8%, transparent); font-size: 12px; }
 .contractContent { margin: 22px -20px -42px; overflow: visible; border-top: 1px solid var(--border); }
 .contractContent > :global(div) { min-height: 0; }
+.bodyPager { min-height: calc(100vh - 260px); margin: 22px -36px -58px; }
+.bodyPage { position: relative; min-height: calc(100vh - 350px); padding: 24px clamp(24px, 4vw, 68px) 64px; }
 .generatedLayout { grid-template-columns: minmax(220px, 280px) minmax(0, 820px); align-items: start; }
 .generatedList { display: grid; gap: 8px; position: sticky; top: 0; }
 .generatedList button { display: grid; gap: 5px; width: 100%; padding: 13px 14px; border: 1px solid transparent; border-radius: 9px; color: var(--fg); background: transparent; text-align: left; }
@@ -44,6 +46,6 @@
 .optionList { display: grid; gap: 7px; }
 .option { display: flex; gap: 9px; align-items: baseline; padding: 7px 9px; border-radius: 7px; background: var(--surface-sunken); }
 .option b { color: var(--accent-ink); font-size: 11px; }
-@media (max-width: 1050px) { .withNotes { grid-template-columns: minmax(0, 780px); } }
+@media (max-width: 1050px) { .withNotes { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 900px) { .generatedLayout { grid-template-columns: minmax(0, 820px); } .generatedList { position: static; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); } }
-@media (max-width: 700px) { .layout { padding: 8px; } .document { padding: 24px 22px 60px; } }
+@media (max-width: 700px) { .layout { padding: 8px; } .document { padding: 24px 22px 60px; } .bodyPager { margin: 22px -22px -60px; } .bodyPage { padding: 18px 16px 48px; } }

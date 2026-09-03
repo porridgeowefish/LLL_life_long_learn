@@ -1,8 +1,8 @@
 # Iteration 13 Acceptance Criteria
 
-Status: implementation in progress; criteria are not yet fully satisfied
+Status: implemented; native provider/CLI smoke checks remain manual
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: black-box completion conditions for iteration 13.
 
 ## AC-13-01 — One conversation creates one learning unit
@@ -197,3 +197,65 @@ commit recovery, source privacy, and Ask-AI tests pass together.
 After cutover, the knowledge-greenhouse and five-zone navigation are hidden.
 Rollback can reopen the preserved legacy reader without reversing committed
 new conversation or asset files.
+
+## AC-13-21 — Keep rich teacher streaming stable
+
+While a teacher message is active, provider deltas are visibly accumulated but
+do not rerun the full Markdown pipeline for every frame. Mermaid remains one
+stable placeholder and is not parsed or rendered until message completion.
+Collapsed reasoning performs no Markdown work until opened. Auto-scroll follows
+only while the learner is near the bottom and is throttled so token bursts do
+not produce repeated forced layouts or visible page oscillation.
+
+## AC-13-22 — Replace project memory with explicit global preferences
+
+New projects contain no `memory/` directory. Existing project memory stays on
+disk but is absent from navigation, generic project-file access, prompt
+assembly, and assistant inputs. One workspace-global `preferences.md` can be
+edited by the learner. Teacher and assistant runs receive read-only snapshots;
+no AI execution path can persist changes to it.
+
+## AC-13-23 — Open long conversations incrementally
+
+Opening `教师` fetches only the newest bounded message page. It does not loop
+through the full conversation, and task, source, asset, or annotation SSE
+events do not invalidate the conversation query. The learner can load older
+pages explicitly without losing the current scroll anchor. The data rail shows
+the durable total rather than misreporting the currently loaded page size.
+
+## AC-13-24 — Connect assistant completion to teacher and materials
+
+When an active assistant task becomes terminal, the corresponding inline task
+card updates in the teacher conversation and an accessible completion notice
+appears. Success and partial completion link to `资料`; failure and terminal
+cancellation state the outcome without automatic retry.
+
+Every validated generic deliverable appears in both `资产 / 助教成果` and
+`资料 / 助教生成资料` from the same canonical generated-artifact directory.
+Uploaded source originals and source-processing derived files are readable
+from source details. A refresh reconstructs these views from durable task,
+artifact, and source records even if an SSE event was missed.
+
+## AC-13-25 — Pin initial teacher view and collect before terminal exit
+
+Opening an existing teacher conversation positions the transcript at its
+newest message. Deferred Markdown, Mermaid, image, or font layout keeps the
+viewport pinned until the learner explicitly scrolls upward; it does not leave
+the first view partway through history.
+
+When a visible interactive CLI writes a stable valid result manifest, the
+dispatcher commits its asset updates and deliverables while that terminal may
+remain open at the next prompt. Closing the terminal is not required. Restart
+recovery applies the same rule.
+
+## AC-13-26 — Paginate long body assets with the existing reader
+
+A Markdown `正文` uses the existing numbered-page reader: previous and next
+controls, numbered page tabs, and one visible page at a time. Level-two Markdown
+headings define the page boundaries; the document preamble belongs to the first
+page. A document without level-two headings remains one page.
+
+Pagination is a browser projection only. `assets/body/current.md`, its version,
+annotation offsets, and Ask AI contract remain canonical and are not split into
+new storage files. On a desktop viewport, the asset surface expands across the
+available workspace while retaining the compact annotation rail.

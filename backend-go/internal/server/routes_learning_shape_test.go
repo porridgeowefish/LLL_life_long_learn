@@ -349,7 +349,7 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	root, _ := workspace.ProjectRootForSlug("delete-me")
-	if err := os.WriteFile(filepath.Join(root, "memory", "note.md"), []byte("memory"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "assets", "note.md"), []byte("artifact"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	store, err := folderstore.New()

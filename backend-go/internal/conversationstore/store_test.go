@@ -66,6 +66,44 @@ func TestReadPagesExposeAdvancingSequence(t *testing.T) {
 	}
 }
 
+func TestReadRecentPagesFromTailAndKeepsTaskLinks(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("recent", "最近对话", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	store, _ := New("recent")
+	var messageIDs []string
+	for i := 0; i < 5; i++ {
+		message, _, err := store.AppendMessage("teacher", "completed", fmt.Sprintf("recent-op-%d", i), []Block{{Type: "markdown", Source: fmt.Sprintf("message-%d", i)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		messageIDs = append(messageIDs, message.ID)
+		if i == 4 {
+			if _, err := store.Append("task-linked", TaskLink{MessageID: message.ID, TaskID: "task-tail"}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	latest, err := store.ReadRecent(0, 2)
+	if err != nil || !latest.HasPrevious || latest.TotalMessages != 5 || len(latest.Messages) != 2 {
+		t.Fatalf("unexpected latest page: %#v %v", latest, err)
+	}
+	if latest.Messages[0].ID != messageIDs[3] || latest.Messages[1].ID != messageIDs[4] || len(latest.TaskLinks) != 1 {
+		t.Fatalf("tail page lost ordering or task link: %#v", latest)
+	}
+	older, err := store.ReadRecent(latest.PageFromSeq, 2)
+	if err != nil || !older.HasPrevious || len(older.Messages) != 2 || older.Messages[0].ID != messageIDs[1] || older.Messages[1].ID != messageIDs[2] {
+		t.Fatalf("unexpected older page: %#v %v", older, err)
+	}
+	oldest, err := store.ReadRecent(older.PageFromSeq, 2)
+	if err != nil || oldest.HasPrevious || len(oldest.Messages) != 1 || oldest.Messages[0].ID != messageIDs[0] {
+		t.Fatalf("unexpected oldest page: %#v %v", oldest, err)
+	}
+}
+
 func TestSnapshotThroughExcludesLaterMessagesWithoutPageLimit(t *testing.T) {
 	root := t.TempDir()
 	workspace.SetProjectsRootForTest(root)

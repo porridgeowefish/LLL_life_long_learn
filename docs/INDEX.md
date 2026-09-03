@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-09-02
 Source of truth: this file is the entry point for people and AI agents.
 
 Read this file before implementation, then move to the linked domain documents.
@@ -14,10 +14,10 @@ Read this file before implementation, then move to the linked domain documents.
 Long-lived product, domain, architecture, data, and governance documents.
 
 01-iterations
-Delivery documents for each implementation slice. Each slice must be independently testable.
+The current delivery baseline plus an indexed set of delivered foundations.
 
 99-archive
-Historical material and deprecated notes. Not a current implementation contract.
+Fully retired material and deprecated notes. Excluded from default AI context.
 ```
 
 ## Fact Priority
@@ -27,12 +27,21 @@ When sources conflict, use:
 ```text
 1. Implemented code and runnable behavior
 2. Current iteration documents in docs/01-iterations/
-3. Long-lived documents in docs/00-product-and-architecture/
-4. docs/99-archive/
-5. research/raw/ materials
+3. Long-lived documents and effective ADRs in docs/00-product-and-architecture/
+4. Task-relevant delivered foundations selected through docs/01-iterations/foundations/README.md
+5. Explicitly requested historical evidence in docs/99-archive/
+6. research/raw/ materials
 ```
 
 Raw material informs the product, but does not by itself expand the current implementation scope.
+
+## Default Reading Boundary
+
+For ordinary implementation work, start with the current iteration and
+task-specific long-lived documents. If the task touches an inherited capability,
+use the foundation index to select its originating slice; do not load all twelve
+iterations. Do not scan `docs/99-archive/` to discover requirements. Open it only
+for an explicit history, migration, compatibility, or regression question.
 
 ## Required Entry Points
 
@@ -41,7 +50,7 @@ Raw material informs the product, but does not by itself expand the current impl
 - Repository map: [REPOSITORY_MAP.md](./00-product-and-architecture/REPOSITORY_MAP.md)
 - Product and architecture overview: [00-product-and-architecture/README.md](./00-product-and-architecture/README.md)
 - Iteration overview: [01-iterations/README.md](./01-iterations/README.md)
-- Archive overview: [99-archive/README.md](./99-archive/README.md)
+- Historical index (read only when needed): [99-archive/README.md](./99-archive/README.md)
 
 ## Update Timing
 

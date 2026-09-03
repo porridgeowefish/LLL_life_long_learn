@@ -333,6 +333,10 @@ These are regression budgets, not promises about external model latency.
 | AC-13-16 | compaction fixtures and recovery tests |
 | AC-13-17–18 | migration fixtures and Path F |
 | AC-13-19–20 | restart recovery and full cutover smoke suite |
+| AC-13-21 | burst-delta render, deferred Mermaid, lazy reasoning, scroll-write tests |
+| AC-13-22 | preference store/API/prompt snapshot and new-project skeleton tests |
+| AC-13-23–25 | bounded conversation/browser load, result collection, task/material refresh tests |
+| AC-13-26 | Markdown section projection tests and real desktop browser pagination QA |
 
 ## 11. Delivery Evidence
 

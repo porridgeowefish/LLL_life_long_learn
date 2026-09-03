@@ -30,7 +30,12 @@ vi.mock('@/components/primitive/MarkdownView', async () => {
   const React = await import('react');
   return {
     MarkdownView: React.forwardRef<HTMLDivElement, { source: string }>(function FakeMarkdown({ source }, ref) {
-      return <div ref={ref} data-testid="body-markdown">{source}</div>;
+      const lines = source.split('\n');
+      return <div ref={ref} data-testid="body-markdown">{lines.some((line) => /^##\s+/.test(line))
+        ? lines.filter(Boolean).map((line, index) => /^##\s+/.test(line)
+          ? <h2 key={index}>{line.replace(/^##\s+/, '')}</h2>
+          : /^#\s+/.test(line) ? <h1 key={index}>{line.replace(/^#\s+/, '')}</h1> : <p key={index}>{line}</p>)
+        : source}</div>;
     }),
   };
 });
@@ -87,5 +92,24 @@ describe('BodyAnnotations', () => {
       initialInput: '请解释「极限」',
       anchor: expect.objectContaining({ left: 40, bottom: 30 }),
     }));
+  });
+
+  it('shows only the requested level-two section while preserving the full body DOM', async () => {
+    const props = {
+      slug: 'kubernetes',
+      content: '# 正文\n\n导语\n\n## 第一节\n\n第一节内容\n\n## 第二节\n\n第二节内容',
+      assetVersionId: 'body-v8',
+      pageIndex: 0,
+    } as Parameters<typeof BodyAnnotations>[0] & { pageIndex: number };
+    const view = render(<BodyAnnotations {...props} />);
+
+    await waitFor(() => expect(screen.getByText('第一节')).toBeVisible());
+    expect(screen.getByText('正文')).toBeVisible();
+    expect(screen.getByText('第二节')).not.toBeVisible();
+
+    view.rerender(<BodyAnnotations {...props} pageIndex={1} />);
+    await waitFor(() => expect(screen.getByText('第二节')).toBeVisible());
+    expect(screen.getByText('正文')).not.toBeVisible();
+    expect(screen.getByText('第一节')).not.toBeVisible();
   });
 });

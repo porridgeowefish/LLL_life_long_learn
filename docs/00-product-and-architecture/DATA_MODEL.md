@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -14,11 +14,11 @@ Source of truth: long-lived conceptual file-first model; Go structs and persiste
 | `title` | string | learner-facing title | required |
 | `projectType` | enum string | `discipline-map` or `system-learning` | missing legacy value decodes as `system-learning` |
 | `status` | string | project lifecycle state | required |
-| `activeZone` | string or null | five-zone name | only meaningful for `system-learning` |
+| `activeZone` | string or null | legacy five-zone name | accepted on old state files; not active teacher-workspace navigation |
 | `createdAt` | RFC 3339 timestamp | timestamp | required |
 | `updatedAt` | RFC 3339 timestamp | timestamp | required |
 
-Project type is immutable in iteration 07.
+Project type is immutable.
 
 `project.md` is type-specific learner context:
 
@@ -27,9 +27,9 @@ Project type is immutable in iteration 07.
 | `discipline-map` | project shape, overview goal, optional scope notes, learner notes |
 | `system-learning` | motivation, current ability, target ability, completion standard, active phase, learner notes |
 
-A discipline-map brief never stores an ability ladder, completion gate, or
-`Intro`/five-zone phase. The backend enforces this boundary even if a client
-submits system-learning-only fields.
+A discipline-map brief never stores a focused-learning ability ladder or
+learning phase. The backend enforces this boundary even if a client submits
+system-learning-only fields.
 
 ## Discipline Overview, Topic Catalog, And Learning Plan
 
@@ -65,24 +65,35 @@ Every system-learning root contains `learning-scope.json` with status
 reused concepts, provenance, and update time. A map-origin scope is a copied
 snapshot; `source.mapSlug/topicId` records provenance rather than live ownership.
 
-System-learning projects retain the existing zone-owned protocols, including:
+The active system-learning model contains:
 
 ```text
-intro assessment and output
-explain manifest and pages
-practice tasks, answer keys, submissions, and evaluations
-extend artifacts
-summary and flashcards
-progress events
-memory and run records
+one durable conversation and recoverable teacher runs
+versioned intro, body, and practice assets
+generic generated assistant deliverables
+body annotations and Ask-AI history
+versioned source originals and derived content
+assistant tasks, sealed inputs, attempts, and run records
 ```
 
-Each `intro/assessment.json` prerequisite may include `summary`, a 45-100
-Chinese-character introduction to the knowledge and the learner's current gap.
-New Intro output writes it; legacy records without it remain readable by
-falling back to `impact`.
+Legacy zone protocols (`intro/assessment.json`, Explain manifests/pages,
+Practice tasks/answers/evaluations, Extend, Summary, flashcards, and progress
+events) remain readable for migration and compatibility. They are not the data
+contract for new assistant outputs.
 
 Exact fields remain owned by their code schemas and active iteration contracts.
+
+## Global Learner Preferences
+
+`<WORKSPACE>/preferences.md` is the only active preference-memory file. It is
+Markdown, capped at 256 KiB, and edited only through the explicit learner UI or
+direct file editing. Teacher prompts receive its content as bounded read-only
+context. Assistant attempts receive an immutable snapshot at
+`workspace/inputs/preferences.md`. No AI path writes the canonical file.
+
+Legacy `projects/<slug>/memory/` files are preserved but ignored. New project
+skeletons do not create them, and the generic project file API rejects reads or
+writes to `memory/`.
 
 ## Persistence Rules
 
@@ -96,7 +107,7 @@ project deletion removes the whole canonical project root and prunes global fold
 active Agent sessions block deletion to prevent post-delete artifact writes
 ```
 
-## Iteration 13 Target Model
+## Teacher-Assistant Learning-Unit Model
 
 ADR-0012 retains the flat project root and adds canonical file-first records
 for one learning unit:
@@ -115,10 +126,11 @@ Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE
 state are derived. Provider deltas, rendered rich content, and compact context
 are projections. Exact paths and schemas are owned by iteration 13
-`DATA_DESIGN.md`; code remains current truth until delivery.
+`DATA_DESIGN.md`; code is current truth.
 
 ## Delivery State
 
 The Go state model persists `projectType` for new projects. Missing type remains
 the legacy compatibility signal and decodes as `system-learning`. Iteration 13
-is planned, not yet implemented.
+is implemented; its file schemas and migration compatibility are the active
+system-learning model.

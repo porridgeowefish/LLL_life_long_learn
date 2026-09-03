@@ -33,7 +33,7 @@ workflow.
 
 ## Documentation Impact
 
-Architecture decision: [ADR-0011](../../00-product-and-architecture/ADR/0011-learning-scope-snapshots-and-intro-calibration.md).
+Architecture decision: [ADR-0011](../../../00-product-and-architecture/ADR/0011-learning-scope-snapshots-and-intro-calibration.md).
 
 Long-lived facts synchronized:
 

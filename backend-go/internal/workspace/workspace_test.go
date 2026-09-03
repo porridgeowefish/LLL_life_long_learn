@@ -84,7 +84,7 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 	}
 
 	// Verify folder tree.
-	wantDirs := []string{"", "memory", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets"}
+	wantDirs := []string{"", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets"}
 	for _, d := range wantDirs {
 		p := filepath.Join(projectsRootOverride, "recommender-systems", d)
 		if info, err := os.Stat(p); err != nil || !info.IsDir() {

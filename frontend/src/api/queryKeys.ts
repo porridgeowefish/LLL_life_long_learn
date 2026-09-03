@@ -30,9 +30,8 @@ export const qk = {
     detail: (id: string) => ['sessions', id] as const,
   },
 
-  memory: {
-    file: (projectSlug: string, filename: string) =>
-      ['memory', projectSlug, filename] as const,
+  preferences: {
+    file: () => ['preferences'] as const,
   },
 
   files: {

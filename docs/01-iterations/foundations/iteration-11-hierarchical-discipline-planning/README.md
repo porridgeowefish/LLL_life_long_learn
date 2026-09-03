@@ -30,7 +30,7 @@ choose topics, own their order, and check off one learning task at a time.
 
 ## Documentation Impact
 
-Architecture decision: [ADR-0010](../../00-product-and-architecture/ADR/0010-hierarchical-discipline-maps-and-learning-plans.md).
+Architecture decision: [ADR-0010](../../../00-product-and-architecture/ADR/0010-hierarchical-discipline-maps-and-learning-plans.md).
 
 Long-lived facts synchronized:
 

@@ -75,8 +75,8 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"deleted": true, "projectId": slug})
 }
 
-// validMemoryFilename limits POST writes to memory/ to safe filenames only.
-var validMemoryFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
+// validEditableFilename limits learner-owned zone writes to safe filenames.
+var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 
 // cache is the package-global project index. Populated on startup and on writes.
 var cache = projectindex.New()
@@ -267,8 +267,8 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleReadFile returns the raw text of a project file by relative path.
-// Restricted to memory/, summary/, and zone folders. Used by frontend for
-// reading project-memory.md and zone output.md as raw text.
+// Restricted to summary/ and zone folders. Global learner preferences use the
+// dedicated workspace-level preferences endpoint.
 func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
 	if !workspace.ValidateSlug(slug) {
@@ -299,7 +299,7 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	top := parts[0]
-	allowedTop := map[string]bool{"memory": true, "summary": true, "intro": true, "explain": true, "practice": true, "extend": true}
+	allowedTop := map[string]bool{"summary": true, "intro": true, "explain": true, "practice": true, "extend": true}
 	if !allowedTop[top] {
 		httpx.Error(w, http.StatusForbidden, "directory not readable")
 		return
@@ -318,9 +318,8 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleWriteFile is the POST counterpart of handleReadFile.
-// Write whitelist: memory/<file>, summary/<file>, explain/notes.md, intro/survey.json, extend/flower.json.
-// Learner-owned files — iter-03 expanded from memory-only to support the
-// MarkdownEditor writing notes and summaries from the UI.
+// Write whitelist: summary/<file>, explain/notes.md, intro/survey.json,
+// extend/flower.json. The retired project-memory path is intentionally absent.
 func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
 	if !workspace.ValidateSlug(slug) {
@@ -349,7 +348,7 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir, file := parts[0], parts[1]
-	allowed := dir == "memory" || dir == "summary"
+	allowed := dir == "summary"
 	// explain/ is read-only except for explain/notes.md (learner-owned notes).
 	if dir == "explain" && file == "notes.md" {
 		allowed = true
@@ -364,7 +363,7 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusForbidden, "directory not writable")
 		return
 	}
-	if !validMemoryFilename.MatchString(file) {
+	if !validEditableFilename.MatchString(file) {
 		httpx.Error(w, http.StatusBadRequest, "invalid filename")
 		return
 	}

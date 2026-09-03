@@ -1,18 +1,16 @@
 import { useEffect, useState } from 'react';
 
 import {
-  generatedArtifactOpenURL,
   useAsset,
   useAssets,
-  useGeneratedArtifactEntry,
   useGeneratedArtifacts,
   useSaveAsset,
-  type GeneratedArtifactSummary,
 } from '@/api/learningWorkspace';
 import { MarkdownView } from '@/components/primitive/MarkdownView';
 import { ExplainReader } from '@/components/feature/explain/ExplainReader';
 import { PracticeFlow } from '@/components/feature/practice/PracticeFlow';
-import { BodyAnnotations } from './BodyAnnotations';
+import { GeneratedMaterials } from './GeneratedMaterials';
+import { MarkdownBodyReader } from './MarkdownBodyReader';
 
 import s from './AssetsView.module.css';
 
@@ -21,23 +19,17 @@ type AssetKey = 'intro' | 'body' | 'practice';
 export function AssetsView({ slug }: { slug: string }) {
   const [view, setView] = useState<AssetKey | 'generated'>('body');
   const key: AssetKey = view === 'generated' ? 'body' : view;
-  const [generatedId, setGeneratedId] = useState('');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const assets = useAssets(slug);
   const asset = useAsset(slug, key);
   const save = useSaveAsset(slug, key);
   const generated = useGeneratedArtifacts(slug);
-  const selectedGenerated = generated.data?.find((item) => item.artifactId === generatedId) ?? generated.data?.[0];
-  const generatedEntry = useGeneratedArtifactEntry(slug, selectedGenerated);
   const structuredBody = key === 'body' && asset.data?.contentKind === 'explain-pages';
   const structuredPractice = key === 'practice' && asset.data?.contentKind === 'practice-set';
   const contractBacked = structuredBody || structuredPractice;
 
   useEffect(() => { if (!editing) setDraft(asset.data?.content ?? ''); }, [asset.data?.content, editing]);
-  useEffect(() => {
-    if (!generatedId && generated.data?.[0]) setGeneratedId(generated.data[0].artifactId);
-  }, [generated.data, generatedId]);
 
   const commit = () => {
     if (!asset.data) return;
@@ -53,7 +45,7 @@ export function AssetsView({ slug }: { slug: string }) {
         </button>
       </div>
       {view === 'generated' ? (
-        <GeneratedAssets slug={slug} artifacts={generated.data ?? []} selected={selectedGenerated} content={generatedEntry.data} onSelect={setGeneratedId} />
+        <GeneratedMaterials slug={slug} />
       ) : <div className={`${s.layout} ${key === 'body' && !structuredBody ? s.withNotes : ''}`}>
         <article className={s.document}>
           <header>
@@ -69,7 +61,7 @@ export function AssetsView({ slug }: { slug: string }) {
               : structuredPractice
                 ? <div className={s.contractContent}><PracticeFlow projectSlug={slug} /></div>
                 : asset.data?.content ? (key === 'body'
-                  ? <BodyAnnotations slug={slug} content={asset.data.content} assetVersionId={asset.data.meta.currentVersionId} />
+                  ? <MarkdownBodyReader slug={slug} content={asset.data.content} assetVersionId={asset.data.meta.currentVersionId} />
                   : key === 'practice'
                     ? <PracticeAsset content={asset.data.content} />
                     : <MarkdownView source={asset.data.content} className={s.markdown} />
@@ -79,34 +71,6 @@ export function AssetsView({ slug }: { slug: string }) {
       </div>}
     </section>
   );
-}
-
-function GeneratedAssets({ slug, artifacts, selected, content, onSelect }: {
-  slug: string;
-  artifacts: GeneratedArtifactSummary[];
-  selected?: GeneratedArtifactSummary;
-  content?: string;
-  onSelect: (id: string) => void;
-}) {
-  return <div className={`${s.layout} ${s.generatedLayout}`}>
-    <aside className={s.generatedList} aria-label="助教成果">
-      {artifacts.map((artifact) => <button key={artifact.artifactId} className={artifact.artifactId === selected?.artifactId ? s.generatedActive : ''} onClick={() => onSelect(artifact.artifactId)}>
-        <strong>{artifact.title}</strong>
-        <span>{artifact.description || `${artifact.fileCount} 个文件`}</span>
-      </button>)}
-      {!artifacts.length && <div className={s.generatedEmpty}>助教完成并通过校验的材料会自动出现在这里。</div>}
-    </aside>
-    <article className={s.document}>
-      {selected ? <>
-        <header>
-          <div><span>助教成果 · {selected.kind || 'artifact'}</span><h2>{selected.title}</h2></div>
-          <a className={s.openArtifact} href={generatedArtifactOpenURL(slug, selected.artifactId)} target="_blank" rel="noreferrer">打开原始成果</a>
-        </header>
-        {selected.description && <p className={s.generatedDescription}>{selected.description}</p>}
-        {content ? <MarkdownView source={content} className={s.markdown} /> : <div className={s.generatedPreviewNote}>该成果包含 {selected.fileCount} 个文件。当前入口不是 Markdown，可通过“打开原始成果”查看或下载。</div>}
-      </> : <div className={s.empty}>还没有已提交的助教成果。</div>}
-    </article>
-  </div>;
 }
 
 const PRACTICE_LABELS: Record<string, string> = {

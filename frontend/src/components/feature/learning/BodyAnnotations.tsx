@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TrashIcon } from '@radix-ui/react-icons';
 
@@ -26,7 +26,7 @@ interface SelectionState {
   rect: SelectionRect;
 }
 
-export function BodyAnnotations({ slug, content, assetVersionId }: { slug: string; content: string; assetVersionId: string }) {
+export function BodyAnnotations({ slug, content, assetVersionId, pageIndex }: { slug: string; content: string; assetVersionId: string; pageIndex?: number }) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const annotations = useBodyAnnotations(slug);
@@ -34,6 +34,22 @@ export function BodyAnnotations({ slug, content, assetVersionId }: { slug: strin
   const remove = useDeleteBodyAnnotation(slug);
   const askAi = useAskAiStore();
   const settings = useAskAiSettings();
+
+  useLayoutEffect(() => {
+    const root = markdownRef.current;
+    if (!root || pageIndex === undefined) return;
+    const children = Array.from(root.children) as HTMLElement[];
+    const hasPages = children.some((child) => child.tagName === 'H2');
+    if (!hasPages) {
+      for (const child of children) child.hidden = false;
+      return;
+    }
+    let section = -1;
+    for (const child of children) {
+      if (child.tagName === 'H2') section += 1;
+      child.hidden = section === pageIndex || (section < 0 && pageIndex === 0) ? false : true;
+    }
+  }, [content, pageIndex]);
 
   useEffect(() => {
     if (!markdownRef.current) return;

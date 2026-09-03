@@ -186,6 +186,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}", s.handleGetGeneratedArtifact)
 	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/open", s.handleOpenGeneratedArtifact)
 	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/files/{path...}", s.handleReadGeneratedArtifactFile)
+	mux.HandleFunc("GET /api/preferences", s.handleGetPreferences)
+	mux.HandleFunc("PUT /api/preferences", s.handlePutPreferences)
 
 	// Agents
 	mux.HandleFunc("GET /api/agents", s.handleListAgents)
@@ -199,7 +201,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/sessions/{id}/follow-up", s.handleFollowUp)
 	mux.HandleFunc("POST /api/sessions/{id}/cancel", s.handleCancelSession)
 
-	// File reads (memory / zone outputs) + memory writes (learner-owned edit)
+	// Legacy project file reads and learner-owned zone edits. Project memory is
+	// deliberately not part of this surface; global preferences use /api/preferences.
 	mux.HandleFunc("GET /files/projects/{id}/", s.handleReadFile)
 	mux.HandleFunc("POST /files/projects/{id}/", s.handleWriteFile)
 

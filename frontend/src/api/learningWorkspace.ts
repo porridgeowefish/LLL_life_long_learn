@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { ApiError, http } from './client';
 
@@ -27,8 +28,11 @@ export interface ConversationProjection {
   conversationId: string;
   unitId: string;
   latestSeq: number;
+  pageFromSeq: number;
   pageThroughSeq: number;
   hasMore: boolean;
+  hasPrevious: boolean;
+  totalMessages: number;
   messages: ConversationMessage[];
   taskLinks: TaskLink[];
 }
@@ -105,6 +109,24 @@ export interface LearningSource {
   updatedAt: string;
 }
 
+export interface SourceFileRef {
+  key?: string;
+  path: string;
+  filename?: string;
+  mediaType: string;
+  bytes: number;
+  sha256: string;
+}
+
+export interface SourceRevision {
+  revisionId: string;
+  sourceId: string;
+  original: SourceFileRef;
+  derivedFiles: SourceFileRef[];
+  parseTaskId?: string;
+  createdAt: string;
+}
+
 export type TeacherStreamFrame =
   | { type: 'turn-accepted'; data: { learnerMessageId: string; responseId: string } }
   | { type: 'message-started'; data: { teacherMessageId: string } }
@@ -115,7 +137,7 @@ export type TeacherStreamFrame =
   | { type: 'message-failed'; data: { messageId?: string; code: string; partialPreserved: boolean } }
   | { type: string; data: Record<string, unknown> };
 
-const keys = {
+export const learningWorkspaceKeys = {
   conversation: (slug: string) => ['learning-workspace', slug, 'conversation'] as const,
   tasks: (slug: string) => ['learning-workspace', slug, 'tasks'] as const,
   assets: (slug: string) => ['learning-workspace', slug, 'assets'] as const,
@@ -124,24 +146,45 @@ const keys = {
   generatedEntry: (slug: string, artifactId: string) => ['learning-workspace', slug, 'generated', artifactId, 'entry'] as const,
   annotations: (slug: string) => ['learning-workspace', slug, 'annotations'] as const,
   sources: (slug: string) => ['learning-workspace', slug, 'sources'] as const,
+  source: (slug: string, sourceId: string) => ['learning-workspace', slug, 'sources', sourceId] as const,
 };
 
+const keys = learningWorkspaceKeys;
+
 export function useConversation(slug: string) {
-  return useQuery({ queryKey: keys.conversation(slug), queryFn: async () => {
-    let afterSeq = 0;
-    let combined: ConversationProjection | null = null;
-    for (;;) {
-      const page = await http.get<ConversationProjection>(`/api/projects/${encodeURIComponent(slug)}/conversation?limit=500&afterSeq=${afterSeq}`);
-      if (!combined) combined = { ...page, messages: [], taskLinks: [] };
-      combined.messages.push(...(page.messages ?? []).map((message) => ({ ...message, blocks: message.blocks ?? [] })));
-      combined.taskLinks.push(...(page.taskLinks ?? []));
-      combined.latestSeq = page.latestSeq;
-      combined.pageThroughSeq = page.pageThroughSeq;
-      combined.hasMore = page.hasMore;
-      if (!page.hasMore || page.pageThroughSeq <= afterSeq) return combined;
-      afterSeq = page.pageThroughSeq;
+  const query = useInfiniteQuery({
+    queryKey: keys.conversation(slug),
+    queryFn: ({ pageParam }) => http.get<ConversationProjection>(`/api/projects/${encodeURIComponent(slug)}/conversation?limit=40&beforeSeq=${pageParam}`),
+    initialPageParam: 0,
+    getNextPageParam: (page) => page.hasPrevious && page.pageFromSeq > 0 ? page.pageFromSeq : undefined,
+    enabled: Boolean(slug),
+  });
+  const data = useMemo(() => {
+    const pages = query.data?.pages;
+    if (!pages?.length) return undefined;
+    const newest = pages[0];
+    const messages = new Map<string, ConversationMessage>();
+    const taskLinks = new Map<string, TaskLink>();
+    for (const page of [...pages].reverse()) {
+      for (const message of page.messages ?? []) messages.set(message.id, { ...message, blocks: message.blocks ?? [] });
+      for (const link of page.taskLinks ?? []) taskLinks.set(`${link.messageId}:${link.taskId}`, link);
     }
-  }, enabled: Boolean(slug) });
+    return {
+      ...newest,
+      pageFromSeq: pages[pages.length - 1].pageFromSeq,
+      hasMore: Boolean(query.hasNextPage),
+      hasPrevious: Boolean(query.hasNextPage),
+      messages: [...messages.values()],
+      taskLinks: [...taskLinks.values()],
+    } satisfies ConversationProjection;
+  }, [query.data?.pages, query.hasNextPage]);
+  return {
+    ...query,
+    data,
+    hasPrevious: Boolean(query.hasNextPage),
+    loadPrevious: query.fetchNextPage,
+    isLoadingPrevious: query.isFetchingNextPage,
+  };
 }
 
 export function useAssistantTasks(slug: string) {
@@ -221,6 +264,18 @@ export function useDeleteBodyAnnotation(slug: string) {
 
 export function useSources(slug: string) {
   return useQuery({ queryKey: keys.sources(slug), queryFn: async () => (await http.get<{ sources: LearningSource[] }>(`/api/projects/${encodeURIComponent(slug)}/sources`)).sources, enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((source) => source.status === 'processing') ? 2500 : false });
+}
+
+export function useSource(slug: string, sourceId: string) {
+  return useQuery({
+    queryKey: keys.source(slug, sourceId),
+    queryFn: () => http.get<{ source: LearningSource; revision: SourceRevision }>(`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}`),
+    enabled: Boolean(slug && sourceId),
+  });
+}
+
+export function sourceFileURL(slug: string, sourceId: string, revisionId: string, fileKey: string) {
+  return `/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}/revisions/${encodeURIComponent(revisionId)}/files/${encodeURIComponent(fileKey)}`;
 }
 
 export function useUploadSource(slug: string) {

@@ -191,7 +191,7 @@ func DeleteProject(slug string) error {
 }
 
 // CreateProjectSkeleton writes the canonical folder tree plus initial
-// state.json, project.md, and memory files. Returns os.ErrExist-equivalent
+// state.json and project.md. Returns os.ErrExist-equivalent
 // (via *SlugConflictError) if the project already exists.
 // CreateProjectSkeleton creates a project with empty background fields.
 // parentSlug is ignored; it remains only for source compatibility. All new
@@ -221,7 +221,7 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	// Folder tree. Discipline maps deliberately do not own learning zones.
-	dirs := []string{"", "memory", "runs", "runs/_index", "assets"}
+	dirs := []string{"", "runs", "runs/_index", "assets"}
 	if projectType == ProjectTypeSystemLearning {
 		dirs = append(dirs, "intro", "explain", "practice", "extend", "summary", "progress")
 	}
@@ -255,24 +255,6 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	// project.md
 	projectMd := fmt.Sprintf("# %s\n\n%s", title, defaultProjectMdBodyForInput(in))
 	if err := AtomicWriteFile(filepath.Join(root, "project.md"), []byte(projectMd), 0o644); err != nil {
-		return err
-	}
-
-	// memory/project-memory.md
-	memMd := "# Project Memory\n\n_What is already understood, where confusion remains, which examples worked._\n"
-	if err := AtomicWriteFile(filepath.Join(root, "memory", "project-memory.md"), []byte(memMd), 0o644); err != nil {
-		return err
-	}
-
-	// memory/project-state.json (empty initial state)
-	memState := map[string]any{
-		"understood":  []string{},
-		"confusion":   []string{},
-		"knownGaps":   []string{},
-		"lastUpdated": parsed,
-	}
-	memBytes, _ := json.MarshalIndent(memState, "", "  ")
-	if err := AtomicWriteFile(filepath.Join(root, "memory", "project-state.json"), memBytes, 0o644); err != nil {
 		return err
 	}
 
@@ -763,7 +745,7 @@ func EnsureProjectsRoot() error {
 }
 
 // ProjectRootForSlug returns the absolute path to a project's folder for
-// external callers (memory store, launcher, etc.). Validates the slug.
+// external callers (stores, launchers, etc.). Validates the slug.
 func ProjectRootForSlug(slug string) (string, error) {
 	return projectRoot(slug)
 }

@@ -3,9 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { qk } from './queryKeys';
 
 describe('queryKeys structure', () => {
-  it('has memory keys with projectSlug + filename', () => {
-    const key = qk.memory.file('rust-ownership', 'notes.md');
-    expect(key).toEqual(['memory', 'rust-ownership', 'notes.md']);
+  it('has one workspace-global preferences key', () => {
+    expect(qk.preferences.file()).toEqual(['preferences']);
   });
 
   it('has files.raw with projectSlug + relPath', () => {
@@ -30,7 +29,7 @@ describe('queryKeys structure', () => {
     expect(qk.projects.all).toBeTypeOf('function');
     expect(qk.agents.all).toBeTypeOf('function');
     expect(qk.sessions.active).toBeTypeOf('function');
-    expect(qk.memory.file).toBeTypeOf('function');
+    expect(qk.preferences.file).toBeTypeOf('function');
     expect(qk.files.raw).toBeTypeOf('function');
     expect(qk.confusions.all).toBeTypeOf('function');
   });

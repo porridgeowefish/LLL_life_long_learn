@@ -8,6 +8,7 @@ import { AssetsView } from './AssetsView';
 import { SourcesView } from './SourcesView';
 import { subscribeToSSE } from '@/hooks/useSSE';
 import { SSE_EVENTS } from '@/lib/constants';
+import { learningWorkspaceKeys } from '@/api/learningWorkspace';
 
 import s from './LearningWorkspace.module.css';
 
@@ -28,16 +29,17 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
   }, [active, navigate, project.slug, zone]);
 
   useEffect(() => {
-    const refresh = (payload: unknown) => {
+    const forProject = (refresh: () => void) => (payload: unknown) => {
       if ((payload as { projectSlug?: string })?.projectSlug === project.slug) {
-        void queryClient.invalidateQueries({ queryKey: ['learning-workspace', project.slug] });
+        refresh();
       }
     };
     const unsubscribers = [
-      subscribeToSSE(SSE_EVENTS.assistantTaskUpdated, refresh),
-      subscribeToSSE(SSE_EVENTS.learningAssetUpdated, refresh),
-      subscribeToSSE(SSE_EVENTS.sourceUpdated, refresh),
-      subscribeToSSE(SSE_EVENTS.annotationUpdated, refresh),
+      subscribeToSSE(SSE_EVENTS.assistantTaskUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.tasks(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.generatedArtifactUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.generated(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.learningAssetUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.assets(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.sourceUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.annotationUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.annotations(project.slug) }); })),
     ];
     return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, [project.slug, queryClient]);

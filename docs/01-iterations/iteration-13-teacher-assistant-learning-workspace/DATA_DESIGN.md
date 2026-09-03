@@ -2,7 +2,7 @@
 
 Status: implemented contract
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: file-first schemas, ownership, atomicity, migration, and recovery for iteration 13.
 
 ## 1. Data Principles
@@ -17,6 +17,8 @@ Source of truth: file-first schemas, ownership, atomicity, migration, and recove
   project slugs and IDs, never from mutable titles.
 - Formal writes use same-directory temporary files, flush, rename, and a
   recoverable journal when several paths must advance together.
+- `<WORKSPACE>/preferences.md` is the only active preference-memory file. It is
+  learner-owned and never written by teacher or assistant execution.
 
 ## 2. Canonical Learning-Unit Layout
 
@@ -66,7 +68,8 @@ projects/<unit-slug>/
       stdout.log
       stderr.log
       heartbeat.json
-      workspace/
+        workspace/
+        inputs/preferences.md
         scratch/**
         deliverables/<deliverable-key>/artifact.json
         deliverables/<deliverable-key>/files/**
@@ -76,19 +79,19 @@ projects/<unit-slug>/
         source-updates/<revision-id>/**
         result-manifest.json
   runs/
-  memory/
   migrations/iteration-13/
     migration.json
     journal.jsonl
     backup/<legacy-relative-tree>/**
 ```
 
-`runs/` and `memory/` remain compatibility/runtime locations already owned by
-the project. New assistant attempts are canonical below `assistant-tasks/`;
+`runs/` remains a compatibility/runtime location already owned by the project.
+Existing `memory/` directories are ignored legacy data and new projects do not
+create them. New assistant attempts are canonical below `assistant-tasks/`;
 optional legacy run-index projections may point to them but do not own state.
 
 Discipline-map projects retain their existing overview, topic catalog,
-learning-plan, runs, memory, and asset layout. They do not gain a teacher
+learning-plan, runs, and asset layout. They do not gain a teacher
 conversation merely by being a map.
 
 ## 3. Unit Metadata
@@ -157,6 +160,11 @@ Initial durable event types are:
 Task progress is not copied into this log. It remains in `task.json` and is
 joined into the conversation read projection by stable task link.
 
+The default teacher projection is a tail page, with `pageFromSeq`,
+`pageThroughSeq`, `hasPrevious`, and `totalMessages`. Canonical history is not
+truncated: pagination changes only the browser projection. Earlier pages are
+read with an exclusive `beforeSeq` cursor and prepended in chronological order.
+
 The repository serializes appends per conversation, assigns `seq`, appends and
 flushes the event, then atomically advances conversation metadata. On startup,
 it ignores one truncated final JSONL line, verifies monotonic sequence, and
@@ -188,6 +196,13 @@ by source hash and renderer version outside canonical history.
 
 Raw hidden chain of thought has no schema field. `reasoning-summary` may contain
 only provider-designated summary output.
+
+`assets/generated/<artifact-id>/` has one canonical owner but two product
+views. `资产 / 助教成果` presents it as a produced asset; `资料 / 助教生成资料`
+presents the same files as readable reference material. No copy is made and no
+second manifest is created. Source originals and their `derived/**` files are
+also readable from the source detail projection without exposing absolute
+paths.
 
 ## 6. Learning-Aware Compact Projection
 
@@ -444,6 +459,11 @@ its promised result. Failed `executor-state-lost` and
 `invalid-result-manifest` attempts remain eligible for late-result
 reconciliation when a stable manifest subsequently appears and passes the
 same sealed-input and output validation.
+
+A stable `workspace/result-manifest.json` is the protocol completion signal
+even while the visible interactive CLI process remains alive at its next
+prompt. The dispatcher validates and commits that result immediately; terminal
+exit is only a later observable user action and is not a commit prerequisite.
 
 ## 12. Queue And Idempotency Indexes
 

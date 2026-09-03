@@ -11,9 +11,15 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('@/api/learningWorkspace', () => ({
   useSources: () => ({ data: [], isLoading: false }),
+  useSource: () => ({ data: undefined, isLoading: false }),
+  sourceFileURL: () => '/source/file',
   useUploadSource: () => ({ mutate: apiMocks.upload, isPending: false, isError: false }),
   useTombstoneSource: () => ({ mutate: apiMocks.tombstone }),
   usePermanentlyDeleteSource: () => ({ mutate: apiMocks.permanent }),
+}));
+
+vi.mock('./GeneratedMaterials', () => ({
+  GeneratedMaterials: () => <div data-testid="generated-materials">已提交的助教资料</div>,
 }));
 
 describe('SourcesView upload confirmation', () => {
@@ -54,5 +60,11 @@ describe('SourcesView upload confirmation', () => {
       { file, parseApproved: true, cloudDisclosureAccepted: true },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
+  });
+
+  it('includes assistant-generated materials in the same sources page', () => {
+    render(<SourcesView slug="calculus" />);
+    expect(screen.getByTestId('generated-materials')).toHaveTextContent('已提交的助教资料');
+    expect(screen.getByText('总结、调研、实验与图表')).toBeInTheDocument();
   });
 });

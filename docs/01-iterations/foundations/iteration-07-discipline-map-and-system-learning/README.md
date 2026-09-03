@@ -49,11 +49,11 @@ Discipline protocols and local learning-lab execution.
 
 ## History
 
-- [ADR-0005](../../00-product-and-architecture/ADR/0005-discipline-map-and-system-learning-project-types.md) owns the durable project-type decision.
-- [ADR-0006](../../00-product-and-architecture/ADR/0006-inline-prerequisite-bridges.md) records the historical bridge decision.
-- [ADR-0007](../../00-product-and-architecture/ADR/0007-flat-project-storage-and-sidebar-classification.md) owns flat storage and map-backed sidebar folders.
-- [ADR-0008](../../00-product-and-architecture/ADR/0008-generated-prerequisite-gap-summaries.md) supersedes the bridge with generated summaries.
-- [Learning Project Structure](../../00-product-and-architecture/LEARNING_PROJECT_STRUCTURE.md) owns the long-lived folder and navigation model.
+- [ADR-0005](../../../00-product-and-architecture/ADR/0005-discipline-map-and-system-learning-project-types.md) owns the durable project-type decision.
+- [ADR-0006](../../../99-archive/adr/0006-inline-prerequisite-bridges.md) records the historical bridge decision.
+- [ADR-0007](../../../00-product-and-architecture/ADR/0007-flat-project-storage-and-sidebar-classification.md) owns flat storage and map-backed sidebar folders.
+- [ADR-0008](../../../00-product-and-architecture/ADR/0008-generated-prerequisite-gap-summaries.md) supersedes the bridge with generated summaries.
+- [Learning Project Structure](../../../00-product-and-architecture/LEARNING_PROJECT_STRUCTURE.md) owns the long-lived folder and navigation model.
 
 ## Delivery Documents
 
@@ -68,7 +68,7 @@ Discipline protocols and local learning-lab execution.
 
 Architecture decision:
 
-- [ADR-0005: Discipline Map And System Learning Project Types](../../00-product-and-architecture/ADR/0005-discipline-map-and-system-learning-project-types.md)
+- [ADR-0005: Discipline Map And System Learning Project Types](../../../00-product-and-architecture/ADR/0005-discipline-map-and-system-learning-project-types.md)
 
 Long-lived facts synchronized:
 

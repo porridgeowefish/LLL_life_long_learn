@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: long-lived product intent and product-object boundaries for LLL.
 
 ## Problem
@@ -77,24 +77,20 @@ The overview represents the possibility space; the sidebar represents actual com
 The encyclopedia Agent plans the whole architecture before writing; the overview uses H3 major chapters and H4 learnable topics. A separate top-level learning-plan view lets the learner choose topics, own their order, and check off one task at a time; AI does not choose the sequence.
 Each H4 topic also declares what it owns, reuses, requires, and excludes. The backend snapshots that canonical boundary when the learner confirms a deep dive.
 Each new-contract H4 topic has its learning action beside that body heading; legacy H3-only overviews remain actionable until regenerated.
-Only system-learning projects use the currently delivered five-zone workflow.
-After iteration-13 migration they retain their type but use the conversation-first workspace.
+System-learning projects use the conversation-first teacher workspace.
+The five-zone workflow remains compatibility data and migration input only.
 Existing projects remain system-learning projects and migrate compatibly.
 Intro presents generated prerequisite-gap summaries directly, without a second action; project creation represents a deliberate longer-lived commitment.
 Intro calibrates readiness, depth, examples, scaffolding, and practice difficulty. It may finalize a standalone draft scope but cannot broaden a ready map-origin scope.
-All project directories are flat. Existing frontend folders are the only navigation/classification structure: a map opens from its folder title, while system-learning projects remain movable child rows. Folder placement never changes learning behavior or prompt context.
+All project directories are flat. Existing frontend folders are the only navigation/classification structure: an explicit `××学科总览` row opens the bound map, while system-learning projects remain movable child rows. Folder placement never changes learning behavior or prompt context.
 ```
 
 ## Current Delivery Boundary
 
-The two-type product model is implemented in iteration 07. Iteration 09 and
-ADR-0008 own the current prerequisite-summary presentation. Current runnable
-behavior and the iteration contracts are the delivery truth.
-
-Iteration 13 is the accepted next product transition. Its target has `教师` as
-one low-latency API conversation, `资产` as versioned editable accumulated
-learning, and `资料` as explicit private source material. A visible native-CLI
-assistant performs approved substantial work asynchronously. The five teaching
-roles are invisible methods in one prompt, not product modules. Until iteration
-13 is implemented and its migration gate passes, the current five-zone runtime
-remains the executable experience.
+The two project types, flat map navigation, scope snapshots, and the Iteration
+13 teacher workspace are implemented. `教师` is one low-latency API
+conversation, `资产` is versioned editable accumulated learning, and `资料` is
+explicit private source material. A visible native-CLI assistant performs
+learner-authorized substantial work asynchronously. The five teaching roles are
+soft methods in one teacher prompt, not product modules. Current runnable code,
+the current iteration, and active architecture documents are the delivery truth.

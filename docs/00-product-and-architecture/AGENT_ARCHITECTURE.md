@@ -2,32 +2,19 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-31
+Last reviewed: 2026-09-02
 Source of truth: rules for using AI runtimes as controlled study operators.
 
-## Current Agent Role
+## Current Roles
 
-LLL treats the configured native AI CLI as an external task runtime:
-
-```text
-The browser prepares a structured prompt.
-The Go backend launches the selected runtime.
-The UI observes status, logs, and final study output.
-```
-
-## Desired Direction
-
-Future slices should support:
+LLL separates teaching from heavy execution:
 
 ```text
-visible agent identities by learning role
-direct Claude Code terminal launch instead of hidden-only execution
-prompt assembly from predecessor project file paths
-zone-specific behavior rules and output contracts
-file-path-based coordination between agents
-flat project-root resolution independent of sidebar classification
-run history and replay
-memory-aware prompt adaptation
+teacher       fast API conversation; teaches and may propose one disclosed delegation tool
+assistant     visible native CLI; performs learner-authorized substantial work
+encyclopedia visible native CLI; generates or updates a discipline map
+Ask AI        lightweight quote-grounded provider helper; no teacher methods or tools
+LLL           owns authorization, paths, task state, validation, promotion, and recovery
 ```
 
 ## Execution Principle
@@ -52,13 +39,13 @@ Claude Code terminal as the live execution surface
 LLL panel as the orchestration, observation, indexing, and editing surface
 ```
 
-When an agent is invoked:
+When a native CLI role is invoked:
 
 ```text
 LLL resolves the active project context
-LLL resolves predecessor node file paths
-LLL builds a role-specific prompt with behavior rules and output rules
-LLL launches a real Claude Code terminal session
+LLL resolves sealed conversation, asset, source, scope, and preference inputs
+LLL builds a role-specific prompt with declared output rules
+LLL launches the selected native Agent CLI through agentexecution.Service
 LLL auto-injects that prompt
 LLL captures run artifacts and updates the project panel
 ```
@@ -86,23 +73,15 @@ non-inspectable orchestration
 
 ## Project-Type Boundary
 
-The five learning-role agents and their zone contracts apply to
-`system-learning` projects. A `discipline-map` has no learning zones.
-
-Iteration 07 provides separate advisor and map-generation capabilities, but
-neither capability becomes a sixth learning stage:
-
 ```text
-choice advisor     -> recommends a project type; never creates
-encyclopedia agent -> explicitly launches the selected native CLI and writes or updates the overview plus topic-boundary catalog
-five learning agents -> operate only inside system-learning zones
+discipline-map  -> encyclopedia CLI + overview/topic/plan contracts
+system-learning -> one API teacher conversation + optional assistant CLI tasks
 ```
 
-Within a system-learning flow, Intro records a concise explanation of each
-detected prerequisite gap in `intro/assessment.json`. The UI presents it as
-diagnostic context without a second AI action. Explain then supplies necessary
-background naturally. A gap does not become a project; only a separately confirmed system-learning commitment
-has no durable map-parent relation; sidebar folders are not added to prompt context.
+A choice advisor may recommend a type but never creates. A discipline map has
+no teacher conversation or learning-stage navigation. A system-learning unit
+does not run the five legacy zone Agents as its active flow; those registrations
+and contracts remain compatibility inputs for old projects and migration only.
 
 The registered `encyclopedia` agent is project-type-bound to `discipline-map`,
 has no allowed learning zone, and owns a versioned charter that first plans the
@@ -139,7 +118,7 @@ show which predecessor files were supplied
 show which output files were written
 ```
 
-## Iteration 13 Teacher And Assistant Roles
+## Teacher And Assistant Roles
 
 ADR-0012 separates product role from runtime mechanism:
 

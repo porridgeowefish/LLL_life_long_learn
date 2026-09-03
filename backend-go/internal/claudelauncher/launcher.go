@@ -213,7 +213,7 @@ func Launch(ctx context.Context, req LaunchRequest) (*RunResult, error) {
 	// file whose hooks POST activity/completion to /api/runs/{runId}/status.
 	// The settings file is passed to `claude --settings <file>` below. Live
 	// validation of the hook command + schema is a manual step — see
-	// docs/01-iterations/iteration-06-ask-ai-and-live-progress/DELIVERY_NOTES.md.
+	// docs/99-archive/iterations/iteration-06-ask-ai-and-live-progress/DELIVERY_NOTES.md.
 	var settingsFile string
 	if req.RunProgress != nil && runtime.ID == agentruntime.RuntimeClaude {
 		sf, token, herr := writeHookSettings(runDirAbs, req.Session.ID, req.RunProgress)

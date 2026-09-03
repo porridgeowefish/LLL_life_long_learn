@@ -9,7 +9,7 @@ import { AppShell } from './components/layout/AppShell';
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })));
 const ProjectPage = lazy(() => import('./pages/ProjectPage').then((m) => ({ default: m.ProjectPage })));
 const AgentsPage = lazy(() => import('./pages/AgentsPage').then((m) => ({ default: m.AgentsPage })));
-const MemoryPage = lazy(() => import('./pages/MemoryPage').then((m) => ({ default: m.MemoryPage })));
+const PreferencesPage = lazy(() => import('./pages/PreferencesPage').then((m) => ({ default: m.PreferencesPage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ModelsPage = lazy(() => import('./pages/ModelsPage').then((m) => ({ default: m.ModelsPage })));
 
@@ -41,8 +41,12 @@ export const routes: RouteObject[] = [
         element: withShell(<AgentsPage />),
       },
       {
+        path: 'preferences',
+        element: withShell(<PreferencesPage />),
+      },
+      {
         path: 'memory',
-        element: withShell(<MemoryPage />),
+        element: <Navigate to="/preferences" replace />,
       },
       {
         path: 'settings',

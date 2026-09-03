@@ -19,9 +19,11 @@ remain suitable. It is not a full-system rewrite.
 
 The product has three quiet top-level destinations: `教师`, `资产`, and `资料`.
 `教师` is the default and visually dominant destination, built as one simple
-continuous conversation. `资产` contains reusable outputs created through
+continuous conversation whose recent tail loads first and whose older history
+is requested on demand. `资产` contains reusable outputs created through
 teaching and assistant work. `资料` contains learner-provided books, documents,
-PDFs, and other source files.
+PDFs, source-derived files, and the same canonical assistant deliverables shown
+as reference material rather than duplicated storage.
 
 The existing knowledge-greenhouse presentation is removed from frontend
 navigation during the cutover, but its files and backend behavior are not
@@ -1264,10 +1266,11 @@ provider cursor that the normalized streaming contract explicitly supports.
 The message renderer supports GitHub-flavored Markdown, syntax-highlighted
 code fences, LaTeX math, Mermaid diagrams, sanitized inline SVG, and referenced
 PNG or JPEG images. These are content capabilities of an ordinary teacher
-message, not separate applications. Text and math render incrementally when
-their syntax is complete enough; incomplete code fences, math delimiters,
-Mermaid blocks, and SVG remain a lightweight source placeholder until closed,
-then replace themselves in place. A rendering failure preserves the source and
+message, not separate applications. Provider deltas are coalesced and Markdown,
+math, and sanitization render from a slower stream snapshot. Mermaid remains a
+stable lightweight placeholder for the entire active response—even after its
+fence closes—and renders once after message completion. Collapsed reasoning is
+not parsed until expanded. A rendering failure preserves the source and
 offers a source view instead of losing the teacher response.
 
 Mermaid and SVG use closed fenced blocks (`mermaid` and `svg`); raw Markdown
@@ -1353,6 +1356,6 @@ migration policy. Planning synchronizes:
 - `PRD.md`, `DOMAIN_MODEL.md`, `DATA_MODEL.md`,
   `LEARNING_PROJECT_STRUCTURE.md`, `SYSTEM_ARCHITECTURE.md`,
   `BACKEND_ARCHITECTURE.md`, `AGENT_ARCHITECTURE.md`,
-  `API_CONTRACT_STRATEGY.md`, and `MVP_ROADMAP.md`;
+  `API_CONTRACT_STRATEGY.md`, and `ROADMAP.md`;
 - `docs/01-iterations/README.md`, `ADR/README.md`, and the complete iteration
   document set required by the documentation standard.

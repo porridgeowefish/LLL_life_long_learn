@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/teachergateway"
 	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -158,6 +160,34 @@ func TestConversationCreatesOneTeacherGreeting(t *testing.T) {
 		if len(projection.Messages) != 1 || projection.Messages[0].Role != "teacher" || len(projection.Messages[0].Blocks) != 1 || !strings.Contains(projection.Messages[0].Blocks[0].Source, "最想先弄懂什么") {
 			t.Fatalf("unexpected greeting projection: %s", response.Body.String())
 		}
+	}
+}
+
+func TestConversationTailEndpointReturnsOnlyRecentMessages(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	store, err := conversationstore.New("topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureTeacherGreeting(store, "topic"); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < 45; index++ {
+		if _, _, err := store.AppendMessage("learner", "completed", fmt.Sprintf("tail-%d", index), []conversationstore.Block{{Type: "markdown", Source: fmt.Sprintf("question-%d", index)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/projects/topic/conversation?limit=10&beforeSeq=0", nil))
+	var projection conversationstore.Projection
+	if err := json.Unmarshal(response.Body.Bytes(), &projection); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusOK || len(projection.Messages) != 10 || projection.TotalMessages != 46 || !projection.HasPrevious {
+		t.Fatalf("unexpected recent projection: %d %s", response.Code, response.Body.String())
+	}
+	if got := projection.Messages[0].Blocks[0].Source; got != "question-35" {
+		t.Fatalf("recent endpoint did not start at the expected tail: %q", got)
 	}
 }
 

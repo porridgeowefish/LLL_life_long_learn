@@ -1,9 +1,14 @@
 # Agent Primitives
 
-Status: draft
+Status: active compatibility contract
 Owner: project maintainer
-Last reviewed: 2026-06-15
-Source of truth: design rules for the LLL reasoning primitives library.
+Last reviewed: 2026-09-02
+Source of truth: file-shape rules for the reusable reasoning-primitives library and legacy zone-agent coverage.
+
+> Current-context boundary: the teacher uses five soft teaching methods in one
+> unified system prompt. The five zone-agent ownership table below applies to
+> retained CLI compatibility charters; it does not define active product
+> navigation or require the teacher to invoke five separate Agents.
 
 ## Intent
 
@@ -85,7 +90,8 @@ This table is the authoritative mapping from the legacy `deepthink` mechanism li
 └────┴──────────────────────────┴─────────────────────────┴──────────────┘
 ```
 
-`Progressive learning path (Step 1-4)` is not in this table — it is the five-zone flow itself (Intro → Explain → Practice + Extend → Summary), not a single agent's mechanism.
+`Progressive learning path (Step 1-4)` is not in this table — it described the
+legacy five-zone flow rather than one reusable mechanism.
 
 ## Primitive File Shape
 

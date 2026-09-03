@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: `docs/INDEX.md` routes readers here; each linked document owns its topic.
 
 This directory stores long-lived documents that answer:
@@ -26,18 +26,21 @@ Which rules guide implementation and delivery
 - [AGENT_ARCHITECTURE.md](./AGENT_ARCHITECTURE.md)
 - [LEARNING_PROJECT_STRUCTURE.md](./LEARNING_PROJECT_STRUCTURE.md)
 - [API_CONTRACT_STRATEGY.md](./API_CONTRACT_STRATEGY.md)
-- [MVP_ROADMAP.md](./MVP_ROADMAP.md)
+- [ROADMAP.md](./ROADMAP.md)
 - [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md)
 - [agent-rules/README.md](./agent-rules/README.md)
 - [ADR index](./ADR/README.md)
 
-## Reference Attachments
+## Supporting Current Documents
 
-These files are useful alignment inputs, but not core delivery contracts:
+This file is useful for active collaboration, but does not override the core
+contracts above:
 
 - [ALIGNMENT_MODE.md](./ALIGNMENT_MODE.md)
-- [WORKBENCH_ALIGNMENT_REVIEW.html](./WORKBENCH_ALIGNMENT_REVIEW.html) — legacy visual reference
-- [LEARNING_AGENTS_USER_STORY_ALIGNMENT.html](./LEARNING_AGENTS_USER_STORY_ALIGNMENT.html) — legacy visual reference
+
+Retired alignment artifacts are indexed under
+[`docs/99-archive/references/`](../99-archive/references/README.md) and are not
+part of the default reading path.
 
 ## Relationship To Iteration Docs
 
@@ -51,8 +54,11 @@ Current implementation follows docs/01-iterations/ for scope.
 Long-term changes must be captured in ADR or updated architecture docs.
 ```
 
-The accepted next architectural target is
+The active architectural baseline is
 [ADR-0012](./ADR/0012-teacher-assistant-learning-workspace.md): one API teacher
 conversation per system-learning unit, asynchronous visible-CLI assistance,
-versioned teaching assets, and explicit source material. Iteration 13 owns the
-proposed contracts; current code remains the delivery truth until implemented.
+versioned teaching assets, and explicit source material. It is extended by
+[ADR-0013](./ADR/0013-stable-stream-rendering-and-global-preferences.md), which
+defines stable rich-stream rendering and one learner-owned global preferences file.
+[ADR-0014](./ADR/0014-current-documentation-surface-and-archive-boundary.md)
+defines which documents belong to the current AI context and which are historical only.

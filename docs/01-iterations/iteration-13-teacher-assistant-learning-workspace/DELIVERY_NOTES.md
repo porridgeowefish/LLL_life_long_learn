@@ -526,3 +526,98 @@ repeat the independent-reader check when capacity is available.
 The original planning-only note is superseded by the implementation and
 verification evidence above. Independent-reader review and native desktop
 smoke tests remain explicitly separate from the automated implementation pass.
+
+## 2026-09-02 Stream Performance And Preferences Simplification
+
+The teacher renderer now separates transport cadence from rich-content cadence:
+deltas flush every 64 ms, Markdown/KaTeX/DOMPurify use a 120 ms stream snapshot,
+Mermaid waits until completion, collapsed reasoning mounts lazily, historical
+messages are memoized, and auto-scroll is throttled. Ask AI reuses the same
+streaming Markdown boundary. This removes Mermaid success/failure oscillation
+without removing visible streaming.
+
+The project-level memory editor, API client, prompt dependency, and new-project
+memory files were removed. `<WORKSPACE>/preferences.md` is now the sole active
+preference file. The learner edits it through `/preferences`; teacher context
+and assistant attempts consume read-only snapshots. Existing project memory is
+preserved but ignored. ADR-0013 records the durable decision.
+
+## 2026-09-02 Long Conversation And Assistant Result Integration
+
+The teacher view no longer drains the complete append-only conversation during
+initial navigation. It requests the newest 40-message page, exposes an
+explicit older-history action, preserves the viewport while prepending, and
+uses the durable total message count for the right rail. Historical message
+containers use browser content visibility, while the existing stream batching
+continues to keep Mermaid out of incomplete responses.
+
+Workspace events now invalidate only their owning read model. In particular,
+assistant progress no longer reloads or reparses the conversation. Generated
+artifact commits emit `generated-artifact-updated`; source-processing commits
+emit `source-updated`; terminal task state continues through
+`assistant-task-updated`. The teacher joins durable task state to its original
+message and announces active-to-terminal transitions.
+
+The `资料` page now contains two explicit surfaces: uploaded originals with
+their readable derived files, and assistant-generated summaries, research,
+experiments, diagrams, or other validated deliverables. The latter reuses the
+same generated-material reader as `资产`, so the change adds a view rather than
+duplicating storage or creating a second result contract.
+
+This follows the same externally documented direction as ChatGPT's web long-
+conversation improvement: retrieve messages in smaller sections rather than
+fetching the entire conversation at once. See the official
+[ChatGPT release notes](https://help.openai.com/en/articles/6825453).
+
+Fresh verification for this change:
+
+- `go test ./...`: pass;
+- frontend Vitest: 44 files, 146 tests pass;
+- production frontend build: pass;
+- read-only Playwright on `腾讯云解决方案`: one initial conversation request,
+  40 of 55 messages returned, older-page cursor present, no browser errors;
+- read-only Playwright on `分布式计算`: one initial conversation request,
+  40 of 78 messages returned, two generated artifacts visible in `资料`, no
+  browser errors.
+
+## 2026-09-02 Initial Scroll And Interactive Result Collection
+
+The initial transcript position now follows the rendered content height, not
+only the message-array arrival. A content `ResizeObserver` keeps the first view
+at the newest message while deferred rich content settles, then respects the
+learner scrolling upward.
+
+Investigation of the real `腾讯云解决方案` task found three complete asset
+candidates, a valid dossier descriptor, and a valid result manifest, while the
+task remained `running`. The interactive CLI had completed its turn but stayed
+alive at the next prompt, so the old monitor never reached its process-exit
+collection branch. Result stability is now authoritative before process
+liveness in startup recovery and live monitoring.
+
+After deploying the corrected server, the stranded task was collected without
+regeneration: all three core assets became `updated`, the task became
+`succeeded`, and `K8s 入门第一阶段复习底稿（合并版）` appeared as one generated
+material. Browser QA returned one 40-of-55 initial conversation request,
+bottom distance zero after deferred layout, one generated material visible in
+`资料`, and no browser errors.
+
+## 2026-09-02 Existing Reader Pagination For Markdown Body Assets
+
+Long Markdown body assets now reuse the established Explain reader controls
+instead of rendering every section in one vertical document. Level-two
+headings provide the visual page boundaries; the canonical Markdown file stays
+whole so editing, versioning, source attribution, annotations, and Ask AI keep
+their existing offsets and APIs.
+
+The assets canvas now consumes the available desktop width. With annotations
+present it reserves one compact 280-pixel rail rather than constraining the
+document to the old fixed reading column. The responsive layout returns to one
+column on narrower screens.
+
+Fresh delivery evidence:
+
+- focused Vitest: 2 files, 5 tests pass;
+- production frontend build: pass;
+- read-only Playwright on `腾讯云解决方案`: 12 pages, previous/next transition
+  verified, 1456-pixel asset layout and 1122-pixel document at a 1600-pixel
+  viewport, no browser errors.

@@ -20,6 +20,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/assetstore"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	"github.com/xmz14/lll/backend-go/internal/preferencestore"
 	"github.com/xmz14/lll/backend-go/internal/sourcestore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -151,6 +152,10 @@ type inputManifest struct {
 		Snapshot   string `json:"snapshot"`
 		SHA256     string `json:"sha256"`
 	} `json:"conversation"`
+	Preferences struct {
+		Path   string `json:"path"`
+		SHA256 string `json:"sha256"`
+	} `json:"preferences"`
 	Assets map[string]struct {
 		VersionID string `json:"versionId"`
 		Cursor    uint64 `json:"cursor"`
@@ -214,6 +219,12 @@ type launchRecord struct {
 }
 
 const launchRecordGrace = 30 * time.Second
+const resultManifestSettleDelay = time.Second
+
+func stableResultManifest(attemptDir string) bool {
+	info, err := os.Stat(filepath.Join(attemptDir, "workspace", "result-manifest.json"))
+	return err == nil && info.Mode().IsRegular() && time.Since(info.ModTime()) >= resultManifestSettleDelay
+}
 
 func prepareLaunchRecord(task Task, runID string) error {
 	projectRoot, err := workspace.ProjectRootForSlug(task.ProjectSlug)
@@ -350,6 +361,16 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 		return manifest, nil, err
 	}
 	manifest.Conversation.ThroughSeq, manifest.Conversation.Snapshot, manifest.Conversation.SHA256 = task.ConversationCutoffSeq, "workspace/inputs/conversation.json", hashBytes(conversationBytes)
+	preferences, err := preferencestore.Read()
+	if err != nil {
+		return manifest, nil, err
+	}
+	preferenceBytes := []byte(preferences.Content)
+	preferencePath := filepath.Join(workDir, "inputs", preferencestore.Filename)
+	if err := workspace.AtomicWriteFile(preferencePath, preferenceBytes, 0o444); err != nil {
+		return manifest, nil, err
+	}
+	manifest.Preferences.Path, manifest.Preferences.SHA256 = "workspace/inputs/"+preferencestore.Filename, hashBytes(preferenceBytes)
 	assets, err := assetstore.New(task.ProjectSlug)
 	if err != nil {
 		return manifest, nil, err
@@ -405,7 +426,7 @@ func buildTaskPrompt(task Task, runID string) string {
 ## 工作边界
 
 1. 当前目录就是本次 attempt 的 workspace。只在此目录工作，不修改学习单元正式文件。
-2. 输入位于 inputs/；conversation.json 是已封存对话，assets/ 是三类资产基线，sources/ 是本次授权资料。
+2. 输入位于 inputs/；conversation.json 是已封存对话，preferences.md 是学习者维护的全局偏好只读快照，assets/ 是三类资产基线，sources/ 是本次授权资料。不得修改 preferences.md，也不得推断或回写新偏好。
 3. 可调研、运行代码、作图、生成任意必要文件。一般过程放 scratch/；值得保留的成果放 deliverables/<key>/。
 4. 对引入、正文、练习的候选更新分别写入 asset-updates/intro/current.md、asset-updates/body/current.md、asset-updates/practice/current.md。没有变化就声明 unchanged，不要为了填满而修改。
 5. 资料解析任务的派生文件放 source-updates/<revision-id>/。
@@ -759,6 +780,7 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		}
 		taskResult.Deliverables = append(taskResult.Deliverables, artifactID)
 		updated++
+		d.emitGenerated(task.ProjectSlug, task.ID, artifactID)
 	}
 	if result.SourceUpdate != nil && task.Type == "source-processing" {
 		files, media := map[string][]byte{}, map[string]string{}
@@ -782,7 +804,8 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		} else if _, err := sources.CommitDerived(result.SourceUpdate.SourceID, result.SourceUpdate.RevisionID, files, media); err != nil {
 			failed++
 		} else {
-			_, _ = sources.SetStatus(result.SourceUpdate.SourceID, "ready", "", task.ID)
+			updatedSource, _ := sources.SetStatus(result.SourceUpdate.SourceID, "ready", "", task.ID)
+			d.emitSource(task.ProjectSlug, updatedSource)
 			updated++
 		}
 	}
@@ -834,6 +857,18 @@ func (d *Dispatcher) emitAsset(slug string, asset *assetstore.Asset) {
 	}
 }
 
+func (d *Dispatcher) emitGenerated(slug, taskID, artifactID string) {
+	if d.events != nil {
+		d.events.Emit("generated-artifact-updated", map[string]any{"projectSlug": slug, "taskId": taskID, "artifactId": artifactID})
+	}
+}
+
+func (d *Dispatcher) emitSource(slug string, source sourcestore.Source) {
+	if d.events != nil && source.SourceID != "" {
+		d.events.Emit("source-updated", map[string]any{"projectSlug": slug, "source": source})
+	}
+}
+
 func (d *Dispatcher) reconcileLostRuns() {
 	projects, _ := workspace.IndexAll()
 	for _, project := range projects {
@@ -878,8 +913,7 @@ func (d *Dispatcher) reconcileLateResults() {
 			}
 			attemptDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID)
 			resultPath := filepath.Join(attemptDir, "workspace", "result-manifest.json")
-			info, statErr := os.Stat(resultPath)
-			if statErr != nil || time.Since(info.ModTime()) < time.Second {
+			if !stableResultManifest(attemptDir) {
 				continue
 			}
 			var journal commitJournal
@@ -985,6 +1019,13 @@ func (d *Dispatcher) reconcileRunningTask(store *Store, task Task) {
 		go d.recoverAttempt(store, task, runID, finished.ExitCode)
 		return
 	}
+	// Interactive CLIs intentionally remain open after finishing a turn. The
+	// result manifest is the assistant protocol's completion signal; terminal
+	// process exit only represents a later human action and must not gate commit.
+	if stableResultManifest(attemptDir) {
+		go d.recoverAttempt(store, task, runID, 0)
+		return
+	}
 	var executor executorRecord
 	if readJSON(filepath.Join(attemptDir, "executor.json"), &executor) == nil && processMatches(executor.PID, executor.StartedAt) {
 		_, _ = store.Update(task.ID, func(current *Task) error {
@@ -996,10 +1037,6 @@ func (d *Dispatcher) reconcileRunningTask(store *Store, task Task) {
 			return nil
 		})
 		go d.monitorRecovered(store, task, runID, executor.PID)
-		return
-	}
-	if _, err := os.Stat(filepath.Join(attemptDir, "workspace", "result-manifest.json")); err == nil {
-		go d.recoverAttempt(store, task, runID, 0)
 		return
 	}
 	var launch launchRecord
@@ -1031,13 +1068,13 @@ func (d *Dispatcher) monitorLaunching(store *Store, task Task, runID string, dea
 				d.recoverAttempt(store, task, runID, finished.ExitCode)
 				return
 			}
+			if stableResultManifest(attemptDir) {
+				d.recoverAttempt(store, task, runID, 0)
+				return
+			}
 			var executor executorRecord
 			if readJSON(filepath.Join(attemptDir, "executor.json"), &executor) == nil && processMatches(executor.PID, executor.StartedAt) {
 				d.monitorRecovered(store, task, runID, executor.PID)
-				return
-			}
-			if _, err := os.Stat(filepath.Join(attemptDir, "workspace", "result-manifest.json")); err == nil {
-				d.recoverAttempt(store, task, runID, 0)
 				return
 			}
 			if !time.Now().UTC().Before(deadline) {
@@ -1064,6 +1101,10 @@ func (d *Dispatcher) monitorRecovered(store *Store, task Task, runID string, pid
 			var finished exitRecord
 			if readJSON(filepath.Join(attemptDir, "exit.json"), &finished) == nil {
 				d.recoverAttempt(store, task, runID, finished.ExitCode)
+				return
+			}
+			if stableResultManifest(attemptDir) {
+				d.recoverAttempt(store, task, runID, 0)
 				return
 			}
 			var executor executorRecord

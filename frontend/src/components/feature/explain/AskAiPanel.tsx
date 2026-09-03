@@ -191,12 +191,16 @@ export function AskAiPanel() {
         {store.messages.length === 0 && !store.reviewMode && (
           <div className={s.hint}>针对选中文字提问，回答会流式输出并保存到这条疑问。</div>
         )}
-        {store.messages.map((m) =>
+        {store.messages.map((m, index) =>
           m.role === 'user' ? (
             <div key={m.id} className={s.user}>{m.content}</div>
           ) : (
             <div key={m.id} className={s.assistant}>
-              <MarkdownView source={m.content || (store.streaming ? '…' : '')} className={s.answer} />
+              <MarkdownView
+                source={m.content || (store.streaming ? '…' : '')}
+                className={s.answer}
+                streaming={store.streaming && index === store.messages.length - 1}
+              />
             </div>
           ),
         )}

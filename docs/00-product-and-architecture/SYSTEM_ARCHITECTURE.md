@@ -2,139 +2,146 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
-Source of truth: long-lived runtime boundaries and approved target architecture; code owns current implementation details.
+Last reviewed: 2026-09-02
+Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
 
 LLL is a local-first web application:
 
 ```text
-frontend/          Vite + React 18 + TypeScript SPA
-backend-go/        Go HTTP server, project runtime, file stores, and agent launcher
-projects/          canonical local project and artifact data
-agents/            registry, charters, and reasoning primitives
+frontend/          React 18 + TypeScript SPA
+backend-go/        Go HTTP/SSE server and application services
+projects/          canonical learning-unit, conversation, asset, source, and task files
+agents/            native CLI charters and reusable reasoning primitives
+preferences.md     learner-owned global preferences, read-only to AI
 ```
 
-The Go binary serves `frontend/dist/` in production. The file system is durable
-truth; in-memory indexes accelerate reads and can be rebuilt.
+The Go binary serves `frontend/dist/` in production. Filesystem content is
+durable truth; in-memory indexes, dispatch slots, and SSE connections are
+rebuildable runtime state. No database, external queue, cloud account, or
+hidden-only agent runtime is required.
 
 ## Runtime Planes
 
-```text
-Project plane
-Flat typed project directories, artifacts, runs, progress, and memory.
+| Plane | Responsibility |
+|---|---|
+| Experience | project tree, discipline overview, teacher conversation, assets, sources, preferences |
+| Transport | thin HTTP routes, response-local teacher SSE, global invalidation SSE |
+| Application | teacher, annotation Q&A, assistant task, dispatcher, asset, source, migration operations |
+| Domain | conversation, task, run, asset version, source revision, annotation, and project rules |
+| Infrastructure | file stores, provider adapters, visible native CLI, IDs, clock, event broadcast |
 
-Execution plane
-Real local AI runtime sessions launched through explicit project contracts.
-
-Experience plane
-Frontend project tree, discipline overview, five-zone learning surfaces, and controls.
-```
+Route handlers decode, validate size, call one application operation, and encode
+a stable response. Provider loops, queue admission, source privacy, and asset
+commits belong behind application/domain services rather than route-local code.
 
 ## Project-Type Routing
 
-```text
-discipline-map
-  -> switch between one discipline overview and one learning plan
-  -> render as an explicit overview row in an existing sidebar folder object
-  -> no five-zone navigation
-  -> may start creation of an ordinary system-learning project
-
-system-learning
-  -> open Intro / Explain / Practice / Extend / Summary
-  -> load one objective learning-scope.json into every Agent prompt
-  -> invoke zone-bound learning agents
-  -> render generated prerequisite-gap summaries without a second AI request or new project
-```
-
-The sidebar combines indexed project objects with the persisted folder layout.
-A bound discipline map opens from the folder title and is omitted from child
-rows; system-learning projects remain ordinary movable folder members. It never
-derives navigation nodes or projects from overview Markdown. The map page derives
-a Word-style table of contents from the H2/H3/H4 hierarchy and attaches a prefill
-action beside each contracted H4 topic in the explanatory body. A second top-level
-tab renders the learner-owned ordered task list.
-
-## Execution Flow
-
-System-learning invocation:
+### Discipline map
 
 ```text
-learner selects project + zone + agent
--> backend validates system-learning type and zone compatibility
--> backend resolves predecessor files and memory
--> backend assembles and launches the local AI runtime
--> run files remain raw; curated outputs land in zone contracts
+explicit ××学科总览 row
+-> overview.md + discipline-topics.json
+-> learner-owned learning-plan.json
+-> optional confirmed creation of an ordinary system-learning project
 ```
 
-Discipline-map generation or update:
+The encyclopedia Agent uses the shared visible native-CLI execution service. It
+writes the overview and topic-boundary catalog but does not choose the learner's
+order or create a learning unit without confirmation.
+
+### System learning
 
 ```text
-learner explicitly requests generation/update
--> backend validates discipline-map type
--> registered encyclopedia agent supplies its versioned charter
--> normal session and prompt package are created
--> selected native Agent CLI opens in a visible terminal
--> runtime writes the overview artifact
--> runtime also writes the validated discipline topic-boundary catalog
--> learner adds selected H4 topics to the ordered task-plan API
--> filesystem watcher emits artifact updates and the active page refetches
--> other project creation and progress changes do not trigger regeneration
+one project = one learning unit = one durable teacher conversation
+-> 教师: fast provider-neutral streaming dialogue
+-> 资产: versioned intro / body / practice plus generated deliverables
+-> 资料: immutable uploaded revisions and assistant-derived files
+-> 助教: disclosed, learner-authorized heavy work in a visible native CLI
 ```
 
-The encyclopedia agent is project-type-bound and has no learning zone; no sixth
-learning zone is implied.
+A map-origin unit receives a canonical topic scope snapshot. A standalone unit
+starts with a draft scope. Scope guides the teacher and assistant but does not
+create extra conversations, nested projects, or forced single-topic policing.
 
-Map deep-dive creation sends only map slug and topic ID. The backend resolves
-the canonical catalog entry and persists a ready scope snapshot. Standalone
-creation persists a draft scope. Intro changes learner adaptation, not a ready
-map boundary; all later zones consume the same scope.
+## Teacher Flow
+
+```text
+learner sends a turn
+-> teacher service assembles conversation, scope, active assets, disclosed sources, and read-only preferences
+-> selected model provider streams reasoning summary (when supplied) and answer deltas
+-> events append to the conversation log before they are projected to the UI
+-> refresh reconnects to durable run state and recovers the final response
+```
+
+The teacher owns teaching only. It has one narrow tool,
+`delegate_learning_work`. Before a task can be created, the teacher explains
+the proposed command, inputs, output, and learning value; a later learner turn
+must explicitly authorize that proposal.
+
+Rich output uses a two-rate rendering boundary: provider deltas are coalesced,
+Markdown/KaTeX/sanitization renders from a slower snapshot, collapsed reasoning
+is not mounted, and Mermaid stays a stable placeholder until the message is
+complete. Auto-scroll is throttled and historical messages are isolated from
+live-message rerenders.
+
+## Assistant Flow
+
+```text
+authorized teacher tool call
+-> assistant task service validates proposal identity and creates durable task.json
+-> dispatcher seals exact conversation/assets/sources/preferences into an attempt workspace
+-> shared execution service opens the selected native CLI in the project folder and injects one prompt
+-> CLI writes only declared attempt outputs
+-> Go validates result.json and declared deliverables
+-> valid candidates are versioned/merged into assets; generic outputs remain declared generated assets
+-> task state and global invalidation events update the conversation UI
+```
+
+The queue is local and rebuildable from task files. Default running limits are
+five globally and two per learning unit. Cancellation is the learner manually
+ending the visible terminal process; LLL records the resulting state but does
+not pretend to own a second remote cancellation mechanism.
+
+## Persistence And Recovery
+
+Canonical records live below the project root:
+
+```text
+unit.json
+conversation/{conversation.json,events.jsonl,compact.json}
+assets/{intro,body,practice,generated}
+sources/<source-id>/revisions/<revision-id>/{original,derived}
+assistant-tasks/<task-id>/{task.json,input-manifest.json,attempts}
+migrations/iteration-13/{migration.json,journal.jsonl,backup}
+```
+
+REST reconstructs durable state after refresh; SSE only reduces latency. Formal
+asset/source/conversation/task writes are owned by Go and use validated,
+recoverable file operations. The CLI cannot write canonical records directly.
+
+`<WORKSPACE>/preferences.md` is the only active preference document. Only the
+explicit preferences editor or direct user file editing may write it. Teacher
+and assistant prompts receive bounded read-only snapshots. Existing project
+`memory/` folders are preserved as ignored legacy data and are not supplied to AI.
+
+## Compatibility Boundary
+
+Legacy Intro / Explain / Practice / Extend / Summary routes, files, registered
+zone Agents, and readers remain only for old-project migration, rollback, and
+Ask-AI/asset compatibility. They are not the active system-learning navigation
+or the source for new assistant output contracts.
 
 ## Architectural Rules
 
 ```text
-filesystem-first truth
-explicit project types
-learner-owned product-shape choice
-real project objects only in navigation
-separation of raw runs and curated artifacts
-append-only execution history where supported
-missing legacy project type defaults to system learning
+filesystem-first durable truth
+one active teacher conversation per learning unit
+explicit learner authorization before heavy assistant work
+visible native CLI through one reusable execution service
+raw execution separated from curated/versioned assets
+REST recovery; SSE as notification/stream transport
+learner-owned preferences; no AI-managed memory
+legacy readers are compatibility, never fallback product direction
 ```
-
-Do not optimize for cloud accounts, multi-tenant collaboration, hidden-only
-orchestration, or database-first project modeling.
-
-## Iteration 13 Target Runtime
-
-ADR-0012 adds an application seam inside the existing Go process:
-
-```text
-Experience: one React teacher chat plus focused asset and source routes
-Transport: thin HTTP/SSE handlers and the existing single global SSE stream
-Application: teacher, annotation Q&A, task, dispatcher, asset, source, migration
-Domain: conversation, task, run, asset, version, source, annotation rules
-Infrastructure: provider adapters, file repositories, visible native CLI, IDs
-```
-
-The API teacher streams normal teaching and owns one narrow disclosed handoff
-tool. The visible native CLI performs approved substantial work asynchronously.
-LLL persists and mediates between them; neither runtime writes through the
-other's private interface.
-
-Conversation events, task files, source revisions, and asset versions remain
-filesystem truth. A local dispatcher rebuilds its queue by scanning task files;
-no external broker or database is introduced. Global SSE emits small
-invalidation events, while REST recovers durable state.
-
-This target is planned. The current project-type and five-zone execution flows
-remain executable until iteration-13 migration and cutover tests pass.
-
-## Delivery State
-
-The two-type routing, encyclopedia-agent generation, flat project storage,
-stateless type-advice conversation, and map-backed folder navigation are
-implemented by iteration 07. Hierarchical overview planning and the separate
-learning-plan view are implemented by iteration 11. Durable scope catalogs,
-snapshots, and prompt enforcement are implemented by iteration 12.

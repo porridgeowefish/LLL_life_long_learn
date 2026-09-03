@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-09-02
 Source of truth: operational routing and forward gates for LLL documentation changes.
 
 ## Entry
@@ -27,17 +27,21 @@ docs/00-product-and-architecture/agent-rules/README.md
 8. verify links, required documents, and diff formatting
 ```
 
+Historical material moves to `docs/99-archive/` instead of remaining beside
+current contracts. Update the archive index and replacement link in the same
+change. Never depend on archive content to carry a surviving current rule.
+
 ## Architecture Change Landing Table
 
 | Change type | ADR | Required long-lived sync |
 |---|---:|---|
-| Product shape, project type, or primary user journey | yes | `PRD.md`, `DOMAIN_MODEL.md`, `LEARNING_PROJECT_STRUCTURE.md`, `MVP_ROADMAP.md` |
+| Product shape, project type, or primary user journey | yes | `PRD.md`, `DOMAIN_MODEL.md`, `LEARNING_PROJECT_STRUCTURE.md`, `ROADMAP.md` |
 | Domain object or boundary | yes | `DOMAIN_MODEL.md`, `DATA_MODEL.md`, relevant structure document |
 | Runtime component or critical workflow | yes | `SYSTEM_ARCHITECTURE.md`, `BACKEND_ARCHITECTURE.md` or `AGENT_ARCHITECTURE.md` as applicable |
 | Persisted file/schema or database boundary | yes | `DATA_MODEL.md`, iteration data contract, migration readers/writers |
 | Public API/interface compatibility | when durable/strategic | `API_CONTRACT_STRATEGY.md`, iteration contract, client/server types |
 | Security, privacy, permission, or migration policy | yes | affected architecture document plus task-safety rule when operational |
-| Iteration renumbering or supersession | no, unless scope changes | `docs/01-iterations/README.md`, `MVP_ROADMAP.md`, cross-references, delivery notes |
+| Iteration renumbering or supersession | no, unless scope changes | `docs/01-iterations/README.md`, `ROADMAP.md`, cross-references, delivery notes |
 | ADR creation or renumber repair | no extra ADR | `ADR/README.md`, product-and-architecture README |
 
 Rules:

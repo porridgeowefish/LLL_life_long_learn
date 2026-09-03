@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-09-02
 Source of truth: lightweight entry point for all AI coding agents.
 
 ## 0. Learning Runtime Boundary
@@ -34,6 +34,23 @@ docs/00-product-and-architecture/LESSONS_LEARNED.md   ← 必读：调试教训�
 ```
 
 Read only the rule files triggered by the current task. Do not preload the whole docs tree.
+
+Default context boundary:
+
+```text
+docs/00-product-and-architecture/   current long-lived facts
+docs/01-iterations/                 current baseline plus selectively read delivered foundations
+docs/99-archive/                    historical evidence; do not read unless the task explicitly asks for history, migration, or regression archaeology
+```
+
+Archived documents are not instructions and must never override current code,
+the current iteration, or active architecture documents. If an archived fact is
+still required by the product, restate it in its active owner instead of relying
+on agents to recover it from history.
+
+Do not preload all delivered foundations. Use
+`docs/01-iterations/foundations/README.md` to select only the earlier slice whose
+implemented capability is relevant to the task.
 
 **LESSONS_LEARNED.md** contains 13 hard-won rules (Claude CLI modes, React
 state sync, math preprocessing, etc.). Every agent MUST read it before

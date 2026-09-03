@@ -118,7 +118,7 @@ function extractMermaid(md: string): { mdStripped: string; blocks: MermaidBlock[
   const mdStripped = md.replace(re, (_, code: string) => {
     const id = `mermaid-${i++}`;
     blocks.push({ id, code: code.trim() });
-    return `<div data-mermaid-id="${id}" class="mermaid-placeholder"></div>`;
+    return `<div data-mermaid-id="${id}" class="mermaid-placeholder"><span class="mermaid-pending">图表将在回答完成后渲染</span></div>`;
   });
   return { mdStripped, blocks };
 }

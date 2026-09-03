@@ -30,3 +30,5 @@ videos/
 # IDE / editor personal config
 .vscode/
 .idea/
+# Workspace-global learner preferences are local user data.
+/preferences.md

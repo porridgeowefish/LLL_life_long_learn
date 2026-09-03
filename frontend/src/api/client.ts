@@ -20,7 +20,7 @@ export interface RequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   signal?: AbortSignal;
-  // Set to true for endpoints that return text/plain (e.g. memory file reads).
+  // Set to true for endpoints that return plain text instead of JSON.
   rawText?: boolean;
 }
 

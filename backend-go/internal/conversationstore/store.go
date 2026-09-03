@@ -71,8 +71,11 @@ type Projection struct {
 	ConversationID string     `json:"conversationId"`
 	UnitID         string     `json:"unitId"`
 	LatestSeq      uint64     `json:"latestSeq"`
+	PageFromSeq    uint64     `json:"pageFromSeq,omitempty"`
 	PageThroughSeq uint64     `json:"pageThroughSeq"`
 	HasMore        bool       `json:"hasMore"`
+	HasPrevious    bool       `json:"hasPrevious,omitempty"`
+	TotalMessages  int        `json:"totalMessages"`
 	Messages       []Message  `json:"messages"`
 	TaskLinks      []TaskLink `json:"taskLinks"`
 }
@@ -282,6 +285,11 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		return Projection{}, err
 	}
 	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}}
+	for _, event := range events {
+		if event.Type == "message-recorded" {
+			proj.TotalMessages++
+		}
+	}
 	count := 0
 	for _, event := range events {
 		if event.Seq <= afterSeq {
@@ -292,6 +300,9 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 			break
 		}
 		proj.PageThroughSeq = event.Seq
+		if proj.PageFromSeq == 0 {
+			proj.PageFromSeq = event.Seq
+		}
 		switch event.Type {
 		case "message-recorded":
 			var msg Message
@@ -307,6 +318,82 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		count++
 	}
 	return proj, nil
+}
+
+// ReadRecent returns the newest message page before beforeSeq. A zero cursor
+// means "start at the tail". The page is message-based (not event-based), so
+// task links remain attached even when their event was recorded before the
+// corresponding teacher message. This endpoint is intended for interactive
+// clients that must not download and render an entire long conversation just
+// to open the teacher view.
+func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 40
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	meta, events, err := s.loadLocked()
+	if err != nil {
+		return Projection{}, err
+	}
+	type sequenced struct {
+		seq     uint64
+		message Message
+	}
+	messages := make([]sequenced, 0)
+	links := make([]TaskLink, 0)
+	for _, event := range events {
+		switch event.Type {
+		case "message-recorded":
+			var message Message
+			if json.Unmarshal(event.Data, &message) == nil {
+				messages = append(messages, sequenced{seq: event.Seq, message: message})
+			}
+		case "task-linked":
+			var link TaskLink
+			if json.Unmarshal(event.Data, &link) == nil {
+				links = append(links, link)
+			}
+		}
+	}
+	upper := beforeSeq
+	if upper == 0 || upper > meta.LatestSeq+1 {
+		upper = meta.LatestSeq + 1
+	}
+	end := len(messages)
+	for end > 0 && messages[end-1].seq >= upper {
+		end--
+	}
+	start := end - limit
+	if start < 0 {
+		start = 0
+	}
+	projection := Projection{
+		ConversationID: meta.ID,
+		UnitID:         meta.UnitID,
+		LatestSeq:      meta.LatestSeq,
+		HasPrevious:    start > 0,
+		TotalMessages:  len(messages),
+		Messages:       []Message{},
+		TaskLinks:      []TaskLink{},
+	}
+	selected := map[string]bool{}
+	for _, item := range messages[start:end] {
+		if projection.PageFromSeq == 0 {
+			projection.PageFromSeq = item.seq
+		}
+		projection.PageThroughSeq = item.seq
+		projection.Messages = append(projection.Messages, item.message)
+		selected[item.message.ID] = true
+	}
+	for _, link := range links {
+		if selected[link.MessageID] {
+			projection.TaskLinks = append(projection.TaskLinks, link)
+		}
+	}
+	// hasMore is retained as a compatibility alias for older clients.
+	projection.HasMore = projection.HasPrevious
+	return projection, nil
 }
 
 // SnapshotThrough returns the complete durable projection up to and including

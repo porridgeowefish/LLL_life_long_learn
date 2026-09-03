@@ -24,6 +24,7 @@ export const SSE_EVENTS = {
   sessionCompleted: 'session-completed',
   sessionFailed: 'session-failed',
   assistantTaskUpdated: 'assistant-task-updated',
+  generatedArtifactUpdated: 'generated-artifact-updated',
   learningAssetUpdated: 'learning-asset-updated',
   sourceUpdated: 'source-updated',
 } as const;

@@ -38,9 +38,19 @@ the existing result. Reusing it with different content returns
 
 ### 2.1 Read durable conversation
 
+Initial and backward reading uses:
+
+`GET /api/projects/{unitSlug}/conversation?beforeSeq={n}&limit={n}`
+
+`beforeSeq=0` means the current tail. The interactive client requests at most
+40 messages initially and supplies the returned `pageFromSeq` to load the next
+older page. The server returns messages in chronological order. Forward event
+reading remains available for compatibility:
+
 `GET /api/projects/{unitSlug}/conversation?afterSeq={n}&limit={n}`
 
-The default limit is 200 and the maximum is 500. The response is an ordered
+Backward message paging defaults to 40 and accepts at most 100. Forward event
+paging defaults to 200 and accepts at most 500. The response is an ordered
 durable projection, not raw provider frames:
 
 ```json
@@ -48,7 +58,11 @@ durable projection, not raw provider frames:
   "conversationId": "conv_01...",
   "unitId": "unit_01...",
   "latestSeq": 91,
-  "hasMore": false,
+  "pageFromSeq": 52,
+  "pageThroughSeq": 91,
+  "hasPrevious": true,
+  "totalMessages": 126,
+  "hasMore": true,
   "messages": [
     {
       "id": "msg_01...",
@@ -79,6 +93,11 @@ Canonical block types are:
 
 Rendered HTML, Mermaid-generated SVG, decoded pixels, and syntax-highlighted
 HTML are never returned as canonical history.
+
+Opening a conversation never requires downloading its complete projection.
+Older pages are prepended only after learner action and the viewport anchor is
+preserved. Task links are selected by the messages in the page, so an inline
+task card cannot be separated from its teacher message by event pagination.
 
 Renderer syntax is explicit: fenced `mermaid` blocks produce diagrams, fenced
 `svg` blocks produce sanitized isolated SVG previews, and `$...$` / `$$...$$`
@@ -130,6 +149,22 @@ Frontend stream union:
 The server emits no raw provider frame. The frontend concatenates deltas by
 stable `blockId`; it never reparses a delta as a complete message. A repeated
 frame ID is ignored.
+
+Global workspace SSE uses domain-specific invalidation instead of reloading
+the entire learning unit:
+
+| Event | Invalidated projection |
+|---|---|
+| `assistant-task-updated` | assistant task list and inline task state |
+| `generated-artifact-updated` | generated-material list |
+| `learning-asset-updated` | three core asset projections |
+| `source-updated` | source list and selected source detail |
+| `annotation-updated` | body annotations |
+
+Task completion remains durable in `assistant-tasks/<task-id>/task.json`. The
+teacher page joins that state through `taskLinks`, announces active-to-terminal
+transitions, and retains the terminal card after refresh. A transient browser
+notification is never the source of truth.
 
 ### 2.2.1 Reconnect an active teacher response
 
@@ -543,6 +578,12 @@ Each attempt writes exactly one `workspace/result-manifest.json`:
 }
 ```
 
+After the file has remained stable for the settlement window, its presence is
+the executor-to-LLL completion signal. LLL must validate and collect it even if
+the interactive CLI stays open at a new prompt. An `exit.json` record still
+reports terminal exit or manual interruption, but successful collection never
+waits for that record.
+
 Each deliverable descriptor is:
 
 ```json
@@ -627,3 +668,20 @@ payloads, or raw CLI command lines.
 - Existing global SSE remains a single connection mounted at the app shell.
 - A future contract may remove compatibility routes only after migration data
   and rollback support are no longer required.
+
+## 13. Global Learner Preferences
+
+```http
+GET /api/preferences
+PUT /api/preferences
+Content-Type: text/markdown; charset=utf-8
+```
+
+GET returns `{path:"preferences.md", content, maxBytes}` and creates the
+documented default file when absent. PUT atomically replaces at most 256 KiB of
+learner-authored Markdown. No project ID is accepted because the file is
+workspace-global. Teacher and assistant services have read-only store access;
+no AI tool, task result, generated asset, or prompt may call the write path.
+
+The retired `/files/projects/{slug}/memory/*` surface returns forbidden. The
+frontend `/memory` route redirects to `/preferences` for bookmarks only.

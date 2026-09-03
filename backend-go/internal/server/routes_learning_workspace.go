@@ -31,9 +31,16 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
-	after, _ := strconv.ParseUint(r.URL.Query().Get("afterSeq"), 10, 64)
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	projection, err := store.Read(after, limit)
+	query := r.URL.Query()
+	var projection conversationstore.Projection
+	if _, backward := query["beforeSeq"]; backward {
+		before, _ := strconv.ParseUint(query.Get("beforeSeq"), 10, 64)
+		projection, err = store.ReadRecent(before, limit)
+	} else {
+		after, _ := strconv.ParseUint(query.Get("afterSeq"), 10, 64)
+		projection, err = store.Read(after, limit)
+	}
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -158,6 +165,13 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *activeTeacher
 }
 
 func ensureTeacherGreeting(store *conversationstore.Store, slug string) error {
+	meta, err := store.Meta()
+	if err != nil {
+		return err
+	}
+	if meta.EventCount > 0 {
+		return nil
+	}
 	messages, err := store.AllMessages()
 	if err != nil || len(messages) > 0 {
 		return err
@@ -439,7 +453,9 @@ func (s *Server) handleReadSourceFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", mediaType)
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
+	if !strings.HasPrefix(mediaType, "text/") && !strings.HasPrefix(mediaType, "image/") && mediaType != "application/pdf" {
+		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
+	}
 	http.ServeFile(w, r, path)
 }
 

@@ -9,8 +9,8 @@ Editable alignment handoff: [ALIGNMENT.md](./ALIGNMENT.md)
 
 Related design and iterations:
 
-- `docs/superpowers/specs/2026-06-17-progressive-explain-generation-design.md` — charter-side progressive generation. That spec explicitly deferred the fsnotify/SSE "observation layer" as optional polish. Iteration 06 lands it.
-- `docs/01-iterations/iteration-05-follow-up-update-mechanism/` — no overlap (prompt contract + manifest metadata only).
+- [Progressive Explain Generation Design](../../../99-archive/designs/2026-06-17-progressive-explain-generation-design.md) — charter-side progressive generation. That spec explicitly deferred the fsnotify/SSE "observation layer" as optional polish. Iteration 06 lands it.
+- [Iteration 05](../iteration-05-follow-up-update-mechanism/README.md) — no overlap (prompt contract + manifest metadata only).
 
 ## Goal
 

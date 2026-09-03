@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-08-30
+Last reviewed: 2026-09-02
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -20,6 +20,8 @@ Explain confusions and Ask-AI
 Practice tasks, attempts, checking, submission, and evaluation
 Summary flashcards
 progress, activity aggregation, infographics, and SSE events
+teacher conversation and response recovery
+assistant task projection, assets, annotations, sources, and preferences
 ```
 
 `backend-go/internal/server/router.go` is the route truth. Go request/response
@@ -36,7 +38,7 @@ legacy-compatible defaults are explicit
 Markdown never overrides implemented route behavior
 ```
 
-## Iteration 07 Direction
+## Project Types And Discipline Maps
 
 Project APIs become type-aware:
 
@@ -61,42 +63,43 @@ overviews. The frontend renders each binding as an explicit `××学科总览` r
 while map slugs never enter child `slugOrder` membership.
 
 Exact request, response, and error semantics are owned by the implemented Go
-and TypeScript types and explained by iteration 07 `API_CONTRACT.md`.
+and TypeScript types. Historical delivery rationale is indexed in the archive.
 
-The iteration 07 on-demand prerequisite bridge is removed by iteration 09 and
-ADR-0008. Prerequisite summaries are generated as part of
+The on-demand prerequisite bridge is removed. Legacy prerequisite summaries are generated as part of
 `intro/assessment.json`; there is no separate prerequisite-helper endpoint.
 
-## Iteration 11 Discipline Planning
+## Discipline Planning
 
 Discipline-map generation records `overview.md` and `discipline-topics.json`; AI does not choose a task
 order. `GET/PUT /api/projects/{id}/learning-plan` read and atomically replace the
 learner-owned ordered task list in `learning-plan.json`. Older maps without the
 file read as an empty list. Root-file artifact events independently refresh the
 overview and plan queries. Completing a task records an idempotent activity event
-for that completion timestamp. Exact behavior is owned by iteration 11.
+for that completion timestamp. Exact behavior is owned by Go routes, stores, and
+the matching TypeScript client types.
 
-## Iteration 12 Learning Scope
+## Learning Scope
 
 `GET /api/projects/{id}/discipline-topics` reads the validated topic-boundary
 catalog. A system-learning create request may send `scopeSource` with
 `discipline-map`, map slug, and topic ID. The backend resolves the canonical
 topic and writes a creation-time `learning-scope.json` snapshot; the client
 never supplies boundary content. Standalone creation writes a draft scope.
-Exact shapes and stable errors are owned by iteration 12.
+Exact shapes and stable errors are owned by the implemented request types and
+learning-scope store.
 
-## Iteration 09 Project Deletion
+## Project Deletion
 
 `DELETE /api/projects/{id}` permanently removes a project resource after the
 client obtains one explicit learner confirmation. The server rejects deletion
 with `409 project_has_active_session` while an Agent may still write artifacts.
 Successful deletion includes canonical project files plus workspace-global
 folder references and in-memory session metadata. Exact semantics are owned by
-iteration 09 `API_CONTRACT.md`.
+the project route, workspace operation, and their tests.
 
-## Iteration 13 Conversation And Task Boundary
+## Conversation And Task Boundary
 
-Iteration 13 adds one provider-neutral teacher-turn stream, durable conversation
+The active API includes one provider-neutral teacher-turn stream, durable conversation
 reads, task and asset reads, editable core assets, body annotations, and source
 operations. The frontend consumes normalized block events and never consumes a
 provider SDK stream directly.
@@ -112,9 +115,9 @@ and source changes. REST remains the recovery truth. There is intentionally no
 public assistant-task create, cancel, or retry endpoint in the initial contract.
 Legacy confusion routes adapt to canonical body annotations during migration.
 
-Exact proposed shapes and stable errors are owned by iteration 13
-`INTERFACE_CONTRACT.md`. Current Go routes remain executable truth until the
-slice is implemented.
+Exact stable shapes and errors are documented by the current iteration
+`INTERFACE_CONTRACT.md`; implemented Go routes and TypeScript types remain
+executable truth.
 
 ## Compatibility
 

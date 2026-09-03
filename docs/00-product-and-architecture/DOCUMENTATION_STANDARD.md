@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-09-02
 Source of truth: documentation structure, required contracts, and completion rules for LLL.
 
 ## Core Principle
@@ -18,8 +18,8 @@ architecture, tests, and delivery status change in the same task.
 
 ```text
 docs/00-product-and-architecture/   long-lived product, domain, architecture, ADR, governance
-docs/01-iterations/                 one independently testable delivery increment
-docs/99-archive/                    historical reference only
+docs/01-iterations/                 current delivery plus selectively read delivered foundations
+docs/99-archive/                    fully retired historical reference only
 ```
 
 Entry documents index; detailed documents own facts. Do not copy one long
@@ -145,4 +145,11 @@ indexes and links are valid
 ## Supersession And Archive
 
 Superseded delivery documents remain for traceability and point to the replacing
-iteration. Archive content is never a fallback product contract.
+iteration. Once a newer baseline is current, move a retained implemented slice
+to `docs/01-iterations/foundations/` and register its current contribution. Move
+a slice to `docs/99-archive/` only when it is fully abandoned or replaced
+without an active contribution.
+
+Archive content is never a fallback product contract and is excluded from the
+default AI reading path. An archived ADR may leave the active index only after
+all surviving current facts have been consolidated into an active owner.
