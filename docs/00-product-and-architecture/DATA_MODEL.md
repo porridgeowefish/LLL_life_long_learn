@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -95,6 +95,27 @@ Legacy `projects/<slug>/memory/` files are preserved but ignored. New project
 skeletons do not create them, and the generic project file API rejects reads or
 writes to `memory/`.
 
+## Application Configuration And Quality Evidence
+
+Iteration 14 centralizes local application configuration without changing
+learner project data. `config.local.json` remains gitignored and read-compatible
+with current flat keys. The approved target groups server, workspace, AI,
+assistant, image, and UI values, with precedence:
+
+```text
+compiled defaults < local JSON < LLL_* environment < explicit CLI flags
+```
+
+Loading normalizes values in memory and never rewrites the learner's file.
+Secrets are supplied through environment variables by default and are redacted
+from diagnostics.
+
+Generated test, coverage, and dependency evidence lives below the ignored
+`.artifacts/quality/` root. It is build evidence, not product state, and must
+not contain secrets, full prompts, learner preferences, uploaded source
+contents, or unrestricted absolute paths. Exact iteration-14 shapes and
+compatibility fields are owned by its `DATA_DESIGN.md`.
+
 ## Persistence Rules
 
 ```text
@@ -125,12 +146,14 @@ migration backup and recovery journals
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE
 state are derived. Provider deltas, rendered rich content, and compact context
-are projections. Exact paths and schemas are owned by iteration 13
-`DATA_DESIGN.md`; code is current truth.
+are projections. Exact product paths and schemas remain owned by iteration 13
+`DATA_DESIGN.md`; code is current truth. Iteration 14 changes source ownership
+only and freezes these product schemas during the refactor.
 
 ## Delivery State
 
 The Go state model persists `projectType` for new projects. Missing type remains
 the legacy compatibility signal and decodes as `system-learning`. Iteration 13
 is implemented; its file schemas and migration compatibility are the active
-system-learning model.
+system-learning model. Iteration 14 is an approved source-architecture target
+and does not become product-data truth until delivered.

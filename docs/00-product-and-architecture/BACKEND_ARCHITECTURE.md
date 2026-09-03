@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: current Go backend boundaries and write ownership; package code owns implementation details.
 
 ## Intent
@@ -20,7 +20,39 @@ HTTP/SSE adapters
 Handlers must not own provider loops, queue admission, prompt injection,
 filesystem path policy, source disclosure, or multi-file asset commits.
 
-## Package Map
+## Iteration-14 Target Package Model
+
+The package map below describes current iteration-13 code. ADR-0015 approves a
+behavior-preserving migration to this target during iteration 14:
+
+```text
+internal/
+  app/{bootstrap,integration}
+  transport/http
+  modules/
+    teacher
+    assistant
+    assets
+    sources
+    projects
+    learning
+    preferences
+  platform/{config,filesystem,process,events,identity}
+  compatibility
+```
+
+Each module root is its public facade. Private domain, application, port, and
+adapter packages live below that module's nested `internal` directory as
+needed. Go visibility plus `tools/archcheck` prevents transport or other
+modules from bypassing the facade. `app/integration` converts bounded values
+between facades but owns no business rule; `app/bootstrap` is the only concrete
+composition root.
+
+The migration does not introduce microservices, a database, a broker, new
+public routes, or new project-file schemas. Current package names remain
+runtime truth until their iteration-14 wave is delivered and verified.
+
+## Current Package Map
 
 | Area | Primary packages | Responsibility |
 |---|---|---|

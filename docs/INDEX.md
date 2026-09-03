@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: this file is the entry point for people and AI agents.
 
 Read this file before implementation, then move to the linked domain documents.
@@ -42,6 +42,15 @@ task-specific long-lived documents. If the task touches an inherited capability,
 use the foundation index to select its originating slice; do not load all twelve
 iterations. Do not scan `docs/99-archive/` to discover requirements. Open it only
 for an explicit history, migration, compatibility, or regression question.
+
+## Active Delivery
+
+The implemented product baseline is
+[Iteration 13](./01-iterations/iteration-13-teacher-assistant-learning-workspace/README.md).
+The approved next architecture slice is
+[Iteration 14](./01-iterations/iteration-14-modular-monolith-architecture/README.md),
+which reorganizes source code, configuration, tests, and quality enforcement
+without changing learner-visible behavior or persisted project schemas.
 
 ## Required Entry Points
 

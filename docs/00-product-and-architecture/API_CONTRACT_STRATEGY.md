@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -37,6 +37,23 @@ backend and frontend types change in the same implementation task
 legacy-compatible defaults are explicit
 Markdown never overrides implemented route behavior
 ```
+
+## Iteration-14 Compatibility Freeze
+
+The modular-monolith refactor changes internal ownership, not the public
+product contract. Existing HTTP paths, status behavior, request and response
+shapes, normalized teacher stream blocks, and global invalidation events are
+frozen inputs to iteration 14.
+
+Backend capabilities expose small Go facades; frontend features expose one
+`index.ts`. These internal entry points replace direct imports of stores,
+providers, executors, components, hooks, or API implementations. They do not
+create a second public HTTP API.
+
+Contract tests run against the new composition root during migration. Any
+discovered need for a public shape change is a separate scoped decision that
+must update the active iteration contract, Go and TypeScript types, migration
+behavior, and tests before implementation.
 
 ## Project Types And Discipline Maps
 

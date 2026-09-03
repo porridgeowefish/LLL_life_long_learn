@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -27,6 +27,33 @@ agents/            agent registry, charters, primitives
 ```
 
 Use these as executable truth before trusting any design/mock document.
+
+### Approved Iteration-14 Source Target
+
+The current directories above remain executable truth. Iteration 14 will
+reorganize their internals without moving the top-level `backend-go/`,
+`frontend/`, or `agents/` roots and without moving runtime data:
+
+```text
+backend-go/internal/app/              composition and cross-module glue
+backend-go/internal/transport/        HTTP/SSE adapters
+backend-go/internal/modules/          business-capability facades and private implementations
+backend-go/internal/platform/         config, filesystem, process, event, identity mechanics
+backend-go/internal/compatibility/    legacy reads and migration only
+
+frontend/src/app/                     router, providers, app shell, single SSE mount
+frontend/src/features/                business feature public entries and private implementation
+frontend/src/shared/                  proven cross-feature UI and pure utilities
+
+tests/                                cross-module contracts, fixtures, recovery, smoke
+tools/archcheck/                      executable dependency policy
+.artifacts/quality/                   ignored generated test and coverage evidence
+config/                               committed schema and non-secret example
+```
+
+The target becomes current only after iteration 14 passes its full gate. Until
+then, use code and the current package map in `BACKEND_ARCHITECTURE.md` as
+implemented truth.
 
 ## 2. Project Runtime Data
 

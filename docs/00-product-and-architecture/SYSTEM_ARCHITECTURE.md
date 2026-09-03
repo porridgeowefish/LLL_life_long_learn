@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -21,6 +21,31 @@ The Go binary serves `frontend/dist/` in production. Filesystem content is
 durable truth; in-memory indexes, dispatch slots, and SSE connections are
 rebuildable runtime state. No database, external queue, cloud account, or
 hidden-only agent runtime is required.
+
+## Approved Iteration-14 Target
+
+ADR-0015 reorganizes the same runtime as a business-capability modular
+monolith. This is an approved target, not yet implemented reality. Deployment,
+public APIs, and canonical project files remain unchanged.
+
+```text
+cmd/lll
+-> app/bootstrap                         one composition root
+-> transport/http                       thin HTTP and SSE adapters
+-> modules/{teacher,assistant,assets,sources,projects,learning,preferences}
+-> platform/{config,filesystem,process,events,identity}
+-> compatibility                        legacy reads and migration only
+```
+
+Business capabilities are the primary code boundary. Complex modules may use
+domain, application, ports, and adapters internally; simple modules stay
+compact. A module exposes one facade, owns its persisted data family, and keeps
+stores, providers, executors, paths, and mutable entities private. Platform
+code supplies technical mechanics and may not depend on a business module.
+
+Cross-module calls use small consumer-defined ports connected in
+`app/integration`. Only `app/bootstrap` sees concrete implementations across
+the system. Automated import checks enforce these rules.
 
 ## Runtime Planes
 

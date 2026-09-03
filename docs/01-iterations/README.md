@@ -2,8 +2,8 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
-Source of truth: current delivery baseline and routing index for implemented foundations.
+Last reviewed: 2026-09-03
+Source of truth: current implemented baseline, active planning slice, and routing index for delivered foundations.
 
 Each iteration should be independently understandable and testable.
 
@@ -12,6 +12,17 @@ Each iteration should be independently understandable and testable.
 | Iteration | Goal | Directory |
 |---|---|---|
 | 13 | Teacher-assistant learning workspace, assets, source materials, stable streaming, and global preferences | [iteration-13-teacher-assistant-learning-workspace](./iteration-13-teacher-assistant-learning-workspace/README.md) |
+
+## Active Planning Slice
+
+| Iteration | Goal | Directory | State |
+|---|---|---|---|
+| 14 | Reorganize LLL as an enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) | approved design; implementation not started |
+
+Iteration 13 remains in place as the implemented baseline until iteration 14
+passes its complete delivery gate. At that point, iteration 13 moves to
+`foundations/` and its retained teacher-workspace contribution is registered in
+the foundation index.
 
 Iterations 01–12 are retained as [delivered foundations](./foundations/README.md).
 They explain reusable capabilities that still support the current architecture.
