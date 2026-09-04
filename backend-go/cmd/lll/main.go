@@ -2,6 +2,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,18 +11,42 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/paths"
+	"github.com/xmz14/lll/backend-go/internal/platform/config"
 	"github.com/xmz14/lll/backend-go/internal/server"
 )
 
 func main() {
+	var (
+		port       = flag.Int("port", 0, "server port (overrides config and LLL_SERVER_PORT)")
+		workspace  = flag.String("workspace", "", "workspace root (overrides config and LLL_WORKSPACE_ROOT)")
+		configPath = flag.String("config", "", "config file path (default: <workspace>/config.local.json)")
+	)
+	flag.Parse()
+
+	cfg, _, err := config.Load(config.Options{Path: *configPath, WorkspaceRoot: *workspace, Port: *port})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "config:", err)
+		os.Exit(1)
+	}
+	for _, warning := range cfg.Warnings {
+		fmt.Println("config:", warning)
+	}
+	// Flag/env workspace wins over the file value for the runtime roots.
+	if cfg.Workspace.Root != "" {
+		os.Setenv("WORKSPACE", cfg.Workspace.Root)
+	}
+
 	srv := server.New()
 	defer srv.Close()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8787"
+	portEnv := fmt.Sprintf("%d", cfg.Server.Port)
+	if *port != 0 {
+		portEnv = fmt.Sprintf("%d", *port)
 	}
-	addr := ":" + port
+	if portEnv == "" {
+		portEnv = "8787"
+	}
+	addr := ":" + portEnv
 
 	fmt.Printf("LifeLongLearn server\n")
 	fmt.Printf("  Workspace: %s\n", paths.WORKSPACE)
@@ -30,7 +55,7 @@ func main() {
 	fmt.Printf("  Frontend:  %s\n", paths.FRONTEND_ROOT)
 	fmt.Printf("  Claude:    %s (available=%t)\n", srv.ClaudeBin, srv.ClaudeAvailable)
 	fmt.Printf("  Runtime:   %s / %s (available=%t)\n", srv.Runtime.ID, srv.Runtime.Bin, srv.Runtime.Available)
-	fmt.Printf("Listening on http://localhost:%s\n", port)
+	fmt.Printf("Listening on http://localhost:%s\n", portEnv)
 
 	httpServer := &http.Server{Addr: addr, Handler: srv.Handler()}
 	srv.SetShutdownFunc(func() {

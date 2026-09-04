@@ -236,7 +236,6 @@ export function MarkdownEditor({
             <div
               ref={previewRef}
               className={s.previewContent}
-              // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: html }}
             />
           </div>

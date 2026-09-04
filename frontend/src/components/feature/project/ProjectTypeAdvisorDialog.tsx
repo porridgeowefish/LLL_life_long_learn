@@ -54,7 +54,8 @@ export function ProjectTypeAdvisorDialog({
     setRecommendationReason('');
     setRecommendationTradeoff('');
     advice.reset();
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Reset-on-open is intentional; `advice` is a stable object.
+  }, [open]);
 
   useEffect(() => {
     const el = listRef.current;

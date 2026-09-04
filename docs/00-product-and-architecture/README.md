@@ -28,6 +28,7 @@ Which rules guide implementation and delivery
 - [API_CONTRACT_STRATEGY.md](./API_CONTRACT_STRATEGY.md)
 - [ROADMAP.md](./ROADMAP.md)
 - [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md)
+- [QUALITY_COMMANDS.md](./QUALITY_COMMANDS.md)
 - [agent-rules/README.md](./agent-rules/README.md)
 - [ADR index](./ADR/README.md)
 

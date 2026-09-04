@@ -214,7 +214,7 @@ export function OutputViewer({ slug, zone }: OutputViewerProps) {
       <div
         ref={markdownRef}
         className={s.markdown}
-        // eslint-disable-next-line react/no-danger -- HTML is sanitised via DOMPurify in useMarkdown.
+        // HTML is sanitised via DOMPurify in useMarkdown.
         dangerouslySetInnerHTML={{ __html: html }}
       />
       {toolbar && createPortal((

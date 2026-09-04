@@ -38,7 +38,7 @@ plan.
 | Wave | State | Evidence |
 |---|---|---|
 | 0 — contract and baseline freeze | delivered | `tests/fixtures/` synthetic families (canonical/legacy-zones/memory-era/corrupt) generated through production stores via `backend-go/internal/testfixtures`; `contract_freeze_test.go` pins 89 frozen routes, key JSON shapes, SSE hello/event names, error paths, and fixture non-mutation; baseline `tests/baseline.json` (Go 29.35%, frontend 40.24%); `.gitignore` gains `.artifacts/` |
-| 1 — config and quality foundation | pending | none |
+| 1 — config and quality foundation | delivered | `backend-go/internal/platform/config` typed loader with flat-key compat, LLL_* env, `--port/--workspace/--config` flags, redaction, provenance, and a no-rewrite guarantee (12 loader tests incl. flat↔sectioned equivalence); `tools/archcheck` R1–R4 with negative fixtures and allowlist; root `check:fast`/`check`/`check:full` via `scripts/run-check.js` + `scripts/check-coverage.js` floors; frontend ESLint 9 flat config (lint now actually runs: 3 stale disable comments and 1 useless-escape fixed); `config/config.example.json` + `config/README.md`; `.github/workflows/ci.yml` (windows-latest, `npm run check`); QUALITY_COMMANDS.md documented. Gate: `node scripts/run-check.js complete` PASSED (go 32.60% ≥ floor) |
 | 2 — bootstrap and transport | pending | none |
 | 3 — preferences, sources, assets | pending | none |
 | 4 — teacher | pending | none |

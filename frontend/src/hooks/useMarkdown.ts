@@ -91,7 +91,7 @@ function extractMath(md: string): ExtractedMath {
   });
 
   // 2) Inline math $...$  (single line, no nested $).
-  out = out.replace(/\$([^\$\n\r][^\$\n\r]*?)\$/g, (_, code: string) => {
+  out = out.replace(/\$([^$\n\r][^$\n\r]*?)\$/g, (_, code: string) => {
     const id = `MATHINLINE${i++}X`;
     let html = '';
     try {

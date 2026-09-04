@@ -45,11 +45,11 @@ func writeAgent(t *testing.T, dir, id string, zones []workspace.ZoneName, charte
 		t.Fatal(err)
 	}
 	a := Agent{
-		ID:           id,
-		Name:         id,
-		UserStory:    "test user story for " + id,
-		AllowedZones: zones,
-		CharterPath:  chPath,
+		ID:                   id,
+		Name:                 id,
+		UserStory:            "test user story for " + id,
+		AllowedZones:         zones,
+		CharterPath:          chPath,
 		DefaultOutputTargets: []OutputTarget{{ZoneName: zones[0], Filename: "output.md"}},
 	}
 	data, err := json.Marshal(a)

@@ -12,12 +12,12 @@ import (
 // PROJECTS_ROOT holds all learning project folders.
 // AGENTS_ROOT holds agent registry + charter files.
 var (
-	PROJECT_ROOT    string
-	WORKSPACE       string
-	PROJECTS_ROOT   string
-	AGENTS_ROOT     string
-	FRONTEND_ROOT   string
-	FRONTEND_INDEX  string
+	PROJECT_ROOT   string
+	WORKSPACE      string
+	PROJECTS_ROOT  string
+	AGENTS_ROOT    string
+	FRONTEND_ROOT  string
+	FRONTEND_INDEX string
 )
 
 func init() {
