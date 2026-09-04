@@ -37,6 +37,10 @@ type (
 	CreateInput            = tasks.CreateInput
 	TaskStore              = tasks.Store
 	Dispatcher             = tasks.Dispatcher
+	Dependencies           = tasks.Dependencies
+	AssetSnapshot          = tasks.AssetSnapshot
+	AssetCommitInput       = tasks.AssetCommitInput
+	SourceSnapshot         = tasks.SourceSnapshot
 	SameTypeActiveError    = tasks.SameTypeActiveError
 	OperationConflictError = tasks.OperationConflictError
 

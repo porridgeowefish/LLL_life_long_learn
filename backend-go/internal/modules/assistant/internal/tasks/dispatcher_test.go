@@ -8,10 +8,86 @@ import (
 	"time"
 
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
+
+func newTestDispatcher(execution ExecutionService, events EventEmitter) *Dispatcher {
+	d := NewDispatcher(execution, events)
+	d.Configure(Dependencies{
+		ConversationSnapshot: func(slug string, through uint64) ([]byte, error) {
+			store, err := teacher.NewConversation(slug)
+			if err != nil {
+				return nil, err
+			}
+			projection, err := store.SnapshotThrough(through)
+			if err != nil {
+				return nil, err
+			}
+			return json.MarshalIndent(projection, "", "  ")
+		},
+		PreferencesSnapshot: func() (string, []byte, error) {
+			snapshot, err := preferencestore.Read()
+			return preferencestore.Filename, []byte(snapshot.Content), err
+		},
+		AssetKeys: assetstore.CoreKeys,
+		ReadAsset: func(slug, key string) (AssetSnapshot, error) {
+			store, err := assetstore.New(slug)
+			if err != nil {
+				return AssetSnapshot{}, err
+			}
+			asset, err := store.Get(key)
+			return AssetSnapshot{VersionID: asset.Meta.CurrentVersionID, ConversationCursor: asset.Meta.ConversationCursor, Content: asset.Content}, err
+		},
+		AdvanceAsset: func(slug, key string, through uint64) error {
+			store, err := assetstore.New(slug)
+			if err != nil {
+				return err
+			}
+			_, err = store.AdvanceCursor(key, through)
+			return err
+		},
+		CommitAsset: func(slug string, input AssetCommitInput) (string, any, error) {
+			store, err := assetstore.New(slug)
+			if err != nil {
+				return "", nil, err
+			}
+			result, err := store.CommitCandidate(assetstore.CandidateInput{Key: input.Key, BaseVersionID: input.BaseVersionID, BaseContent: input.BaseContent, CandidateContent: input.CandidateContent, TaskID: input.TaskID, RunID: input.RunID, FromSeq: input.FromSeq, ThroughSeq: input.ThroughSeq, SourceRevisionIDs: input.SourceRevisionIDs, ChangeSummary: input.ChangeSummary})
+			return result.Status, result.Asset.Meta, err
+		},
+		SealSource: func(slug, sourceID, destination string) (SourceSnapshot, error) {
+			store, err := sourcestore.New(slug)
+			if err != nil {
+				return SourceSnapshot{}, err
+			}
+			_, revision, err := store.Get(sourceID)
+			if err != nil {
+				return SourceSnapshot{}, err
+			}
+			root, err := workspace.ProjectRootForSlug(slug)
+			if err != nil {
+				return SourceSnapshot{}, err
+			}
+			if err := copyTree(filepath.Join(root, "sources", sourceID, "revisions", revision.RevisionID), filepath.Join(destination, revision.RevisionID)); err != nil {
+				return SourceSnapshot{}, err
+			}
+			return SourceSnapshot{RevisionID: revision.RevisionID, SHA256: revision.Original.SHA256}, nil
+		},
+		CommitSourceDerived: func(slug, sourceID, revisionID, taskID string, files map[string][]byte, media map[string]string) (any, error) {
+			store, err := sourcestore.New(slug)
+			if err != nil {
+				return nil, err
+			}
+			if _, err := store.CommitDerived(sourceID, revisionID, files, media); err != nil {
+				return nil, err
+			}
+			return store.SetStatus(sourceID, "ready", "", taskID)
+		},
+	})
+	return d
+}
 
 func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testing.T) {
 	root := t.TempDir()
@@ -36,7 +112,7 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "body"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	d := NewDispatcher(nil, nil)
+	d := newTestDispatcher(nil, nil)
 	defer close(d.stop)
 	manifest, _, err := d.sealInputs(task, workDir)
 	if err != nil {
@@ -89,7 +165,7 @@ func (e *recordingTaskEmitter) Emit(name string, _ any) { e.names = append(e.nam
 
 func TestDispatcherEmitsResultProjectionEvents(t *testing.T) {
 	emitter := &recordingTaskEmitter{}
-	dispatcher := NewDispatcher(nil, emitter)
+	dispatcher := newTestDispatcher(nil, emitter)
 	dispatcher.emitGenerated("topic", "task-1", "artifact-1")
 	dispatcher.emitSource("topic", sourcestore.Source{SourceID: "source-1"})
 	if len(emitter.names) != 2 || emitter.names[0] != "generated-artifact-updated" || emitter.names[1] != "source-updated" {
@@ -191,7 +267,7 @@ func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T)
 			t.Fatal(err)
 		}
 	}
-	d := NewDispatcher(nil, nil)
+	d := newTestDispatcher(nil, nil)
 	manifest, _, err := d.sealInputs(task, workDir)
 	if err != nil {
 		t.Fatal(err)
@@ -277,7 +353,7 @@ func TestSealInputsUsesCompleteConversationAtApprovalCutoff(t *testing.T) {
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	dispatcher := NewDispatcher(nil, nil)
+	dispatcher := newTestDispatcher(nil, nil)
 	manifest, _, err := dispatcher.sealInputs(Task{ID: "task_cutoff", ProjectSlug: "cutoff", ConversationCutoffSeq: cutoff}, workDir)
 	if err != nil {
 		t.Fatal(err)
@@ -310,7 +386,7 @@ func TestFreshLaunchRecordPreventsImmediateRestartFailure(t *testing.T) {
 		current.Status, current.Phase, current.AttemptIDs = "running", "preparing", []string{runID}
 		return nil
 	})
-	dispatcher := NewDispatcher(nil, nil)
+	dispatcher := newTestDispatcher(nil, nil)
 	dispatcher.reconcileRunningTask(store, task)
 	got, _ := store.Get(task.ID)
 	if got.Status != "running" {
@@ -351,7 +427,7 @@ func TestRecoverAttemptFinishesCompletedCommitJournal(t *testing.T) {
 	if err := writeJSON(journalPath, commitJournal{SchemaVersion: 1, TaskID: task.ID, RunID: runID, State: "completed", Status: "succeeded", Result: &Result{Summary: "已恢复"}, UpdatedAt: time.Now().UTC()}); err != nil {
 		t.Fatal(err)
 	}
-	d := NewDispatcher(nil, nil)
+	d := newTestDispatcher(nil, nil)
 	d.recoverAttempt(store, task, runID, 0)
 	got, _ := store.Get(task.ID)
 	if got.Status != "succeeded" || got.Result == nil || got.Result.Summary != "已恢复" {

@@ -3,16 +3,13 @@ package agentruntime
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 type ID string
@@ -95,58 +92,33 @@ func DefinitionByID(id ID) (Definition, bool) {
 }
 
 func Load() (Config, error) {
-	cfg := Config{Selected: RuntimeClaude, Bins: map[string]string{}}
-	if env := strings.TrimSpace(os.Getenv("LLL_AGENT_RUNTIME")); env != "" {
-		cfg.Selected = normalizeID(ID(env))
-	}
-	data, err := os.ReadFile(configPath())
+	loaded, _, err := platformconfig.Load(platformconfig.Options{})
 	if err != nil {
-		if os.IsNotExist(err) {
-			return cfg, nil
-		}
-		return cfg, err
+		return Config{}, err
 	}
-	var disk Config
-	if err := json.Unmarshal(data, &disk); err != nil {
-		return cfg, err
+	cfg := Config{Selected: normalizeID(ID(loaded.Assistant.Runtime)), Bins: loaded.Assistant.Bins}
+	if cfg.Selected == "" {
+		cfg.Selected = RuntimeClaude
 	}
-	if disk.Selected != "" {
-		cfg.Selected = normalizeID(disk.Selected)
+	if cfg.Bins == nil {
+		cfg.Bins = map[string]string{}
 	}
-	if disk.Bins != nil {
-		cfg.Bins = disk.Bins
-		if cfg.Bins[string(RuntimeCodeBuddy)] == "" && cfg.Bins["workbuddy"] != "" {
-			cfg.Bins[string(RuntimeCodeBuddy)] = cfg.Bins["workbuddy"]
-		}
-	}
-	if env := strings.TrimSpace(os.Getenv("LLL_AGENT_RUNTIME")); env != "" {
-		cfg.Selected = normalizeID(ID(env))
+	if cfg.Bins[string(RuntimeCodeBuddy)] == "" && cfg.Bins["workbuddy"] != "" {
+		cfg.Bins[string(RuntimeCodeBuddy)] = cfg.Bins["workbuddy"]
 	}
 	return cfg, nil
 }
 
 func SaveSelected(id ID) error {
 	if _, ok := DefinitionByID(id); !ok {
-		return errors.New("unknown agent runtime")
+		return &unknownRuntimeError{id: id}
 	}
-	path := configPath()
-	raw := map[string]json.RawMessage{}
-	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &raw)
-	} else if !os.IsNotExist(err) {
-		return err
-	}
-	encoded, _ := json.Marshal(id)
-	raw["agentRuntime"] = encoded
-	data, err := json.MarshalIndent(raw, "", "  ")
-	if err != nil {
-		return err
-	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return platformconfig.SaveAssistantRuntime(string(id))
 }
+
+type unknownRuntimeError struct{ id ID }
+
+func (e *unknownRuntimeError) Error() string { return "unknown agent runtime: " + string(e.id) }
 
 func Resolve(cfg Config) Runtime {
 	def, ok := DefinitionByID(cfg.Selected)
@@ -215,14 +187,6 @@ func probeWSL(bin string, args []string, timeout time.Duration) bool {
 
 func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
-}
-
-func configPath() string {
-	root := paths.WORKSPACE
-	if root == "" {
-		root = paths.PROJECT_ROOT
-	}
-	return filepath.Join(root, "config.local.json")
 }
 
 func normalizeID(id ID) ID {

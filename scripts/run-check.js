@@ -77,17 +77,18 @@ if (mode !== 'fast') {
 
 // ---- full adds ----
 if (mode === 'full') {
-  // Contract suite currently lives inside backend-go/internal/server
-  // (contract_freeze_test.go); run its tagged subset explicitly.
+  // Run the frozen HTTP/SSE/persistence contract subset explicitly.
   run(
     'contract freeze suite',
     'go',
-    ['test', '-count=1', '-timeout', '300s', '-run', 'TestRouteTableFrozen|TestEventsEndpointRegistered|TestConversationProjectionShape|TestAssetsListShape|TestSourcesListShape|TestAssistantTasksListShape|TestErrorPathsFrozen|TestLegacyFixtureReadableWithoutMutation|TestCorruptFixtureClassifiedFailure|TestHealthShape|TestSSEEventNamesFrozen', './backend-go/internal/server/'],
+    ['test', '-count=1', '-timeout', '300s', './backend-go/internal/transport/httpserver/'],
   );
-  // Windows-native smoke lands in wave 5 (tests/smoke).
   if (process.platform === 'win32') {
-    console.log('\n=== Windows-native smoke ===');
-    console.log('smoke suite is delivered in a later wave; nothing to run yet.');
+    run(
+      'Windows-native fake CLI smoke',
+      'go',
+      ['test', '-count=1', '-timeout', '60s', '-run', 'TestWindowsWrapperPreservesLongQuotedPromptAndChineseWorkspace', './backend-go/internal/modules/assistant/internal/launch/'],
+    );
   } else {
     console.log('\n=== Windows-native smoke === skipped (not on Windows)');
   }
