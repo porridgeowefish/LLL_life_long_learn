@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/folderstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/learningscope"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // contentTypeFor returns the appropriate Content-Type for a file based on its extension.
@@ -60,7 +60,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	store, err := folderstore.New()
+	store, err := folderstore.NewFolderStore()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
 		return
@@ -380,7 +380,7 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	}
 	if dir == "extend" && file == "flower.json" {
 		digest := sha256.Sum256(body)
-		_, _, err := awardLearningEvent(slug, progressstore.Event{
+		_, _, err := awardLearningEvent(slug, progressstore.ProgressEvent{
 			ID:            "extend-flower:" + hex.EncodeToString(digest[:12]),
 			SourceType:    "extend-flower",
 			SourceID:      rel,

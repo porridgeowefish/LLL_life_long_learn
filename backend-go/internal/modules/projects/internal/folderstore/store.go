@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/xmz14/lll/backend-go/internal/modules/projects/internal/workspace"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 // Folder is one user-created grouping of project slugs (references only).

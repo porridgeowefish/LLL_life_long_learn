@@ -9,9 +9,9 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/preferences"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func AssistantDependencies() assistant.Dependencies {

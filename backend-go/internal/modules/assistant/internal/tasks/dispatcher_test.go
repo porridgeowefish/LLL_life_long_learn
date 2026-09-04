@@ -9,9 +9,9 @@ import (
 
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func newTestDispatcher(execution ExecutionService, events EventEmitter) *Dispatcher {

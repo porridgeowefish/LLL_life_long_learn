@@ -6,7 +6,7 @@ import (
 	"errors"
 
 	"crypto/sha256"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 
 	"encoding/hex"
 	"os"

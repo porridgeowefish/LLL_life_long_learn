@@ -13,14 +13,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/projectindex"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func setupAskAiTestProject(t *testing.T) {
@@ -176,9 +176,9 @@ func newTestServer(t *testing.T) *Server {
 		broadcaster:    httpx.NewBroadcaster(),
 		teacher:        teacher.New(nil),
 		activeTeacher:  teacher.NewActiveResponses(),
-		runProgress:    runprogress.New(),
+		runProgress:    runprogress.NewRunStore(),
 		sessions:       sessionstore.New(),
-		cache:          projectindex.New(),
+		cache:          projectindex.NewIndex(),
 		migrationReady: true,
 	}
 	s.agents = assistant.NewRegistry()

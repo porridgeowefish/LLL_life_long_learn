@@ -5,11 +5,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 type recordingEvents struct {
@@ -171,7 +171,7 @@ func TestTUIWrapperInjectsSettingsForClaude(t *testing.T) {
 
 func TestWriteHookSettingsRegistersRunAndToken(t *testing.T) {
 	dir := t.TempDir()
-	store := runprogress.New()
+	store := runprogress.NewRunStore()
 	path, token, err := writeHookSettings(dir, "run-xyz", store)
 	if err != nil {
 		t.Fatalf("writeHookSettings error: %v", err)
@@ -198,7 +198,7 @@ func TestWriteHookSettingsRegistersRunAndToken(t *testing.T) {
 		t.Errorf("settings JSON missing PostToolUse/Stop hooks:\n%s", body)
 	}
 	// Wrong token must be rejected by the store.
-	if _, ok := store.Set("run-xyz", "wrong", runprogress.Status{Activity: "x"}); ok {
+	if _, ok := store.Set("run-xyz", "wrong", runprogress.RunStatus{Activity: "x"}); ok {
 		t.Errorf("store accepted a wrong token")
 	}
 }

@@ -13,16 +13,16 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/app/integration"
-	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/artifactwatch"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/iteration13migration"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
-	"github.com/xmz14/lll/backend-go/internal/iteration13migration"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/projectindex"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/transport/httpserver"
 )
 
@@ -60,8 +60,8 @@ func Build() *App {
 		ClaudeBin: bin, ClaudeAvailable: probeBin(bin, "--version"),
 		Runtime: assistant.ResolveRuntime(runtimeCfg), RuntimeOptions: assistant.ListRuntimes(runtimeCfg),
 		ImageConfig: imageCfg, ImageAvailable: imageCfg != nil && imageCfg.PythonBin != "" && probeBin(imageCfg.PythonBin, "--version"),
-		RunProgress: runprogress.New(), Watcher: watcher, Teacher: teacherService, Broadcaster: broadcaster,
-		Agents: registry, Sessions: sessionstore.New(), Cache: projectindex.New(),
+		RunProgress: runprogress.NewRunStore(), Watcher: watcher, Teacher: teacherService, Broadcaster: broadcaster,
+		Agents: registry, Sessions: sessionstore.New(), Cache: projectindex.NewIndex(),
 		MigrationReady: migration.Ready, MigrationFailed: migration.FailedProjects,
 	})
 	execution := assistant.NewExecution(server.RuntimeSnapshot)

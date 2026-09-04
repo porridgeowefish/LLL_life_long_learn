@@ -14,15 +14,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/artifactwatch"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/projectindex"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 )
 
 // Server bundles runtime dependencies shared across handlers. Every field
@@ -35,7 +35,7 @@ type Server struct {
 	RuntimeOptions  []assistant.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
-	runProgress     *runprogress.Store
+	runProgress     *runprogress.RunStore
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
 	teacher         *teacher.Service
@@ -48,7 +48,7 @@ type Server struct {
 	broadcaster      *httpx.Broadcaster
 	agents           *assistant.Registry
 	sessions         *sessionstore.Store
-	cache            *projectindex.Cache
+	cache            *projectindex.Index
 	infographicJobs  sync.Map
 	practiceEvalJobs sync.Map
 	mu               sync.RWMutex
@@ -68,13 +68,13 @@ type Dependencies struct {
 	RuntimeOptions  []assistant.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
-	RunProgress     *runprogress.Store
+	RunProgress     *runprogress.RunStore
 	Watcher         *artifactwatch.Watcher
 	Teacher         *teacher.Service
 	Broadcaster     *httpx.Broadcaster
 	Agents          *assistant.Registry
 	Sessions        *sessionstore.Store
-	Cache           *projectindex.Cache
+	Cache           *projectindex.Index
 	MigrationReady  bool
 	MigrationFailed []string
 }

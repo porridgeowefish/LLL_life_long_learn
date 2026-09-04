@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 // copyFixture copies one fixture family below dst and returns the projects root.

@@ -3,14 +3,14 @@ package httpserver
 import (
 	"net/http"
 
-	"github.com/xmz14/lll/backend-go/internal/folderstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // handleGetFolders returns the workspace-global folder layout.
 func (s *Server) handleGetFolders(w http.ResponseWriter, r *http.Request) {
-	store, err := folderstore.New()
+	store, err := folderstore.NewFolderStore()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -33,7 +33,7 @@ func (s *Server) handlePutFolders(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	store, err := folderstore.New()
+	store, err := folderstore.NewFolderStore()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -50,7 +50,7 @@ func (s *Server) handlePutFolders(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
-func (s *Server) syncDisciplineMapFolders(store *folderstore.Store) (folderstore.Layout, error) {
+func (s *Server) syncDisciplineMapFolders(store *folderstore.FolderStore) (folderstore.Layout, error) {
 	if err := s.cache.Rebuild(); err != nil {
 		return folderstore.Layout{}, err
 	}

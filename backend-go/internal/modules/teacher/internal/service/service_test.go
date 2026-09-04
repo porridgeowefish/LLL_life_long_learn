@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 type fakeGateway struct {

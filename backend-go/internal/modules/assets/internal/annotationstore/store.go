@@ -17,7 +17,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	"github.com/xmz14/lll/backend-go/internal/modules/assets/internal/assetstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 const SchemaVersion = 1

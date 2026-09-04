@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/practicestore"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
-	"github.com/xmz14/lll/backend-go/internal/practicestore"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/projectindex"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 func setupTestServer(t *testing.T) (*Server, func()) {
@@ -26,7 +26,7 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 
-	srv := &Server{ClaudeBin: "echo", ClaudeAvailable: false, cache: projectindex.New()}
+	srv := &Server{ClaudeBin: "echo", ClaudeAvailable: false, cache: projectindex.NewIndex()}
 
 	// Load agents so registry is populated (needed for router).
 	regDir := dir + "/registry"
@@ -322,7 +322,7 @@ func TestWriteFlowerRecordsOneActivityPerDistinctSavedContent(t *testing.T) {
 			t.Fatalf("write flower: expected 200, got %d — %s", w.Code, w.Body.String())
 		}
 	}
-	store, err := progressstore.New("testproj")
+	store, err := progressstore.NewProgressStore("testproj")
 	if err != nil {
 		t.Fatal(err)
 	}

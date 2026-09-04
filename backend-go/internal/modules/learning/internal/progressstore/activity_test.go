@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 func TestAggregateCombinesActivityGrowthAndLegacyPractice(t *testing.T) {

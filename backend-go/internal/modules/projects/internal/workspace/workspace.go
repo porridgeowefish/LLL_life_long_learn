@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 )
 
@@ -259,11 +258,11 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	if projectType == ProjectTypeSystemLearning {
-		scope := learningscope.NewDraft(title, parsed)
+		var scope any = newDraftLearningScope(title, parsed)
 		if in.LearningScope != nil {
-			scope = *in.LearningScope
+			scope = in.LearningScope
 		}
-		scopeBytes, err := learningscope.MarshalScope(scope)
+		scopeBytes, err := json.MarshalIndent(scope, "", "  ")
 		if err != nil {
 			return fmt.Errorf("encode learning scope: %w", err)
 		}
@@ -662,7 +661,33 @@ type ProjectInput struct {
 	Current       string // current ability self-assessment
 	Target        string // target ability self-assessment
 	Standard      string // completion criteria the learner commits to
-	LearningScope *learningscope.Scope
+	LearningScope any
+}
+
+func newDraftLearningScope(title string, now time.Time) any {
+	return struct {
+		SchemaVersion  int      `json:"schemaVersion"`
+		Status         string   `json:"status"`
+		Title          string   `json:"title"`
+		Goal           string   `json:"goal"`
+		InScope        []string `json:"inScope"`
+		OutOfScope     []string `json:"outOfScope"`
+		Prerequisites  []string `json:"prerequisites"`
+		OwnedConcepts  []string `json:"ownedConcepts"`
+		ReusedConcepts []string `json:"reusedConcepts"`
+		Source         struct {
+			Type string `json:"type"`
+		} `json:"source"`
+		UpdatedAt string `json:"updatedAt"`
+	}{
+		SchemaVersion: 1, Status: "draft", Title: strings.TrimSpace(title),
+		InScope: []string{}, OutOfScope: []string{}, Prerequisites: []string{},
+		OwnedConcepts: []string{}, ReusedConcepts: []string{},
+		Source: struct {
+			Type string `json:"type"`
+		}{Type: "standalone"},
+		UpdatedAt: now.UTC().Format(time.RFC3339),
+	}
 }
 
 func defaultProjectMdBodyForInput(in ProjectInput) string {

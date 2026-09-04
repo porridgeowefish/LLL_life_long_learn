@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // Flashcard is a single Q&A card.

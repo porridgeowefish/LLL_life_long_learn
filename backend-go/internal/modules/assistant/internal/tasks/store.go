@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 const SchemaVersion = 1

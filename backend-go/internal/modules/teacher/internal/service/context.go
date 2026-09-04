@@ -12,14 +12,14 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/xmz14/lll/backend-go/internal/learningscope"
+	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
 	askaiprovider "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/providers"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 const contextThresholdTokens = 256 * 1024

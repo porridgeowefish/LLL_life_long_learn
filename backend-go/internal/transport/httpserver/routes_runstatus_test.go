@@ -7,13 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 )
 
 func TestRunStatusRejectsBadToken(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
+	srv := &Server{runProgress: runprogress.NewRunStore(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	srv.runProgress.Register("r1")
 	body := `{"activity":"x"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(body))
@@ -27,7 +27,7 @@ func TestRunStatusRejectsBadToken(t *testing.T) {
 }
 
 func TestRunStatusRejectsMissingToken(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
+	srv := &Server{runProgress: runprogress.NewRunStore(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	srv.runProgress.Register("r1")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(`{}`))
 	req.SetPathValue("runId", "r1")
@@ -39,7 +39,7 @@ func TestRunStatusRejectsMissingToken(t *testing.T) {
 }
 
 func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
+	srv := &Server{runProgress: runprogress.NewRunStore(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("r1")
 	body := `{"activity":"wrote p","pagesDone":3,"pagesPlanned":5,"done":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(body))
@@ -51,7 +51,7 @@ func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
 		t.Fatalf("want 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 	var resp struct {
-		Status runprogress.Status `json:"status"`
+		Status runprogress.RunStatus `json:"status"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("decode response: %v", err)
@@ -70,7 +70,7 @@ func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
 }
 
 func TestRunStatusRejectsInvalidBody(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
+	srv := &Server{runProgress: runprogress.NewRunStore(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("r1")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader("not json"))
 	req.SetPathValue("runId", "r1")
@@ -83,7 +83,7 @@ func TestRunStatusRejectsInvalidBody(t *testing.T) {
 }
 
 func TestRunStatusAcceptsFailedRuntimeExit(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
+	srv := &Server{runProgress: runprogress.NewRunStore(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("failed-run")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/failed-run/status", strings.NewReader(`{"failed":true}`))
 	req.SetPathValue("runId", "failed-run")

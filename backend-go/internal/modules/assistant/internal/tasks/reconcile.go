@@ -3,7 +3,7 @@ package assistanttask
 import (
 	"fmt"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"os"
 	"path/filepath"
 	"time"

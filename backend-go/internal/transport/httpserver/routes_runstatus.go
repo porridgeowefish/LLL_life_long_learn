@@ -3,9 +3,9 @@ package httpserver
 import (
 	"net/http"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 )
 
 // handleRunStatus receives per-run progress reports from injected Claude Code
@@ -16,7 +16,7 @@ import (
 func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 	runId := r.PathValue("runId")
 	token := r.Header.Get("X-Run-Token")
-	var in runprogress.Status
+	var in runprogress.RunStatus
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return

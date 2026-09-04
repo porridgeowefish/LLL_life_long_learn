@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 func (s *Server) handleGetActivity(w http.ResponseWriter, r *http.Request) {
@@ -56,7 +56,7 @@ func (s *Server) handlePostActivity(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid activity event")
 		return
 	}
-	event, added, err := awardLearningEvent(slug, progressstore.Event{
+	event, added, err := awardLearningEvent(slug, progressstore.ProgressEvent{
 		ID: "reading:" + in.ID, SourceType: "reading", SourceID: in.SourceID,
 		ActivityDelta: in.ActivityDelta, Title: in.Title, Detail: in.Detail,
 	})
@@ -67,13 +67,13 @@ func (s *Server) handlePostActivity(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"event": event, "added": added})
 }
 
-func awardLearningEvent(slug string, event progressstore.Event) (progressstore.Event, bool, error) {
+func awardLearningEvent(slug string, event progressstore.ProgressEvent) (progressstore.ProgressEvent, bool, error) {
 	if event.PolicyVersion == "" {
 		event.PolicyVersion = progressstore.LearningPolicyVersion
 	}
-	store, err := progressstore.New(slug)
+	store, err := progressstore.NewProgressStore(slug)
 	if err != nil {
-		return progressstore.Event{}, false, err
+		return progressstore.ProgressEvent{}, false, err
 	}
 	awarded, added, _, err := store.Award(event)
 	return awarded, added, err

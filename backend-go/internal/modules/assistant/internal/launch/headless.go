@@ -12,7 +12,7 @@ import (
 
 	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
 	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // LaunchHeadless runs a single-shot background task for product workflows

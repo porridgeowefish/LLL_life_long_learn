@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/confusionstore"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/confusionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 func (s *Server) handleListConfusions(w http.ResponseWriter, r *http.Request) {

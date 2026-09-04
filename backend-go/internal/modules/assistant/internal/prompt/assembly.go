@@ -12,7 +12,7 @@ import (
 
 	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // Request carries the inputs to a prompt build.

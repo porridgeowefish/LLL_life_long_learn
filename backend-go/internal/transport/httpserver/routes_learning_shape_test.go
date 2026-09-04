@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/folderstore"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func setupLearningShapeTest(t *testing.T) string {
@@ -341,7 +341,7 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "assets", "note.md"), []byte("artifact"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	store, err := folderstore.New()
+	store, err := folderstore.NewFolderStore()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("project root still exists: %v", err)
 	}
-	reloaded, _ := folderstore.New()
+	reloaded, _ := folderstore.NewFolderStore()
 	if got := reloaded.Layout().Folders[0].SlugOrder; len(got) != 0 {
 		t.Fatalf("folder reference remains: %v", got)
 	}

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func TestSoftScopeAppendixIsGuidance(t *testing.T) {

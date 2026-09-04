@@ -8,7 +8,7 @@ import (
 
 	"sort"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"

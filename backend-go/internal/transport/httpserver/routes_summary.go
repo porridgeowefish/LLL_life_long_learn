@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/flashcardstore"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/flashcardstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // GET /api/projects/{id}/summary/flashcards
@@ -78,7 +78,7 @@ func (s *Server) handleGradeFlashcard(w http.ResponseWriter, r *http.Request) {
 	if body.Grade == "got-it" || body.Grade == "easy" {
 		growth = 1
 	}
-	_, _, _ = awardLearningEvent(slug, progressstore.Event{
+	_, _, _ = awardLearningEvent(slug, progressstore.ProgressEvent{
 		ID: "flashcard:" + eventID, SourceType: "flashcard-review", SourceID: body.CardID,
 		ActivityDelta: 1, Delta: growth, Outcome: body.Grade,
 		Title: "复习闪卡", Detail: body.CardID,

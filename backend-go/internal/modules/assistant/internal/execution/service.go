@@ -7,13 +7,13 @@ import (
 	"context"
 	"errors"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	claudelauncher "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/launch"
 	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
 	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 type EventEmitter interface{ Emit(string, any) }
@@ -31,7 +31,7 @@ type ProjectRequest struct {
 	Session        *sessionstore.Session
 	SessionStore   *sessionstore.Store
 	Events         EventEmitter
-	RunProgress    *runprogress.Store
+	RunProgress    *runprogress.RunStore
 }
 
 // TaskRequest starts the same visible, prompt-injected CLI surface inside an
@@ -51,7 +51,7 @@ type ResumeRequest struct {
 	Session      *sessionstore.Session
 	SessionStore *sessionstore.Store
 	Events       EventEmitter
-	RunProgress  *runprogress.Store
+	RunProgress  *runprogress.RunStore
 }
 
 type HeadlessRequest struct {

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func TestMigrationBacksUpAndCreatesCanonicalWorkspace(t *testing.T) {

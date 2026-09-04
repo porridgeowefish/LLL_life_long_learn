@@ -13,9 +13,9 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 const maskedKey = "••••"
@@ -163,7 +163,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	if updatedAnnotation.Ask != nil && len(updatedAnnotation.Ask.Messages) > 0 {
 		messageID = updatedAnnotation.Ask.Messages[len(updatedAnnotation.Ask.Messages)-1].ID
 	}
-	_, _, _ = awardLearningEvent(slug, progressstore.Event{
+	_, _, _ = awardLearningEvent(slug, progressstore.ProgressEvent{
 		ID:         "ask-ai:" + messageID,
 		SourceType: "ask-ai", SourceID: cid, ActivityDelta: 1,
 		Title: "使用 Ask AI", Detail: strings.TrimSpace(conf.QuoteSnapshot),

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // PromoteOptions configures artifact promotion.

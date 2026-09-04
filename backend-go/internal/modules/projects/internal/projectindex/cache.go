@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	"github.com/xmz14/lll/backend-go/internal/modules/projects/internal/workspace"
 )
 
 // Cache holds flat project metadata keyed by globally unique slug.

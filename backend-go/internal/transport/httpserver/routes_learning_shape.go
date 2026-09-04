@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 var completeLearningShapeAI = teacher.Complete
@@ -346,7 +346,7 @@ func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.
 		if item.Status != "completed" {
 			continue
 		}
-		if _, _, err := awardLearningEvent(r.PathValue("id"), progressstore.Event{
+		if _, _, err := awardLearningEvent(r.PathValue("id"), progressstore.ProgressEvent{
 			ID:            "learning-task-complete:" + item.ID + ":" + item.CompletedAt,
 			SourceType:    "learning-task-complete",
 			SourceID:      item.ID,

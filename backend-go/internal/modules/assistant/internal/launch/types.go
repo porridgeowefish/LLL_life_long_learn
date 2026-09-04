@@ -3,11 +3,11 @@ package claudelauncher
 import (
 	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"path/filepath"
 
 	"strings"
@@ -36,7 +36,7 @@ type LaunchRequest struct {
 	// RunProgress registers every interactive runtime for authenticated exit
 	// reporting. Claude additionally receives a run-scoped settings file whose
 	// PostToolUse/Stop hooks provide granular progress.
-	RunProgress *runprogress.Store
+	RunProgress *runprogress.RunStore
 	runToken    string
 	// taskExecutorPath/taskExitPath are optional durable markers used by the
 	// assistant-task dispatcher. They are deliberately part of the same
@@ -58,7 +58,7 @@ type ResumeRequest struct {
 	ClaudeBin   string
 	Runtime     *agentruntime.Runtime
 	RunDirName  string
-	RunProgress *runprogress.Store
+	RunProgress *runprogress.RunStore
 	runToken    string
 }
 

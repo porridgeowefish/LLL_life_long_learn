@@ -1,7 +1,7 @@
 package claudelauncher
 
 import (
-	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	"path/filepath"
 
 	"sort"
@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 )
 
 func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsFile string, req LaunchRequest) string {
@@ -394,7 +394,7 @@ func psSingleQuote(s string) string {
 // real Explain run is a manual step — see DELIVERY_NOTES.md (Phase C). Per
 // the project's Windows + UTF-8 rule (CLAUDE.md), only ASCII goes on the curl
 // command line; Chinese activity text would be mangled via argv.
-func writeHookSettings(runDir, runId string, store *runprogress.Store) (path, token string, err error) {
+func writeHookSettings(runDir, runId string, store *runprogress.RunStore) (path, token string, err error) {
 	token = store.Register(runId)
 	base := "http://127.0.0.1:8787/api/runs/" + runId + "/status"
 	post := `curl.exe -s -o /dev/null -X POST ` + base +

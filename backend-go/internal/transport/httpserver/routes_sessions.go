@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 // invokeRequest is the body of POST /api/agents/{id}/invoke.
@@ -125,7 +125,7 @@ func (s *Server) startAgentSession(
 	}
 	s.sessions.Create(sess)
 	s.sessions.AppendTurn(sessID, "system", "session created", "")
-	_, _, _ = awardLearningEvent(projectID, progressstore.Event{
+	_, _, _ = awardLearningEvent(projectID, progressstore.ProgressEvent{
 		ID: "agent-invoke:" + sessID, SourceType: "agent-invoke", SourceID: agent.ID,
 		ActivityDelta: 1, Title: "开始学习", Detail: contextName + " · " + agent.Name,
 	})
@@ -245,7 +245,7 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 		httpx.Error(w, http.StatusInternalServerError, "resume explain session: "+err.Error())
 		return
 	}
-	_, _, _ = awardLearningEvent(projectID, progressstore.Event{
+	_, _, _ = awardLearningEvent(projectID, progressstore.ProgressEvent{
 		ID: "agent-resume:" + runDirName, SourceType: "agent-resume", SourceID: "explain",
 		ActivityDelta: 1, Title: "继续学习", Detail: "Explain · 恢复会话",
 	})
@@ -322,7 +322,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 	}
 	// Reset session state to running, then launch again.
 	s.sessions.SetState(sess.ID, sessionstore.StateRunning)
-	_, _, _ = awardLearningEvent(sess.ProjectSlug, progressstore.Event{
+	_, _, _ = awardLearningEvent(sess.ProjectSlug, progressstore.ProgressEvent{
 		ID: "agent-followup:" + sess.ID + ":" + pkg.RunDirName, SourceType: "agent-followup", SourceID: sess.AgentID,
 		ActivityDelta: 1, Title: "追问学习 Agent", Detail: sess.ZoneName,
 	})

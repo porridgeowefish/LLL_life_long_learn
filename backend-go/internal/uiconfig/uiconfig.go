@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 type Theme string

@@ -15,9 +15,9 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {

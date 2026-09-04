@@ -14,9 +14,9 @@ import (
 
 	assets "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 type FileInventory struct {

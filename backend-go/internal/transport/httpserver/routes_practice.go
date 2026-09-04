@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/xmz14/lll/backend-go/internal/compatibility/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
-	"github.com/xmz14/lll/backend-go/internal/practicestore"
-	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
 
 func practiceStoreForRequest(w http.ResponseWriter, slug string) (*practicestore.Store, bool) {
@@ -166,10 +166,10 @@ func (s *Server) handleCheckObjective(w http.ResponseWriter, r *http.Request) {
 	}
 	tasks, _ := store.ReadTasks()
 	difficulty := taskDifficulty(tasks, taskID)
-	progress, _ := progressstore.New(slug)
+	progress, _ := progressstore.NewProgressStore(slug)
 	delta := 0
 	if progress != nil {
-		_, added, summary, awardErr := progress.Award(progressstore.Event{
+		_, added, summary, awardErr := progress.Award(progressstore.ProgressEvent{
 			ID:            fmt.Sprintf("practice-submit:%d:%s", attemptID, taskID),
 			SourceType:    "practice-submit",
 			SourceID:      taskID,
@@ -185,7 +185,7 @@ func (s *Server) handleCheckObjective(w http.ResponseWriter, r *http.Request) {
 			delta += difficulty
 		}
 		if result.Correct {
-			_, correctAdded, nextSummary, correctErr := progress.Award(progressstore.Event{
+			_, correctAdded, nextSummary, correctErr := progress.Award(progressstore.ProgressEvent{
 				ID:         fmt.Sprintf("practice-correct:%d:%s", attemptID, taskID),
 				SourceType: "practice-correct",
 				SourceID:   taskID,
@@ -234,7 +234,7 @@ func (s *Server) handleSubmitPracticeAttempt(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	tasks, _ := store.ReadTasks()
-	progress, _ := progressstore.New(slug)
+	progress, _ := progressstore.NewProgressStore(slug)
 	growthDelta := 0
 	if progress != nil {
 		for _, sub := range body.Submissions {
@@ -242,7 +242,7 @@ func (s *Server) handleSubmitPracticeAttempt(w http.ResponseWriter, r *http.Requ
 			if task == nil || task.IsObjective() || len(sub.Answer) == 0 {
 				continue
 			}
-			_, added, _, awardErr := progress.Award(progressstore.Event{
+			_, added, _, awardErr := progress.Award(progressstore.ProgressEvent{
 				ID:            fmt.Sprintf("practice-submit:%d:%s", attemptID, sub.TaskID),
 				SourceType:    "practice-submit",
 				SourceID:      sub.TaskID,
@@ -310,7 +310,7 @@ func (s *Server) handleGetPracticeEvaluation(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	tasks, _ := store.ReadTasks()
-	progress, _ := progressstore.New(slug)
+	progress, _ := progressstore.NewProgressStore(slug)
 	growthDelta := 0
 	if progress != nil {
 		for _, result := range ev.Results {
@@ -319,7 +319,7 @@ func (s *Server) handleGetPracticeEvaluation(w http.ResponseWriter, r *http.Requ
 				continue
 			}
 			delta := int(math.Round(float64(task.Difficulty*result.Score) / 5))
-			_, added, _, awardErr := progress.Award(progressstore.Event{
+			_, added, _, awardErr := progress.Award(progressstore.ProgressEvent{
 				ID:         fmt.Sprintf("practice-evaluation:%d:%s", attemptID, result.TaskID),
 				SourceType: "practice-evaluation",
 				SourceID:   result.TaskID,
@@ -410,7 +410,7 @@ func (s *Server) handleGetProgress(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
-	store, err := progressstore.New(slug)
+	store, err := progressstore.NewProgressStore(slug)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
