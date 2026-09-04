@@ -99,7 +99,7 @@ writes to `memory/`.
 
 Iteration 14 centralizes local application configuration without changing
 learner project data. `config.local.json` remains gitignored and read-compatible
-with current flat keys. The approved target groups server, workspace, AI,
+with current flat keys. The implemented configuration groups server, workspace, AI,
 assistant, image, and UI values, with precedence:
 
 ```text

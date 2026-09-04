@@ -1,6 +1,6 @@
 # Iteration 14 Test Plan
 
-Status: approved design; implementation not started
+Status: automated plan executed; user-run native browser acceptance pending
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: verification strategy and delivery gates for the modular-monolith refactor.
@@ -128,4 +128,3 @@ The final merge additionally requires:
 
 Commands, results, environment, and residual risks are recorded in
 `DELIVERY_NOTES.md`.
-

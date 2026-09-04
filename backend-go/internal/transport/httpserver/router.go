@@ -22,7 +22,7 @@ import (
 	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // Server bundles runtime dependencies shared across handlers. Every field

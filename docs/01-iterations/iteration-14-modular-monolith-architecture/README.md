@@ -1,6 +1,6 @@
 # Iteration 14: Business-Capability Modular Monolith Architecture
 
-Status: approved design; implementation not started
+Status: implementation complete; user-run native browser acceptance pending
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: scope, architecture decisions, and delivery waves for the non-destructive modular-monolith refactor.
@@ -13,9 +13,9 @@ The result must be easier to extend in later iterations and easier for a new
 maintainer to read without changing learner-visible behavior or persisted
 project data.
 
-## Starting Point
+## Delivered Starting-Point Migration
 
-Iteration 13 is the implemented product baseline: a Go HTTP/SSE server, React
+Iteration 13 was the starting product baseline: a Go HTTP/SSE server, React
 SPA, API teacher, visible asynchronous CLI assistants, versioned assets,
 sources, global preferences, and file-first recovery. The current backend has
 many flat internal packages, a transport package with broad knowledge, and
@@ -144,4 +144,3 @@ Windows native-CLI smoke paths pass on a real Windows environment
 delivery notes contain commands, results, residual risks, and migration evidence
 all required long-lived documents match delivered reality
 ```
-

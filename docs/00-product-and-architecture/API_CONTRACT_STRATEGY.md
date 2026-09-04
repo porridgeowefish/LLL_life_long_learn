@@ -24,7 +24,7 @@ teacher conversation and response recovery
 assistant task projection, assets, annotations, sources, and preferences
 ```
 
-`backend-go/internal/server/router.go` is the route truth. Go request/response
+`backend-go/internal/transport/httpserver/router.go` is the route truth. Go request/response
 types and frontend TypeScript types own payload truth.
 
 ## Contract Rules

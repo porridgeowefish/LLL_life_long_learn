@@ -13,6 +13,8 @@ folders.json
 tmp/
 temp/
 frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
 research/raw/
 
 # Local runtime data & TS incremental build cache

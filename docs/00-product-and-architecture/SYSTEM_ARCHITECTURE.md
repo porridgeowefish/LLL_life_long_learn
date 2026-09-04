@@ -22,16 +22,16 @@ durable truth; in-memory indexes, dispatch slots, and SSE connections are
 rebuildable runtime state. No database, external queue, cloud account, or
 hidden-only agent runtime is required.
 
-## Approved Iteration-14 Target
+## Implemented Modular Monolith
 
-ADR-0015 reorganizes the same runtime as a business-capability modular
-monolith. This is an approved target, not yet implemented reality. Deployment,
-public APIs, and canonical project files remain unchanged.
+ADR-0015 reorganized the runtime as a business-capability modular monolith in
+Iteration 14. Deployment, public APIs, and canonical project files remain
+unchanged.
 
 ```text
 cmd/lll
 -> app/bootstrap                         one composition root
--> transport/http                       thin HTTP and SSE adapters
+-> transport/httpserver                 thin HTTP and SSE adapters
 -> modules/{teacher,assistant,assets,sources,projects,learning,preferences}
 -> platform/{config,filesystem,process,events,identity}
 -> compatibility                        legacy reads and migration only

@@ -1,6 +1,6 @@
 # Iteration 14 Delivery Notes
 
-Status: implementation in progress
+Status: automated delivery complete; user-run native browser/visible-CLI acceptance pending
 Owner: project maintainer
 Last reviewed: 2026-09-04
 Source of truth: implementation progress, verification evidence, and residual risk for iteration 14.
@@ -8,7 +8,7 @@ Source of truth: implementation progress, verification evidence, and residual ri
 ## Current State
 
 The architecture design was approved on 2026-09-03. ADR-0015 and the complete
-iteration contract set were created before implementation. Waves 0 through 7
+iteration contract set were created before implementation. Waves 0 through 8
 are delivered on the iteration branch; public API and product-data contracts
 remain unchanged.
 
@@ -46,12 +46,12 @@ plan.
 | 5 — assistant and CLI | delivered | Task storage/dispatch, execution, registry, runtime selection, prompt assembly, and CLI launch implementations live below `modules/assistant/internal` behind one facade; launcher-only artifact promotion moved out of assets. The 1,370-line dispatcher is split into queue/manifest/execute/validate/commit/reconcile/artifacts files, and the launcher into types/exec/terminal/wrappers. Dispatcher access to conversation/preferences/assets/sources now uses consumer-owned ports wired by `app/integration`; runtime configuration delegates to platform config. A real PowerShell wrapper smoke builds `tests/smoke/fake-agent`, verifies UTF-8 BOM, a Chinese workspace, and one intact 4,422-character prompt argument after the documented straight-to-curly quote normalization. `check:full` first exposed and fixed a Windows shell-pipe bug in its contract command; direct reruns of the complete HTTP contract package and Windows fake-CLI smoke PASS. Full pre-contract layers passed with Go 32.15% ≥ 28.35%, frontend 44 files/149 tests, and both production builds. |
 | 6 — projects, learning, compatibility | delivered | Project workspace/state/slug/index/folder implementations moved below `modules/projects/internal` behind the `projects` facade; learning scope, progress/activity, and live run status moved below `modules/learning/internal` behind the `learning` facade. The project skeleton accepts a serializable learning-scope contract so projects does not depend back on learning, while learning resolves project storage through the projects facade. Session/practice/confusion/flashcard legacy stores, artifact watching, and iteration-13 migration are quarantined under `internal/compatibility` with unchanged persisted formats. `check:complete` PASSED: archcheck 44 packages/122 direct edges, all Go tests, frontend 44 files/149 tests, Go coverage 32.15% ≥ 28.35%, and both production builds. |
 | 7 — frontend feature boundaries | delivered | The SPA is organized into `app/`, `features/{learning,projects,agents,legacy-zones,preferences,settings}`, and `shared/`. Every feature has an `index.ts` public surface, and all 24 initially detected cross-feature private imports were redirected through those surfaces. Query-key strings, routes, the single app-level SSE mount, legacy components, and API behavior were preserved. Frontend architecture check, ESLint, all 44 files/149 tests, and the production TypeScript/Vite build PASS. |
-| 8 — cleanup and final cutover | pending | none |
+| 8 — cleanup and final cutover | delivered | Retired `internal/paths` moved to `platform/filesystem`; iteration 13 moved into delivered foundations; repository, backend, system, API, data, roadmap, frontend, ADR, and iteration docs now describe delivered reality. Playwright configuration plus critical project-creation and `/memory` compatibility paths were added and statically discovered (2 tests); execution on this machine requires `npx playwright install chromium`, so native browser acceptance remains assigned to the user. Final `npm run check:full` PASSED: archcheck 44 packages/122 edges; Go short/full, compatibility/recovery and frozen HTTP contracts; frontend ESLint and 44 files/149 tests; Go coverage 32.15% (2629/8177) against 28.35% floor; both production builds; and the Windows fake-CLI UTF-8/long-prompt smoke. |
 
 ## Residual Risk
 
-The highest expected risks are assistant restart/idempotency regressions,
-Windows prompt delivery, route-to-store bypasses surviving behind forwarding
-facades, frontend query/SSE behavior changing during moves, and old project
-fixtures failing after compatibility code is isolated. None is considered
-closed until its planned automated and native smoke evidence is recorded here.
+Automated checks close the structural, compatibility, recovery, contract,
+coverage, build, and fake-CLI risks. Residual acceptance is deliberately human:
+run the two Playwright paths after installing Chromium, then exercise a visible
+native provider in a Chinese project path, including long quoted prompt delivery
+and interruption/restart reconciliation.

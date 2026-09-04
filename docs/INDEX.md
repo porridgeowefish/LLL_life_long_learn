@@ -46,7 +46,7 @@ for an explicit history, migration, compatibility, or regression question.
 ## Active Delivery
 
 The implemented product baseline is
-[Iteration 13](./01-iterations/iteration-13-teacher-assistant-learning-workspace/README.md).
+[Iteration 14](./01-iterations/iteration-14-modular-monolith-architecture/README.md).
 The approved next architecture slice is
 [Iteration 14](./01-iterations/iteration-14-modular-monolith-architecture/README.md),
 which reorganizes source code, configuration, tests, and quality enforcement

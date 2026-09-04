@@ -28,11 +28,10 @@ agents/            agent registry, charters, primitives
 
 Use these as executable truth before trusting any design/mock document.
 
-### Approved Iteration-14 Source Target
+### Current Iteration-14 Source Layout
 
-The current directories above remain executable truth. Iteration 14 will
-reorganize their internals without moving the top-level `backend-go/`,
-`frontend/`, or `agents/` roots and without moving runtime data:
+Iteration 14 reorganized the internals without moving the top-level
+`backend-go/`, `frontend/`, or `agents/` roots or runtime data:
 
 ```text
 backend-go/internal/app/              composition and cross-module glue
@@ -51,9 +50,8 @@ tools/archcheck/                      executable dependency policy
 config/                               committed schema and non-secret example
 ```
 
-The target becomes current only after iteration 14 passes its full gate. Until
-then, use code and the current package map in `BACKEND_ARCHITECTURE.md` as
-implemented truth.
+This is the implemented source layout; `BACKEND_ARCHITECTURE.md` owns its
+dependency and responsibility rules.
 
 ## 2. Project Runtime Data
 

@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
-	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 func main() {

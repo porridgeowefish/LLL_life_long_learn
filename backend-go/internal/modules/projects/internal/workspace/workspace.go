@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // ZoneName is the canonical name of one of the five learning zones.

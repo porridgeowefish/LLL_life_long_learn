@@ -1,6 +1,6 @@
 # Iteration 14 Data Design
 
-Status: approved design; implementation not started
+Status: implemented without persisted-schema change
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: configuration, quality-artifact, fixture, and compatibility data boundaries for iteration 14.

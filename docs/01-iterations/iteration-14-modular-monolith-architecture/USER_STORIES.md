@@ -1,6 +1,6 @@
 # Iteration 14 User Stories
 
-Status: approved design; implementation not started
+Status: implemented; native acceptance handoff pending
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: maintainer and learner value targeted by the modular-monolith refactor.

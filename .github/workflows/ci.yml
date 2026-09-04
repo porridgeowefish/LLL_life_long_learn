@@ -27,8 +27,8 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
 
-      - name: Repository quality gate (check)
-        run: npm run check
+      - name: Repository quality gate (full)
+        run: npm run check:full
 
       - name: Upload quality evidence
         if: always()

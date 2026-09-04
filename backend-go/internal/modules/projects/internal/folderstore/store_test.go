@@ -3,7 +3,7 @@ package folderstore
 import (
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // setTempWorkspace points the store at a per-test workspace dir and restores it

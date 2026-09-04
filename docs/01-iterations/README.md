@@ -11,20 +11,18 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 13 | Teacher-assistant learning workspace, assets, source materials, stable streaming, and global preferences | [iteration-13-teacher-assistant-learning-workspace](./iteration-13-teacher-assistant-learning-workspace/README.md) |
+| 14 | Enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) |
 
-## Active Planning Slice
+## Active Delivery Slice
 
 | Iteration | Goal | Directory | State |
 |---|---|---|---|
-| 14 | Reorganize LLL as an enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) | approved design; implementation not started |
+| 14 | Reorganize LLL as an enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) | delivered; native browser acceptance remains user-run |
 
-Iteration 13 remains in place as the implemented baseline until iteration 14
-passes its complete delivery gate. At that point, iteration 13 moves to
-`foundations/` and its retained teacher-workspace contribution is registered in
-the foundation index.
+Iteration 13 is retained under `foundations/`; iteration 14 is the current
+implemented baseline.
 
-Iterations 01–12 are retained as [delivered foundations](./foundations/README.md).
+Iterations 01–13 are retained as [delivered foundations](./foundations/README.md).
 They explain reusable capabilities that still support the current architecture.
 Read only the slice relevant to the task; active architecture and code decide
 how that capability participates in the current teacher workspace.

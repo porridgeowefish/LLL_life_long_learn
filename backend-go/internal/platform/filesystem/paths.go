@@ -1,6 +1,6 @@
-// Package paths exposes canonical filesystem roots for LLL.
+// Package filesystem exposes canonical filesystem roots for LLL.
 // All other packages resolve project, agent, and workspace paths through here.
-package paths
+package filesystem
 
 import (
 	"os"

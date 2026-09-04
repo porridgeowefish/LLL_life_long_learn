@@ -16,7 +16,7 @@ import (
 	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 func setupLearningShapeTest(t *testing.T) string {

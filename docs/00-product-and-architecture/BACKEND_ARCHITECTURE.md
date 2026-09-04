@@ -20,15 +20,15 @@ HTTP/SSE adapters
 Handlers must not own provider loops, queue admission, prompt injection,
 filesystem path policy, source disclosure, or multi-file asset commits.
 
-## Iteration-14 Target Package Model
+## Current Package Model
 
-The package map below describes current iteration-13 code. ADR-0015 approves a
-behavior-preserving migration to this target during iteration 14:
+ADR-0015's behavior-preserving modular package model was implemented in
+iteration 14:
 
 ```text
 internal/
   app/{bootstrap,integration}
-  transport/http
+  transport/httpserver
   modules/
     teacher
     assistant
@@ -48,23 +48,20 @@ modules from bypassing the facade. `app/integration` converts bounded values
 between facades but owns no business rule; `app/bootstrap` is the only concrete
 composition root.
 
-The migration does not introduce microservices, a database, a broker, new
-public routes, or new project-file schemas. Current package names remain
-runtime truth until their iteration-14 wave is delivered and verified.
+The migration introduced no microservices, database, broker, public routes, or
+project-file schemas.
 
-## Current Package Map
+## Responsibility Map
 
 | Area | Primary packages | Responsibility |
 |---|---|---|
-| Transport | `internal/server`, `internal/httpx` | decode, size-limit, call one operation, encode, stream |
-| Teacher | `teacherservice`, `teachergateway`, `conversationstore` | context assembly, provider-neutral blocks, tool loop, durable recovery |
-| Assistant | `assistanttask`, `agentexecution`, `claudelauncher` | authorization, task state, queue/leases, sealed input, visible CLI lifecycle |
-| Learning assets | `assetstore`, `artifactwriter`, `artifactwatch`, `annotationstore` | versions, edits, merge/promotion, annotations, invalidation |
-| Sources | `sourcestore` | upload limits, hashes, immutable revisions, disclosure, parse outputs, deletion |
-| Projects | `workspace`, `projectindex`, `folderstore`, `learningscope` | project roots, types, flat classification, scope snapshots |
-| Preferences | `preferencestore`, `promptassembly` | learner-owned global file and bounded read-only prompt snapshots |
-| Migration | `iteration13migration` | inventory, backup, staged conversion, journal, cutover/rollback reads |
-| Compatibility | `sessionstore`, `agentregistry`, `practicestore`, `flashcardstore`, `confusionstore`, `progressstore` | old-project readers and legacy routes only |
+| Transport | `internal/transport/httpserver`, `internal/httpx` | decode, size-limit, call one operation, encode, stream |
+| Teacher | `modules/teacher` | context assembly, provider-neutral blocks, tool loop, durable recovery |
+| Assistant | `modules/assistant` | authorization, task state, queue/leases, sealed input, visible CLI lifecycle |
+| Assets and sources | `modules/assets`, `modules/sources` | versions, edits, annotations, immutable source revisions and disclosure |
+| Projects and learning | `modules/projects`, `modules/learning` | project roots, folders, scope, activity, progress and live run state |
+| Preferences | `modules/preferences` | learner-owned global file and bounded read-only prompt snapshots |
+| Compatibility | `internal/compatibility` | old-project readers, artifact watch, migration, and legacy routes only |
 
 `agentexecution.Service` is the reusable domain boundary for opening a project
 folder, selecting a native runtime, injecting a prompt, exposing the terminal,

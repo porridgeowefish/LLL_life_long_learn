@@ -11,6 +11,7 @@ Source of truth: delivered product slices and the next architecture work; iterat
 Iterations 02–06   file-first Go backend, learning agents, rich readers, Ask AI
 Iterations 07–12   project types, flat storage, discipline maps, plans, scope snapshots
 Iteration 13       teacher conversation, async CLI assistant, assets, sources, migration
+Iteration 14       enforced modular monolith, unified configuration, quality gates
 2026-09 hardening  stable rich streaming and one global learner preferences file
 ```
 
@@ -27,10 +28,10 @@ compatibility reader and migration source, not the product's primary workflow.
 - One `<WORKSPACE>/preferences.md` is learner-owned and read-only to AI.
 - There is no project-memory agent, automatic preference inference, or AI write path.
 
-## Committed Next Slice
+## Current Baseline
 
-Iteration 14 is approved for implementation. It reorganizes the existing
-runtime into an enforced business-capability modular monolith and adds one
+Iteration 14 reorganized the existing runtime into an enforced
+business-capability modular monolith and added one
 typed configuration system plus standardized architecture, test, coverage,
 build, browser, and Windows smoke gates.
 

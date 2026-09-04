@@ -101,7 +101,8 @@ npm run test       # Vitest run (44 files / 149 tests today)
 npm run test:watch # Vitest watch mode
 ```
 
-E2E with Playwright is deferred (W6 of the refactor plan).
+Critical browser paths live in `e2e/critical.spec.ts`. Install Chromium once
+with `npx playwright install chromium`, then run `npm run test:e2e`.
 
 ## Legacy Reference
 

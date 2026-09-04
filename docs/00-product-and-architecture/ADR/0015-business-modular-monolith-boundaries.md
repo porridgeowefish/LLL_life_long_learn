@@ -1,6 +1,6 @@
 # ADR-0015: Business-Capability Modular Monolith Boundaries
 
-Status: accepted; implementation planned in iteration 14
+Status: accepted and implemented in iteration 14
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: durable decision for LLL source-code module boundaries, dependency direction, configuration ownership, and architecture enforcement.

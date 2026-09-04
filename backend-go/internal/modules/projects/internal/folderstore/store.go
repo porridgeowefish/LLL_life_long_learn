@@ -14,7 +14,7 @@ import (
 	"sync"
 
 	"github.com/xmz14/lll/backend-go/internal/modules/projects/internal/workspace"
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // Folder is one user-created grouping of project slugs (references only).

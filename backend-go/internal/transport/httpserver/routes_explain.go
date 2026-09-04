@@ -15,7 +15,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
-	"github.com/xmz14/lll/backend-go/internal/paths"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 const (

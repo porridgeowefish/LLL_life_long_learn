@@ -1,6 +1,6 @@
 # Iteration 14 Interface Contract
 
-Status: approved design; implementation not started
+Status: implemented and contract-tested
 Owner: project maintainer
 Last reviewed: 2026-09-03
 Source of truth: internal module, configuration, architecture-check, and quality-command contracts introduced by iteration 14.
