@@ -1,0 +1,46 @@
+{
+  "server": { "host": "127.0.0.1", "port": 8787 },
+  "workspace": { "root": "." },
+  "ai": {
+    "defaultProvider": "primary",
+    "searchEngine": "google",
+    "providers": [
+      {
+        "id": "primary",
+        "kind": "openai",
+        "name": "Primary provider",
+        "baseURL": "",
+        "apiKeyEnv": "LLL_PRIMARY_AI_API_KEY",
+        "model": "",
+        "contextWindowTokens": 0,
+        "reasoning": false,
+        "thinking": false
+      }
+    ],
+    "bindings": {
+      "teacher": { "providerId": "primary", "model": "" },
+      "conversationCompaction": { "providerId": "primary", "model": "" },
+      "annotationAskAI": { "providerId": "primary", "model": "" }
+    }
+  },
+  "assistant": {
+    "runtime": "claude",
+    "maxConcurrent": 5,
+    "maxConcurrentPerProject": 2,
+    "bins": {}
+  },
+  "image": {
+    "enabled": false,
+    "baseURL": "",
+    "apiKeyEnv": "LLL_IMAGE_API_KEY",
+    "model": "",
+    "promptModel": "",
+    "pythonBin": "python",
+    "backup": {
+      "baseURL": "",
+      "apiKeyEnv": "LLL_IMAGE_BACKUP_API_KEY",
+      "model": ""
+    }
+  },
+  "ui": { "theme": "lychee-paper" }
+}

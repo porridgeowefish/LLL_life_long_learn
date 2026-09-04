@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "task_01M1M509Z79ZXMER3QR2TJ77EA",
+  "unitId": "unit_01M1M509V6D1HVJDAN85W2MPMM",
+  "projectSlug": "lingo-duihua",
+  "type": "consolidate",
+  "objective": "整理合成对话要点",
+  "sourceRefs": [],
+  "status": "queued",
+  "origin": {
+    "kind": "fixture",
+    "operationId": "op_fixture_task"
+  },
+  "conversationCutoffSeq": 3,
+  "attemptIds": null,
+  "createdAt": "2026-09-03T17:27:58.6956098Z",
+  "updatedAt": "2026-09-03T17:27:58.6956098Z"
+}

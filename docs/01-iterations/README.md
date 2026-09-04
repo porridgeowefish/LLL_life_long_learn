@@ -2,8 +2,8 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
-Source of truth: current delivery baseline and routing index for implemented foundations.
+Last reviewed: 2026-09-03
+Source of truth: current implemented baseline, active planning slice, and routing index for delivered foundations.
 
 Each iteration should be independently understandable and testable.
 
@@ -11,9 +11,18 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 13 | Teacher-assistant learning workspace, assets, source materials, stable streaming, and global preferences | [iteration-13-teacher-assistant-learning-workspace](./iteration-13-teacher-assistant-learning-workspace/README.md) |
+| 16 | Completed conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) |
 
-Iterations 01–12 are retained as [delivered foundations](./foundations/README.md).
+## Active Delivery Slice
+
+| Iteration | Goal | Directory | State |
+|---|---|---|---|
+| 16 | Complete conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) | delivered; native browser acceptance remains user-run |
+
+Iteration 13 is retained under `foundations/`; iteration 16 is the current
+implemented baseline. Iteration 14 remains the architecture baseline.
+
+Iterations 01–13 are retained as [delivered foundations](./foundations/README.md).
 They explain reusable capabilities that still support the current architecture.
 Read only the slice relevant to the task; active architecture and code decide
 how that capability participates in the current teacher workspace.

@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -14,7 +14,7 @@ Source of truth: long-lived conceptual file-first model; Go structs and persiste
 | `title` | string | learner-facing title | required |
 | `projectType` | enum string | `discipline-map` or `system-learning` | missing legacy value decodes as `system-learning` |
 | `status` | string | project lifecycle state | required |
-| `activeZone` | string or null | legacy five-zone name | accepted on old state files; not active teacher-workspace navigation |
+| `activeZone` | string or null | legacy Intro/Explain/Practice name | accepted on old state files; not active teacher-workspace navigation |
 | `createdAt` | RFC 3339 timestamp | timestamp | required |
 | `updatedAt` | RFC 3339 timestamp | timestamp | required |
 
@@ -73,13 +73,15 @@ versioned intro, body, and practice assets
 generic generated assistant deliverables
 body annotations and Ask-AI history
 versioned source originals and derived content
+append-only provider-reported teacher usage by response
 assistant tasks, sealed inputs, attempts, and run records
 ```
 
 Legacy zone protocols (`intro/assessment.json`, Explain manifests/pages,
-Practice tasks/answers/evaluations, Extend, Summary, flashcards, and progress
-events) remain readable for migration and compatibility. They are not the data
-contract for new assistant outputs.
+Practice tasks/answers/evaluations, and progress events) remain readable for
+migration and compatibility. Historical Extend/Summary files are intentionally
+excluded from runtime readers and migration inventory. None is the data contract
+for new assistant outputs.
 
 Exact fields remain owned by their code schemas and active iteration contracts.
 
@@ -94,6 +96,27 @@ context. Assistant attempts receive an immutable snapshot at
 Legacy `projects/<slug>/memory/` files are preserved but ignored. New project
 skeletons do not create them, and the generic project file API rejects reads or
 writes to `memory/`.
+
+## Application Configuration And Quality Evidence
+
+Iteration 14 centralizes local application configuration without changing
+learner project data. `config.local.json` remains gitignored and read-compatible
+with current flat keys. The implemented configuration groups server, workspace, AI,
+assistant, image, and UI values, with precedence:
+
+```text
+compiled defaults < local JSON < LLL_* environment < explicit CLI flags
+```
+
+Loading normalizes values in memory and never rewrites the learner's file.
+Secrets are supplied through environment variables by default and are redacted
+from diagnostics.
+
+Generated test, coverage, and dependency evidence lives below the ignored
+`.artifacts/quality/` root. It is build evidence, not product state, and must
+not contain secrets, full prompts, learner preferences, uploaded source
+contents, or unrestricted absolute paths. Exact iteration-14 shapes and
+compatibility fields are owned by its `DATA_DESIGN.md`.
 
 ## Persistence Rules
 
@@ -125,12 +148,15 @@ migration backup and recovery journals
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE
 state are derived. Provider deltas, rendered rich content, and compact context
-are projections. Exact paths and schemas are owned by iteration 13
-`DATA_DESIGN.md`; code is current truth.
+are projections. Exact product paths and schemas remain owned by iteration 13
+`DATA_DESIGN.md`; code is current truth. A ready source revision has exactly one
+canonical `content.md`; `conversation/usage.jsonl` records only nonzero,
+provider-reported teacher token usage. Assistant usage is not yet modelled.
 
 ## Delivery State
 
 The Go state model persists `projectType` for new projects. Missing type remains
 the legacy compatibility signal and decodes as `system-learning`. Iteration 13
 is implemented; its file schemas and migration compatibility are the active
-system-learning model.
+system-learning model. Iteration 14 is an approved source-architecture target
+and does not become product-data truth until delivered.

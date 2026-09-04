@@ -88,6 +88,7 @@
       "title": "与四级标题完全一致",
       "chapterTitle": "所属三级标题",
       "goal": "学完本主题能够解释、判断或完成什么",
+      "teachingOutline": "一段面向教师的教学大纲：从什么问题切入、建立哪些共同语言、解释哪些关键关系，以及明确不深入的实现细节。",
       "inScope": ["本主题完整教授的内容"],
       "outOfScope": ["容易混入、但应由兄弟主题负责的内容"],
       "prerequisites": ["进入本主题前需要的最低前置"],
@@ -103,6 +104,7 @@
 
 - `id` 只使用小写字母、数字和连字符；同一份地图内唯一且重生成时尽量稳定。
 - 每个主题至少有一项 `inScope` 和一项 `ownedConcepts`。
+- 每个主题都写出 `teachingOutline`；它应是可直接注入教师上下文的自然语言教学边界，不是标题复述或术语堆砌。
 - 兄弟主题不得互为超集；若 A.1 的内容属于 A.2，应放入 A.1 的 `outOfScope`，并由 A.2 的 `ownedConcepts` 拥有。
 - `prerequisites` 表示需要先具备的知识，`reusedConcepts` 表示本主题会用到但不重新完整教学的概念，二者都不能伪装成当前主题的核心内容。
 - 先写 `overview.md`，再把 `discipline-topics.json` 作为本次生成的最后一个文件写入。

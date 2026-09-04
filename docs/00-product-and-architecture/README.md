@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: `docs/INDEX.md` routes readers here; each linked document owns its topic.
 
 This directory stores long-lived documents that answer:
@@ -28,6 +28,7 @@ Which rules guide implementation and delivery
 - [API_CONTRACT_STRATEGY.md](./API_CONTRACT_STRATEGY.md)
 - [ROADMAP.md](./ROADMAP.md)
 - [DOCUMENTATION_STANDARD.md](./DOCUMENTATION_STANDARD.md)
+- [QUALITY_COMMANDS.md](./QUALITY_COMMANDS.md)
 - [agent-rules/README.md](./agent-rules/README.md)
 - [ADR index](./ADR/README.md)
 
@@ -62,3 +63,7 @@ versioned teaching assets, and explicit source material. It is extended by
 defines stable rich-stream rendering and one learner-owned global preferences file.
 [ADR-0014](./ADR/0014-current-documentation-surface-and-archive-boundary.md)
 defines which documents belong to the current AI context and which are historical only.
+[ADR-0015](./ADR/0015-business-modular-monolith-boundaries.md) defines the
+implemented iteration-14 architecture: business-capability modules with private
+implementations, selective hexagonal boundaries, one composition root, one
+typed configuration system, and executable architecture checks.

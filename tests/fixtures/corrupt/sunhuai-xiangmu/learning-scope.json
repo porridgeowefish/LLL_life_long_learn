@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "status": "draft",
+  "title": "损坏示例",
+  "goal": "",
+  "inScope": [],
+  "outOfScope": [],
+  "prerequisites": [],
+  "ownedConcepts": [],
+  "reusedConcepts": [],
+  "source": {
+    "type": "standalone"
+  },
+  "updatedAt": "2026-09-03T17:27:58Z"
+}

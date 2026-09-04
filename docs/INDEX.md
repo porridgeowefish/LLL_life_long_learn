@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: this file is the entry point for people and AI agents.
 
 Read this file before implementation, then move to the linked domain documents.
@@ -42,6 +42,14 @@ task-specific long-lived documents. If the task touches an inherited capability,
 use the foundation index to select its originating slice; do not load all twelve
 iterations. Do not scan `docs/99-archive/` to discover requirements. Open it only
 for an explicit history, migration, compatibility, or regression question.
+
+## Active Delivery
+
+The implemented product baseline is
+[Iteration 16](./01-iterations/iteration-16-conversation-learning-workflow/README.md).
+Iteration 16 completes the conversation source/citation workflow, confirmed
+asset consolidation, map teaching outlines, and teacher token usage. Browser
+E2E acceptance remains learner-run.
 
 ## Required Entry Points
 

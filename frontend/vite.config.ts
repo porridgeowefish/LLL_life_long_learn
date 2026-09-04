@@ -7,7 +7,7 @@ import path from 'node:path';
 // In dev, Vite serves on :5173 and proxies /api, /files, /events to the Go
 // backend on :8787. In production, `npm run build` emits a static bundle
 // under dist/ that the Go binary serves via http.FileServer plus an SPA
-// fallback (see backend-go/internal/server/router.go).
+// fallback (see backend-go/internal/transport/httpserver/router.go).
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -44,6 +44,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: false,
   },
 });

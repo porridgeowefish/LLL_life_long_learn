@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -18,13 +18,12 @@ sessions, follow-up, cancellation, and run status
 project files
 Explain confusions and Ask-AI
 Practice tasks, attempts, checking, submission, and evaluation
-Summary flashcards
 progress, activity aggregation, infographics, and SSE events
 teacher conversation and response recovery
 assistant task projection, assets, annotations, sources, and preferences
 ```
 
-`backend-go/internal/server/router.go` is the route truth. Go request/response
+`backend-go/internal/transport/httpserver/router.go` is the route truth. Go request/response
 types and frontend TypeScript types own payload truth.
 
 ## Contract Rules
@@ -37,6 +36,23 @@ backend and frontend types change in the same implementation task
 legacy-compatible defaults are explicit
 Markdown never overrides implemented route behavior
 ```
+
+## Iteration-14 Compatibility Freeze
+
+The modular-monolith refactor changes internal ownership, not the public
+product contract. Existing HTTP paths, status behavior, request and response
+shapes, normalized teacher stream blocks, and global invalidation events are
+frozen inputs to iteration 14.
+
+Backend capabilities expose small Go facades; frontend features expose one
+`index.ts`. These internal entry points replace direct imports of stores,
+providers, executors, components, hooks, or API implementations. They do not
+create a second public HTTP API.
+
+Contract tests run against the new composition root during migration. Any
+discovered need for a public shape change is a separate scoped decision that
+must update the active iteration contract, Go and TypeScript types, migration
+behavior, and tests before implementation.
 
 ## Project Types And Discipline Maps
 
@@ -103,6 +119,11 @@ The active API includes one provider-neutral teacher-turn stream, durable conver
 reads, task and asset reads, editable core assets, body annotations, and source
 operations. The frontend consumes normalized block events and never consumes a
 provider SDK stream directly.
+
+Ready sources expose one teacher-citation Markdown endpoint; the source ledger
+does not preview it. `GET /api/usage/teacher` returns paginated, durable
+conversation-level teacher usage with per-response rows. These values are
+provider-reported only and do not include assistant usage.
 
 The teacher sees one `delegate_learning_work` tool with logical type, objective,
 source references, and proposal message identity. Application services inject

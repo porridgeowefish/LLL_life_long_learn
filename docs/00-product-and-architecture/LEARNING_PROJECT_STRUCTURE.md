@@ -128,7 +128,8 @@ ordinary movable folder members.
   learner-facing teaching assets.
 - `assets/generated` holds declared research, code, images, experiments, and
   other assistant deliverables that do not fit the three teaching sections.
-- `sources/` holds learner-provided immutable revisions and derived parse output.
+- `sources/` holds learner-provided immutable revisions and, after supported
+  background parsing, exactly one `derived/content.md` citation per ready revision.
 - `runs/` and task attempts hold raw execution evidence; they never become
   curated assets merely because a CLI wrote them.
 - `<WORKSPACE>/preferences.md` is one learner-owned global preference document,
@@ -136,15 +137,17 @@ ordinary movable folder members.
 
 Formal assets are written by Go after validation and version/merge handling.
 The visible CLI writes only its attempt workspace and declared result manifest.
+Confirmed consolidation always rewrites Intro and Body from sealed conversation
+evidence; Practice changes only when the approved task explicitly requests it.
 
 ## Compatibility Boundary
 
 Old projects may contain `intro/`, `explain/`, `practice/`, `extend/`,
 `summary/`, `progress/`, and `memory/`. Migration may read Intro, Explain,
 Practice, and Explain annotations into the current intro/body/practice model.
-Summary and Extend do not enter new teacher context. Project memory is preserved
-but ignored. Legacy readers and zone Agents exist for recovery, not as the
-active product shape.
+`extend/` and `summary/` are preserved historical files: they do not enter
+teacher context, migration inventory, file APIs, watchers, navigation, or agent
+registration. Project memory is likewise preserved but ignored.
 
 ## Required State
 
@@ -161,6 +164,7 @@ not active navigation state for the teacher workspace.
 - [ADR-0011](./ADR/0011-learning-scope-snapshots-and-intro-calibration.md) defines topic-boundary snapshots.
 - [ADR-0012](./ADR/0012-teacher-assistant-learning-workspace.md) defines the conversation-first learning unit.
 - [ADR-0013](./ADR/0013-stable-stream-rendering-and-global-preferences.md) defines stable streaming and global preferences.
+- [ADR-0016](./ADR/0016-retire-legacy-summary-extend-and-knowledge-garden.md) retires Summary, Extend, and Knowledge Garden product surfaces.
 
 Earlier partially effective workbench and artifact decisions remain in the
 [active ADR graph](./ADR/README.md). Only fully superseded decisions move to the

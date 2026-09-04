@@ -78,7 +78,8 @@ The encyclopedia Agent plans the whole architecture before writing; the overview
 Each H4 topic also declares what it owns, reuses, requires, and excludes. The backend snapshots that canonical boundary when the learner confirms a deep dive.
 Each new-contract H4 topic has its learning action beside that body heading; legacy H3-only overviews remain actionable until regenerated.
 System-learning projects use the conversation-first teacher workspace.
-The five-zone workflow remains compatibility data and migration input only.
+Intro, Explain, and Practice remain compatibility data and migration input only;
+retired Summary and Extend files stay recoverable but have no product interface.
 Existing projects remain system-learning projects and migrate compatibly.
 Intro presents generated prerequisite-gap summaries directly, without a second action; project creation represents a deliberate longer-lived commitment.
 Intro calibrates readiness, depth, examples, scaffolding, and practice difficulty. It may finalize a standalone draft scope but cannot broaden a ready map-origin scope.
@@ -94,3 +95,6 @@ explicit private source material. A visible native-CLI assistant performs
 learner-authorized substantial work asynchronously. The five teaching roles are
 soft methods in one teacher prompt, not product modules. Current runnable code,
 the current iteration, and active architecture documents are the delivery truth.
+Iteration 16 makes ready source citations selectable in the teacher composer,
+uses map-topic teaching outlines as soft guidance, consolidates confirmed
+conversation learning into Intro/Body, and exposes teacher-only token usage.

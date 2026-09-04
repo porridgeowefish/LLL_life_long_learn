@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-03
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -21,6 +21,31 @@ The Go binary serves `frontend/dist/` in production. Filesystem content is
 durable truth; in-memory indexes, dispatch slots, and SSE connections are
 rebuildable runtime state. No database, external queue, cloud account, or
 hidden-only agent runtime is required.
+
+## Implemented Modular Monolith
+
+ADR-0015 reorganized the runtime as a business-capability modular monolith in
+Iteration 14. Deployment, public APIs, and canonical project files remain
+unchanged.
+
+```text
+cmd/lll
+-> app/bootstrap                         one composition root
+-> transport/httpserver                 thin HTTP and SSE adapters
+-> modules/{teacher,assistant,assets,sources,projects,learning,preferences}
+-> platform/{config,filesystem,process,events,identity}
+-> compatibility                        legacy reads and migration only
+```
+
+Business capabilities are the primary code boundary. Complex modules may use
+domain, application, ports, and adapters internally; simple modules stay
+compact. A module exposes one facade, owns its persisted data family, and keeps
+stores, providers, executors, paths, and mutable entities private. Platform
+code supplies technical mechanics and may not depend on a business module.
+
+Cross-module calls use small consumer-defined ports connected in
+`app/integration`. Only `app/bootstrap` sees concrete implementations across
+the system. Automated import checks enforce these rules.
 
 ## Runtime Planes
 
@@ -72,6 +97,7 @@ learner sends a turn
 -> teacher service assembles conversation, scope, active assets, disclosed sources, and read-only preferences
 -> selected model provider streams reasoning summary (when supplied) and answer deltas
 -> events append to the conversation log before they are projected to the UI
+-> nonzero provider-reported usage appends to conversation/usage.jsonl
 -> refresh reconnects to durable run state and recovers the final response
 ```
 
@@ -113,6 +139,7 @@ unit.json
 conversation/{conversation.json,events.jsonl,compact.json}
 assets/{intro,body,practice,generated}
 sources/<source-id>/revisions/<revision-id>/{original,derived}
+conversation/usage.jsonl
 assistant-tasks/<task-id>/{task.json,input-manifest.json,attempts}
 migrations/iteration-13/{migration.json,journal.jsonl,backup}
 ```
@@ -128,9 +155,11 @@ and assistant prompts receive bounded read-only snapshots. Existing project
 
 ## Compatibility Boundary
 
-Legacy Intro / Explain / Practice / Extend / Summary routes, files, registered
-zone Agents, and readers remain only for old-project migration, rollback, and
-Ask-AI/asset compatibility. They are not the active system-learning navigation
+Legacy Intro / Explain / Practice routes, files, and readers remain only for
+old-project migration, rollback, and Ask-AI/asset compatibility. Extend,
+Summary, and Knowledge Garden are retired: historical directories survive on
+disk but have no routes, registered agents, readers, or navigation. These legacy
+paths are not the active system-learning navigation
 or the source for new assistant output contracts.
 
 ## Architectural Rules

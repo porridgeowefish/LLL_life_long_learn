@@ -49,7 +49,7 @@ LLL 是一个**本地优先的教师—助教型 AI 学习工作台**。它不�
 - **本地优先、可恢复**：不引入数据库或外部消息队列，重启后从文件恢复状态。
 - **偏好由学习者维护**：工作区只保留一个 `preferences.md`；教师与助教只读，当前不允许 AI 自动编辑或推断写回。
 
-架构与迭代文档见 [docs/00-product-and-architecture](docs/00-product-and-architecture/README.md) 和 [Iteration 13](docs/01-iterations/iteration-13-teacher-assistant-learning-workspace/README.md)。文档与代码冲突时，以可运行代码和当前迭代契约为准。
+架构与迭代文档见 [docs/00-product-and-architecture](docs/00-product-and-architecture/README.md) 和 [Iteration 14](docs/01-iterations/iteration-14-modular-monolith-architecture/README.md)。文档与代码冲突时，以可运行代码和当前迭代契约为准。
 
 ## 部署
 

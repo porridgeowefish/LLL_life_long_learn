@@ -29,17 +29,9 @@ See `docs/00-product-and-architecture/AGENT_PRIMITIVES.md` for the design ration
 
 - `transfer.md` — Apply learned concept to a new problem
 
-### Extend Agent (required, primitive ready — agent pending)
-
-- `critical_thinking.md` — Counterfactual + relation reasoning
-
-### Summary Agent (required, primitive ready — agent pending)
-
-- `review_pack.md` — Feynman checklist + spaced repetition cards
-
 ## Conventions
 
 - File name = primitive id used in `agents/registry/*.json`.
-- Five fixed sections per file (see `AGENT_PRIMITIVES.md`).
+- Fixed sections per file (see `AGENT_PRIMITIVES.md`).
 - Roughly 400 words per file to keep the assembled prompt manageable.
 - No behavioral commands — primitives describe mechanisms, charters give orders.
