@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"errors"
@@ -66,7 +66,7 @@ func (s *Server) handleCreateAnnotation(w http.ResponseWriter, r *http.Request) 
 		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	emitAnnotationUpdated(slug, "create", annotation.AnnotationID)
+	s.emitAnnotationUpdated(slug, "create", annotation.AnnotationID)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"annotation": annotation})
 }
 
@@ -98,7 +98,7 @@ func (s *Server) handleUpdateAnnotation(w http.ResponseWriter, r *http.Request) 
 		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	emitAnnotationUpdated(slug, "update", id)
+	s.emitAnnotationUpdated(slug, "update", id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"annotation": annotation})
 }
 
@@ -120,7 +120,7 @@ func (s *Server) handleDeleteAnnotation(w http.ResponseWriter, r *http.Request) 
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	emitAnnotationUpdated(slug, "delete", id)
+	s.emitAnnotationUpdated(slug, "delete", id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
@@ -134,10 +134,10 @@ func (s *Server) handleAnnotationAskAiSummarize(w http.ResponseWriter, r *http.R
 	s.handleAskAiSummarize(w, r)
 }
 
-func emitAnnotationUpdated(slug, action, id string) {
-	if broadcaster != nil {
+func (s *Server) emitAnnotationUpdated(slug, action, id string) {
+	if s.broadcaster != nil {
 		payload := map[string]any{"projectSlug": slug, "action": action, "id": id}
-		broadcaster.Emit("annotation-updated", payload)
-		broadcaster.Emit("confusion-updated", payload)
+		s.broadcaster.Emit("annotation-updated", payload)
+		s.broadcaster.Emit("confusion-updated", payload)
 	}
 }

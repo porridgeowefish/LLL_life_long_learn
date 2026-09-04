@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"math"
 	"net/http"
 	"strconv"
-	"sync"
 
 	"github.com/xmz14/lll/backend-go/internal/agentexecution"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
@@ -18,8 +17,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
-
-var practiceEvaluationJobs sync.Map
 
 func practiceStoreForRequest(w http.ResponseWriter, slug string) (*practicestore.Store, bool) {
 	if !workspace.ValidateSlug(slug) {
@@ -367,13 +364,13 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 		return
 	}
 	jobKey := fmt.Sprintf("%s:%d", slug, attemptID)
-	if _, loaded := practiceEvaluationJobs.LoadOrStore(jobKey, true); loaded {
+	if _, loaded := s.practiceEvalJobs.LoadOrStore(jobKey, true); loaded {
 		httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "running", "attempt": attemptID})
 		return
 	}
-	agent, found := agents.Get("practice")
+	agent, found := s.agents.Get("practice")
 	if !found {
-		practiceEvaluationJobs.Delete(jobKey)
+		s.practiceEvalJobs.Delete(jobKey)
 		httpx.Error(w, http.StatusInternalServerError, "practice agent not found")
 		return
 	}
@@ -382,14 +379,14 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 		ZoneName:        workspace.ZonePractice,
 		AgentID:         agent.ID,
 		PracticeAttempt: attemptID,
-	}, agents)
+	}, s.agents)
 	if err != nil {
-		practiceEvaluationJobs.Delete(jobKey)
+		s.practiceEvalJobs.Delete(jobKey)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	go func() {
-		defer practiceEvaluationJobs.Delete(jobKey)
+		defer s.practiceEvalJobs.Delete(jobKey)
 		execution := s.agentExecution
 		if execution == nil {
 			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })

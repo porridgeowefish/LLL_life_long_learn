@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/xmz14/lll/backend-go/internal/app/bootstrap"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/platform/config"
-	"github.com/xmz14/lll/backend-go/internal/server"
 )
 
 func main() {
@@ -36,8 +36,8 @@ func main() {
 		os.Setenv("WORKSPACE", cfg.Workspace.Root)
 	}
 
-	srv := server.New()
-	defer srv.Close()
+	srv := bootstrap.Build()
+	defer srv.Server.Close()
 
 	portEnv := fmt.Sprintf("%d", cfg.Server.Port)
 	if *port != 0 {
@@ -53,12 +53,12 @@ func main() {
 	fmt.Printf("  Projects:  %s\n", paths.PROJECTS_ROOT)
 	fmt.Printf("  Agents:    %s\n", paths.AGENTS_ROOT)
 	fmt.Printf("  Frontend:  %s\n", paths.FRONTEND_ROOT)
-	fmt.Printf("  Claude:    %s (available=%t)\n", srv.ClaudeBin, srv.ClaudeAvailable)
-	fmt.Printf("  Runtime:   %s / %s (available=%t)\n", srv.Runtime.ID, srv.Runtime.Bin, srv.Runtime.Available)
+	fmt.Printf("  Claude:    %s (available=%t)\n", srv.Server.ClaudeBin, srv.Server.ClaudeAvailable)
+	fmt.Printf("  Runtime:   %s / %s (available=%t)\n", srv.Server.Runtime.ID, srv.Server.Runtime.Bin, srv.Server.Runtime.Available)
 	fmt.Printf("Listening on http://localhost:%s\n", portEnv)
 
-	httpServer := &http.Server{Addr: addr, Handler: srv.Handler()}
-	srv.SetShutdownFunc(func() {
+	httpServer := &http.Server{Addr: addr, Handler: srv.Server.Handler()}
+	srv.Server.SetShutdownFunc(func() {
 		time.Sleep(200 * time.Millisecond)
 		fmt.Println("\nShutting down from UI...")
 		_ = httpServer.Close()

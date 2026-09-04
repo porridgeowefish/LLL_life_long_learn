@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 // The historical /confusions surface is now only a compatibility adapter.
 // It reads and writes the same canonical body annotation log as the new UI.
@@ -60,7 +60,7 @@ func (s *Server) handleCreateConfusion(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	emitAnnotationUpdated(slug, "create", annotation.AnnotationID)
+	s.emitAnnotationUpdated(slug, "create", annotation.AnnotationID)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"confusion": legacyConfusion(annotation)})
 }
 
@@ -88,7 +88,7 @@ func (s *Server) handleUpdateConfusion(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "confusion not found")
 		return
 	}
-	emitAnnotationUpdated(slug, "update", id)
+	s.emitAnnotationUpdated(slug, "update", id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"confusion": legacyConfusion(annotation)})
 }
 
@@ -107,7 +107,7 @@ func (s *Server) handleDeleteConfusion(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "confusion not found")
 		return
 	}
-	emitAnnotationUpdated(slug, "delete", id)
+	s.emitAnnotationUpdated(slug, "delete", id)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 

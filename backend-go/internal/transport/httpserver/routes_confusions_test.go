@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
+	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -25,7 +26,7 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 		t.Fatal(err)
 	}
 
-	srv := &Server{ClaudeBin: "echo", ClaudeAvailable: false}
+	srv := &Server{ClaudeBin: "echo", ClaudeAvailable: false, cache: projectindex.New()}
 
 	// Load agents so registry is populated (needed for router).
 	regDir := dir + "/registry"
@@ -42,7 +43,8 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 	_ = os.WriteFile(regDir+"/explain.json", agentJSON, 0o644)
 	oldAgents := agentregistry.AgentsRootForTest()
 	agentregistry.SetAgentsRootForTest(dir)
-	_ = agents.Load()
+	srv.agents = agentregistry.New()
+	_ = srv.agents.Load()
 	agentregistry.SetAgentsRootForTest(oldAgents)
 
 	return srv, func() {

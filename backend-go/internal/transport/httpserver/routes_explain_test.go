@@ -1,8 +1,10 @@
-package server
+package httpserver
 
 import (
 	"testing"
 	"time"
+
+	"github.com/xmz14/lll/backend-go/internal/httpx"
 )
 
 // TestEmitInfographicReadyBroadcastsArtifactUpdated pins the SSE contract the
@@ -11,11 +13,12 @@ import (
 // and the explain infographic artifact path. Drift here would silently break
 // Stage 2 delivery.
 func TestEmitInfographicReadyBroadcastsArtifactUpdated(t *testing.T) {
-	ch, unsub := broadcaster.Subscribe()
+	s := &Server{broadcaster: httpx.NewBroadcaster()}
+	ch, unsub := s.broadcaster.Subscribe()
 	defer unsub()
 
 	const slug = "test-proj"
-	emitInfographicReady(slug)
+	s.emitInfographicReady(slug)
 
 	select {
 	case ev := <-ch:
@@ -41,9 +44,10 @@ func TestEmitInfographicReadyBroadcastsArtifactUpdated(t *testing.T) {
 // it calls emit unconditionally on completion, so Emit must never block when no
 // SSE client is subscribed (Broadcaster drops to a buffered channel / silently).
 func TestEmitInfographicReadyDoesNotBlockWithoutSubscribers(t *testing.T) {
+	s := &Server{broadcaster: httpx.NewBroadcaster()}
 	done := make(chan struct{})
 	go func() {
-		emitInfographicReady("solo-proj")
+		s.emitInfographicReady("solo-proj")
 		close(done)
 	}()
 	select {

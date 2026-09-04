@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"net/http"
@@ -15,7 +15,7 @@ func (s *Server) handleGetFolders(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	layout, err := syncDisciplineMapFolders(store)
+	layout, err := s.syncDisciplineMapFolders(store)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -42,7 +42,7 @@ func (s *Server) handlePutFolders(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	out, err := syncDisciplineMapFolders(store)
+	out, err := s.syncDisciplineMapFolders(store)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
@@ -50,12 +50,12 @@ func (s *Server) handlePutFolders(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, out)
 }
 
-func syncDisciplineMapFolders(store *folderstore.Store) (folderstore.Layout, error) {
-	if err := cache.Rebuild(); err != nil {
+func (s *Server) syncDisciplineMapFolders(store *folderstore.Store) (folderstore.Layout, error) {
+	if err := s.cache.Rebuild(); err != nil {
 		return folderstore.Layout{}, err
 	}
 	maps := make([]folderstore.MapFolderSpec, 0)
-	for _, project := range cache.All() {
+	for _, project := range s.cache.All() {
 		if project.ProjectType == workspace.ProjectTypeDisciplineMap {
 			maps = append(maps, folderstore.MapFolderSpec{Slug: project.Slug, Title: project.Title})
 		}

@@ -1,5 +1,5 @@
 // backend-go/internal/server/routes_askai_test.go
-package server
+package httpserver
 
 import (
 	"bytes"
@@ -13,9 +13,15 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
+	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/projectindex"
+	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	"github.com/xmz14/lll/backend-go/internal/sessionstore"
+	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -164,8 +170,23 @@ func TestAskAiStreamPersistsPartialFailure(t *testing.T) {
 
 var _ io.ReadCloser = (*failingAskBody)(nil)
 
-// newTestServer returns a *Server without probing Claude.
+// newTestServer returns a *Server without probing Claude. Every handler-
+// reachable field is wired because the hidden globals became struct fields.
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
-	return &Server{}
+	s := &Server{
+		broadcaster:     httpx.NewBroadcaster(),
+		teacher:         teacherservice.New(nil),
+		activeTeacher:   map[string]*activeTeacherRun{},
+		activeByProject: map[string]*activeTeacherRun{},
+		runProgress:     runprogress.New(),
+		sessions:        sessionstore.New(),
+		cache:           projectindex.New(),
+		migrationReady:  true,
+	}
+	s.agents = agentregistry.New()
+	if err := s.agents.Load(); err != nil {
+		t.Logf("agent registry load warning: %v", err)
+	}
+	return s
 }

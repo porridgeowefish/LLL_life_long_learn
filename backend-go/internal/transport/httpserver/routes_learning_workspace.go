@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -273,7 +273,7 @@ func (s *Server) handlePutLearningAsset(w http.ResponseWriter, r *http.Request) 
 		learningWorkspaceError(w, err)
 		return
 	}
-	broadcaster.Emit("learning-asset-updated", map[string]any{"projectSlug": r.PathValue("id"), "asset": asset.Meta})
+	s.broadcaster.Emit("learning-asset-updated", map[string]any{"projectSlug": r.PathValue("id"), "asset": asset.Meta})
 	httpx.WriteJSON(w, http.StatusOK, asset)
 }
 
@@ -369,7 +369,7 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 			source = updated
 		}
 	}
-	broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
+	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"source": source, "revision": revision, "task": task, "parseDisposition": disposition, "parseReason": dispositionReason})
 }
 

@@ -1,32 +1,37 @@
-// Package server wires HTTP routes for the LLL backend.
-package server
+// Package httpserver wires HTTP routes for the LLL backend. It is a thin
+// transport adapter: handlers decode, call one application operation, and
+// encode. Composition happens in app/bootstrap, which constructs the
+// Server with every dependency injected.
+package httpserver
 
 import (
 	"context"
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentexecution"
+	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
-	"github.com/xmz14/lll/backend-go/internal/iteration13migration"
 	"github.com/xmz14/lll/backend-go/internal/paths"
+	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 )
 
-// Server bundles runtime dependencies shared across handlers.
+// Server bundles runtime dependencies shared across handlers. Every field
+// is injected by the composition root (app/bootstrap); handlers own no
+// package-level mutable state.
 type Server struct {
 	ClaudeBin       string
 	ClaudeAvailable bool
@@ -38,100 +43,79 @@ type Server struct {
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
 	teacher         *teacherservice.Service
-	agentExecution  agentExecutionService
+	agentExecution  AgentExecutionService
 	dispatcher      *assistanttask.Dispatcher
 	activeTeacher   map[string]*activeTeacherRun
 	activeByProject map[string]*activeTeacherRun
 	migrationReady  bool
 	migrationFailed []string
-	mu              sync.RWMutex
+
+	broadcaster      *httpx.Broadcaster
+	agents           *agentregistry.Registry
+	sessions         *sessionstore.Store
+	cache            *projectindex.Cache
+	infographicJobs  sync.Map
+	practiceEvalJobs sync.Map
+	mu               sync.RWMutex
 }
 
-type agentExecutionService interface {
+type AgentExecutionService interface {
 	StartProject(context.Context, agentexecution.ProjectRequest) (*claudelauncher.RunResult, error)
 	StartTask(context.Context, agentexecution.TaskRequest) error
 	Resume(context.Context, agentexecution.ResumeRequest) (*claudelauncher.RunResult, error)
 	StartHeadless(context.Context, agentexecution.HeadlessRequest) error
 }
 
-// broadcaster is the package-global SSE event bus.
-var broadcaster = httpx.NewBroadcaster()
+type Dependencies struct {
+	ClaudeBin       string
+	ClaudeAvailable bool
+	Runtime         agentruntime.Runtime
+	RuntimeOptions  []agentruntime.Runtime
+	ImageConfig     *imageconfig.Config
+	ImageAvailable  bool
+	RunProgress     *runprogress.Store
+	Watcher         *artifactwatch.Watcher
+	Teacher         *teacherservice.Service
+	Broadcaster     *httpx.Broadcaster
+	Agents          *agentregistry.Registry
+	Sessions        *sessionstore.Store
+	Cache           *projectindex.Cache
+	MigrationReady  bool
+	MigrationFailed []string
+}
 
-// New creates a Server and probes the Claude binary once.
-// Loads the agent registry from disk. Errors are logged but non-fatal.
-func New() *Server {
-	bin := "claude"
-	if env := envOr("CLAUDE_BIN", ""); env != "" {
-		bin = env
-	}
-	available := probeClaude(bin, 3*time.Second)
-	runtimeCfg, err := agentruntime.Load()
-	if err != nil {
-		println("agent-runtime: load warning:", err.Error())
-	}
-	selectedRuntime := agentruntime.Resolve(runtimeCfg)
-	runtimeOptions := agentruntime.List(runtimeCfg)
-	if err := agents.Load(); err != nil {
-		println("agent-registry: load warning:", err.Error())
-	}
-	migration := iteration13migration.RunAll()
-	conversationstore.ReconcileAllInterruptedResponses()
-
-	// Load image configuration
-	imgCfg, err := imageconfig.Load()
-	if err != nil {
-		println("image-config: load error:", err.Error())
-		imgCfg = nil
-	}
-	if imgCfg == nil {
-		println("image-config: not configured")
-	}
-
-	imgAvailable := false
-	if imgCfg != nil && imgCfg.PythonBin != "" {
-		if probeBin(imgCfg.PythonBin, "--version") {
-			imgAvailable = true
-		} else {
-			println("image-config: python binary not available:", imgCfg.PythonBin)
-		}
-	}
-
-	// Start the artifact file watcher (event-driven refresh; replaces polling).
-	watcher, werr := artifactwatch.Start(paths.PROJECTS_ROOT, broadcaster.Emit)
-	if werr != nil {
-		println("artifactwatch: start warning:", werr.Error())
-	}
-
-	teacher := teacherservice.New(nil)
-	server := &Server{
-		ClaudeBin:       bin,
-		ClaudeAvailable: available,
-		Runtime:         selectedRuntime,
-		RuntimeOptions:  runtimeOptions,
-		ImageConfig:     imgCfg,
-		ImageAvailable:  imgAvailable,
-		runProgress:     runprogress.New(),
-		watcher:         watcher,
-		teacher:         teacher,
+// New constructs only the HTTP adapter. Concrete dependency creation and
+// background worker startup belong to app/bootstrap.
+func New(deps Dependencies) *Server {
+	return &Server{
+		ClaudeBin:       deps.ClaudeBin,
+		ClaudeAvailable: deps.ClaudeAvailable,
+		Runtime:         deps.Runtime,
+		RuntimeOptions:  deps.RuntimeOptions,
+		ImageConfig:     deps.ImageConfig,
+		ImageAvailable:  deps.ImageAvailable,
+		runProgress:     deps.RunProgress,
+		watcher:         deps.Watcher,
+		teacher:         deps.Teacher,
 		activeTeacher:   map[string]*activeTeacherRun{},
 		activeByProject: map[string]*activeTeacherRun{},
-		migrationReady:  migration.Ready,
-		migrationFailed: migration.FailedProjects,
+		migrationReady:  deps.MigrationReady,
+		migrationFailed: deps.MigrationFailed,
+		broadcaster:     deps.Broadcaster,
+		agents:          deps.Agents,
+		sessions:        deps.Sessions,
+		cache:           deps.Cache,
 	}
-	execution := agentexecution.New(func() agentruntime.Runtime {
-		runtime, _ := server.runtimeSnapshot()
-		return runtime
-	})
-	server.agentExecution = execution
-	dispatcher := assistanttask.NewDispatcher(execution, broadcaster)
-	server.dispatcher = dispatcher
-	teacher.OnTask = func(projectSlug string, task assistanttask.Task) {
-		broadcaster.Emit("assistant-task-updated", map[string]any{"projectSlug": projectSlug, "task": task})
-		dispatcher.Notify()
-	}
-	dispatcher.Start()
-	return server
 }
+
+func (s *Server) AttachExecution(execution AgentExecutionService, dispatcher *assistanttask.Dispatcher) {
+	s.agentExecution = execution
+	s.dispatcher = dispatcher
+}
+
+// Broadcaster exposes the SSE event bus for the composition root (tests,
+// future integrations). Read-only use only.
+func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 
 // Handler returns the root HTTP handler with all routes mounted.
 func (s *Server) Handler() http.Handler {
@@ -249,7 +233,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/runs/{runId}/status", s.handleRunStatus)
 
 	// Events (SSE)
-	mux.HandleFunc("GET /api/events", broadcaster.SSEHandler(map[string]any{
+	mux.HandleFunc("GET /api/events", s.broadcaster.SSEHandler(map[string]any{
 		"sessions": []any{},
 	}))
 
@@ -339,12 +323,12 @@ func spaHandler(root, indexFile string) http.Handler {
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	// Aggregate dashboard stats from project index + session store.
-	if err := cache.Rebuild(); err != nil {
+	if err := s.cache.Rebuild(); err != nil {
 		// Non-fatal: continue with whatever cache has.
 		println("health: cache rebuild warning:", err.Error())
 	}
-	projCount := len(cache.All())
-	sessCount, turnCount, activeCount := sessions.Stats()
+	projCount := len(s.cache.All())
+	sessCount, turnCount, activeCount := s.sessions.Stats()
 	rt, options := s.runtimeSnapshot()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
@@ -379,32 +363,9 @@ func (s *Server) runtimeSnapshot() (agentruntime.Runtime, []agentruntime.Runtime
 	return s.Runtime, out
 }
 
-// probeClaude runs `<bin> --version` with a timeout; returns true on success.
-func probeClaude(bin string, timeout time.Duration) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, "--version")
-	out, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return strings.TrimSpace(string(out)) != ""
-}
-
-// probeBin runs a binary with given arguments and a short timeout; returns true on success.
-func probeBin(bin string, args ...string) bool {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, args...)
-	_, err := cmd.Output()
-	return err == nil
-}
-
-func envOr(key, fallback string) string {
-	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
-		return v
-	}
-	return fallback
+func (s *Server) RuntimeSnapshot() agentruntime.Runtime {
+	runtime, _ := s.runtimeSnapshot()
+	return runtime
 }
 
 // logging wraps h with simple request logging on stdout.

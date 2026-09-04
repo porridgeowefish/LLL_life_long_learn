@@ -4,7 +4,7 @@
 // shapes of key endpoints, SSE event names, and error paths — so the
 // modular-monolith refactor cannot silently change behavior. Fixtures are
 // copied to a temporary workspace; the checked-in fixtures are never mutated.
-package server
+package httpserver
 
 import (
 	"context"
@@ -26,7 +26,7 @@ import (
 // copyFixture copies one fixture family below dst and returns the projects root.
 func copyFixture(t *testing.T, family string) string {
 	t.Helper()
-	src := filepath.Join("..", "..", "..", "tests", "fixtures", family)
+	src := filepath.Join("..", "..", "..", "..", "tests", "fixtures", family)
 	dst := t.TempDir()
 	if err := copyTreeForFixture(filepath.Clean(src), dst); err != nil {
 		t.Fatalf("copy fixture %s: %v", family, err)
@@ -98,12 +98,8 @@ func canonicalFixtureServer(t *testing.T) (*Server, string) {
 	t.Cleanup(func() { assertTreeUnchanged(t, root, before) })
 	workspace.SetProjectsRootForTest(root)
 	t.Cleanup(func() { workspace.SetProjectsRootForTest("") })
-	s := &Server{
-		teacher:         teacherservice.New(textTeacherGateway{}),
-		activeTeacher:   map[string]*activeTeacherRun{},
-		activeByProject: map[string]*activeTeacherRun{},
-		migrationReady:  true,
-	}
+	s := newTestServer(t)
+	s.teacher = teacherservice.New(textTeacherGateway{})
 	return s, root
 }
 
@@ -206,12 +202,8 @@ func TestRouteTableFrozen(t *testing.T) {
 	if len(frozenRoutes) != 89 {
 		t.Fatalf("route table snapshot has %d entries; update this test deliberately if the iteration-13 surface changed", len(frozenRoutes))
 	}
-	handler := (&Server{}).Handler()
-	mux, ok := handler.(http.Handler)
-	if !ok {
-		t.Fatal("handler is not an http.Handler")
-	}
-	_ = mux
+	s := newTestServer(t)
+	handler := s.Handler()
 	// The ServeMux pattern list is not exported; instead walk the registration
 	// source: assert every frozen route answers non-404 (method mismatch gives
 	// 405, unknown method still proves the pattern exists). See TestRoutesRespond.
@@ -268,8 +260,7 @@ var frozenSSEEvents = []string{
 func TestEventsEndpointRegistered(t *testing.T) {
 	// GET /api/events is registered by Handler(); verify it answers with an
 	// SSE content type and terminates promptly when the client goes away.
-	srv := &Server{}
-	handler := srv.Handler()
+	handler := newTestServer(t).Handler()
 	req := httptest.NewRequest(http.MethodGet, "/api/events", nil)
 	ctx, cancel := context.WithTimeout(req.Context(), 500*time.Millisecond)
 	defer cancel()
@@ -422,7 +413,8 @@ func TestLegacyFixtureReadableWithoutMutation(t *testing.T) {
 		workspace.SetProjectsRootForTest("")
 		assertTreeUnchanged(t, root, before)
 	})
-	server := &Server{migrationReady: false}
+	server := newTestServer(t)
+	server.migrationReady = false
 
 	// Legacy zone read surface.
 	rec := httptest.NewRecorder()
@@ -468,7 +460,7 @@ func TestCorruptFixtureClassifiedFailure(t *testing.T) {
 	root := copyFixture(t, "corrupt")
 	workspace.SetProjectsRootForTest(root)
 	t.Cleanup(func() { workspace.SetProjectsRootForTest("") })
-	server := &Server{migrationReady: true}
+	server := newTestServer(t)
 
 	// First read may self-heal missing canonical files (ensure()); that is
 	// production behavior. Assert the response stays a classified JSON error

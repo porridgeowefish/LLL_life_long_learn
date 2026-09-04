@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -445,7 +445,7 @@ func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http
 		httpx.Error(w, http.StatusServiceUnavailable, string(runtime.ID)+" binary not available")
 		return
 	}
-	encyclopedia, found := agents.Get("encyclopedia")
+	encyclopedia, found := s.agents.Get("encyclopedia")
 	if !found || strings.TrimSpace(encyclopedia.CharterText) == "" {
 		httpx.Error(w, http.StatusInternalServerError, "encyclopedia_agent_not_configured")
 		return
@@ -454,7 +454,7 @@ func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http
 		ProjectSlug: state.Slug,
 		AgentID:     encyclopedia.ID,
 		OutputPaths: []string{"overview.md", "discipline-topics.json"},
-	}, agents)
+	}, s.agents)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())
 		return

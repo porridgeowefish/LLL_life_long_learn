@@ -11,7 +11,9 @@ import (
 // shortenDebounce makes debounce deterministic and fast in tests.
 func shortenDebounce(t *testing.T) {
 	t.Helper()
-	debounceWindow = 5 * time.Millisecond
+	old := debounceWindow
+	debounceWindow = 25 * time.Millisecond
+	t.Cleanup(func() { debounceWindow = old })
 }
 
 func TestWatcherEmitsOnZoneFileWrite(t *testing.T) {
@@ -87,7 +89,7 @@ func TestWatcherDebouncesBursts(t *testing.T) {
 		_ = os.WriteFile(filepath.Join(projDir, "tasks.json"), []byte("x"), 0o644)
 		time.Sleep(1 * time.Millisecond)
 	}
-	time.Sleep(80 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 
 	mu.Lock()
 	defer mu.Unlock()

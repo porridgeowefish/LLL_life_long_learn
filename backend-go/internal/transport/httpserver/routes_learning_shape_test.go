@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -29,9 +29,6 @@ func setupLearningShapeTest(t *testing.T) string {
 	workspace.SetProjectsRootForTest(dir)
 	restoreCfg := askaiconfig.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
 	oldComplete := completeLearningShapeAI
-	if err := agents.Load(); err != nil {
-		t.Fatalf("load agents: %v", err)
-	}
 	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: "http://stub", APIKey: "k", Model: "m"})
 	t.Cleanup(func() {
 		workspace.SetProjectsRootForTest(oldRoot)
@@ -339,12 +336,7 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 	dir := setupLearningShapeTest(t)
 	oldWorkspace := paths.WORKSPACE
 	paths.WORKSPACE = dir
-	oldSessions := sessions
-	sessions = sessionstore.New()
-	t.Cleanup(func() {
-		paths.WORKSPACE = oldWorkspace
-		sessions = oldSessions
-	})
+	t.Cleanup(func() { paths.WORKSPACE = oldWorkspace })
 	if err := workspace.CreateProjectSkeleton("delete-me", "Delete Me", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -359,12 +351,13 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 	if _, err := store.Replace(folderstore.Layout{Folders: []folderstore.Folder{{ID: "f1", Name: "Folder", SlugOrder: []string{"delete-me"}}}}); err != nil {
 		t.Fatal(err)
 	}
-	sessions.Create(&sessionstore.Session{ID: "done", ProjectSlug: "delete-me", State: sessionstore.StateCompleted})
+	srv := newTestServer(t)
+	srv.sessions.Create(&sessionstore.Session{ID: "done", ProjectSlug: "delete-me", State: sessionstore.StateCompleted})
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/projects/delete-me", nil)
 	req.SetPathValue("id", "delete-me")
 	rec := httptest.NewRecorder()
-	newTestServer(t).handleDeleteProject(rec, req)
+	srv.handleDeleteProject(rec, req)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
@@ -375,24 +368,22 @@ func TestDeleteProjectRemovesArtifactsReferencesAndSessions(t *testing.T) {
 	if got := reloaded.Layout().Folders[0].SlugOrder; len(got) != 0 {
 		t.Fatalf("folder reference remains: %v", got)
 	}
-	if len(sessions.List("delete-me")) != 0 {
+	if len(srv.sessions.List("delete-me")) != 0 {
 		t.Fatal("in-memory sessions remain")
 	}
 }
 
 func TestDeleteProjectRejectsActiveSession(t *testing.T) {
 	setupLearningShapeTest(t)
-	oldSessions := sessions
-	sessions = sessionstore.New()
-	t.Cleanup(func() { sessions = oldSessions })
 	if err := workspace.CreateProjectSkeleton("busy", "Busy", ""); err != nil {
 		t.Fatal(err)
 	}
-	sessions.Create(&sessionstore.Session{ID: "running", ProjectSlug: "busy", State: sessionstore.StateRunning})
+	srv := newTestServer(t)
+	srv.sessions.Create(&sessionstore.Session{ID: "running", ProjectSlug: "busy", State: sessionstore.StateRunning})
 	req := httptest.NewRequest(http.MethodDelete, "/api/projects/busy", nil)
 	req.SetPathValue("id", "busy")
 	rec := httptest.NewRecorder()
-	newTestServer(t).handleDeleteProject(rec, req)
+	srv.handleDeleteProject(rec, req)
 	if rec.Code != http.StatusConflict || !strings.Contains(rec.Body.String(), "project_has_active_session") {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}

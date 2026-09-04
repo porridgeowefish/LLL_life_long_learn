@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"crypto/sha256"
@@ -16,7 +16,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -48,7 +47,7 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return
 	}
-	if sessions.HasActiveProject(slug) {
+	if s.sessions.HasActiveProject(slug) {
 		httpx.Error(w, http.StatusConflict, "project_has_active_session")
 		return
 	}
@@ -70,8 +69,8 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "project deleted but folder cleanup failed: "+err.Error())
 		return
 	}
-	cache.Invalidate(slug)
-	sessions.RemoveProject(slug)
+	s.cache.Invalidate(slug)
+	s.sessions.RemoveProject(slug)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"deleted": true, "projectId": slug})
 }
 
@@ -79,7 +78,6 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 
 // cache is the package-global project index. Populated on startup and on writes.
-var cache = projectindex.New()
 
 // createProjectRequest is the body of POST /api/projects.
 // Why/Current/Target/Standard seed only system-learning project.md files.
@@ -103,11 +101,11 @@ type learningScopeSourceRequest struct {
 
 // handleListProjects returns the indexed project tree.
 func (s *Server) handleListProjects(w http.ResponseWriter, r *http.Request) {
-	if err := cache.Rebuild(); err != nil {
+	if err := s.cache.Rebuild(); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "rebuild: "+err.Error())
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": cache.All()})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": s.cache.All()})
 }
 
 // handleCreateProject creates a flat, independent project.
@@ -163,7 +161,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	cache.Invalidate(slug)
+	s.cache.Invalidate(slug)
 	state, _ := workspace.ReadProjectState(slug)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"project": state})
 }
@@ -225,11 +223,11 @@ func (s *Server) handleGetProject(w http.ResponseWriter, r *http.Request) {
 // handleProjectTree preserves the legacy endpoint name but returns the same
 // flat, peer-level project set used by the sidebar.
 func (s *Server) handleProjectTree(w http.ResponseWriter, r *http.Request) {
-	if err := cache.Rebuild(); err != nil {
+	if err := s.cache.Rebuild(); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	flat := cache.All()
+	flat := s.cache.All()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": flat})
 }
 
@@ -395,7 +393,7 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	cache.Invalidate(slug)
+	s.cache.Invalidate(slug)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})
 }
 

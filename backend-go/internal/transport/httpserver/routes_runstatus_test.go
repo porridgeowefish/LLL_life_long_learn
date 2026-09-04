@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"encoding/json"
@@ -7,11 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
+	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 )
 
 func TestRunStatusRejectsBadToken(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New()}
+	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	srv.runProgress.Register("r1")
 	body := `{"activity":"x"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(body))
@@ -25,7 +27,7 @@ func TestRunStatusRejectsBadToken(t *testing.T) {
 }
 
 func TestRunStatusRejectsMissingToken(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New()}
+	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	srv.runProgress.Register("r1")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(`{}`))
 	req.SetPathValue("runId", "r1")
@@ -37,7 +39,7 @@ func TestRunStatusRejectsMissingToken(t *testing.T) {
 }
 
 func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New()}
+	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("r1")
 	body := `{"activity":"wrote p","pagesDone":3,"pagesPlanned":5,"done":true}`
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader(body))
@@ -58,9 +60,9 @@ func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
 		t.Errorf("status not reflected: %+v", resp.Status)
 	}
 	// The done branch calls sessions.SetFinished(runId, completed, 0) against
-	// the package-global store. For an unknown runId it is a no-op (returns
-	// false) and must NOT fail the request. We assert the merged status is
-	// returned + the store remembers Done.
+	// the injected store. For an unknown runId it is a no-op (returns false)
+	// and must NOT fail the request. We assert the merged status is returned
+	// + the store remembers Done.
 	got, ok := srv.runProgress.Get("r1")
 	if !ok || !got.Done || got.PagesDone != 3 {
 		t.Errorf("store not updated: %+v ok=%v", got, ok)
@@ -68,7 +70,7 @@ func TestRunStatusAcceptsAndDoneCompletes(t *testing.T) {
 }
 
 func TestRunStatusRejectsInvalidBody(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New()}
+	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("r1")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/r1/status", strings.NewReader("not json"))
 	req.SetPathValue("runId", "r1")
@@ -81,7 +83,7 @@ func TestRunStatusRejectsInvalidBody(t *testing.T) {
 }
 
 func TestRunStatusAcceptsFailedRuntimeExit(t *testing.T) {
-	srv := &Server{runProgress: runprogress.New()}
+	srv := &Server{runProgress: runprogress.New(), sessions: sessionstore.New(), broadcaster: httpx.NewBroadcaster()}
 	tok := srv.runProgress.Register("failed-run")
 	req := httptest.NewRequest(http.MethodPost, "/api/runs/failed-run/status", strings.NewReader(`{"failed":true}`))
 	req.SetPathValue("runId", "failed-run")

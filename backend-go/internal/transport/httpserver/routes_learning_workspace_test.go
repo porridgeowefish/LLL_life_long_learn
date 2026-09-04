@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
+	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/teachergateway"
 	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -49,7 +50,7 @@ func learningWorkspaceServer(t *testing.T) *Server {
 	if err := workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		t.Fatal(err)
 	}
-	return &Server{teacher: teacherservice.New(textTeacherGateway{}), activeTeacher: map[string]*activeTeacherRun{}, activeByProject: map[string]*activeTeacherRun{}, migrationReady: true}
+	return &Server{teacher: teacherservice.New(textTeacherGateway{}), activeTeacher: map[string]*activeTeacherRun{}, activeByProject: map[string]*activeTeacherRun{}, broadcaster: httpx.NewBroadcaster(), migrationReady: true}
 }
 
 func TestTeacherTurnStreamsAndPersists(t *testing.T) {

@@ -1,18 +1,14 @@
-package server
+package httpserver
 
 import (
 	"net/http"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 )
 
-// agents is the package-global agent registry. Loaded once on startup.
-var agents = agentregistry.New()
-
 // handleListAgents returns every loaded agent.
 func (s *Server) handleListAgents(w http.ResponseWriter, r *http.Request) {
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"agents": agents.List()})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"agents": s.agents.List()})
 }
 
 // handleInvokeAgent delegates to the Phase E implementation in routes_sessions.go.

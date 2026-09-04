@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -215,7 +215,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 		}
 		if sb.Len() > 0 {
 			_, _ = store.AppendMessage(cid, annotationstore.Message{Role: "assistant", Content: sb.String(), Status: status})
-			emitAnnotationUpdated(slug, "ask", cid)
+			s.emitAnnotationUpdated(slug, "ask", cid)
 		}
 		writeFrame(askaiprovider.Frame{Type: "error", Content: "回答暂时中断，已保留收到的部分内容。"})
 		return
@@ -224,7 +224,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	if sb.Len() > 0 {
 		_, _ = store.AppendMessage(cid, annotationstore.Message{Role: "assistant", Content: sb.String(), Status: "completed"})
 	}
-	emitAnnotationUpdated(slug, "ask", cid)
+	s.emitAnnotationUpdated(slug, "ask", cid)
 }
 
 // loadPageContext reads a project-relative artifact (e.g. "explain/pages/01.md")
@@ -266,19 +266,19 @@ func (s *Server) handleAskAiSummarize(w http.ResponseWriter, r *http.Request) {
 
 	// Mark pending immediately + notify (sidebar shows "生成总结中...").
 	store.SetAskSummary(cid, "", "pending")
-	broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
+	s.broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
 
-	go summarizeAskExchange(slug, cid, conf.QuoteSnapshot, conf.Ask)
+	go s.summarizeAskExchange(slug, cid, conf.QuoteSnapshot, conf.Ask)
 
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "pending"})
 }
 
-func summarizeAskExchange(slug, cid, quote string, ask *annotationstore.Ask) {
+func (s *Server) summarizeAskExchange(slug, cid, quote string, ask *annotationstore.Ask) {
 	cfg, err := askaiconfig.Load()
 	if err != nil || !cfg.Enabled() {
 		store, _ := openAnnotationStore(slug)
 		store.SetAskSummary(cid, "总结生成失败：未配置 Ask-AI 模型源。", "failed")
-		broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
+		s.broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
 		return
 	}
 	pc := cfg.Resolve("annotationAskAI")
@@ -302,5 +302,5 @@ func summarizeAskExchange(slug, cid, quote string, ask *annotationstore.Ask) {
 	} else {
 		store.SetAskSummary(cid, strings.TrimSpace(summary), "done")
 	}
-	broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
+	s.broadcaster.Emit("confusion-updated", map[string]any{"projectSlug": slug, "action": "summarize", "id": cid})
 }

@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"context"
@@ -23,9 +23,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
-// sessions is the package-global session store.
-var sessions = sessionstore.New()
-
 // invokeRequest is the body of POST /api/agents/{id}/invoke.
 type invokeRequest struct {
 	ProjectID             string   `json:"projectId"`
@@ -49,7 +46,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	agentID := r.PathValue("id")
-	agent, ok := agents.Get(agentID)
+	agent, ok := s.agents.Get(agentID)
 	if !ok {
 		httpx.Error(w, http.StatusNotFound, "agent not found: "+agentID)
 		return
@@ -95,7 +92,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		ParentPageID:          strings.TrimSpace(req.ParentPageID),
 		PracticeAttempt:       req.PracticeAttempt,
 		PracticeQuestionCount: req.PracticeQuestionCount,
-	}, agents)
+	}, s.agents)
 	if err != nil {
 		httpx.Error(w, http.StatusBadRequest, "prompt assembly: "+err.Error())
 		return
@@ -130,20 +127,20 @@ func (s *Server) startAgentSession(
 		State:       sessionstore.StatePreparing,
 		CreatedAt:   time.Now().UTC(),
 	}
-	sessions.Create(sess)
-	sessions.AppendTurn(sessID, "system", "session created", "")
+	s.sessions.Create(sess)
+	s.sessions.AppendTurn(sessID, "system", "session created", "")
 	_, _, _ = awardLearningEvent(projectID, progressstore.Event{
 		ID: "agent-invoke:" + sessID, SourceType: "agent-invoke", SourceID: agent.ID,
 		ActivityDelta: 1, Title: "开始学习", Detail: contextName + " · " + agent.Name,
 	})
-	if broadcaster != nil {
-		broadcaster.Emit("session-created", map[string]any{"sessionId": sessID, "session": sess})
+	if s.broadcaster != nil {
+		s.broadcaster.Emit("session-created", map[string]any{"sessionId": sessID, "session": sess})
 	}
 
 	go func() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		sessions.SetCancel(sessID, make(chan struct{}))
+		s.sessions.SetCancel(sessID, make(chan struct{}))
 		go func() {
 			if ch := getSessionCancelChannel(sessID); ch != nil {
 				select {
@@ -159,8 +156,8 @@ func (s *Server) startAgentSession(
 		}
 		_, launchErr := execution.StartProject(ctx, agentexecution.ProjectRequest{
 			ProjectSlug: projectID, ContextName: contextName, Agent: agent, PromptPackage: pkg,
-			PermissionMode: permissionMode, Session: sess, SessionStore: sessions,
-			Events: broadcaster, RunProgress: s.runProgress,
+			PermissionMode: permissionMode, Session: sess, SessionStore: s.sessions,
+			Events: s.broadcaster, RunProgress: s.runProgress,
 		})
 		if launchErr != nil {
 			_ = os.WriteFile(filepath.Join(
@@ -198,11 +195,11 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 	var list []*sessionstore.Session
 	switch {
 	case q.Has("active"):
-		list = sessions.ListActive()
+		list = s.sessions.ListActive()
 	case q.Has("recent"):
-		list = sessions.ListRecent(limit)
+		list = s.sessions.ListRecent(limit)
 	default:
-		list = sessions.List("")
+		list = s.sessions.List("")
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sessions": list})
 }
@@ -210,7 +207,7 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 // handleListActiveSessions returns sessions currently in flight (preparing / launching / running / awaiting-follow-up).
 // Convenience endpoint equivalent to GET /api/sessions?active=true.
 func (s *Server) handleListActiveSessions(w http.ResponseWriter, r *http.Request) {
-	list := sessions.ListActive()
+	list := s.sessions.ListActive()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sessions": list})
 }
 
@@ -238,7 +235,7 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 		httpx.Error(w, http.StatusNotFound, "project not found")
 		return
 	}
-	sess := latestProjectZoneSession(projectID, string(workspace.ZoneExplain))
+	sess := latestProjectZoneSession(s.sessions, projectID, string(workspace.ZoneExplain))
 	runDirName := promptassembly.MakeRunDirName("explain-resume", time.Now().UTC())
 	execution := s.agentExecution
 	if execution == nil {
@@ -246,7 +243,7 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 	}
 	result, err := execution.Resume(context.Background(), agentexecution.ResumeRequest{
 		ProjectSlug: projectID, ContextName: string(workspace.ZoneExplain), Session: sess,
-		SessionStore: sessions, Events: broadcaster, RunDirName: runDirName, RunProgress: s.runProgress,
+		SessionStore: s.sessions, Events: s.broadcaster, RunDirName: runDirName, RunProgress: s.runProgress,
 	})
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "resume explain session: "+err.Error())
@@ -269,7 +266,7 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 // handleGetSession returns one session's state including the full turn timeline.
 func (s *Server) handleGetSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	sess, ok := sessions.Get(id)
+	sess, ok := s.sessions.Get(id)
 	if !ok {
 		httpx.Error(w, http.StatusNotFound, "session not found")
 		return
@@ -292,7 +289,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	sess, ok := sessions.Get(id)
+	sess, ok := s.sessions.Get(id)
 	if !ok {
 		httpx.Error(w, http.StatusNotFound, "session not found")
 		return
@@ -308,7 +305,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	permissionMode := claudelauncher.NormalizePermissionMode(req.PermissionMode)
-	agent, ok := agents.Get(sess.AgentID)
+	agent, ok := s.agents.Get(sess.AgentID)
 	if !ok {
 		httpx.Error(w, http.StatusInternalServerError, "agent missing: "+sess.AgentID)
 		return
@@ -322,13 +319,13 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		AgentID:                  sess.AgentID,
 		Intent:                   text,
 		FollowupPriorResultPaths: priorPaths,
-	}, agents)
+	}, s.agents)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "prompt assembly: "+err.Error())
 		return
 	}
 	// Reset session state to running, then launch again.
-	sessions.SetState(sess.ID, sessionstore.StateRunning)
+	s.sessions.SetState(sess.ID, sessionstore.StateRunning)
 	_, _, _ = awardLearningEvent(sess.ProjectSlug, progressstore.Event{
 		ID: "agent-followup:" + sess.ID + ":" + pkg.RunDirName, SourceType: "agent-followup", SourceID: sess.AgentID,
 		ActivityDelta: 1, Title: "追问学习 Agent", Detail: sess.ZoneName,
@@ -342,8 +339,8 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = execution.StartProject(ctx, agentexecution.ProjectRequest{
 			ProjectSlug: sess.ProjectSlug, ContextName: sess.ZoneName, Agent: agent, PromptPackage: pkg,
-			PermissionMode: permissionMode, Session: sess, SessionStore: sessions,
-			Events: broadcaster, RunProgress: s.runProgress,
+			PermissionMode: permissionMode, Session: sess, SessionStore: s.sessions,
+			Events: s.broadcaster, RunProgress: s.runProgress,
 		})
 	}()
 
@@ -356,12 +353,12 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 // handleCancelSession cancels a running session.
 func (s *Server) handleCancelSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	ok := sessions.Cancel(id)
+	ok := s.sessions.Cancel(id)
 	if !ok {
 		httpx.Error(w, http.StatusNotFound, "session not running or not found")
 		return
 	}
-	sessions.SetState(id, sessionstore.StateCancelled)
+	s.sessions.SetState(id, sessionstore.StateCancelled)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sessionId": id, "cancelled": true})
 }
 
@@ -381,9 +378,9 @@ func collectPriorResultPaths(sess *sessionstore.Session) []string {
 	return out
 }
 
-func latestProjectZoneSession(projectSlug, zoneName string) *sessionstore.Session {
+func latestProjectZoneSession(store *sessionstore.Store, projectSlug, zoneName string) *sessionstore.Session {
 	var latest *sessionstore.Session
-	for _, sess := range sessions.List(projectSlug) {
+	for _, sess := range store.List(projectSlug) {
 		if sess.ZoneName != zoneName {
 			continue
 		}

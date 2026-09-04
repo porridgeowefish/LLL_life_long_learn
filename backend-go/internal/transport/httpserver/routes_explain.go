@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentexecution"
@@ -20,8 +19,6 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
-
-var infographicJobs sync.Map
 
 const (
 	infographicStateFile  = "infographic-state.json"
@@ -170,8 +167,8 @@ func writeInfographicState(slug string, state infographicState) error {
 // emitInfographicReady broadcasts an artifact-updated SSE event so the
 // frontend can swap in the finished infographic without waiting for the
 // next poll. Call only after the complete state is durably written.
-func emitInfographicReady(slug string) {
-	broadcaster.Emit("artifact-updated", map[string]any{
+func (s *Server) emitInfographicReady(slug string) {
+	s.broadcaster.Emit("artifact-updated", map[string]any{
 		"slug":     slug,
 		"artifact": "explain/infographic.png",
 	})
@@ -286,7 +283,7 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 
 	// Dedupe in-flight requests
 	jobKey := slug
-	if _, loaded := infographicJobs.LoadOrStore(jobKey, true); loaded {
+	if _, loaded := s.infographicJobs.LoadOrStore(jobKey, true); loaded {
 		httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "running"})
 		return
 	}
@@ -299,14 +296,14 @@ func (s *Server) handleRequestExplainInfographic(w http.ResponseWriter, r *http.
 		UpdatedAt: now,
 	}
 	if err := writeInfographicState(slug, pendingState); err != nil {
-		infographicJobs.Delete(jobKey)
+		s.infographicJobs.Delete(jobKey)
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	// Start pipeline in background
 	go func() {
-		defer infographicJobs.Delete(jobKey)
+		defer s.infographicJobs.Delete(jobKey)
 		s.runInfographicPipeline(context.Background(), slug)
 	}()
 
@@ -449,7 +446,7 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 		fmt.Println("infographic: failed to write complete state:", err)
 		return
 	}
-	emitInfographicReady(slug)
+	s.emitInfographicReady(slug)
 }
 
 // buildCrafterPrompt constructs the prompt for the infographic-crafter subagent.

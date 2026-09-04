@@ -1,4 +1,4 @@
-package server
+package httpserver
 
 import (
 	"net/http"
@@ -26,7 +26,7 @@ func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusUnauthorized, "bad run token")
 		return
 	}
-	broadcaster.Emit("run-progress", map[string]any{
+	s.broadcaster.Emit("run-progress", map[string]any{
 		"runId":        runId,
 		"phase":        updated.Phase,
 		"activity":     updated.Activity,
@@ -36,14 +36,13 @@ func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
 	})
 	if in.Done {
 		// Reliable completion for Claude runs (fixes "sessions stay running").
-		// SetFinished is a method on the package-global *sessionstore.Store
-		// (see routes_sessions.go). For an unknown runId it is a no-op, so a
-		// hook firing after a server restart does not fail the request.
-		sessions.SetFinished(runId, sessionstore.StateCompleted, 0)
-		broadcaster.Emit("session-completed", map[string]any{"runId": runId})
+		// SetFinished is a no-op for an unknown runId, so a hook firing after
+		// a server restart does not fail the request.
+		s.sessions.SetFinished(runId, sessionstore.StateCompleted, 0)
+		s.broadcaster.Emit("session-completed", map[string]any{"runId": runId})
 	} else if in.Failed {
-		sessions.SetFinished(runId, sessionstore.StateFailed, 1)
-		broadcaster.Emit("session-failed", map[string]any{"runId": runId, "error": "runtime exited with a non-zero status"})
+		s.sessions.SetFinished(runId, sessionstore.StateFailed, 1)
+		s.broadcaster.Emit("session-failed", map[string]any{"runId": runId, "error": "runtime exited with a non-zero status"})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"status": updated})
 }
