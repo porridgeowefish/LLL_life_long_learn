@@ -2,13 +2,9 @@
 package askaiconfig
 
 import (
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/workspace"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 // Provider is one configured Ask-AI model source.
@@ -94,45 +90,29 @@ func (c *Config) Resolve(service string) *Provider {
 	return &resolved
 }
 
-// pathFn resolves the config file path. It is a var so tests can redirect it.
-var pathFn = func() string {
-	base := paths.WORKSPACE
-	if base == "" {
-		base = paths.PROJECT_ROOT
-	}
-	return filepath.Join(base, "config.local.json")
-}
-
 // UseConfigPathForTest redirects the config file path and returns a restore
 // function. For tests in OTHER packages (e.g. server handler tests) that
-// cannot touch the unexported pathFn directly.
+// need to isolate section-preserving settings writes.
 func UseConfigPathForTest(path string) (restore func()) {
-	old := pathFn
-	pathFn = func() string { return path }
-	return func() { pathFn = old }
+	return platformconfig.UsePathForTest(path)
 }
 
 // Load reads the askAiProviders section. Returns (nil, nil) when the file or
 // section is absent (feature disabled). Returns an error only on parse failure.
 func Load() (*Config, error) {
-	data, err := os.ReadFile(pathFn())
+	settings, ok, err := platformconfig.LoadAI()
 	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, err
-	}
-	section, ok := raw["askAiProviders"]
 	if !ok {
 		return nil, nil
 	}
-	var cfg Config
-	if err := json.Unmarshal(section, &cfg); err != nil {
-		return nil, err
+	cfg := Config{Default: settings.Default, SearchEngine: settings.SearchEngine, Bindings: make(map[string]Binding, len(settings.Bindings))}
+	for name, binding := range settings.Bindings {
+		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
+	}
+	for _, provider := range settings.Providers {
+		cfg.Providers = append(cfg.Providers, Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.ResolveAPIKey(), Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
 	cfg.Default = strings.TrimSpace(cfg.Default)
 	cfg.SearchEngine = strings.TrimSpace(cfg.SearchEngine)
@@ -151,17 +131,12 @@ func Load() (*Config, error) {
 // Save writes the askAiProviders section back to config.local.json, preserving
 // all other top-level keys via a raw-JSON round-trip. Atomic write.
 func Save(cfg Config) error {
-	var raw map[string]any
-	if data, err := os.ReadFile(pathFn()); err == nil && len(data) > 0 {
-		_ = json.Unmarshal(data, &raw)
+	settings := platformconfig.AISettings{Default: cfg.Default, SearchEngine: cfg.SearchEngine, Bindings: make(map[string]platformconfig.Binding, len(cfg.Bindings))}
+	for name, binding := range cfg.Bindings {
+		settings.Bindings[name] = platformconfig.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
-	if raw == nil {
-		raw = map[string]any{}
+	for _, provider := range cfg.Providers {
+		settings.Providers = append(settings.Providers, platformconfig.Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
-	raw["askAiProviders"] = cfg
-	out, err := json.MarshalIndent(raw, "", "  ")
-	if err != nil {
-		return err
-	}
-	return workspace.AtomicWriteFile(pathFn(), out, 0o644)
+	return platformconfig.SaveAI(settings)
 }

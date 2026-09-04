@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	assets "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -123,7 +123,7 @@ func Migrate(slug string) error {
 	if err := writeJSON(recordPath, record); err != nil {
 		return err
 	}
-	if _, err := conversationstore.New(slug); err != nil {
+	if _, err := teacher.NewConversation(slug); err != nil {
 		return fail(migrationDir, record, "conversation-conversion-failed", err)
 	}
 	if _, err := assets.New(slug); err != nil {

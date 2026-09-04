@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -347,7 +347,7 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 		Path      string `json:"path"`
 		SHA256    string `json:"sha256"`
 	}{}
-	conversation, err := conversationstore.New(task.ProjectSlug)
+	conversation, err := teacher.NewConversation(task.ProjectSlug)
 	if err != nil {
 		return manifest, nil, err
 	}

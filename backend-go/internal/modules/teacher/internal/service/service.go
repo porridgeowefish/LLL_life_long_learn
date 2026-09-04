@@ -7,11 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
-	"github.com/xmz14/lll/backend-go/internal/teachergateway"
+	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
+	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
 )
 
 const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者进行清晰、耐心、有针对性的教学对话，而不是生产文件或代替 IDE。
@@ -53,9 +52,36 @@ type TurnInput struct {
 	ProviderID     string
 }
 
+type DelegationInput struct {
+	TaskType              string
+	Objective             string
+	SourceRefs            []string
+	OperationID           string
+	ProposalMessageID     string
+	ApprovalMessageID     string
+	ToolCallID            string
+	ConversationCutoffSeq uint64
+}
+
+type DelegatedTask struct {
+	ID     string
+	Status string
+}
+
+type TaskAuthorizer interface {
+	CreateDelegation(projectSlug string, input DelegationInput) (DelegatedTask, bool, error)
+}
+
+type taskAuthorizationError interface {
+	error
+	DelegationCode() string
+	ExistingTaskIDValue() string
+}
+
 type Service struct {
-	Gateway teachergateway.Gateway
-	OnTask  func(projectSlug string, task assistanttask.Task)
+	Gateway    teachergateway.Gateway
+	Authorizer TaskAuthorizer
+	OnTask     func(projectSlug string, task DelegatedTask)
 }
 
 func New(gateway teachergateway.Gateway) *Service {
@@ -160,9 +186,9 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 			task, ok, toolErr := s.acceptDelegation(slug, conversation, learner, learnerEvent.Seq, in.OperationID, *event.ToolCall)
 			if toolErr != nil {
 				data := map[string]any{"toolCallId": event.ToolCall.CallID, "code": delegationCode(toolErr)}
-				var active *assistanttask.SameTypeActiveError
-				if errors.As(toolErr, &active) {
-					data["existingTaskId"] = active.ExistingTaskID
+				var classified taskAuthorizationError
+				if errors.As(toolErr, &classified) && classified.ExistingTaskIDValue() != "" {
+					data["existingTaskId"] = classified.ExistingTaskIDValue()
 				}
 				emit(StreamFrame{Type: "tool-rejected", Data: data})
 				appendToolNotice(&text, textBlockID, data["code"].(string), emit)
@@ -224,18 +250,18 @@ func appendToolNotice(text *strings.Builder, blockID, code string, emit func(Str
 	emit(StreamFrame{Type: "text-delta", Data: map[string]any{"blockId": blockID, "delta": notice}})
 }
 
-func (s *Service) acceptDelegation(slug string, conversation *conversationstore.Store, approval conversationstore.Message, cutoff uint64, operationID string, call teachergateway.ToolCall) (assistanttask.Task, bool, error) {
+func (s *Service) acceptDelegation(slug string, conversation *conversationstore.Store, approval conversationstore.Message, cutoff uint64, operationID string, call teachergateway.ToolCall) (DelegatedTask, bool, error) {
 	if call.ToolName != "delegate_learning_work" {
-		return assistanttask.Task{}, false, errors.New("unsupported tool")
+		return DelegatedTask{}, false, errors.New("unsupported tool")
 	}
 	taskType, _ := call.Arguments["taskType"].(string)
 	objective, _ := call.Arguments["objective"].(string)
 	if !isExplicitApproval(messageText(approval)) {
-		return assistanttask.Task{}, false, errors.New("delegation not approved")
+		return DelegatedTask{}, false, errors.New("delegation not approved")
 	}
 	messages, err := conversation.AllMessages()
 	if err != nil {
-		return assistanttask.Task{}, false, err
+		return DelegatedTask{}, false, err
 	}
 	approvalIndex := -1
 	for i := range messages {
@@ -246,7 +272,7 @@ func (s *Service) acceptDelegation(slug string, conversation *conversationstore.
 	}
 	proposal, authorizedObjective, found := findAuthorizedProposal(messages, approvalIndex, objective)
 	if !found {
-		return assistanttask.Task{}, false, errors.New("delegation not approved: no approved proposal")
+		return DelegatedTask{}, false, errors.New("delegation not approved: no approved proposal")
 	}
 	proposalID := proposal.ID
 	// proposalMessageId was part of an early tool contract and leaked into some
@@ -271,7 +297,7 @@ func (s *Service) acceptDelegation(slug string, conversation *conversationstore.
 	proposalText := messageText(proposal)
 	sources, err := sourcestore.New(slug)
 	if err != nil {
-		return assistanttask.Task{}, false, err
+		return DelegatedTask{}, false, err
 	}
 	authorized := map[string]bool{}
 	for i := 0; i <= approvalIndex; i++ {
@@ -284,20 +310,20 @@ func (s *Service) acceptDelegation(slug string, conversation *conversationstore.
 	for _, ref := range refs {
 		source, _, err := sources.Get(ref)
 		if err != nil {
-			return assistanttask.Task{}, false, fmt.Errorf("invalid source ref: %w", err)
+			return DelegatedTask{}, false, fmt.Errorf("invalid source ref: %w", err)
 		}
 		if !authorized[ref] {
-			return assistanttask.Task{}, false, errors.New("delegation not approved: source was not selected by learner")
+			return DelegatedTask{}, false, errors.New("delegation not approved: source was not selected by learner")
 		}
 		if !strings.Contains(proposalText, ref) && !strings.Contains(proposalText, source.DisplayName) {
-			return assistanttask.Task{}, false, errors.New("delegation not approved: source was not disclosed")
+			return DelegatedTask{}, false, errors.New("delegation not approved: source was not disclosed")
 		}
 	}
-	tasks, err := assistanttask.New(slug)
-	if err != nil {
-		return assistanttask.Task{}, false, err
+	if s.Authorizer == nil {
+		return DelegatedTask{}, false, errors.New("task authorizer unavailable")
 	}
-	return tasks.Create(assistanttask.CreateInput{Type: taskType, Objective: authorizedObjective, SourceRefs: refs, Origin: assistanttask.Origin{Kind: "teacher-tool", OperationID: operationID + ":delegate", ProposalMessageID: proposalID, ApprovalMessageID: approval.ID, ToolCallID: call.CallID}, ConversationCutoffSeq: cutoff})
+	task, created, err := s.Authorizer.CreateDelegation(slug, DelegationInput{TaskType: taskType, Objective: authorizedObjective, SourceRefs: refs, OperationID: operationID + ":delegate", ProposalMessageID: proposalID, ApprovalMessageID: approval.ID, ToolCallID: call.CallID, ConversationCutoffSeq: cutoff})
+	return task, created, err
 }
 
 func messageText(message conversationstore.Message) string {
@@ -445,13 +471,9 @@ func runePairs(text string) map[string]bool {
 }
 
 func delegationCode(err error) string {
-	var active *assistanttask.SameTypeActiveError
-	if errors.As(err, &active) {
-		return "same_type_active"
-	}
-	var conflict *assistanttask.OperationConflictError
-	if errors.As(err, &conflict) {
-		return "operation_conflict"
+	var classified taskAuthorizationError
+	if errors.As(err, &classified) {
+		return classified.DelegationCode()
 	}
 	if strings.Contains(err.Error(), "approved") {
 		return "delegation_not_approved"

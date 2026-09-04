@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -262,10 +262,10 @@ func TestSealInputsUsesCompleteConversationAtApprovalCutoff(t *testing.T) {
 	if err := workspace.CreateProjectSkeletonWithInput("cutoff", "截止", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		t.Fatal(err)
 	}
-	conversation, _ := conversationstore.New("cutoff")
+	conversation, _ := teacher.NewConversation("cutoff")
 	var cutoff uint64
 	for i := 0; i < 510; i++ {
-		_, event, err := conversation.AppendMessage("learner", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "message"}})
+		_, event, err := conversation.AppendMessage("learner", "completed", "", []teacher.Block{{Type: "markdown", Source: "message"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -286,7 +286,7 @@ func TestSealInputsUsesCompleteConversationAtApprovalCutoff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var projection conversationstore.Projection
+	var projection teacher.Projection
 	if err := json.Unmarshal(data, &projection); err != nil {
 		t.Fatal(err)
 	}

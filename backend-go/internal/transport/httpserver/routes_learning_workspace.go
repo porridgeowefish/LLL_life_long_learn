@@ -13,16 +13,15 @@ import (
 	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
-	"github.com/xmz14/lll/backend-go/internal/teacherservice"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
-	store, err := conversationstore.New(r.PathValue("id"))
+	store, err := teacher.NewConversation(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -33,7 +32,7 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 	}
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	query := r.URL.Query()
-	var projection conversationstore.Projection
+	var projection teacher.Projection
 	if _, backward := query["beforeSeq"]; backward {
 		before, _ := strconv.ParseUint(query.Get("beforeSeq"), 10, 64)
 		projection, err = store.ReadRecent(before, limit)
@@ -50,11 +49,11 @@ func (s *Server) handleGetConversation(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
-	if _, err := conversationstore.New(slug); err != nil {
+	if _, err := teacher.NewConversation(slug); err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
-	conversation, _ := conversationstore.New(slug)
+	conversation, _ := teacher.NewConversation(slug)
 	if err := ensureTeacherGreeting(conversation, slug); err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -69,58 +68,38 @@ func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid teacher turn")
 		return
 	}
-	s.mu.Lock()
-	if s.activeByProject == nil {
-		s.activeByProject = map[string]*activeTeacherRun{}
-	}
 	if s.activeTeacher == nil {
-		s.activeTeacher = map[string]*activeTeacherRun{}
+		s.activeTeacher = teacher.NewActiveResponses()
 	}
-	if s.activeByProject[slug] != nil {
-		s.mu.Unlock()
+	ctx, run, started := s.activeTeacher.Start(slug)
+	if !started {
 		httpx.Error(w, http.StatusConflict, "a teacher response is already active")
 		return
 	}
-	ctx, cancel := context.WithCancel(context.Background())
-	run := newActiveTeacherRun(slug, cancel)
-	s.activeByProject[slug] = run
-	s.mu.Unlock()
 
 	go func() {
 		responseID := ""
-		emit := func(frame teacherservice.StreamFrame) {
-			run.append(frame)
+		emit := func(frame teacher.StreamFrame) {
+			run.Append(frame)
 			if frame.Type == "turn-accepted" {
 				responseID, _ = frame.Data["responseId"].(string)
 				if responseID != "" {
-					s.mu.Lock()
-					s.activeTeacher[responseID] = run
-					s.mu.Unlock()
+					s.activeTeacher.Bind(responseID, run)
 				}
 			}
 		}
-		err := s.teacher.StreamTurn(ctx, slug, teacherservice.TurnInput{OperationID: in.OperationID, Content: in.Content, AttachmentRefs: in.AttachmentRefs, ProviderID: in.ProviderID}, emit)
+		err := s.teacher.StreamTurn(ctx, slug, teacher.TurnInput{OperationID: in.OperationID, Content: in.Content, AttachmentRefs: in.AttachmentRefs, ProviderID: in.ProviderID}, emit)
 		if err != nil {
-			emit(teacherservice.StreamFrame{Type: "message-failed", Data: map[string]any{"code": "teacher_provider_unavailable", "partialPreserved": false}})
+			emit(teacher.StreamFrame{Type: "message-failed", Data: map[string]any{"code": "teacher_provider_unavailable", "partialPreserved": false}})
 		}
-		run.finish()
-		s.mu.Lock()
-		if responseID != "" {
-			delete(s.activeTeacher, responseID)
-		}
-		if s.activeByProject[slug] == run {
-			delete(s.activeByProject, slug)
-		}
-		s.mu.Unlock()
+		s.activeTeacher.Finish(slug, responseID, run)
 	}()
 
 	streamTeacherRun(w, r, run)
 }
 
 func (s *Server) handleActiveTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	s.mu.RLock()
-	run := s.activeByProject[r.PathValue("id")]
-	s.mu.RUnlock()
+	run := s.activeTeacher.Project(r.PathValue("id"))
 	if run == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -128,7 +107,7 @@ func (s *Server) handleActiveTeacherResponse(w http.ResponseWriter, r *http.Requ
 	streamTeacherRun(w, r, run)
 }
 
-func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *activeTeacherRun) {
+func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *teacher.ActiveResponse) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		httpx.Error(w, http.StatusInternalServerError, "streaming not supported")
@@ -141,7 +120,7 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *activeTeacher
 	w.WriteHeader(http.StatusOK)
 	frameID := 0
 	for {
-		frames, done, notify := run.snapshot(frameID)
+		frames, done, notify := run.Snapshot(frameID)
 		for _, frame := range frames {
 			frameID++
 			payload, err := json.Marshal(frame.Data)
@@ -164,7 +143,7 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *activeTeacher
 	}
 }
 
-func ensureTeacherGreeting(store *conversationstore.Store, slug string) error {
+func ensureTeacherGreeting(store *teacher.ConversationStore, slug string) error {
 	meta, err := store.Meta()
 	if err != nil {
 		return err
@@ -181,20 +160,18 @@ func ensureTeacherGreeting(store *conversationstore.Store, slug string) error {
 		return err
 	}
 	text := "你好，我是「" + state.Title + "」的教师。你可以直接告诉我：最想先弄懂什么、目前卡在哪里，或者希望我从哪里开始引导？"
-	_, _, err = store.AppendMessage("teacher", "completed", "teacher-welcome-v1", []conversationstore.Block{{Type: "markdown", Source: text}})
+	_, _, err = store.AppendMessage("teacher", "completed", "teacher-welcome-v1", []teacher.Block{{Type: "markdown", Source: text}})
 	return err
 }
 
 func (s *Server) handleStopTeacherResponse(w http.ResponseWriter, r *http.Request) {
 	responseID := r.PathValue("responseId")
-	s.mu.RLock()
-	run := s.activeTeacher[responseID]
-	s.mu.RUnlock()
+	run := s.activeTeacher.Response(responseID)
 	if run == nil {
 		httpx.Error(w, http.StatusNotFound, "active teacher response not found")
 		return
 	}
-	run.cancel()
+	run.Stop()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"stopped": true, "responseId": responseID})
 }
 
@@ -360,7 +337,7 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 				task = &created
 				_, _ = store.SetStatus(source.SourceID, "processing", "", created.ID)
 				if isNew && s.teacher != nil && s.teacher.OnTask != nil {
-					s.teacher.OnTask(r.PathValue("id"), created)
+					s.teacher.OnTask(r.PathValue("id"), teacher.DelegatedTask{ID: created.ID, Status: created.Status})
 				}
 			}
 		}

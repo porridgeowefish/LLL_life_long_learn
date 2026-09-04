@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
+	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

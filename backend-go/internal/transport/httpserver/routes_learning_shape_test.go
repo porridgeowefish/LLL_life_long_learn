@@ -13,10 +13,9 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/agentexecution"
 	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/folderstore"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -27,9 +26,9 @@ func setupLearningShapeTest(t *testing.T) string {
 	dir := t.TempDir()
 	oldRoot := workspace.ProjectsRootForTest()
 	workspace.SetProjectsRootForTest(dir)
-	restoreCfg := askaiconfig.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
+	restoreCfg := teacher.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
 	oldComplete := completeLearningShapeAI
-	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: "http://stub", APIKey: "k", Model: "m"})
+	writeAskAiConfig(t, teacher.ProviderConfig{ID: "stub", Kind: "openai", BaseURL: "http://stub", APIKey: "k", Model: "m"})
 	t.Cleanup(func() {
 		workspace.SetProjectsRootForTest(oldRoot)
 		restoreCfg()
@@ -40,7 +39,7 @@ func setupLearningShapeTest(t *testing.T) string {
 
 func TestProjectTypeAdviceHasNoCreationSideEffect(t *testing.T) {
 	dir := setupLearningShapeTest(t)
-	completeLearningShapeAI = func(context.Context, askaiprovider.Provider, string, []askaiprovider.Message) (string, error) {
+	completeLearningShapeAI = func(context.Context, teacher.Provider, string, []teacher.AIMessage) (string, error) {
 		return `{"reply":"建议先建立学科地图。","recommendation":"discipline-map","reason":"先建立领域方向感","tradeoff":"系统学习会更快进入细节","confidence":"high"}`, nil
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/project-type-advice", strings.NewReader(`{"title":"博弈论","current":"未接触","target":"看懂原理","messages":[{"role":"user","content":"我想先知道有哪些研究领域"}]}`))
@@ -57,7 +56,7 @@ func TestProjectTypeAdviceHasNoCreationSideEffect(t *testing.T) {
 
 func TestProjectTypeAdviceCanAskClarifyingQuestion(t *testing.T) {
 	setupLearningShapeTest(t)
-	completeLearningShapeAI = func(context.Context, askaiprovider.Provider, string, []askaiprovider.Message) (string, error) {
+	completeLearningShapeAI = func(context.Context, teacher.Provider, string, []teacher.AIMessage) (string, error) {
 		return `{"reply":"你更想先看全貌，还是直接掌握一个具体问题？","recommendation":"undetermined","reason":"","tradeoff":"","confidence":"low"}`, nil
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/project-type-advice", strings.NewReader(`{"current":"未接触","target":"看懂原理","messages":[{"role":"user","content":"我想学数学"}]}`))
@@ -74,7 +73,7 @@ func TestProjectTypeAdviceCanAskClarifyingQuestion(t *testing.T) {
 func TestProjectTypeAdviceTreatsMissingDraftFieldsAsUnknown(t *testing.T) {
 	setupLearningShapeTest(t)
 	var capturedSystem, capturedInput string
-	completeLearningShapeAI = func(_ context.Context, _ askaiprovider.Provider, system string, messages []askaiprovider.Message) (string, error) {
+	completeLearningShapeAI = func(_ context.Context, _ teacher.Provider, system string, messages []teacher.AIMessage) (string, error) {
 		capturedSystem = system
 		capturedInput = messages[0].Content
 		return `{"reply":"你更想先看全貌，还是直接掌握一个具体问题？","recommendation":"undetermined","reason":"","tradeoff":"","confidence":"low"}`, nil
@@ -95,7 +94,7 @@ func TestProjectTypeAdviceTreatsMissingDraftFieldsAsUnknown(t *testing.T) {
 
 func TestProjectTypeAdviceFallsBackToNaturalLanguage(t *testing.T) {
 	setupLearningShapeTest(t)
-	completeLearningShapeAI = func(context.Context, askaiprovider.Provider, string, []askaiprovider.Message) (string, error) {
+	completeLearningShapeAI = func(context.Context, teacher.Provider, string, []teacher.AIMessage) (string, error) {
 		return "建议先建立学科地图，因为你目前需要的是研究领域全貌。", nil
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/project-type-advice", strings.NewReader(`{"current":"未接触","target":"看懂原理","messages":[{"role":"user","content":"我想先看全貌"}]}`))
@@ -108,7 +107,7 @@ func TestProjectTypeAdviceFallsBackToNaturalLanguage(t *testing.T) {
 
 func TestProjectTypeAdviceRecoversMalformedJSONQuotes(t *testing.T) {
 	setupLearningShapeTest(t)
-	completeLearningShapeAI = func(context.Context, askaiprovider.Provider, string, []askaiprovider.Message) (string, error) {
+	completeLearningShapeAI = func(context.Context, teacher.Provider, string, []teacher.AIMessage) (string, error) {
 		return `{"reply":"你需要"先看清全貌"，适合建立地图。","recommendation":"discipline-map","reason":"需要领域关系","tradeoff":"不会立即深入练习","confidence":"high"}`, nil
 	}
 	req := httptest.NewRequest(http.MethodPost, "/api/project-type-advice", strings.NewReader(`{"current":"未接触","target":"看懂原理","messages":[{"role":"user","content":"我想先看全貌"}]}`))

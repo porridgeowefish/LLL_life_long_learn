@@ -60,7 +60,7 @@ func SaveAssistantRuntime(runtime string) error {
 	return writeRaw(activePath(""), raw)
 }
 
-// AISettings mirrors askaiconfig.Config for the settings flows.
+// AISettings mirrors teacher.Config for the settings flows.
 type AISettings struct {
 	Default      string             `json:"default"`
 	SearchEngine string             `json:"searchEngine"`

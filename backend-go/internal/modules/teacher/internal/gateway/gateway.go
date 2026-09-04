@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 )
 
 type Message struct {

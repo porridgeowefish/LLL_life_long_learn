@@ -6,10 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
-	"github.com/xmz14/lll/backend-go/internal/teachergateway"
+	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
+	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -35,6 +34,21 @@ type sourceGateway struct {
 	sourceID   string
 }
 
+type fakeTaskAuthorizer struct {
+	inputs []DelegationInput
+}
+
+func (f *fakeTaskAuthorizer) CreateDelegation(_ string, input DelegationInput) (DelegatedTask, bool, error) {
+	f.inputs = append(f.inputs, input)
+	return DelegatedTask{ID: "task_test", Status: "queued"}, true, nil
+}
+
+func newTestService(gateway teachergateway.Gateway) *Service {
+	service := New(gateway)
+	service.Authorizer = &fakeTaskAuthorizer{}
+	return service
+}
+
 func (f sourceGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
 	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_source", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": "verify", "objective": "读取讲义并核查当前结论", "sourceRefs": []string{f.sourceID}, "proposalMessageId": f.proposalID}}})
 	return nil
@@ -52,7 +66,7 @@ func TestApprovedDelegationCreatesTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := New(fakeGateway{proposalID: proposal.ID})
+	service := newTestService(fakeGateway{proposalID: proposal.ID})
 	var types []string
 	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_test", Content: "同意"}, func(frame StreamFrame) { types = append(types, frame.Type) }); err != nil {
 		t.Fatal(err)
@@ -80,7 +94,7 @@ func TestApprovedDelegationAcceptsOKAndIgnoresLegacyLeakedMessageID(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	service := New(fakeGateway{proposalID: "msg_stale", objective: "整理 MapReduce 论文精读材料，包含调度、容错和权衡分析", sourceRefs: []string{"public:MapReduce paper"}})
+	service := newTestService(fakeGateway{proposalID: "msg_stale", objective: "整理 MapReduce 论文精读材料，包含调度、容错和权衡分析", sourceRefs: []string{"public:MapReduce paper"}})
 	accepted := false
 	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_legacy_approval", Content: "ok，你不需要规定太多提示词和约束。"}, func(frame StreamFrame) {
 		accepted = accepted || frame.Type == "task-accepted"
@@ -110,7 +124,7 @@ func TestDelegationRejectsAmbiguousLearnerReply(t *testing.T) {
 	_ = workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning})
 	conversation, _ := conversationstore.New("topic")
 	proposal, _, _ := conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "我准备让助教核查当前结论并给出证据。是否同意？"}})
-	service := New(fakeGateway{proposalID: proposal.ID})
+	service := newTestService(fakeGateway{proposalID: proposal.ID})
 	var accepted bool
 	_ = service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_ambiguous", Content: "你看着办"}, func(frame StreamFrame) { accepted = accepted || frame.Type == "task-accepted" })
 	if accepted {
@@ -129,7 +143,7 @@ func TestDelegationRejectsObjectiveOutsideProposal(t *testing.T) {
 	_ = workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning})
 	conversation, _ := conversationstore.New("topic")
 	proposal, _, _ := conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "我准备让助教制作一张概念图。是否同意？"}})
-	service := New(fakeGateway{proposalID: proposal.ID})
+	service := newTestService(fakeGateway{proposalID: proposal.ID})
 	var accepted bool
 	_ = service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_changed", Content: "同意"}, func(frame StreamFrame) { accepted = accepted || frame.Type == "task-accepted" })
 	if accepted {
@@ -154,7 +168,7 @@ func TestApprovedDelegationNarrowsExpandedObjectiveToRealProposal(t *testing.T) 
 请回复“同意”。`
 	_, _, _ = conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: proposalText}})
 	expanded := `制作第一课“MapReduce 与调度哲学”的配套学习材料。第一部分基于 Dean 与 Ghemawat 2004 年公开论文，按章节整理核心要点，解析 Master 任务分配、数据本地性、推测执行、worker/master 失败处理、任务重试、combiner、本地写盘和设计权衡，并制作中英术语表。第二部分用 Python 模拟 20 台 worker、200 个三副本数据块，对比随机分配、数据本地性优先、含故障注入与推测执行三种策略，输出网络传输量、总完成时间、甘特图、柱状图和网页动画，帮助学习者直观理解调度与容错哲学。`
-	service := New(fakeGateway{objective: expanded})
+	service := newTestService(fakeGateway{objective: expanded})
 	accepted := false
 	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_real_expansion", Content: "同意"}, func(frame StreamFrame) {
 		accepted = accepted || frame.Type == "task-accepted"
@@ -164,16 +178,9 @@ func TestApprovedDelegationNarrowsExpandedObjectiveToRealProposal(t *testing.T) 
 	if !accepted {
 		t.Fatal("a detailed restatement of the approved MapReduce plan was rejected")
 	}
-	tasks, err := assistanttask.New("topic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	items, err := tasks.List("")
-	if err != nil || len(items) != 1 {
-		t.Fatalf("expected one task: err=%v tasks=%v", err, items)
-	}
-	if items[0].Objective != proposalText {
-		t.Fatalf("expanded tool input widened the approved objective: %q", items[0].Objective)
+	inputs := service.Authorizer.(*fakeTaskAuthorizer).inputs
+	if len(inputs) != 1 || inputs[0].Objective != proposalText {
+		t.Fatalf("expanded tool input widened the approved objective: %v", inputs)
 	}
 }
 
@@ -187,7 +194,7 @@ func TestDelegationRetryReusesApprovedProposalAfterTechnicalRejection(t *testing
 	proposal, _, _ := conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: proposalText}})
 	_, _, _ = conversation.AppendMessage("learner", "completed", "old-approval", []conversationstore.Block{{Type: "markdown", Source: "同意"}})
 	_, _, _ = conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "收到，正在正式提交。\n\n> 助教任务未创建。我需要重新说明方案。"}})
-	service := New(fakeGateway{objective: "制作 MapReduce 论文精读材料、调度实验、数据图表和网页动画"})
+	service := newTestService(fakeGateway{objective: "制作 MapReduce 论文精读材料、调度实验、数据图表和网页动画"})
 	accepted := false
 	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_retry", Content: "重试"}, func(frame StreamFrame) {
 		accepted = accepted || frame.Type == "task-accepted"
@@ -197,16 +204,9 @@ func TestDelegationRetryReusesApprovedProposalAfterTechnicalRejection(t *testing
 	if !accepted {
 		t.Fatal("technical rejection incorrectly revoked the existing approval")
 	}
-	store, err := assistanttask.New("topic")
-	if err != nil {
-		t.Fatal(err)
-	}
-	items, err := store.List("")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 1 || items[0].Origin.ProposalMessageID != proposal.ID {
-		t.Fatalf("retry did not preserve the approved proposal: %v", items)
+	inputs := service.Authorizer.(*fakeTaskAuthorizer).inputs
+	if len(inputs) != 1 || inputs[0].ProposalMessageID != proposal.ID {
+		t.Fatalf("retry did not preserve the approved proposal: %v", inputs)
 	}
 }
 
@@ -228,7 +228,7 @@ func TestDelegationAcceptsLearnerSelectedSourceDisclosedByName(t *testing.T) {
 	conversation, _ := conversationstore.New("topic")
 	_, _, _ = conversation.AppendMessage("learner", "completed", "select-source", []conversationstore.Block{{Type: "markdown", Source: "请结合这份资料"}, {Type: "attachment", ArtifactRef: source.SourceID}})
 	proposal, _, _ := conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "我准备让助教读取闭包讲义并核查当前结论，产出证据说明。是否同意？"}})
-	service := New(sourceGateway{proposalID: proposal.ID, sourceID: source.SourceID})
+	service := newTestService(sourceGateway{proposalID: proposal.ID, sourceID: source.SourceID})
 	accepted := false
 	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_source", Content: "同意"}, func(frame StreamFrame) { accepted = accepted || frame.Type == "task-accepted" }); err != nil {
 		t.Fatal(err)

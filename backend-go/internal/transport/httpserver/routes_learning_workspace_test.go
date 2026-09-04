@@ -13,18 +13,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/teachergateway"
-	"github.com/xmz14/lll/backend-go/internal/teacherservice"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 type textTeacherGateway struct{}
 
-func (textTeacherGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
-	emit(teachergateway.Event{Type: "text-delta", Delta: "我们先从定义开始。"})
-	emit(teachergateway.Event{Type: "response-completed"})
+func (textTeacherGateway) Stream(_ context.Context, _ teacher.GatewayRequest, emit func(teacher.GatewayEvent)) error {
+	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "我们先从定义开始。"})
+	emit(teacher.GatewayEvent{Type: "response-completed"})
 	return nil
 }
 
@@ -33,12 +31,12 @@ type blockingTeacherGateway struct {
 	release chan struct{}
 }
 
-func (g blockingTeacherGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
+func (g blockingTeacherGateway) Stream(_ context.Context, _ teacher.GatewayRequest, emit func(teacher.GatewayEvent)) error {
 	close(g.started)
-	emit(teachergateway.Event{Type: "text-delta", Delta: "先给你一个思考方向。"})
+	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "先给你一个思考方向。"})
 	<-g.release
-	emit(teachergateway.Event{Type: "text-delta", Delta: "现在继续完成回答。"})
-	emit(teachergateway.Event{Type: "response-completed"})
+	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "现在继续完成回答。"})
+	emit(teacher.GatewayEvent{Type: "response-completed"})
 	return nil
 }
 
@@ -50,7 +48,7 @@ func learningWorkspaceServer(t *testing.T) *Server {
 	if err := workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		t.Fatal(err)
 	}
-	return &Server{teacher: teacherservice.New(textTeacherGateway{}), activeTeacher: map[string]*activeTeacherRun{}, activeByProject: map[string]*activeTeacherRun{}, broadcaster: httpx.NewBroadcaster(), migrationReady: true}
+	return &Server{teacher: teacher.New(textTeacherGateway{}), activeTeacher: teacher.NewActiveResponses(), broadcaster: httpx.NewBroadcaster(), migrationReady: true}
 }
 
 func TestTeacherTurnStreamsAndPersists(t *testing.T) {
@@ -86,7 +84,7 @@ func TestTeacherTurnStreamsAndPersists(t *testing.T) {
 func TestTeacherRunSurvivesDisconnectedSubscriber(t *testing.T) {
 	server := learningWorkspaceServer(t)
 	gateway := blockingTeacherGateway{started: make(chan struct{}), release: make(chan struct{})}
-	server.teacher = teacherservice.New(gateway)
+	server.teacher = teacher.New(gateway)
 	requestContext, disconnect := context.WithCancel(context.Background())
 	req := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns", strings.NewReader(`{"operationId":"op_disconnect","content":"刷新也要继续回答"}`)).WithContext(requestContext)
 	req.Header.Set("Content-Type", "application/json")
@@ -166,7 +164,7 @@ func TestConversationCreatesOneTeacherGreeting(t *testing.T) {
 
 func TestConversationTailEndpointReturnsOnlyRecentMessages(t *testing.T) {
 	server := learningWorkspaceServer(t)
-	store, err := conversationstore.New("topic")
+	store, err := teacher.NewConversation("topic")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,13 +172,13 @@ func TestConversationTailEndpointReturnsOnlyRecentMessages(t *testing.T) {
 		t.Fatal(err)
 	}
 	for index := 0; index < 45; index++ {
-		if _, _, err := store.AppendMessage("learner", "completed", fmt.Sprintf("tail-%d", index), []conversationstore.Block{{Type: "markdown", Source: fmt.Sprintf("question-%d", index)}}); err != nil {
+		if _, _, err := store.AppendMessage("learner", "completed", fmt.Sprintf("tail-%d", index), []teacher.Block{{Type: "markdown", Source: fmt.Sprintf("question-%d", index)}}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	response := httptest.NewRecorder()
 	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/projects/topic/conversation?limit=10&beforeSeq=0", nil))
-	var projection conversationstore.Projection
+	var projection teacher.Projection
 	if err := json.Unmarshal(response.Body.Bytes(), &projection); err != nil {
 		t.Fatal(err)
 	}

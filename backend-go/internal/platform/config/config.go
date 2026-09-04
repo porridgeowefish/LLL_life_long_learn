@@ -264,7 +264,7 @@ type diskShape struct {
 	PythonBin          *string           `json:"pythonBin"`
 }
 
-// legacyAI mirrors askaiconfig.Config.
+// legacyAI mirrors teacher.Config.
 type legacyAI struct {
 	Default      string             `json:"default"`
 	SearchEngine string             `json:"searchEngine"`

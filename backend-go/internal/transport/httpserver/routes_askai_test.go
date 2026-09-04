@@ -14,14 +14,12 @@ import (
 	"testing"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -33,17 +31,17 @@ func setupAskAiTestProject(t *testing.T) {
 	if err := workspace.CreateProjectSkeletonWithInput("proj", "测试", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		t.Fatal(err)
 	}
-	restoreCfg := askaiconfig.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
+	restoreCfg := teacher.UseConfigPathForTest(filepath.Join(dir, "config.local.json"))
 	t.Cleanup(func() {
 		workspace.SetProjectsRootForTest(old)
 		restoreCfg()
 	})
 }
 
-func writeAskAiConfig(t *testing.T, p askaiconfig.Provider) {
+func writeAskAiConfig(t *testing.T, p teacher.ProviderConfig) {
 	t.Helper()
-	cfg := askaiconfig.Config{Default: p.ID, Providers: []askaiconfig.Provider{p}}
-	if err := askaiconfig.Save(cfg); err != nil {
+	cfg := teacher.Config{Default: p.ID, Providers: []teacher.ProviderConfig{p}}
+	if err := teacher.SaveConfig(cfg); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -54,7 +52,7 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 	// Fake OpenAI-compatible provider pointed at a stub SSE server.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var request struct {
-			Messages []askaiprovider.Message `json:"messages"`
+			Messages []teacher.AIMessage `json:"messages"`
 		}
 		_ = json.NewDecoder(r.Body).Decode(&request)
 		if len(request.Messages) > 0 {
@@ -66,7 +64,7 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 		fmt.Fprint(w, "data: [DONE]\n\n")
 	}))
 	defer srv.Close()
-	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m", Reasoning: true})
+	writeAskAiConfig(t, teacher.ProviderConfig{ID: "stub", Kind: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m", Reasoning: true})
 
 	// Create a confusion to attach the ask exchange to.
 	store, err := annotationstore.NewAnnotations("proj")
@@ -135,7 +133,7 @@ func (b *failingAskBody) Close() error { return nil }
 
 func TestAskAiStreamPersistsPartialFailure(t *testing.T) {
 	setupAskAiTestProject(t)
-	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: "http://provider.invalid", APIKey: "k", Model: "m"})
+	writeAskAiConfig(t, teacher.ProviderConfig{ID: "stub", Kind: "openai", BaseURL: "http://provider.invalid", APIKey: "k", Model: "m"})
 	oldClient := http.DefaultClient
 	http.DefaultClient = &http.Client{Transport: askRoundTripFunc(func(*http.Request) (*http.Response, error) {
 		body := []byte("data: {\"choices\":[{\"delta\":{\"content\":\"Partial\"}}]}\n\n")
@@ -175,14 +173,13 @@ var _ io.ReadCloser = (*failingAskBody)(nil)
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	s := &Server{
-		broadcaster:     httpx.NewBroadcaster(),
-		teacher:         teacherservice.New(nil),
-		activeTeacher:   map[string]*activeTeacherRun{},
-		activeByProject: map[string]*activeTeacherRun{},
-		runProgress:     runprogress.New(),
-		sessions:        sessionstore.New(),
-		cache:           projectindex.New(),
-		migrationReady:  true,
+		broadcaster:    httpx.NewBroadcaster(),
+		teacher:        teacher.New(nil),
+		activeTeacher:  teacher.NewActiveResponses(),
+		runProgress:    runprogress.New(),
+		sessions:       sessionstore.New(),
+		cache:          projectindex.New(),
+		migrationReady: true,
 	}
 	s.agents = agentregistry.New()
 	if err := s.agents.Load(); err != nil {

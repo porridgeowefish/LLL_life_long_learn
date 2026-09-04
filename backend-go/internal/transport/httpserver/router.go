@@ -22,11 +22,11 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
-	"github.com/xmz14/lll/backend-go/internal/teacherservice"
 )
 
 // Server bundles runtime dependencies shared across handlers. Every field
@@ -42,11 +42,10 @@ type Server struct {
 	runProgress     *runprogress.Store
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
-	teacher         *teacherservice.Service
+	teacher         *teacher.Service
 	agentExecution  AgentExecutionService
 	dispatcher      *assistanttask.Dispatcher
-	activeTeacher   map[string]*activeTeacherRun
-	activeByProject map[string]*activeTeacherRun
+	activeTeacher   *teacher.ActiveResponses
 	migrationReady  bool
 	migrationFailed []string
 
@@ -75,7 +74,7 @@ type Dependencies struct {
 	ImageAvailable  bool
 	RunProgress     *runprogress.Store
 	Watcher         *artifactwatch.Watcher
-	Teacher         *teacherservice.Service
+	Teacher         *teacher.Service
 	Broadcaster     *httpx.Broadcaster
 	Agents          *agentregistry.Registry
 	Sessions        *sessionstore.Store
@@ -97,8 +96,7 @@ func New(deps Dependencies) *Server {
 		runProgress:     deps.RunProgress,
 		watcher:         deps.Watcher,
 		teacher:         deps.Teacher,
-		activeTeacher:   map[string]*activeTeacherRun{},
-		activeByProject: map[string]*activeTeacherRun{},
+		activeTeacher:   teacher.NewActiveResponses(),
 		migrationReady:  deps.MigrationReady,
 		migrationFailed: deps.MigrationFailed,
 		broadcaster:     deps.Broadcaster,

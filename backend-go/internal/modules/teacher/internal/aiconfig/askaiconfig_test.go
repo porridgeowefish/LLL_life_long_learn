@@ -11,9 +11,7 @@ func useTempConfig(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.local.json")
-	old := pathFn
-	pathFn = func() string { return path }
-	t.Cleanup(func() { pathFn = old })
+	t.Cleanup(UseConfigPathForTest(path))
 	return path
 }
 

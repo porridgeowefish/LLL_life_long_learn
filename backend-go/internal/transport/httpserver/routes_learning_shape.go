@@ -10,17 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/learningscope"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
-var completeLearningShapeAI = askaiprovider.Complete
+var completeLearningShapeAI = teacher.Complete
 
 type projectTypeAdviceMessage struct {
 	Role    string `json:"role"`
@@ -51,19 +50,19 @@ type disciplineLearningPlan struct {
 	UpdatedAt     string                   `json:"updatedAt"`
 }
 
-func configuredAskAIProvider() (askaiprovider.Provider, error) {
-	cfg, err := askaiconfig.Load()
+func configuredAskAIProvider() (teacher.Provider, error) {
+	cfg, err := teacher.LoadConfig()
 	if err != nil {
-		return askaiprovider.Provider{}, err
+		return teacher.Provider{}, err
 	}
 	if cfg == nil || !cfg.Enabled() {
-		return askaiprovider.Provider{}, errors.New("ai_not_configured")
+		return teacher.Provider{}, errors.New("ai_not_configured")
 	}
 	p := cfg.Find("")
 	if p == nil {
-		return askaiprovider.Provider{}, errors.New("ai_not_configured")
+		return teacher.Provider{}, errors.New("ai_not_configured")
 	}
-	return askaiprovider.Provider{
+	return teacher.Provider{
 		ID: p.ID, Kind: p.Kind, Name: p.Name, BaseURL: p.BaseURL, APIKey: p.APIKey,
 		Model: p.Model, Reasoning: p.Reasoning, Thinking: p.Thinking,
 	}, nil
@@ -131,7 +130,7 @@ JSON 字符串内部需要引用概念时使用全角引号「」，不要使用
 		"conversation": in.Messages,
 	}
 	input, _ := json.Marshal(payload)
-	out, err := completeLearningShapeAI(ctx, provider, system, []askaiprovider.Message{{Role: "user", Content: string(input)}})
+	out, err := completeLearningShapeAI(ctx, provider, system, []teacher.AIMessage{{Role: "user", Content: string(input)}})
 	if err != nil {
 		httpx.Error(w, http.StatusBadGateway, "project type advice failed: "+err.Error())
 		return

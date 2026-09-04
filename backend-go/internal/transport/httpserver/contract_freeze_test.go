@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/teacherservice"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -99,7 +99,7 @@ func canonicalFixtureServer(t *testing.T) (*Server, string) {
 	workspace.SetProjectsRootForTest(root)
 	t.Cleanup(func() { workspace.SetProjectsRootForTest("") })
 	s := newTestServer(t)
-	s.teacher = teacherservice.New(textTeacherGateway{})
+	s.teacher = teacher.New(textTeacherGateway{})
 	return s, root
 }
 

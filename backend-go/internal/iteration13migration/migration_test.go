@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -84,7 +84,7 @@ func TestMigrationResumesIncompleteJournalEvenWhenUnitExists(t *testing.T) {
 	if err := writeJSON(filepath.Join(migrationDir, "migration.json"), record); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationstore.New("resume"); err != nil {
+	if _, err := teacher.NewConversation("resume"); err != nil {
 		t.Fatal(err)
 	}
 	if err := Migrate("resume"); err != nil {

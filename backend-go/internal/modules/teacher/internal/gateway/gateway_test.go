@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
+	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 )
 
 func TestOpenAIToolArgumentsBufferUntilComplete(t *testing.T) {

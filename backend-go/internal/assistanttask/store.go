@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -86,13 +86,17 @@ type CreateInput struct {
 
 type SameTypeActiveError struct{ ExistingTaskID string }
 
-func (e *SameTypeActiveError) Error() string { return "same task type is already active" }
+func (e *SameTypeActiveError) Error() string               { return "same task type is already active" }
+func (e *SameTypeActiveError) DelegationCode() string      { return "same_type_active" }
+func (e *SameTypeActiveError) ExistingTaskIDValue() string { return e.ExistingTaskID }
 
 type OperationConflictError struct{ ExistingTaskID string }
 
 func (e *OperationConflictError) Error() string {
 	return "operation id reused with different task input"
 }
+func (e *OperationConflictError) DelegationCode() string      { return "operation_conflict" }
+func (e *OperationConflictError) ExistingTaskIDValue() string { return e.ExistingTaskID }
 
 type Store struct {
 	slug   string
@@ -103,7 +107,7 @@ type Store struct {
 var workspaceLock sync.Mutex
 
 func New(slug string) (*Store, error) {
-	conversation, err := conversationstore.New(slug)
+	conversation, err := teacher.NewConversation(slug)
 	if err != nil {
 		return nil, err
 	}

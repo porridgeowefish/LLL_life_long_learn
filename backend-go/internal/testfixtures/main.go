@@ -15,9 +15,9 @@ import (
 	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -50,17 +50,17 @@ func main() {
 		fatal(err)
 	}
 
-	conv, err := conversationstore.New("lingo-duihua")
+	conv, err := teacher.NewConversation("lingo-duihua")
 	if err != nil {
 		fatal(err)
 	}
-	if _, _, err := conv.AppendMessage("teacher", "completed", "teacher-welcome-v1", []conversationstore.Block{{Type: "markdown", Source: "你好，我是合成教师。"}}); err != nil {
+	if _, _, err := conv.AppendMessage("teacher", "completed", "teacher-welcome-v1", []teacher.Block{{Type: "markdown", Source: "你好，我是合成教师。"}}); err != nil {
 		fatal(err)
 	}
-	if _, _, err := conv.AppendMessage("learner", "completed", "op_fixture_1", []conversationstore.Block{{Type: "markdown", Source: "什么是闭包？"}}); err != nil {
+	if _, _, err := conv.AppendMessage("learner", "completed", "op_fixture_1", []teacher.Block{{Type: "markdown", Source: "什么是闭包？"}}); err != nil {
 		fatal(err)
 	}
-	if _, _, err := conv.AppendMessage("teacher", "completed", "op_fixture_2", []conversationstore.Block{{Type: "markdown", Source: "闭包是捕获了环境的函数。"}}); err != nil {
+	if _, _, err := conv.AppendMessage("teacher", "completed", "op_fixture_2", []teacher.Block{{Type: "markdown", Source: "闭包是捕获了环境的函数。"}}); err != nil {
 		fatal(err)
 	}
 
@@ -183,11 +183,11 @@ func main() {
 	if err := workspace.CreateProjectSkeletonWithInput("sunhuai-xiangmu", "损坏示例", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		fatal(err)
 	}
-	conv2, err := conversationstore.New("sunhuai-xiangmu")
+	conv2, err := teacher.NewConversation("sunhuai-xiangmu")
 	if err != nil {
 		fatal(err)
 	}
-	if _, _, err := conv2.AppendMessage("learner", "completed", "op_corrupt", []conversationstore.Block{{Type: "markdown", Source: "半截对话"}}); err != nil {
+	if _, _, err := conv2.AppendMessage("learner", "completed", "op_corrupt", []teacher.Block{{Type: "markdown", Source: "半截对话"}}); err != nil {
 		fatal(err)
 	}
 	// Truncate the events log mid-record so readers must exercise recovery paths.

@@ -12,13 +12,13 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
-	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/learningscope"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
-	"github.com/xmz14/lll/backend-go/internal/teachergateway"
+	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
+	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
+	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	askaiprovider "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/providers"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

@@ -11,18 +11,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
-	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
 const maskedKey = "••••"
 
-func maskProviders(ps []askaiconfig.Provider) []askaiconfig.Provider {
-	out := make([]askaiconfig.Provider, len(ps))
+func maskProviders(ps []teacher.ProviderConfig) []teacher.ProviderConfig {
+	out := make([]teacher.ProviderConfig, len(ps))
 	for i, p := range ps {
 		if p.APIKey != "" {
 			p.APIKey = maskedKey
@@ -33,13 +32,13 @@ func maskProviders(ps []askaiconfig.Provider) []askaiconfig.Provider {
 }
 
 func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) {
-	cfg, err := askaiconfig.Load()
+	cfg, err := teacher.LoadConfig()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if cfg == nil {
-		cfg = &askaiconfig.Config{}
+		cfg = &teacher.Config{}
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"default":      cfg.Default,
@@ -50,14 +49,14 @@ func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) {
-	var in askaiconfig.Config
+	var in teacher.Config
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
 	// Preserve real keys for providers the client echoed back masked.
-	old, _ := askaiconfig.Load()
-	oldByKey := map[string]askaiconfig.Provider{}
+	old, _ := teacher.LoadConfig()
+	oldByKey := map[string]teacher.ProviderConfig{}
 	if old != nil {
 		if in.Bindings == nil {
 			in.Bindings = old.Bindings
@@ -73,7 +72,7 @@ func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) 
 			}
 		}
 	}
-	if err := askaiconfig.Save(in); err != nil {
+	if err := teacher.SaveConfig(in); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -82,18 +81,18 @@ func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) 
 
 func (s *Server) handleProbeAskAi(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		ProviderID string                `json:"providerId"`
-		Inline     *askaiconfig.Provider `json:"inline"`
+		ProviderID string                  `json:"providerId"`
+		Inline     *teacher.ProviderConfig `json:"inline"`
 	}
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	var pc askaiconfig.Provider
+	var pc teacher.ProviderConfig
 	if in.Inline != nil {
 		pc = *in.Inline
 	} else {
-		cfg, err := askaiconfig.Load()
+		cfg, err := teacher.LoadConfig()
 		if err != nil || cfg == nil {
 			httpx.Error(w, http.StatusBadRequest, "ask-ai not configured")
 			return
@@ -105,8 +104,8 @@ func (s *Server) handleProbeAskAi(w http.ResponseWriter, r *http.Request) {
 		}
 		pc = *p
 	}
-	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
-	_, err := askaiprovider.Complete(r.Context(), prov, "Reply with the single word: ok", []askaiprovider.Message{{Role: "user", Content: "ping"}})
+	prov := teacher.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
+	_, err := teacher.Complete(r.Context(), prov, "Reply with the single word: ok", []teacher.AIMessage{{Role: "user", Content: "ping"}})
 	if err != nil {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
 		return
@@ -140,7 +139,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "confusion not found")
 		return
 	}
-	cfg, err := askaiconfig.Load()
+	cfg, err := teacher.LoadConfig()
 	if err != nil || !cfg.Enabled() {
 		httpx.Error(w, http.StatusBadRequest, "ask-ai not configured")
 		return
@@ -171,17 +170,17 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Build the message history (prior turns + this user turn).
-	var msgs []askaiprovider.Message
+	var msgs []teacher.AIMessage
 	if conf.Ask != nil {
 		for _, m := range conf.Ask.Messages {
 			role := m.Role
 			if role == "learner" {
 				role = "user"
 			}
-			msgs = append(msgs, askaiprovider.Message{Role: role, Content: m.Content})
+			msgs = append(msgs, teacher.AIMessage{Role: role, Content: m.Content})
 		}
 	}
-	msgs = append(msgs, askaiprovider.Message{Role: "user", Content: in.Content})
+	msgs = append(msgs, teacher.AIMessage{Role: "user", Content: in.Content})
 
 	system := "你是正文批注旁的轻量答疑助手。只回答当前问题，不使用教师的五角色流程，也不调用任何工具。以下内容是学习者明确选中并主动提问的引用；版本 ID 只用于说明引用来源。\n\n引用：" + conf.QuoteSnapshot + "\n正文版本：" + conf.AssetVersionID
 
@@ -195,9 +194,9 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 
-	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: false, Thinking: false}
+	prov := teacher.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: false, Thinking: false}
 	var sb strings.Builder
-	writeFrame := func(f askaiprovider.Frame) {
+	writeFrame := func(f teacher.AIFrame) {
 		if f.Type == "thinking" {
 			return
 		}
@@ -208,7 +207,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 			sb.WriteString(f.Content)
 		}
 	}
-	if err := askaiprovider.Stream(r.Context(), prov, system, msgs, writeFrame); err != nil {
+	if err := teacher.Stream(r.Context(), prov, system, msgs, writeFrame); err != nil {
 		status := "failed"
 		if errors.Is(err, context.Canceled) {
 			status = "interrupted"
@@ -217,7 +216,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 			_, _ = store.AppendMessage(cid, annotationstore.Message{Role: "assistant", Content: sb.String(), Status: status})
 			s.emitAnnotationUpdated(slug, "ask", cid)
 		}
-		writeFrame(askaiprovider.Frame{Type: "error", Content: "回答暂时中断，已保留收到的部分内容。"})
+		writeFrame(teacher.AIFrame{Type: "error", Content: "回答暂时中断，已保留收到的部分内容。"})
 		return
 	}
 	// Persist the assistant reply (best-effort).
@@ -274,7 +273,7 @@ func (s *Server) handleAskAiSummarize(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) summarizeAskExchange(slug, cid, quote string, ask *annotationstore.Ask) {
-	cfg, err := askaiconfig.Load()
+	cfg, err := teacher.LoadConfig()
 	if err != nil || !cfg.Enabled() {
 		store, _ := openAnnotationStore(slug)
 		store.SetAskSummary(cid, "总结生成失败：未配置 Ask-AI 模型源。", "failed")
@@ -285,17 +284,17 @@ func (s *Server) summarizeAskExchange(slug, cid, quote string, ask *annotationst
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	prov := askaiprovider.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
+	prov := teacher.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
 
 	system := "结合用户的疑问点和下面的对话，生成一段不超过 250 个汉字的中文总结，帮助用户日后回忆这次答疑的结论。直接输出总结正文，不要寒暄或多余说明。"
-	var msgs []askaiprovider.Message
-	msgs = append(msgs, askaiprovider.Message{Role: "user", Content: "疑问原文：" + quote})
+	var msgs []teacher.AIMessage
+	msgs = append(msgs, teacher.AIMessage{Role: "user", Content: "疑问原文：" + quote})
 	if ask != nil {
 		for _, m := range ask.Messages {
-			msgs = append(msgs, askaiprovider.Message{Role: m.Role, Content: m.Content})
+			msgs = append(msgs, teacher.AIMessage{Role: m.Role, Content: m.Content})
 		}
 	}
-	summary, err := askaiprovider.Complete(ctx, prov, system, msgs)
+	summary, err := teacher.Complete(ctx, prov, system, msgs)
 	store, _ := openAnnotationStore(slug)
 	if err != nil || strings.TrimSpace(summary) == "" {
 		store.SetAskSummary(cid, "总结生成失败。", "failed")
