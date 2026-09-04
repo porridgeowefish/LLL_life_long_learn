@@ -1,0 +1,71 @@
+import { lazy, Suspense } from 'react';
+import { Navigate, RouteObject, useRoutes } from 'react-router-dom';
+
+import { AppShell } from '@/app/layout/AppShell';
+
+// Routes are lazy-loaded so each page lands in its own chunk. AppShell
+// wraps every page; it owns the topbar, sidebar, SSE connection, and
+// the terminal drawer.
+const HomePage = lazy(() => import('@/features/projects/HomePage').then((m) => ({ default: m.HomePage })));
+const ProjectPage = lazy(() => import('@/features/projects/ProjectPage').then((m) => ({ default: m.ProjectPage })));
+const AgentsPage = lazy(() => import('@/features/agents/AgentsPage').then((m) => ({ default: m.AgentsPage })));
+const PreferencesPage = lazy(() => import('@/features/preferences/PreferencesPage').then((m) => ({ default: m.PreferencesPage })));
+const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const ModelsPage = lazy(() => import('@/features/settings/ModelsPage').then((m) => ({ default: m.ModelsPage })));
+
+function PageFallback() {
+  return <div style={{ padding: 24, color: 'var(--muted)' }}>加载中…</div>;
+}
+
+function withShell(el: React.ReactNode) {
+  return (
+    <Suspense fallback={<PageFallback />}>{el}</Suspense>
+  );
+}
+
+export const routes: RouteObject[] = [
+  {
+    path: '/',
+    element: <AppShell />,
+    children: [
+      {
+        index: true,
+        element: withShell(<HomePage />),
+      },
+      {
+        path: 'project/:id/:zone?',
+        element: withShell(<ProjectPage />),
+      },
+      {
+        path: 'agents',
+        element: withShell(<AgentsPage />),
+      },
+      {
+        path: 'preferences',
+        element: withShell(<PreferencesPage />),
+      },
+      {
+        path: 'memory',
+        element: <Navigate to="/preferences" replace />,
+      },
+      {
+        path: 'settings',
+        element: withShell(<SettingsPage />),
+      },
+      {
+        path: 'models',
+        element: withShell(<ModelsPage />),
+      },
+      {
+        path: '*',
+        element: <Navigate to="/" replace />,
+      },
+    ],
+  },
+];
+
+// AppRoutes — helper component so App.tsx stays boring. useRoutes needs
+// to be called from inside a <BrowserRouter>, which is mounted in main.
+export function AppRoutes() {
+  return useRoutes(routes);
+}
