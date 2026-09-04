@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
+	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
+	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"

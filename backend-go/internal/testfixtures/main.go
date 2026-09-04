@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -95,14 +95,14 @@ func main() {
 		fatal(err)
 	}
 
-	tasks, err := assistanttask.New("lingo-duihua")
+	tasks, err := assistant.NewTaskStore("lingo-duihua")
 	if err != nil {
 		fatal(err)
 	}
-	if _, _, err := tasks.Create(assistanttask.CreateInput{
+	if _, _, err := tasks.Create(assistant.CreateInput{
 		Type:                  "consolidate",
 		Objective:             "整理合成对话要点",
-		Origin:                assistanttask.Origin{Kind: "fixture", OperationID: "op_fixture_task"},
+		Origin:                assistant.Origin{Kind: "fixture", OperationID: "op_fixture_task"},
 		ConversationCutoffSeq: 3,
 	}); err != nil {
 		fatal(err)

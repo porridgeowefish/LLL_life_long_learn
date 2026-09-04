@@ -12,13 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
@@ -65,7 +61,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	intent := strings.TrimSpace(req.Intent)
-	permissionMode := claudelauncher.NormalizePermissionMode(req.PermissionMode)
+	permissionMode := assistant.NormalizePermissionMode(req.PermissionMode)
 	exists, err := workspace.ProjectExists(req.ProjectID)
 	if err != nil || !exists {
 		httpx.Error(w, http.StatusNotFound, "project not found")
@@ -83,7 +79,7 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 	zoneName := workspace.ZoneName(req.Zone)
 
 	// Build the prompt package.
-	pkg, err := promptassembly.Build(promptassembly.Request{
+	pkg, err := assistant.BuildPrompt(assistant.PromptRequest{
 		ProjectSlug:           req.ProjectID,
 		ZoneName:              zoneName,
 		AgentID:               agent.ID,
@@ -111,11 +107,11 @@ func (s *Server) handleInvokeAgentImpl(w http.ResponseWriter, r *http.Request) {
 // project-type-bound agents. contextName is learner-facing execution context;
 // it is not required to be one of the five learning zones.
 func (s *Server) startAgentSession(
-	runtime agentruntime.Runtime,
+	runtime assistant.Runtime,
 	projectID string,
 	contextName string,
-	agent *agentregistry.Agent,
-	pkg *promptassembly.Package,
+	agent *assistant.Agent,
+	pkg *assistant.PromptPackage,
 	permissionMode string,
 ) *sessionstore.Session {
 	sessID := newSessionID()
@@ -152,9 +148,9 @@ func (s *Server) startAgentSession(
 		}()
 		execution := s.agentExecution
 		if execution == nil {
-			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+			execution = assistant.NewExecution(func() assistant.Runtime { return runtime })
 		}
-		_, launchErr := execution.StartProject(ctx, agentexecution.ProjectRequest{
+		_, launchErr := execution.StartProject(ctx, assistant.ProjectRequest{
 			ProjectSlug: projectID, ContextName: contextName, Agent: agent, PromptPackage: pkg,
 			PermissionMode: permissionMode, Session: sess, SessionStore: s.sessions,
 			Events: s.broadcaster, RunProgress: s.runProgress,
@@ -217,7 +213,7 @@ func (s *Server) handleListActiveSessions(w http.ResponseWriter, r *http.Request
 // wants to reopen the closed native TUI to keep asking questions.
 func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Request) {
 	runtime, _ := s.runtimeSnapshot()
-	if runtime.ID != agentruntime.RuntimeClaude && runtime.ID != agentruntime.RuntimeCodex {
+	if runtime.ID != assistant.RuntimeClaude && runtime.ID != assistant.RuntimeCodex {
 		httpx.Error(w, http.StatusBadRequest, string(runtime.ID)+" does not support interactive resume")
 		return
 	}
@@ -236,12 +232,12 @@ func (s *Server) handleResumeExplainSession(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	sess := latestProjectZoneSession(s.sessions, projectID, string(workspace.ZoneExplain))
-	runDirName := promptassembly.MakeRunDirName("explain-resume", time.Now().UTC())
+	runDirName := assistant.MakeRunDirName("explain-resume", time.Now().UTC())
 	execution := s.agentExecution
 	if execution == nil {
-		execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+		execution = assistant.NewExecution(func() assistant.Runtime { return runtime })
 	}
-	result, err := execution.Resume(context.Background(), agentexecution.ResumeRequest{
+	result, err := execution.Resume(context.Background(), assistant.ResumeRequest{
 		ProjectSlug: projectID, ContextName: string(workspace.ZoneExplain), Session: sess,
 		SessionStore: s.sessions, Events: s.broadcaster, RunDirName: runDirName, RunProgress: s.runProgress,
 	})
@@ -304,7 +300,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "text is required")
 		return
 	}
-	permissionMode := claudelauncher.NormalizePermissionMode(req.PermissionMode)
+	permissionMode := assistant.NormalizePermissionMode(req.PermissionMode)
 	agent, ok := s.agents.Get(sess.AgentID)
 	if !ok {
 		httpx.Error(w, http.StatusInternalServerError, "agent missing: "+sess.AgentID)
@@ -313,7 +309,7 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 	// Build the list of prior assistant result.md paths to include as context.
 	priorPaths := collectPriorResultPaths(sess)
 
-	pkg, err := promptassembly.Build(promptassembly.Request{
+	pkg, err := assistant.BuildPrompt(assistant.PromptRequest{
 		ProjectSlug:              sess.ProjectSlug,
 		ZoneName:                 workspace.ZoneName(sess.ZoneName),
 		AgentID:                  sess.AgentID,
@@ -335,9 +331,9 @@ func (s *Server) handleFollowUp(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		execution := s.agentExecution
 		if execution == nil {
-			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+			execution = assistant.NewExecution(func() assistant.Runtime { return runtime })
 		}
-		_, _ = execution.StartProject(ctx, agentexecution.ProjectRequest{
+		_, _ = execution.StartProject(ctx, assistant.ProjectRequest{
 			ProjectSlug: sess.ProjectSlug, ContextName: sess.ZoneName, Agent: agent, PromptPackage: pkg,
 			PermissionMode: permissionMode, Session: sess, SessionStore: s.sessions,
 			Events: s.broadcaster, RunProgress: s.runProgress,

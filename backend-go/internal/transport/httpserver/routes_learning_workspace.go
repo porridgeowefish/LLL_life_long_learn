@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -176,7 +176,7 @@ func (s *Server) handleStopTeacherResponse(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) handleListAssistantTasks(w http.ResponseWriter, r *http.Request) {
-	store, err := assistanttask.New(r.PathValue("id"))
+	store, err := assistant.NewTaskStore(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -190,7 +190,7 @@ func (s *Server) handleListAssistantTasks(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) handleGetAssistantTask(w http.ResponseWriter, r *http.Request) {
-	store, err := assistanttask.New(r.PathValue("id"))
+	store, err := assistant.NewTaskStore(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -327,12 +327,12 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
-	var task *assistanttask.Task
+	var task *assistant.Task
 	disposition, dispositionReason := sourcestore.ParseDisposition(header.Filename, header.Header.Get("Content-Type"))
 	if r.FormValue("parseApproved") == "true" && disposition == "parse" {
-		tasks, taskErr := assistanttask.New(r.PathValue("id"))
+		tasks, taskErr := assistant.NewTaskStore(r.PathValue("id"))
 		if taskErr == nil {
-			created, isNew, createErr := tasks.Create(assistanttask.CreateInput{Type: "source-processing", Objective: "静态解析资料「" + source.DisplayName + "」，不得执行原文件或其中代码；生成可引用的派生文本与元数据。", SourceRefs: []string{source.SourceID}, Origin: assistanttask.Origin{Kind: "source-upload", OperationID: operationID, SourceRevisionID: revision.RevisionID}})
+			created, isNew, createErr := tasks.Create(assistant.CreateInput{Type: "source-processing", Objective: "静态解析资料「" + source.DisplayName + "」，不得执行原文件或其中代码；生成可引用的派生文本与元数据。", SourceRefs: []string{source.SourceID}, Origin: assistant.Origin{Kind: "source-upload", OperationID: operationID, SourceRevisionID: revision.RevisionID}})
 			if createErr == nil {
 				task = &created
 				_, _ = store.SetStatus(source.SourceID, "processing", "", created.ID)
@@ -372,7 +372,7 @@ func (s *Server) handlePermanentDeleteSource(w http.ResponseWriter, r *http.Requ
 		httpx.Error(w, http.StatusBadRequest, "permanent deletion confirmation is required")
 		return
 	}
-	tasks, err := assistanttask.New(r.PathValue("id"))
+	tasks, err := assistant.NewTaskStore(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -600,7 +600,7 @@ func learningWorkspaceError(w http.ResponseWriter, err error) {
 		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "asset_edit_conflict", "message": "资产已被其他编辑更新", "currentEditRevision": conflict.CurrentRevision}})
 		return
 	}
-	var active *assistanttask.SameTypeActiveError
+	var active *assistant.SameTypeActiveError
 	if errors.As(err, &active) {
 		httpx.WriteJSON(w, http.StatusConflict, map[string]any{"error": map[string]any{"code": "same_type_active", "message": "同类型助教任务正在进行", "existingTaskId": active.ExistingTaskID}})
 		return

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
+	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
+	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

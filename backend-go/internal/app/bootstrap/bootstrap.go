@@ -12,15 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/app/integration"
 	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	"github.com/xmz14/lll/backend-go/internal/iteration13migration"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
@@ -37,11 +34,11 @@ type App struct {
 // Build assembles the application with production wiring.
 func Build() *App {
 	bin := envOr("CLAUDE_BIN", "claude")
-	runtimeCfg, err := agentruntime.Load()
+	runtimeCfg, err := assistant.LoadRuntime()
 	if err != nil {
 		println("agent-runtime: load warning:", err.Error())
 	}
-	registry := agentregistry.New()
+	registry := assistant.NewRegistry()
 	if err := registry.Load(); err != nil {
 		println("agent-registry: load warning:", err.Error())
 	}
@@ -61,14 +58,14 @@ func Build() *App {
 	teacherService.Authorizer = integration.TeacherTaskAuthorizer{}
 	server := httpserver.New(httpserver.Dependencies{
 		ClaudeBin: bin, ClaudeAvailable: probeBin(bin, "--version"),
-		Runtime: agentruntime.Resolve(runtimeCfg), RuntimeOptions: agentruntime.List(runtimeCfg),
+		Runtime: assistant.ResolveRuntime(runtimeCfg), RuntimeOptions: assistant.ListRuntimes(runtimeCfg),
 		ImageConfig: imageCfg, ImageAvailable: imageCfg != nil && imageCfg.PythonBin != "" && probeBin(imageCfg.PythonBin, "--version"),
 		RunProgress: runprogress.New(), Watcher: watcher, Teacher: teacherService, Broadcaster: broadcaster,
 		Agents: registry, Sessions: sessionstore.New(), Cache: projectindex.New(),
 		MigrationReady: migration.Ready, MigrationFailed: migration.FailedProjects,
 	})
-	execution := agentexecution.New(server.RuntimeSnapshot)
-	dispatcher := assistanttask.NewDispatcher(execution, broadcaster)
+	execution := assistant.NewExecution(server.RuntimeSnapshot)
+	dispatcher := assistant.NewDispatcher(execution, broadcaster)
 	server.AttachExecution(execution, dispatcher)
 	teacherService.OnTask = func(projectSlug string, task teacher.DelegatedTask) {
 		broadcaster.Emit("assistant-task-updated", map[string]any{"projectSlug": projectSlug, "task": task})

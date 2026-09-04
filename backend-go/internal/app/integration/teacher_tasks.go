@@ -2,22 +2,22 @@
 package integration
 
 import (
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
 type TeacherTaskAuthorizer struct{}
 
 func (TeacherTaskAuthorizer) CreateDelegation(projectSlug string, input teacher.DelegationInput) (teacher.DelegatedTask, bool, error) {
-	store, err := assistanttask.New(projectSlug)
+	store, err := assistant.NewTaskStore(projectSlug)
 	if err != nil {
 		return teacher.DelegatedTask{}, false, err
 	}
-	task, created, err := store.Create(assistanttask.CreateInput{
+	task, created, err := store.Create(assistant.CreateInput{
 		Type:       input.TaskType,
 		Objective:  input.Objective,
 		SourceRefs: input.SourceRefs,
-		Origin: assistanttask.Origin{
+		Origin: assistant.Origin{
 			Kind:              "teacher-tool",
 			OperationID:       input.OperationID,
 			ProposalMessageID: input.ProposalMessageID,

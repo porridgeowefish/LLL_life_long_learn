@@ -11,10 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/folderstore"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
@@ -123,13 +121,13 @@ func TestGenerateDisciplineOverviewLaunchesExplicitAgentCLI(t *testing.T) {
 	if err := workspace.CreateProjectSkeletonWithInput("physics", "物理学", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeDisciplineMap}); err != nil {
 		t.Fatal(err)
 	}
-	launched := make(chan agentexecution.ProjectRequest, 1)
+	launched := make(chan assistant.ProjectRequest, 1)
 	req := httptest.NewRequest(http.MethodPost, "/api/projects/physics/discipline-overview/generate", strings.NewReader(`{}`))
 	req.SetPathValue("id", "physics")
 	rec := httptest.NewRecorder()
 	srv := newTestServer(t)
-	srv.Runtime = agentruntime.Runtime{
-		Definition: agentruntime.Definition{ID: agentruntime.RuntimeClaude},
+	srv.Runtime = assistant.Runtime{
+		Definition: assistant.Definition{ID: assistant.RuntimeClaude},
 		Bin:        "claude",
 		Available:  true,
 	}
@@ -138,7 +136,7 @@ func TestGenerateDisciplineOverviewLaunchesExplicitAgentCLI(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 	}
-	var launchReq agentexecution.ProjectRequest
+	var launchReq assistant.ProjectRequest
 	select {
 	case launchReq = <-launched:
 	case <-time.After(time.Second):
@@ -160,21 +158,21 @@ func TestGenerateDisciplineOverviewLaunchesExplicitAgentCLI(t *testing.T) {
 }
 
 type recordingExecutionService struct {
-	projects chan agentexecution.ProjectRequest
+	projects chan assistant.ProjectRequest
 }
 
-func (r recordingExecutionService) StartProject(_ context.Context, req agentexecution.ProjectRequest) (*claudelauncher.RunResult, error) {
+func (r recordingExecutionService) StartProject(_ context.Context, req assistant.ProjectRequest) (*assistant.RunResult, error) {
 	r.projects <- req
-	return &claudelauncher.RunResult{RunDirRel: filepath.Join("runs", req.PromptPackage.RunDirName)}, nil
+	return &assistant.RunResult{RunDirRel: filepath.Join("runs", req.PromptPackage.RunDirName)}, nil
 }
 
-func (recordingExecutionService) StartTask(context.Context, agentexecution.TaskRequest) error {
+func (recordingExecutionService) StartTask(context.Context, assistant.TaskRequest) error {
 	return nil
 }
-func (recordingExecutionService) Resume(context.Context, agentexecution.ResumeRequest) (*claudelauncher.RunResult, error) {
-	return &claudelauncher.RunResult{}, nil
+func (recordingExecutionService) Resume(context.Context, assistant.ResumeRequest) (*assistant.RunResult, error) {
+	return &assistant.RunResult{}, nil
 }
-func (recordingExecutionService) StartHeadless(context.Context, agentexecution.HeadlessRequest) error {
+func (recordingExecutionService) StartHeadless(context.Context, assistant.HeadlessRequest) error {
 	return nil
 }
 

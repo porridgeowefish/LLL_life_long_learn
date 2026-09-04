@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 )
 
 // primitiveCache caches primitive bodies in-memory keyed by primitive id.

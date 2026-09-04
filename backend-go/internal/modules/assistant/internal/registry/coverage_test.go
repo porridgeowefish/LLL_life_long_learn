@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 )
 
 // TestPrimitivesCoverage_AllPresent is the regression gate for the

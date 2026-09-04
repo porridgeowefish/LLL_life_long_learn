@@ -12,11 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -333,10 +331,10 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 	}
 
 	// STAGE A: Craft the image prompt
-	runDirName := promptassembly.MakeRunDirName("infographic-crafter", time.Now().UTC())
+	runDirName := assistant.MakeRunDirName("infographic-crafter", time.Now().UTC())
 	runDirRel := filepath.Join("runs", runDirName)
 	prompt := buildCrafterPrompt(slug, runDirRel)
-	pkg := &promptassembly.Package{
+	pkg := &assistant.PromptPackage{
 		PromptMd:   prompt,
 		RunDirName: runDirName,
 	}
@@ -353,9 +351,9 @@ func (s *Server) runInfographicPipeline(ctx context.Context, slug string) {
 	for attempt := 1; attempt <= 3; attempt++ {
 		execution := s.agentExecution
 		if execution == nil {
-			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+			execution = assistant.NewExecution(func() assistant.Runtime { return runtime })
 		}
-		err = execution.StartHeadless(ctx, agentexecution.HeadlessRequest{ProjectSlug: slug, AgentID: "infographic-crafter", Model: cfg.ImagePromptModel, PromptPackage: pkg})
+		err = execution.StartHeadless(ctx, assistant.HeadlessRequest{ProjectSlug: slug, AgentID: "infographic-crafter", Model: cfg.ImagePromptModel, PromptPackage: pkg})
 		if err == nil {
 			break
 		}

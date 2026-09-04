@@ -16,9 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	agentexecution "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/execution"
 	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"

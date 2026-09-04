@@ -1,5 +1,4 @@
-// Package artifactwriter promotes session output into project zone files.
-package artifactwriter
+package claudelauncher
 
 import (
 	"errors"
@@ -7,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

@@ -3,13 +3,13 @@ package httpserver
 import (
 	"net/http"
 
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/uiconfig"
 )
 
 type updateAgentRuntimeRequest struct {
-	Selected agentruntime.ID `json:"selected"`
+	Selected assistant.RuntimeID `json:"selected"`
 }
 
 func (s *Server) handleGetAppearance(w http.ResponseWriter, r *http.Request) {
@@ -53,21 +53,21 @@ func (s *Server) handlePutAgentRuntimeSettings(w http.ResponseWriter, r *http.Re
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	if _, ok := agentruntime.DefinitionByID(req.Selected); !ok {
+	if _, ok := assistant.RuntimeDefinitionByID(req.Selected); !ok {
 		httpx.Error(w, http.StatusBadRequest, "unknown agent runtime")
 		return
 	}
-	if err := agentruntime.SaveSelected(req.Selected); err != nil {
+	if err := assistant.SaveSelectedRuntime(req.Selected); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "save agent runtime: "+err.Error())
 		return
 	}
-	cfg, err := agentruntime.Load()
+	cfg, err := assistant.LoadRuntime()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "reload agent runtime: "+err.Error())
 		return
 	}
-	selected := agentruntime.Resolve(cfg)
-	options := agentruntime.List(cfg)
+	selected := assistant.ResolveRuntime(cfg)
+	options := assistant.ListRuntimes(cfg)
 
 	s.mu.Lock()
 	s.Runtime = selected

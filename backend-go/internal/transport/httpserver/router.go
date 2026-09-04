@@ -14,14 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/artifactwatch"
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/paths"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
@@ -35,8 +31,8 @@ import (
 type Server struct {
 	ClaudeBin       string
 	ClaudeAvailable bool
-	Runtime         agentruntime.Runtime
-	RuntimeOptions  []agentruntime.Runtime
+	Runtime         assistant.Runtime
+	RuntimeOptions  []assistant.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
 	runProgress     *runprogress.Store
@@ -44,13 +40,13 @@ type Server struct {
 	shutdown        func()
 	teacher         *teacher.Service
 	agentExecution  AgentExecutionService
-	dispatcher      *assistanttask.Dispatcher
+	dispatcher      *assistant.Dispatcher
 	activeTeacher   *teacher.ActiveResponses
 	migrationReady  bool
 	migrationFailed []string
 
 	broadcaster      *httpx.Broadcaster
-	agents           *agentregistry.Registry
+	agents           *assistant.Registry
 	sessions         *sessionstore.Store
 	cache            *projectindex.Cache
 	infographicJobs  sync.Map
@@ -59,24 +55,24 @@ type Server struct {
 }
 
 type AgentExecutionService interface {
-	StartProject(context.Context, agentexecution.ProjectRequest) (*claudelauncher.RunResult, error)
-	StartTask(context.Context, agentexecution.TaskRequest) error
-	Resume(context.Context, agentexecution.ResumeRequest) (*claudelauncher.RunResult, error)
-	StartHeadless(context.Context, agentexecution.HeadlessRequest) error
+	StartProject(context.Context, assistant.ProjectRequest) (*assistant.RunResult, error)
+	StartTask(context.Context, assistant.TaskRequest) error
+	Resume(context.Context, assistant.ResumeRequest) (*assistant.RunResult, error)
+	StartHeadless(context.Context, assistant.HeadlessRequest) error
 }
 
 type Dependencies struct {
 	ClaudeBin       string
 	ClaudeAvailable bool
-	Runtime         agentruntime.Runtime
-	RuntimeOptions  []agentruntime.Runtime
+	Runtime         assistant.Runtime
+	RuntimeOptions  []assistant.Runtime
 	ImageConfig     *imageconfig.Config
 	ImageAvailable  bool
 	RunProgress     *runprogress.Store
 	Watcher         *artifactwatch.Watcher
 	Teacher         *teacher.Service
 	Broadcaster     *httpx.Broadcaster
-	Agents          *agentregistry.Registry
+	Agents          *assistant.Registry
 	Sessions        *sessionstore.Store
 	Cache           *projectindex.Cache
 	MigrationReady  bool
@@ -106,7 +102,7 @@ func New(deps Dependencies) *Server {
 	}
 }
 
-func (s *Server) AttachExecution(execution AgentExecutionService, dispatcher *assistanttask.Dispatcher) {
+func (s *Server) AttachExecution(execution AgentExecutionService, dispatcher *assistant.Dispatcher) {
 	s.agentExecution = execution
 	s.dispatcher = dispatcher
 }
@@ -353,15 +349,15 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) runtimeSnapshot() (agentruntime.Runtime, []agentruntime.Runtime) {
+func (s *Server) runtimeSnapshot() (assistant.Runtime, []assistant.Runtime) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	out := make([]agentruntime.Runtime, len(s.RuntimeOptions))
+	out := make([]assistant.Runtime, len(s.RuntimeOptions))
 	copy(out, s.RuntimeOptions)
 	return s.Runtime, out
 }
 
-func (s *Server) RuntimeSnapshot() agentruntime.Runtime {
+func (s *Server) RuntimeSnapshot() assistant.Runtime {
 	runtime, _ := s.runtimeSnapshot()
 	return runtime
 }

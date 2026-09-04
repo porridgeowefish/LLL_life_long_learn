@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
@@ -41,11 +41,11 @@ func setupTestServer(t *testing.T) (*Server, func()) {
 		"defaultOutputTargets": [{"zone": "Explain", "filename": "output.md"}]
 	}`)
 	_ = os.WriteFile(regDir+"/explain.json", agentJSON, 0o644)
-	oldAgents := agentregistry.AgentsRootForTest()
-	agentregistry.SetAgentsRootForTest(dir)
-	srv.agents = agentregistry.New()
+	oldAgents := assistant.AgentsRootForTest()
+	assistant.SetAgentsRootForTest(dir)
+	srv.agents = assistant.NewRegistry()
 	_ = srv.agents.Load()
-	agentregistry.SetAgentsRootForTest(oldAgents)
+	assistant.SetAgentsRootForTest(oldAgents)
 
 	return srv, func() {
 		workspace.SetProjectsRootForTest(oldWS)

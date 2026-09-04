@@ -13,7 +13,7 @@ type Event struct {
 }
 
 // Broadcaster dispatches typed events to all subscribed SSE clients.
-// Implements claudelauncher.EventEmitter.
+// Implements assistant.LaunchEventEmitter.
 type Broadcaster struct {
 	mu      sync.RWMutex
 	clients map[chan Event]struct{}

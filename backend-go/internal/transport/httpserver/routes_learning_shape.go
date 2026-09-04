@@ -10,12 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/learningscope"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -449,7 +448,7 @@ func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http
 		httpx.Error(w, http.StatusInternalServerError, "encyclopedia_agent_not_configured")
 		return
 	}
-	pkg, err := promptassembly.BuildProjectAgent(promptassembly.ProjectAgentRequest{
+	pkg, err := assistant.BuildProjectAgent(assistant.ProjectAgentRequest{
 		ProjectSlug: state.Slug,
 		AgentID:     encyclopedia.ID,
 		OutputPaths: []string{"overview.md", "discipline-topics.json"},
@@ -464,7 +463,7 @@ func (s *Server) handleGenerateDisciplineOverview(w http.ResponseWriter, r *http
 		"学科总览",
 		encyclopedia,
 		pkg,
-		claudelauncher.NormalizePermissionMode(""),
+		assistant.NormalizePermissionMode(""),
 	)
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
 		"session": sess,

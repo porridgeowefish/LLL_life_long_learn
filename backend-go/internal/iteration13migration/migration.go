@@ -12,8 +12,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	assets "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
@@ -132,7 +132,7 @@ func Migrate(slug string) error {
 	if _, err := sourcestore.New(slug); err != nil {
 		return fail(migrationDir, record, "source-conversion-failed", err)
 	}
-	if _, err := assistanttask.New(slug); err != nil {
+	if _, err := assistant.NewTaskStore(slug); err != nil {
 		return fail(migrationDir, record, "task-conversion-failed", err)
 	}
 	annotations, err := assets.NewAnnotations(slug)

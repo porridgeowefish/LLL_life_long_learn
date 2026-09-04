@@ -9,12 +9,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/xmz14/lll/backend-go/internal/agentexecution"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/practicestore"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -374,7 +372,7 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 		httpx.Error(w, http.StatusInternalServerError, "practice agent not found")
 		return
 	}
-	pkg, err := promptassembly.Build(promptassembly.Request{
+	pkg, err := assistant.BuildPrompt(assistant.PromptRequest{
 		ProjectSlug:     slug,
 		ZoneName:        workspace.ZonePractice,
 		AgentID:         agent.ID,
@@ -389,9 +387,9 @@ func (s *Server) handleRequestPracticeEvaluation(w http.ResponseWriter, r *http.
 		defer s.practiceEvalJobs.Delete(jobKey)
 		execution := s.agentExecution
 		if execution == nil {
-			execution = agentexecution.New(func() agentruntime.Runtime { return runtime })
+			execution = assistant.NewExecution(func() assistant.Runtime { return runtime })
 		}
-		_ = execution.StartHeadless(context.Background(), agentexecution.HeadlessRequest{ProjectSlug: slug, AgentID: agent.ID, PromptPackage: pkg})
+		_ = execution.StartHeadless(context.Background(), assistant.HeadlessRequest{ProjectSlug: slug, AgentID: agent.ID, PromptPackage: pkg})
 	}()
 	httpx.WriteJSON(w, http.StatusAccepted, map[string]any{"status": "queued", "attempt": attemptID})
 }

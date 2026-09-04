@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/agentruntime"
-	"github.com/xmz14/lll/backend-go/internal/claudelauncher"
-	"github.com/xmz14/lll/backend-go/internal/promptassembly"
+	claudelauncher "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/launch"
+	promptassembly "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/prompt"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
+	agentruntime "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/runtime"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
 )
 

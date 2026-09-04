@@ -13,9 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
@@ -181,7 +181,7 @@ func newTestServer(t *testing.T) *Server {
 		cache:          projectindex.New(),
 		migrationReady: true,
 	}
-	s.agents = agentregistry.New()
+	s.agents = assistant.NewRegistry()
 	if err := s.agents.Load(); err != nil {
 		t.Logf("agent registry load warning: %v", err)
 	}

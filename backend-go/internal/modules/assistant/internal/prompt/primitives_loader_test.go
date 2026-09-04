@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/xmz14/lll/backend-go/internal/agentregistry"
+	agentregistry "github.com/xmz14/lll/backend-go/internal/modules/assistant/internal/registry"
 )
 
 func writePrimFile(t *testing.T, dir, name, body string) {
