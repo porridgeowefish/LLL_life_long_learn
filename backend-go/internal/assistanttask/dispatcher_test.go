@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/assetstore"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
-	"github.com/xmz14/lll/backend-go/internal/sourcestore"
+	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

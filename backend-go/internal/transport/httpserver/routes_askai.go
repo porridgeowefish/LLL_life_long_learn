@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/progressstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )

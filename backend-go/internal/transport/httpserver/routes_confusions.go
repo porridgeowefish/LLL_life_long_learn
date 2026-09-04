@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/confusionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

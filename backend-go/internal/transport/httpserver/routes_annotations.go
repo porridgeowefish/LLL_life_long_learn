@@ -5,13 +5,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
-func openAnnotationStore(slug string) (*annotationstore.Store, error) {
-	store, err := annotationstore.New(slug)
+func openAnnotationStore(slug string) (*annotationstore.AnnotationStore, error) {
+	store, err := annotationstore.NewAnnotations(slug)
 	if err != nil {
 		return nil, err
 	}

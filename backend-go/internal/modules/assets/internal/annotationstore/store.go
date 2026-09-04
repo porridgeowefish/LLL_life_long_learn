@@ -15,9 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/assetstore"
-	"github.com/xmz14/lll/backend-go/internal/confusionstore"
 	"github.com/xmz14/lll/backend-go/internal/idgen"
+	"github.com/xmz14/lll/backend-go/internal/modules/assets/internal/assetstore"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -93,6 +92,36 @@ type Event struct {
 	AnnotationID  string      `json:"annotationId"`
 	At            time.Time   `json:"at"`
 	Annotation    *Annotation `json:"annotation,omitempty"`
+}
+
+// legacyConfusion mirrors the retired explain/confusions.json wire shape.
+// Keeping this compatibility DTO local prevents the assets module from
+// depending on the legacy store implementation during the cutover.
+type legacyConfusion struct {
+	ID               string     `json:"id"`
+	SourceArtifactID string     `json:"sourceArtifactId,omitempty"`
+	CharStart        int        `json:"charStart"`
+	CharEnd          int        `json:"charEnd"`
+	QuoteSnapshot    string     `json:"quoteSnapshot"`
+	Notes            string     `json:"notes,omitempty"`
+	State            string     `json:"state"`
+	CreatedAt        string     `json:"createdAt"`
+	Ask              *legacyAsk `json:"ask,omitempty"`
+}
+
+type legacyAsk struct {
+	Messages     []legacyAskMessage `json:"messages,omitempty"`
+	Summary      string             `json:"summary,omitempty"`
+	SummaryState string             `json:"summaryState,omitempty"`
+	ProviderID   string             `json:"providerId,omitempty"`
+	UpdatedAt    string             `json:"updatedAt,omitempty"`
+}
+
+type legacyAskMessage struct {
+	ID        string `json:"id"`
+	Role      string `json:"role"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"createdAt"`
 }
 
 type Store struct {
@@ -212,7 +241,7 @@ func (s *Store) ImportLegacy() error {
 	if err != nil {
 		return err
 	}
-	var legacy []confusionstore.Confusion
+	var legacy []legacyConfusion
 	if err := json.Unmarshal(raw, &legacy); err != nil {
 		return fmt.Errorf("decode legacy annotations: %w", err)
 	}

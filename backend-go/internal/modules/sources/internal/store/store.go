@@ -1,4 +1,4 @@
-package sourcestore
+package store
 
 import (
 	"crypto/sha256"

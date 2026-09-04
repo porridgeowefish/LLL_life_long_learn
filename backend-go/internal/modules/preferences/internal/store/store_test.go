@@ -1,4 +1,4 @@
-package preferencestore
+package store
 
 import (
 	"os"

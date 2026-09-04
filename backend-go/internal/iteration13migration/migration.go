@@ -12,11 +12,10 @@ import (
 	"sort"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
-	"github.com/xmz14/lll/backend-go/internal/assetstore"
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
-	"github.com/xmz14/lll/backend-go/internal/sourcestore"
+	assets "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -74,14 +73,14 @@ func Migrate(slug string) error {
 	var record Record
 	recordErr := readJSON(recordPath, &record)
 	if unitExists && errors.Is(recordErr, os.ErrNotExist) {
-		annotations, openErr := annotationstore.New(slug)
+		annotations, openErr := assets.NewAnnotations(slug)
 		if openErr != nil {
 			return openErr
 		}
 		return annotations.ImportLegacy()
 	}
 	if recordErr == nil && record.SchemaVersion == 1 && record.Status == "completed" {
-		annotations, openErr := annotationstore.New(slug)
+		annotations, openErr := assets.NewAnnotations(slug)
 		if openErr != nil {
 			return openErr
 		}
@@ -127,7 +126,7 @@ func Migrate(slug string) error {
 	if _, err := conversationstore.New(slug); err != nil {
 		return fail(migrationDir, record, "conversation-conversion-failed", err)
 	}
-	if _, err := assetstore.New(slug); err != nil {
+	if _, err := assets.New(slug); err != nil {
 		return fail(migrationDir, record, "asset-conversion-failed", err)
 	}
 	if _, err := sourcestore.New(slug); err != nil {
@@ -136,7 +135,7 @@ func Migrate(slug string) error {
 	if _, err := assistanttask.New(slug); err != nil {
 		return fail(migrationDir, record, "task-conversion-failed", err)
 	}
-	annotations, err := annotationstore.New(slug)
+	annotations, err := assets.NewAnnotations(slug)
 	if err != nil {
 		return fail(migrationDir, record, "annotation-conversion-failed", err)
 	}

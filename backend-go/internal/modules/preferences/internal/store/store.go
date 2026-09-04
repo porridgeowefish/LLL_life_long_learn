@@ -1,7 +1,7 @@
 // Package preferencestore owns the single workspace-global learner preference
 // file. It is user-authored context: AI services may read a snapshot, but no AI
 // execution path is allowed to write the canonical file.
-package preferencestore
+package store
 
 import (
 	"errors"

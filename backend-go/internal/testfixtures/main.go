@@ -14,11 +14,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
-	"github.com/xmz14/lll/backend-go/internal/assetstore"
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
-	"github.com/xmz14/lll/backend-go/internal/sourcestore"
+	assetstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 
@@ -76,13 +75,13 @@ func main() {
 		fatal(err)
 	}
 
-	annotations, err := annotationstore.New("lingo-duihua")
+	annotations, err := assetstore.NewAnnotations("lingo-duihua")
 	if err != nil {
 		fatal(err)
 	}
-	if _, err := annotations.Create(annotationstore.CreateInput{
+	if _, err := annotations.Create(assetstore.CreateInput{
 		QuoteSnapshot: "闭包是捕获了环境的函数",
-		Anchors:       annotationstore.Anchors{Start: 12, End: 25},
+		Anchors:       assetstore.Anchors{Start: 12, End: 25},
 		Note:          "合成批注",
 	}); err != nil {
 		fatal(err)
@@ -151,7 +150,7 @@ func main() {
 	// Import the legacy confusions into the canonical annotation log now, so
 	// the fixture ships in its post-import steady state and later reads are
 	// read-only (the first read in production performs this import once).
-	legacyAnnotations, err := annotationstore.New("legacy-wuqu")
+	legacyAnnotations, err := assetstore.NewAnnotations("legacy-wuqu")
 	if err != nil {
 		fatal(err)
 	}

@@ -14,10 +14,10 @@ import (
 	"testing"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/annotationstore"
 	"github.com/xmz14/lll/backend-go/internal/askaiconfig"
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	annotationstore "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/projectindex"
 	"github.com/xmz14/lll/backend-go/internal/runprogress"
 	"github.com/xmz14/lll/backend-go/internal/sessionstore"
@@ -69,7 +69,7 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 	writeAskAiConfig(t, askaiconfig.Provider{ID: "stub", Kind: "openai", BaseURL: srv.URL, APIKey: "k", Model: "m", Reasoning: true})
 
 	// Create a confusion to attach the ask exchange to.
-	store, err := annotationstore.New("proj")
+	store, err := annotationstore.NewAnnotations("proj")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +101,7 @@ func TestAskAiStreamPersistsAndStreams(t *testing.T) {
 	}
 
 	// The assistant reply should be persisted.
-	again, _ := annotationstore.New("proj")
+	again, _ := annotationstore.NewAnnotations("proj")
 	got, _ := again.Get(conf.AnnotationID)
 	var assistant string
 	for _, m := range got.Ask.Messages {
@@ -143,7 +143,7 @@ func TestAskAiStreamPersistsPartialFailure(t *testing.T) {
 	})}
 	t.Cleanup(func() { http.DefaultClient = oldClient })
 
-	store, _ := annotationstore.New("proj")
+	store, _ := annotationstore.NewAnnotations("proj")
 	annotation, _ := store.Create(annotationstore.CreateInput{QuoteSnapshot: "selected"})
 	request := httptest.NewRequest(http.MethodPost, "/api/projects/proj/assets/body/annotations/"+annotation.AnnotationID+"/ask-stream", bytes.NewBufferString(`{"content":"why?"}`))
 	request.SetPathValue("id", "proj")

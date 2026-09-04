@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/agentregistry"
-	"github.com/xmz14/lll/backend-go/internal/preferencestore"
+	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
 

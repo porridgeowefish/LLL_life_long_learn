@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	"github.com/xmz14/lll/backend-go/internal/paths"
-	"github.com/xmz14/lll/backend-go/internal/preferencestore"
 )
 
 func TestPreferencesEndpointOwnsOneWorkspaceGlobalFile(t *testing.T) {

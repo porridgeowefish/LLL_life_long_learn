@@ -207,7 +207,7 @@ func splitFeaturePath(rest string) (feature, tail string) {
 // goListPackage mirrors the `go list -json` fields we consume.
 type goListPackage struct {
 	ImportPath string   `json:"ImportPath"`
-	Deps       []string `json:"Deps"`
+	Imports    []string `json:"Imports"`
 }
 
 // listGoPackages returns importer → direct repo-internal imports. dir is the
@@ -232,7 +232,7 @@ func listGoPackages(dir, pattern string) (map[string][]string, error) {
 			continue
 		}
 		var deps []string
-		for _, dep := range pkg.Deps {
+		for _, dep := range pkg.Imports {
 			if strings.HasPrefix(dep, repoModule+"/backend-go/internal/") && dep != pkg.ImportPath {
 				deps = append(deps, dep)
 			}

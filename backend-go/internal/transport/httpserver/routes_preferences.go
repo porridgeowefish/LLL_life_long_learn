@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
-	"github.com/xmz14/lll/backend-go/internal/preferencestore"
+	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 )
 
 func (s *Server) handleGetPreferences(w http.ResponseWriter, _ *http.Request) {

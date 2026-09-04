@@ -8,7 +8,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/assistanttask"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
-	"github.com/xmz14/lll/backend-go/internal/sourcestore"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/teachergateway"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )

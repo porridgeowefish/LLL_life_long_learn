@@ -163,3 +163,37 @@ func TestAllowlistSuppresses(t *testing.T) {
 		}
 	}
 }
+
+func TestListGoPackagesUsesDirectImportsOnly(t *testing.T) {
+	repo := t.TempDir()
+	for _, dir := range []string{
+		filepath.Join("backend-go", "internal", "transport", "http"),
+		filepath.Join("backend-go", "internal", "modules", "assets"),
+		filepath.Join("backend-go", "internal", "modules", "assets", "internal", "store"),
+	} {
+		if err := os.MkdirAll(filepath.Join(repo, dir), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeGo := func(rel, body string) {
+		if err := os.WriteFile(filepath.Join(repo, rel), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeGo("go.mod", "module "+repoModule+"\n\ngo 1.25\n")
+	writeGo(filepath.Join("backend-go", "internal", "modules", "assets", "internal", "store", "store.go"), "package store\n")
+	writeGo(filepath.Join("backend-go", "internal", "modules", "assets", "api.go"), "package assets\nimport _ \""+repoModule+"/backend-go/internal/modules/assets/internal/store\"\n")
+	writeGo(filepath.Join("backend-go", "internal", "transport", "http", "router.go"), "package http\nimport _ \""+repoModule+"/backend-go/internal/modules/assets\"\n")
+
+	packages, err := listGoPackages(repo, "./backend-go/...")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transport := repoModule + "/backend-go/internal/transport/http"
+	privateStore := repoModule + "/backend-go/internal/modules/assets/internal/store"
+	for _, imported := range packages[transport] {
+		if imported == privateStore {
+			t.Fatalf("transport inherited facade's transitive dependency: %s", imported)
+		}
+	}
+}

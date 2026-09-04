@@ -16,8 +16,8 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/askaiprovider"
 	"github.com/xmz14/lll/backend-go/internal/conversationstore"
 	"github.com/xmz14/lll/backend-go/internal/learningscope"
-	"github.com/xmz14/lll/backend-go/internal/preferencestore"
-	"github.com/xmz14/lll/backend-go/internal/sourcestore"
+	preferencestore "github.com/xmz14/lll/backend-go/internal/modules/preferences"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/teachergateway"
 	"github.com/xmz14/lll/backend-go/internal/workspace"
 )
