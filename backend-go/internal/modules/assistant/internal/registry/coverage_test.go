@@ -27,14 +27,10 @@ func TestPrimitivesCoverage_AllPresent(t *testing.T) {
 		"prerequisite_scaffold",
 		// Explain optional
 		"analogy",
-		// Extend required (primitive ready, agent pending)
-		"critical_thinking",
 		// Intro required (primitive ready, agent pending)
 		"knowledge_anchor",
 		// Practice required (primitive ready, agent pending)
 		"transfer",
-		// Summary required (primitive ready, agent pending)
-		"review_pack",
 	}
 	for _, name := range requiredPrimitives {
 		if !agentregistry.PrimitiveExists(name) {
@@ -135,13 +131,13 @@ func TestPrimitivesCoverage_LimitsEnforced(t *testing.T) {
 	}
 }
 
-// TestPrimitivesCoverage_AllFiveAgentsShipped asserts that the
-// distribution promise is real, not architectural. Five agents must be
-// registered: explain + intro + practice + extend + summary. Each one
+// TestPrimitivesCoverage_ActiveLearningAgentsShipped asserts that the
+// distribution promise is real, not architectural. The active learning
+// agents explain, intro, and practice must each
 // must own a distinct primitive set. This test exists specifically to
 // prevent regression where someone says "distribution" but ships only
 // one agent with primitive files declared for the other four.
-func TestPrimitivesCoverage_AllFiveAgentsShipped(t *testing.T) {
+func TestPrimitivesCoverage_ActiveLearningAgentsShipped(t *testing.T) {
 	reg := agentregistry.New()
 	if err := reg.Load(); err != nil {
 		t.Fatalf("registry load: %v", err)
@@ -150,8 +146,6 @@ func TestPrimitivesCoverage_AllFiveAgentsShipped(t *testing.T) {
 		"explain":  {"research_question_frame", "prerequisite_scaffold", "misconception", "boundary_map"},
 		"intro":    {"prerequisite_scaffold", "boundary_map"},
 		"practice": {"transfer"},
-		"extend":   {"critical_thinking"},
-		"summary":  {"review_pack"},
 	}
 	for id, requiredPrims := range expected {
 		a, ok := reg.Get(id)
@@ -186,7 +180,7 @@ func TestPrimitivesCoverage_NoPrimitiveIsOrphaned(t *testing.T) {
 	allPrimitives := []string{
 		"mece_decompose", "first_principles", "concept_graph",
 		"misconception", "boundary_map", "analogy",
-		"critical_thinking", "knowledge_anchor", "transfer", "review_pack",
+		"knowledge_anchor", "transfer",
 		"research_question_frame", "prerequisite_scaffold",
 	}
 	reg := agentregistry.New()

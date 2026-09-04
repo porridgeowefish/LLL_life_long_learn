@@ -23,7 +23,7 @@ import s from './Sidebar.module.css';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: '主页', icon: 'zap' },
-  { to: '/agents', label: '智能体管理', icon: 'bot' },
+  { to: '/usage', label: 'Token 用量', icon: 'clock' },
   { to: '/preferences', label: '学习偏好', icon: 'brain' },
   { to: '/models', label: 'API 模型', icon: 'bot' },
   { to: '/settings', label: '统一配置', icon: 'terminal' },

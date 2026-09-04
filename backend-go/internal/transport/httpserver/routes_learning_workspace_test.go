@@ -15,6 +15,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
@@ -36,6 +37,23 @@ func (g blockingTeacherGateway) Stream(_ context.Context, _ teacher.GatewayReque
 	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "先给你一个思考方向。"})
 	<-g.release
 	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "现在继续完成回答。"})
+	emit(teacher.GatewayEvent{Type: "response-completed"})
+	return nil
+}
+
+type concurrentTeacherGateway struct {
+	started chan string
+	release chan struct{}
+}
+
+func (g concurrentTeacherGateway) Stream(_ context.Context, in teacher.GatewayRequest, emit func(teacher.GatewayEvent)) error {
+	question := ""
+	if len(in.Messages) > 0 {
+		question = in.Messages[len(in.Messages)-1].Content
+	}
+	g.started <- question
+	<-g.release
+	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "并行回答：" + question})
 	emit(teacher.GatewayEvent{Type: "response-completed"})
 	return nil
 }
@@ -135,6 +153,50 @@ func TestTeacherRunSurvivesDisconnectedSubscriber(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 	t.Fatal("teacher did not finish after subscriber disconnected")
+}
+
+func TestTeacherTurnsInDifferentLearningUnitsRunConcurrently(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	if err := workspace.CreateProjectSkeletonWithInput("other", "另一个主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	gateway := concurrentTeacherGateway{started: make(chan string, 2), release: make(chan struct{})}
+	server.teacher = teacher.New(gateway)
+	// Exercise the zero-value fallback too: a partially assembled server must
+	// still publish one shared registry when its first requests arrive together.
+	server.activeTeacher = nil
+
+	responses := make(chan *httptest.ResponseRecorder, 2)
+	post := func(slug, operationID, content string) {
+		req := httptest.NewRequest(http.MethodPost, "/api/projects/"+slug+"/conversation/turns", strings.NewReader(`{"operationId":"`+operationID+`","content":"`+content+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		server.Handler().ServeHTTP(response, req)
+		responses <- response
+	}
+	go post("topic", "op_topic_parallel", "主题一")
+	go post("other", "op_other_parallel", "主题二")
+
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case question := <-gateway.started:
+			seen[question] = true
+		case <-time.After(time.Second):
+			t.Fatalf("teacher turns did not run concurrently; started=%v", seen)
+		}
+	}
+	close(gateway.release)
+	for range 2 {
+		select {
+		case response := <-responses:
+			if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "并行回答") {
+				t.Fatalf("parallel teacher turn failed: %d %s", response.Code, response.Body.String())
+			}
+		case <-time.After(time.Second):
+			t.Fatal("parallel teacher turn did not finish")
+		}
+	}
 }
 
 func TestConversationCreatesOneTeacherGreeting(t *testing.T) {
@@ -251,4 +313,89 @@ func TestArchiveUploadStaysOpaqueAndDoesNotCreateParseTask(t *testing.T) {
 	if payload.Source.Status != "opaque" || payload.Task != nil || payload.ParseDisposition != "opaque" {
 		t.Fatalf("archive must remain opaque without a task: %s", response.Body.String())
 	}
+}
+
+func TestParseableUploadImmediatelyReportsBackgroundProcessing(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	_ = writer.WriteField("operationId", "op_parse")
+	_ = writer.WriteField("parseApproved", "true")
+	_ = writer.WriteField("cloudDisclosureAccepted", "true")
+	part, err := writer.CreateFormFile("file", "notes.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write([]byte("notes")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/api/projects/topic/sources", &body)
+	request.Header.Set("Content-Type", writer.FormDataContentType())
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	var payload struct {
+		Source struct {
+			Status string `json:"status"`
+		} `json:"source"`
+		Task *json.RawMessage `json:"task"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.Code != http.StatusCreated || payload.Source.Status != "processing" || payload.Task == nil {
+		t.Fatalf("parseable upload must become background processing: %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestReadReadySourceContentReturnsOnlyCanonicalMarkdown(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	sources, err := sourcestore.New("topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source, revision, err := sources.Add("闭包讲义", "notes.txt", "text/plain", 5, strings.NewReader("notes"), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sources.CommitDerived(source.SourceID, revision.RevisionID, map[string][]byte{"content.md": []byte("# 闭包\n函数与环境")}, map[string]string{"content.md": "text/markdown; charset=utf-8"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sources.SetStatus(source.SourceID, "ready", "", "task_parse"); err != nil {
+		t.Fatal(err)
+	}
+
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/projects/topic/sources/"+source.SourceID+"/revisions/"+revision.RevisionID+"/content", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "函数与环境") || !strings.HasPrefix(response.Header().Get("Content-Type"), "text/markdown") {
+		t.Fatalf("ready content endpoint failed: %d %s %s", response.Code, response.Header().Get("Content-Type"), response.Body.String())
+	}
+
+	notReady, _, err := sources.Add("未完成", "draft.txt", "text/plain", 5, strings.NewReader("draft"), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing := httptest.NewRecorder()
+	server.Handler().ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/api/projects/topic/sources/"+notReady.SourceID+"/revisions/"+notReady.CurrentRevisionID+"/content", nil))
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("unready source content must stay unavailable: %d", missing.Code)
+	}
+}
+
+func TestTeacherUsageIsListedPerConversation(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	if err := teacherUsageForTest("topic"); err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/usage/teacher?page=1&pageSize=10", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "inputTokens") || !strings.Contains(response.Body.String(), "topic") {
+		t.Fatalf("usage listing failed: %d %s", response.Code, response.Body.String())
+	}
+}
+
+func teacherUsageForTest(slug string) error {
+	return teacher.RecordTeacherUsage(slug, teacher.UsageRecord{ConversationID: "conv_test", UnitID: "unit_test", ResponseID: "resp_test", InputTokens: 3, OutputTokens: 5})
 }

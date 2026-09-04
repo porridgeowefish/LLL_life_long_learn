@@ -64,6 +64,7 @@ type Task struct {
 	Type                  string    `json:"type"`
 	Objective             string    `json:"objective"`
 	SourceRefs            []string  `json:"sourceRefs"`
+	PracticeRequested     bool      `json:"practiceRequested,omitempty"`
 	Status                string    `json:"status"`
 	Phase                 string    `json:"phase,omitempty"`
 	Origin                Origin    `json:"origin"`
@@ -80,6 +81,7 @@ type CreateInput struct {
 	Type                  string
 	Objective             string
 	SourceRefs            []string
+	PracticeRequested     bool
 	Origin                Origin
 	ConversationCutoffSeq uint64
 }
@@ -158,7 +160,7 @@ func (s *Store) Create(in CreateInput) (Task, bool, error) {
 		}
 	}
 	now := time.Now().UTC()
-	task := Task{SchemaVersion: SchemaVersion, ID: idgen.New("task"), UnitID: s.unitID, ProjectSlug: s.slug, Type: in.Type, Objective: in.Objective, SourceRefs: dedupe(in.SourceRefs), Status: "queued", Origin: in.Origin, ConversationCutoffSeq: in.ConversationCutoffSeq, CreatedAt: now, UpdatedAt: now}
+	task := Task{SchemaVersion: SchemaVersion, ID: idgen.New("task"), UnitID: s.unitID, ProjectSlug: s.slug, Type: in.Type, Objective: in.Objective, SourceRefs: dedupe(in.SourceRefs), PracticeRequested: in.PracticeRequested, Status: "queued", Origin: in.Origin, ConversationCutoffSeq: in.ConversationCutoffSeq, CreatedAt: now, UpdatedAt: now}
 	dir := filepath.Join(s.root, task.ID)
 	if err := os.MkdirAll(filepath.Join(dir, "attempts"), 0o755); err != nil {
 		return Task{}, false, err
@@ -256,7 +258,7 @@ func (s *Store) listUnlocked() ([]Task, error) {
 }
 
 func sameCreate(task Task, in CreateInput) bool {
-	return task.Type == in.Type && task.Objective == in.Objective && strings.Join(task.SourceRefs, "\x00") == strings.Join(dedupe(in.SourceRefs), "\x00")
+	return task.Type == in.Type && task.Objective == in.Objective && task.PracticeRequested == in.PracticeRequested && strings.Join(task.SourceRefs, "\x00") == strings.Join(dedupe(in.SourceRefs), "\x00")
 }
 
 func dedupe(values []string) []string {

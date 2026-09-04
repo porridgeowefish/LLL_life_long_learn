@@ -110,6 +110,87 @@ describe('TeacherView source references', () => {
     await act(async () => { finish(); });
   });
 
+  it('keeps the reasoning disclosure independently collapsible after answer text arrives', async () => {
+    let emit!: Parameters<typeof streamTeacherTurn>[3];
+    let finish!: () => void;
+    vi.mocked(streamTeacherTurn).mockImplementationOnce(async (_slug, _input, _signal, onFrame) => {
+      emit = onFrame;
+      await new Promise<void>((resolve) => { finish = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="closures" title="闭包" /></QueryClientProvider>);
+
+    fireEvent.change(screen.getByPlaceholderText('和 闭包 的教师继续讨论…'), { target: { value: '先思考再回答' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(streamTeacherTurn).toHaveBeenCalled());
+
+    act(() => {
+      emit({ type: 'message-started', data: { teacherMessageId: 'msg-teacher' } });
+      emit({ type: 'reasoning-summary-delta', data: { blockId: 'reasoning', delta: '先检查边界' } });
+    });
+    const summary = await screen.findByText('思考过程');
+    const details = summary.closest('details');
+    expect(details).not.toHaveAttribute('open');
+    fireEvent.click(summary);
+    expect(details).toHaveAttribute('open');
+    expect(await screen.findByText('先检查边界')).toBeTruthy();
+
+    act(() => emit({ type: 'text-delta', data: { blockId: 'text', delta: '这是最终回答。' } }));
+    expect(await screen.findByText('这是最终回答。')).toBeTruthy();
+    expect(details).toHaveAttribute('open');
+    fireEvent.click(summary);
+    expect(details).not.toHaveAttribute('open');
+
+    await act(async () => { finish(); });
+  });
+
+  it('preserves an open reasoning disclosure when the streamed message becomes history', async () => {
+    let emit!: Parameters<typeof streamTeacherTurn>[3];
+    let finish!: () => void;
+    vi.mocked(streamTeacherTurn).mockImplementationOnce(async (_slug, _input, _signal, onFrame) => {
+      emit = onFrame;
+      await new Promise<void>((resolve) => { finish = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<QueryClientProvider client={client}><TeacherView slug="closures" title="闭包" /></QueryClientProvider>);
+
+    fireEvent.change(screen.getByPlaceholderText('和 闭包 的教师继续讨论…'), { target: { value: '保留思考折叠状态' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(streamTeacherTurn).toHaveBeenCalled());
+
+    act(() => {
+      emit({ type: 'turn-accepted', data: { learnerMessageId: 'msg-learner', responseId: 'resp-1' } });
+      emit({ type: 'message-started', data: { teacherMessageId: 'msg-teacher' } });
+      emit({ type: 'reasoning-summary-delta', data: { blockId: 'stream-reasoning', delta: '流式思考' } });
+      emit({ type: 'text-delta', data: { blockId: 'stream-text', delta: '流式回答' } });
+    });
+    const streamingSummary = await screen.findByText('思考过程');
+    fireEvent.click(streamingSummary);
+    expect(streamingSummary.closest('details')).toHaveAttribute('open');
+    expect(await screen.findByText('流式思考')).toBeTruthy();
+
+    workspaceMocks.conversation = {
+      totalMessages: 2,
+      taskLinks: [],
+      messages: [
+        { id: 'msg-learner', role: 'learner', status: 'completed', blocks: [{ id: 'learner-text', type: 'markdown', source: '保留思考折叠状态' }], createdAt: '' },
+        { id: 'msg-teacher', role: 'teacher', status: 'completed', blocks: [
+          { id: 'history-reasoning', type: 'reasoning-summary', source: '流式思考' },
+          { id: 'history-text', type: 'markdown', source: '流式回答' },
+        ], createdAt: '' },
+      ],
+    };
+    await act(async () => { finish(); });
+    view.rerender(<QueryClientProvider client={client}><TeacherView slug="closures" title="闭包" /></QueryClientProvider>);
+
+    expect(await screen.findByText('流式回答')).toBeTruthy();
+    const historySummary = screen.getByText('思考过程');
+    const historyDetails = historySummary.closest('details');
+    expect(historyDetails).toHaveAttribute('open');
+    fireEvent.click(historySummary);
+    expect(historyDetails).not.toHaveAttribute('open');
+  });
+
   it('coalesces burst deltas and scrolls at most once per rendered frame', async () => {
     let emit!: Parameters<typeof streamTeacherTurn>[3];
     let finish!: () => void;

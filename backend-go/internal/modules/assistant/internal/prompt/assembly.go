@@ -245,7 +245,7 @@ func renderProjectAgentPrompt(
 	b.WriteString(strings.TrimSpace(agent.CharterText))
 	b.WriteString("\n\n# Project-Level Invocation Contract\n\n")
 	b.WriteString("- This is an explicit native Agent CLI invocation recorded as a normal session and run.\n")
-	b.WriteString("- It is bound to the project type, not to Intro / Explain / Practice / Extend / Summary.\n")
+	b.WriteString("- It is bound to the project type, not to Intro / Explain / Practice.\n")
 	b.WriteString("- Read the project brief and the current output artifact before revising it.\n")
 	b.WriteString("- Write the final learner-facing Markdown directly to the declared project-root output path.\n")
 	b.WriteString("- Do not merely paste the proposed artifact into the terminal response.\n\n")
@@ -333,7 +333,7 @@ func renderPrompt(
 		b.WriteString("# Intro Iteration Contract\n\n")
 		b.WriteString("- 如果用户在终端里质疑、补充或修正 Intro 判断，把已有 Intro 产物视为可改进草稿。\n")
 		b.WriteString("- 先直接回应用户疑问，再按证据更新 `intro/output.md` 与 `intro/assessment.json`。\n")
-		b.WriteString("- 只改 Intro 产物；standalone draft 范围可在校准完成后写入 `learning-scope.json`，不得改 Explain、Practice、Extend 或 Summary 产物。\n")
+		b.WriteString("- 只改 Intro 产物；standalone draft 范围可在校准完成后写入 `learning-scope.json`，不得改 Explain 或 Practice 产物。\n")
 		b.WriteString("- 本轮不新增前端追问入口，也不实现快照；必要更新直接原地写入 Intro 文件。\n\n")
 	}
 	if agent.ID == "practice" && req.PracticeAttempt > 0 {
@@ -360,7 +360,6 @@ func renderPrompt(
 		b.WriteString("- Cite predecessor files when building on prior zone output.\n")
 		b.WriteString("- If information is missing, say so explicitly rather than fabricating.\n")
 	}
-	b.WriteString("- Do NOT edit `summary/summary.md`. That file is learner-owned.\n")
 	b.WriteString("- Write Markdown that renders cleanly with GitHub-flavored Markdown + Mermaid.\n")
 	b.WriteString("- Never draw diagrams with ASCII or Unicode text characters, including box-drawing flowcharts, trees, timelines, maps, or relationship diagrams. Use a fenced Mermaid block for every diagram.\n")
 	b.WriteString("- This diagram rule does not prohibit ordinary source-code examples, mathematical notation, or Markdown tables.\n")

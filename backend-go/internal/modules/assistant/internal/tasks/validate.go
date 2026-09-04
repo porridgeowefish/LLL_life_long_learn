@@ -61,6 +61,18 @@ func validateResult(workDir string, task Task, manifest inputManifest, result re
 			return fmt.Errorf("invalid asset status for %s", key)
 		}
 	}
+	if task.Type == "consolidate" {
+		if result.AssetUpdates["intro"].Status != "updated" || result.AssetUpdates["body"].Status != "updated" {
+			return errors.New("consolidation must update intro and body")
+		}
+		if task.PracticeRequested {
+			if result.AssetUpdates["practice"].Status != "updated" {
+				return errors.New("consolidation with requested questions must update practice")
+			}
+		} else if result.AssetUpdates["practice"].Status != "unchanged" {
+			return errors.New("default consolidation must leave practice unchanged")
+		}
+	}
 	seenKeys := map[string]bool{}
 	for _, deliverable := range result.Deliverables {
 		if !safeOutputKey(deliverable.Key) || seenKeys[deliverable.Key] {
@@ -90,9 +102,13 @@ func validateResult(workDir string, task Task, manifest inputManifest, result re
 		}
 		seen := map[string]bool{}
 		prefix := filepath.ToSlash(filepath.Join("source-updates", result.SourceUpdate.RevisionID)) + "/"
+		canonicalPath := prefix + "content.md"
+		if len(result.SourceUpdate.Files) != 1 {
+			return errors.New("source-processing must produce exactly one canonical markdown file")
+		}
 		for _, file := range result.SourceUpdate.Files {
 			clean := filepath.ToSlash(file.Path)
-			if !safeOutputKey(file.Key) || seen[file.Key] || !strings.HasPrefix(clean, prefix) || strings.TrimSpace(file.MediaType) == "" {
+			if file.Key != "content" || clean != canonicalPath || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(file.MediaType)), "text/markdown") || seen[file.Key] || !strings.HasPrefix(clean, prefix) {
 				return errors.New("invalid source-derived file declaration")
 			}
 			seen[file.Key] = true

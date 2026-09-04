@@ -14,9 +14,10 @@ func (TeacherTaskAuthorizer) CreateDelegation(projectSlug string, input teacher.
 		return teacher.DelegatedTask{}, false, err
 	}
 	task, created, err := store.Create(assistant.CreateInput{
-		Type:       input.TaskType,
-		Objective:  input.Objective,
-		SourceRefs: input.SourceRefs,
+		Type:              input.TaskType,
+		Objective:         input.Objective,
+		SourceRefs:        input.SourceRefs,
+		PracticeRequested: input.PracticeRequested,
 		Origin: assistant.Origin{
 			Kind:              "teacher-tool",
 			OperationID:       input.OperationID,

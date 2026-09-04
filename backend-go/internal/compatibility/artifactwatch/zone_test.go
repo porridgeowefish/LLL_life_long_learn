@@ -12,7 +12,7 @@ func TestParseZonePath(t *testing.T) {
 		{"myproj/explain/pages/01.md", "myproj", "explain", true},
 		{"myproj/explain/manifest.json", "myproj", "explain", true},
 		{"abc/intro/output.md", "abc", "intro", true},
-		{"abc/summary/summary.md", "abc", "summary", true},
+		{"abc/summary/summary.md", "", "", false},
 		{"physics/overview.md", "physics", "overview", true},
 		{"physics/learning-plan.json", "physics", "learning-plan", true},
 		{"physics/discipline-topics.json", "physics", "discipline-topics", true},

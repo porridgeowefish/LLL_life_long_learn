@@ -84,7 +84,7 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 	}
 
 	// Verify folder tree.
-	wantDirs := []string{"", "intro", "explain", "practice", "extend", "summary", "progress", "runs", "runs/_index", "assets"}
+	wantDirs := []string{"", "intro", "explain", "practice", "progress", "runs", "runs/_index", "assets"}
 	for _, d := range wantDirs {
 		p := filepath.Join(projectsRootOverride, "recommender-systems", d)
 		if info, err := os.Stat(p); err != nil || !info.IsDir() {
@@ -105,13 +105,22 @@ func TestCreateProjectSkeleton_TopLevel(t *testing.T) {
 		t.Errorf("state mismatch: %+v", state)
 	}
 
-	// Verify summary/summary.md exists and is empty.
-	summary, err := os.ReadFile(filepath.Join(projectsRootOverride, "recommender-systems", "summary", "summary.md"))
-	if err != nil {
-		t.Fatalf("read summary.md: %v", err)
+}
+
+func TestCreateProjectSkeletonDoesNotCreateRetiredZones(t *testing.T) {
+	_, cleanup := withTempWorkspace(t)
+	defer cleanup()
+	if err := CreateProjectSkeleton("retired-zones", "Retired Zones", ""); err != nil {
+		t.Fatal(err)
 	}
-	if len(summary) != 0 {
-		t.Errorf("summary.md should be empty, got %q", summary)
+	root := filepath.Join(projectsRootOverride, "retired-zones")
+	for _, directory := range []string{"extend", "summary"} {
+		if _, err := os.Stat(filepath.Join(root, directory)); !os.IsNotExist(err) {
+			t.Fatalf("retired directory %s exists or returned unexpected error: %v", directory, err)
+		}
+	}
+	if ValidateZoneName("Extend") || ValidateZoneName("Summary") {
+		t.Fatal("retired zone names remain valid")
 	}
 }
 
@@ -315,46 +324,6 @@ func TestResolvePredecessorFiles(t *testing.T) {
 		t.Errorf("Intro should exist after write")
 	}
 
-	// Summary pulls from all four zones.
-	preds, _ = ResolvePredecessorFiles("test", ZoneSummary)
-	if len(preds) != 4 {
-		t.Errorf("Summary predecessors len = %d, want 4: %+v", len(preds), preds)
-	}
-}
-
-func TestSafeWriteSummary_learnerProtected(t *testing.T) {
-	_, cleanup := withTempWorkspace(t)
-	defer cleanup()
-
-	if err := CreateProjectSkeleton("test", "Test", ""); err != nil {
-		t.Fatal(err)
-	}
-	// Initial summary.md is empty → first write OK.
-	if err := SafeWriteSummary("test", []byte("# First\n"), false); err != nil {
-		t.Fatalf("first write should succeed: %v", err)
-	}
-	// Now non-empty → second write without force should fail.
-	err := SafeWriteSummary("test", []byte("# Second\n"), false)
-	if err == nil {
-		t.Error("second write without force should fail")
-	}
-	// With force → succeeds.
-	if err := SafeWriteSummary("test", []byte("# Second\n"), true); err != nil {
-		t.Errorf("forced write should succeed: %v", err)
-	}
-}
-
-func TestSafeWriteArtifact_RefusesSummary(t *testing.T) {
-	_, cleanup := withTempWorkspace(t)
-	defer cleanup()
-
-	if err := CreateProjectSkeleton("test", "Test", ""); err != nil {
-		t.Fatal(err)
-	}
-	err := SafeWriteArtifact("test", ZoneSummary, "summary.md", []byte("nope"))
-	if err == nil {
-		t.Error("SafeWriteArtifact should refuse summary/summary.md")
-	}
 }
 
 func TestAtomicWriteFile(t *testing.T) {
@@ -447,11 +416,9 @@ func TestReadProjectStateDetectsGeneratedZones(t *testing.T) {
 		t.Fatal(err)
 	}
 	files := map[string]string{
-		"intro/assessment.json":    `{"schemaVersion":1}`,
-		"explain/manifest.json":    `{"pages":[{"id":"p001"}]}`,
-		"practice/tasks.json":      `{"tasks":[{"id":"q1"}]}`,
-		"extend/relation-notes.md": "related topic",
-		"summary/flashcards.json":  `{"version":1,"cards":[{"id":"fc-1"}]}`,
+		"intro/assessment.json": `{"schemaVersion":1}`,
+		"explain/manifest.json": `{"pages":[{"id":"p001"}]}`,
+		"practice/tasks.json":   `{"tasks":[{"id":"q1"}]}`,
 	}
 	for rel, content := range files {
 		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(rel)), []byte(content), 0o644); err != nil {
@@ -470,28 +437,5 @@ func TestReadProjectStateDetectsGeneratedZones(t *testing.T) {
 		if state.GeneratedZones[i] != zone {
 			t.Fatalf("zone %d: expected %s, got %s", i, zone, state.GeneratedZones[i])
 		}
-	}
-}
-
-func TestReadProjectStateDetectsFlashcardVariants(t *testing.T) {
-	_, cleanup := withTempWorkspace(t)
-	defer cleanup()
-	if err := CreateProjectSkeleton("flashcard-variants", "Flashcard Variants", ""); err != nil {
-		t.Fatal(err)
-	}
-	root, err := ProjectRootForSlug("flashcard-variants")
-	if err != nil {
-		t.Fatal(err)
-	}
-	path := filepath.Join(root, "summary", "flashcards.json")
-	if err := os.WriteFile(path, []byte("```json\n{\"flashcards\":[{\"id\":\"fc-1\"}]}\n```"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	state, err := ReadProjectState("flashcard-variants")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(state.GeneratedZones) != 1 || state.GeneratedZones[0] != ZoneSummary {
-		t.Fatalf("expected Summary generated from flashcard variant, got %v", state.GeneratedZones)
 	}
 }

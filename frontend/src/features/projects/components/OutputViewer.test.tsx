@@ -81,6 +81,35 @@ describe('OutputViewer selection toolbar', () => {
     expect(Number.parseFloat(toolbar.style.left)).toBeLessThan(300);
   });
 
+  it('finalizes a drag only once when browsers also emit mouseup', async () => {
+    render(<OutputViewer slug="demo" zone="Explain" />);
+    const paragraph = screen.getByText('bottom text');
+    const range = document.createRange();
+    range.selectNodeContents(paragraph);
+    let rectReads = 0;
+    Object.defineProperty(range, 'getClientRects', {
+      value: () => {
+        rectReads += 1;
+        return [new DOMRect(300, 400, 320, 24)];
+      },
+    });
+
+    vi.spyOn(window, 'getSelection').mockReturnValue({
+      isCollapsed: false,
+      rangeCount: 1,
+      toString: () => 'bottom text',
+      getRangeAt: () => range,
+      removeAllRanges: vi.fn(),
+    } as unknown as Selection);
+
+    fireEvent.pointerDown(paragraph, { clientX: 320, clientY: 400 });
+    fireEvent.pointerUp(window, { clientX: 500, clientY: 412 });
+    fireEvent.mouseUp(window, { clientX: 500, clientY: 412 });
+
+    await screen.findByRole('toolbar', { name: '选中文本操作' });
+    expect(rectReads).toBe(1);
+  });
+
   it('shows the toolbar when a bottom-edge drag leaves the window before pointerup', async () => {
     render(<OutputViewer slug="demo" zone="Explain" />);
     const paragraph = screen.getByText('bottom text');

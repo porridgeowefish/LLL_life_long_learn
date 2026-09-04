@@ -18,7 +18,6 @@ sessions, follow-up, cancellation, and run status
 project files
 Explain confusions and Ask-AI
 Practice tasks, attempts, checking, submission, and evaluation
-Summary flashcards
 progress, activity aggregation, infographics, and SSE events
 teacher conversation and response recovery
 assistant task projection, assets, annotations, sources, and preferences
@@ -120,6 +119,11 @@ The active API includes one provider-neutral teacher-turn stream, durable conver
 reads, task and asset reads, editable core assets, body annotations, and source
 operations. The frontend consumes normalized block events and never consumes a
 provider SDK stream directly.
+
+Ready sources expose one teacher-citation Markdown endpoint; the source ledger
+does not preview it. `GET /api/usage/teacher` returns paginated, durable
+conversation-level teacher usage with per-response rows. These values are
+provider-reported only and do not include assistant usage.
 
 The teacher sees one `delegate_learning_work` tool with logical type, objective,
 source references, and proposal message identity. Application services inject

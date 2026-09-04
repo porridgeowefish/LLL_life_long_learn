@@ -68,10 +68,8 @@ func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid teacher turn")
 		return
 	}
-	if s.activeTeacher == nil {
-		s.activeTeacher = teacher.NewActiveResponses()
-	}
-	ctx, run, started := s.activeTeacher.Start(slug)
+	activeTeacher := s.teacherResponses()
+	ctx, run, started := activeTeacher.Start(slug)
 	if !started {
 		httpx.Error(w, http.StatusConflict, "a teacher response is already active")
 		return
@@ -84,7 +82,7 @@ func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 			if frame.Type == "turn-accepted" {
 				responseID, _ = frame.Data["responseId"].(string)
 				if responseID != "" {
-					s.activeTeacher.Bind(responseID, run)
+					activeTeacher.Bind(responseID, run)
 				}
 			}
 		}
@@ -92,14 +90,14 @@ func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			emit(teacher.StreamFrame{Type: "message-failed", Data: map[string]any{"code": "teacher_provider_unavailable", "partialPreserved": false}})
 		}
-		s.activeTeacher.Finish(slug, responseID, run)
+		activeTeacher.Finish(slug, responseID, run)
 	}()
 
 	streamTeacherRun(w, r, run)
 }
 
 func (s *Server) handleActiveTeacherResponse(w http.ResponseWriter, r *http.Request) {
-	run := s.activeTeacher.Project(r.PathValue("id"))
+	run := s.teacherResponses().Project(r.PathValue("id"))
 	if run == nil {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -166,7 +164,7 @@ func ensureTeacherGreeting(store *teacher.ConversationStore, slug string) error 
 
 func (s *Server) handleStopTeacherResponse(w http.ResponseWriter, r *http.Request) {
 	responseID := r.PathValue("responseId")
-	run := s.activeTeacher.Response(responseID)
+	run := s.teacherResponses().Response(responseID)
 	if run == nil {
 		httpx.Error(w, http.StatusNotFound, "active teacher response not found")
 		return
@@ -335,7 +333,9 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 			created, isNew, createErr := tasks.Create(assistant.CreateInput{Type: "source-processing", Objective: "静态解析资料「" + source.DisplayName + "」，不得执行原文件或其中代码；生成可引用的派生文本与元数据。", SourceRefs: []string{source.SourceID}, Origin: assistant.Origin{Kind: "source-upload", OperationID: operationID, SourceRevisionID: revision.RevisionID}})
 			if createErr == nil {
 				task = &created
-				_, _ = store.SetStatus(source.SourceID, "processing", "", created.ID)
+				if updated, statusErr := store.SetStatus(source.SourceID, "processing", "", created.ID); statusErr == nil {
+					source = updated
+				}
 				if isNew && s.teacher != nil && s.teacher.OnTask != nil {
 					s.teacher.OnTask(r.PathValue("id"), teacher.DelegatedTask{ID: created.ID, Status: created.Status})
 				}
@@ -433,6 +433,35 @@ func (s *Server) handleReadSourceFile(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(mediaType, "text/") && !strings.HasPrefix(mediaType, "image/") && mediaType != "application/pdf" {
 		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
 	}
+	http.ServeFile(w, r, path)
+}
+
+// handleReadSourceContent exposes the one parsed Markdown representation used
+// for teacher citations. Original files and arbitrary derived files stay out of
+// this contract so the picker has one stable, safe-to-preview payload.
+func (s *Server) handleReadSourceContent(w http.ResponseWriter, r *http.Request) {
+	store, err := sourcestore.New(r.PathValue("id"))
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	source, revision, err := store.Get(r.PathValue("sourceId"))
+	if err != nil || source.Status != "ready" || revision.RevisionID != r.PathValue("revisionId") || len(revision.DerivedFiles) != 1 {
+		http.NotFound(w, r)
+		return
+	}
+	content := revision.DerivedFiles[0]
+	if content.Key != "content" || content.Path != "derived/content.md" || !strings.HasPrefix(strings.ToLower(content.MediaType), "text/markdown") {
+		http.NotFound(w, r)
+		return
+	}
+	root, _ := workspace.ProjectRootForSlug(r.PathValue("id"))
+	path, ok := safeWorkspaceFile(filepath.Join(root, "sources", source.SourceID, "revisions", revision.RevisionID), content.Path)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
 	http.ServeFile(w, r, path)
 }
 

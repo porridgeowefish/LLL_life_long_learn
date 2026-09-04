@@ -227,6 +227,10 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			return nil
 		}
 		switch event.Type {
+		case "message_start":
+			if event.Usage.InputTokens > 0 {
+				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Usage.InputTokens}})
+			}
 		case "content_block_start":
 			if event.ContentBlock.Type == "tool_use" {
 				toolName, providerID, arguments = event.ContentBlock.Name, event.ContentBlock.ID, ""

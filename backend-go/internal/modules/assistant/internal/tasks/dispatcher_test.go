@@ -112,6 +112,9 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "body"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "intro"), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	d := newTestDispatcher(nil, nil)
 	defer close(d.stop)
 	manifest, _, err := d.sealInputs(task, workDir)
@@ -124,11 +127,14 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "body", "current.md"), []byte("终端仍打开时已经完成的正文"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "intro", "current.md"), []byte("为什么值得学习"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	result := resultManifest{SchemaVersion: 1, TaskID: task.ID, RunID: runID, Summary: "成果已经写完", AssetUpdates: map[string]struct {
 		Status    string `json:"status"`
 		Candidate string `json:"candidate"`
 		Code      string `json:"code"`
-	}{"intro": {Status: "unchanged"}, "body": {Status: "updated", Candidate: "asset-updates/body/current.md"}, "practice": {Status: "unchanged"}}}
+	}{"intro": {Status: "updated", Candidate: "asset-updates/intro/current.md"}, "body": {Status: "updated", Candidate: "asset-updates/body/current.md"}, "practice": {Status: "unchanged"}}}
 	resultPath := filepath.Join(workDir, "result-manifest.json")
 	if err := writeJSON(resultPath, result); err != nil {
 		t.Fatal(err)
@@ -142,7 +148,10 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	}
 
 	d.reconcileRunningTask(store, task)
-	deadline := time.Now().Add(500 * time.Millisecond)
+	// Reconciliation is asynchronous and now commits two required learning
+	// assets (intro and body).  This assertion is about eventual recovery while
+	// the terminal remains alive, not a sub-second latency budget.
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		got, _ := store.Get(task.ID)
 		if got.Status == "succeeded" {

@@ -7,8 +7,6 @@ var zones = map[string]bool{
 	"intro":    true,
 	"explain":  true,
 	"practice": true,
-	"extend":   true,
-	"summary":  true,
 }
 
 // ignoreFolders are structural project folders that are NOT zones. If one

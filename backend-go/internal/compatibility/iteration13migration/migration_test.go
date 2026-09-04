@@ -66,7 +66,7 @@ func TestMigrationResumesIncompleteJournalEvenWhenUnitExists(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "explain", "output.md"), []byte("# 恢复正文"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	inventory, err := inventoryLegacy(project)
+	inventory, err := inventoryActiveLegacy(project)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,5 +97,47 @@ func TestMigrationResumesIncompleteJournalEvenWhenUnitExists(t *testing.T) {
 	body, err := os.ReadFile(filepath.Join(project, "assets", "body", "current.md"))
 	if err != nil || string(body) != "# 恢复正文" {
 		t.Fatalf("resumed body mismatch: %q %v", body, err)
+	}
+}
+
+func TestMigrationIgnoresRetiredZoneFiles(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("retired", "历史目录", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	project := filepath.Join(root, "retired")
+	files := map[string]string{
+		"summary/legacy.md": "历史总结",
+		"extend/legacy.md":  "历史拓展",
+	}
+	for path, content := range files {
+		absolute := filepath.Join(project, filepath.FromSlash(path))
+		if err := os.MkdirAll(filepath.Dir(absolute), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(absolute, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := Migrate("retired"); err != nil {
+		t.Fatal(err)
+	}
+	for path, want := range files {
+		got, err := os.ReadFile(filepath.Join(project, filepath.FromSlash(path)))
+		if err != nil || string(got) != want {
+			t.Fatalf("historical file %s changed: %q, %v", path, got, err)
+		}
+	}
+	var record Record
+	if err := readJSON(filepath.Join(project, "migrations", "iteration-13", "migration.json"), &record); err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range record.Inventory {
+		if strings.HasPrefix(item.Path, "summary/") || strings.HasPrefix(item.Path, "extend/") {
+			t.Fatalf("retired path remained in migration inventory: %s", item.Path)
+		}
 	}
 }

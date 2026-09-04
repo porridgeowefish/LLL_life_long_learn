@@ -13,9 +13,11 @@ import (
 )
 
 type fakeGateway struct {
-	proposalID string
-	objective  string
-	sourceRefs []string
+	proposalID        string
+	objective         string
+	sourceRefs        []string
+	taskType          string
+	practiceRequested bool
 }
 
 func (f fakeGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
@@ -24,7 +26,11 @@ func (f fakeGateway) Stream(_ context.Context, _ teachergateway.Request, emit fu
 		objective = "核查当前结论"
 	}
 	emit(teachergateway.Event{Type: "text-delta", Delta: "助教已开始。"})
-	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_test", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": "verify", "objective": objective, "sourceRefs": f.sourceRefs, "proposalMessageId": f.proposalID}}})
+	taskType := f.taskType
+	if taskType == "" {
+		taskType = "verify"
+	}
+	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_test", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": taskType, "objective": objective, "sourceRefs": f.sourceRefs, "practiceRequested": f.practiceRequested, "proposalMessageId": f.proposalID}}})
 	emit(teachergateway.Event{Type: "response-completed"})
 	return nil
 }
@@ -79,6 +85,25 @@ func TestApprovedDelegationCreatesTask(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("task not accepted: %v", types)
+	}
+}
+
+func TestApprovedConsolidationCarriesExplicitPracticeRequest(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	conversation, _ := conversationstore.New("topic")
+	_, _, _ = conversation.AppendMessage("teacher", "completed", "", []conversationstore.Block{{Type: "markdown", Source: "我准备让助教沉淀本轮教学稿并同时出题，使用本轮对话；预期产出是引言、正文和练习；学习意义是形成可复习材料。是否同意？"}})
+	service := newTestService(fakeGateway{taskType: "consolidate", objective: "沉淀本轮教学稿并同时出题", practiceRequested: true})
+	if err := service.StreamTurn(context.Background(), "topic", TurnInput{OperationID: "op_consolidate", Content: "同意"}, func(StreamFrame) {}); err != nil {
+		t.Fatal(err)
+	}
+	inputs := service.Authorizer.(*fakeTaskAuthorizer).inputs
+	if len(inputs) != 1 || !inputs[0].PracticeRequested {
+		t.Fatalf("practice request was lost: %#v", inputs)
 	}
 }
 

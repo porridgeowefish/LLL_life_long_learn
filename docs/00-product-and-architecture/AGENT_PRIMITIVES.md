@@ -3,12 +3,11 @@
 Status: active compatibility contract
 Owner: project maintainer
 Last reviewed: 2026-09-02
-Source of truth: file-shape rules for the reusable reasoning-primitives library and legacy zone-agent coverage.
+Source of truth: file-shape rules for the reusable reasoning-primitives library and retained compatibility-agent coverage.
 
-> Current-context boundary: the teacher uses five soft teaching methods in one
-> unified system prompt. The five zone-agent ownership table below applies to
-> retained CLI compatibility charters; it does not define active product
-> navigation or require the teacher to invoke five separate Agents.
+> Current-context boundary: the teacher uses a unified system prompt. This
+> primitive table applies to retained Intro/Explain/Practice compatibility
+> charters; it does not define active product navigation.
 
 ## Intent
 
@@ -24,7 +23,7 @@ This is the systematic replacement for the legacy `deepthink` skill. The goal is
 
 ```text
 preserve every useful mechanism from deepthink
-distribute ownership across all five zone agents
+distribute ownership across retained compatibility agents
 keep agents independent (each charter is self-contained)
 avoid recreating a single "god skill" that does everything
 ```
@@ -83,15 +82,13 @@ This table is the authoritative mapping from the legacy `deepthink` mechanism li
 │  6 │ Misconception hunting    │ misconception.md        │ Explain      │
 │  7 │ Boundary mapping         │ boundary_map.md         │ Explain+Intro│
 │  8 │ Analogy (CS / engineering│ analogy.md              │ Explain opt. │
-│  9 │ Critical thinking        │ critical_thinking.md    │ Extend       │
-│ 10 │ Knowledge anchor         │ knowledge_anchor.md     │ Intro        │
-│ 11 │ Knowledge transfer       │ transfer.md             │ Practice     │
-│ 12 │ Review pack (Feynman/SRS)│ review_pack.md          │ Summary      │
+│  9 │ Knowledge anchor         │ knowledge_anchor.md     │ Intro        │
+│ 10 │ Knowledge transfer       │ transfer.md             │ Practice     │
 └────┴──────────────────────────┴─────────────────────────┴──────────────┘
 ```
 
-`Progressive learning path (Step 1-4)` is not in this table — it described the
-legacy five-zone flow rather than one reusable mechanism.
+`Progressive learning path (Step 1-4)` is not in this table — it described a
+retired staged workflow rather than one reusable mechanism.
 
 ## Primitive File Shape
 
@@ -186,7 +183,7 @@ go test ./backend-go/... -run TestPrimitivesCoverage
 
 ```text
 docs/00-product-and-architecture/LEARNING_PROJECT_STRUCTURE.md
-  Five-zone model and the agent invocation contract.
+  Legacy compatibility model and the agent invocation contract.
 
 docs/00-product-and-architecture/AGENT_ARCHITECTURE.md
   Execution principle: agents coordinate via files, not message buses.
@@ -208,8 +205,7 @@ agents/registry/explain.json
 ```text
 Wave 1 — skeleton in place ✓
 Wave 2 — six Explain primitives written (5 required + 1 optional) ✓
-Wave 3 — four future-agent primitives written (placeholder until
-         Intro/Practice/Extend/Summary agents ship) ✓
+Wave 3 — compatibility-agent primitives written ✓
 Wave 4 — registry schema + explain charter migration ✓
 Wave 5 — promptassembly loader + assembly block ✓
 Wave 6 — test suite green (registry, promptassembly, coverage) ✓

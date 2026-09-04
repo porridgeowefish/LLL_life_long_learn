@@ -10,7 +10,6 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/compatibility/practicestore"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
-	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
@@ -224,44 +223,6 @@ func TestPracticeEvaluationRequestReturnsExistingResultWithoutLaunchingAgent(t *
 	}
 }
 
-func TestFlashcardListAndGrade(t *testing.T) {
-	srv, cleanup := setupTestServer(t)
-	defer cleanup()
-
-	// 1. List (empty)
-	req := httptest.NewRequest("GET", "/api/projects/testproj/summary/flashcards", nil)
-	req.SetPathValue("id", "testproj")
-	w := httptest.NewRecorder()
-	srv.handleListFlashcards(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("list flashcards: status %d, body %s", w.Code, w.Body.String())
-	}
-
-	// 2. Grade a card
-	body := `{"cardId":"fc1","grade":"got-it"}`
-	req = httptest.NewRequest("POST", "/api/projects/testproj/summary/flashcards/grade", strings.NewReader(body))
-	req.SetPathValue("id", "testproj")
-	req.Header.Set("Content-Type", "application/json")
-	w = httptest.NewRecorder()
-	srv.handleGradeFlashcard(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("grade: status %d, body %s", w.Code, w.Body.String())
-	}
-
-	// 3. Verify progress persisted
-	req = httptest.NewRequest("GET", "/api/projects/testproj/summary/flashcards", nil)
-	req.SetPathValue("id", "testproj")
-	w = httptest.NewRecorder()
-	srv.handleListFlashcards(w, req)
-	var res struct {
-		Progress []map[string]any `json:"progress"`
-	}
-	json.Unmarshal(w.Body.Bytes(), &res)
-	if len(res.Progress) != 1 {
-		t.Fatalf("expected 1 progress entry, got %d", len(res.Progress))
-	}
-}
-
 func TestConfusionCreate_MissingQuote(t *testing.T) {
 	srv, cleanup := setupTestServer(t)
 	defer cleanup()
@@ -286,10 +247,10 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		ok   bool
 	}{
 		{"memory/notes.md", false},
-		{"summary/report.md", true},
+		{"summary/report.md", false},
 		{"explain/notes.md", true},
 		{"intro/survey.json", true},
-		{"extend/flower.json", true},
+		{"extend/flower.json", false},
 		{"intro/output.md", false},
 		{"extend/prompts.md", false},
 		{"practice/tasks.md", false},
@@ -306,35 +267,6 @@ func TestWriteFile_ExpandedWhitelist(t *testing.T) {
 		if !tt.ok && w.Code != http.StatusForbidden {
 			t.Errorf("write %s: expected 403, got %d — %s", tt.path, w.Code, w.Body.String())
 		}
-	}
-}
-
-func TestWriteFlowerRecordsOneActivityPerDistinctSavedContent(t *testing.T) {
-	srv, cleanup := setupTestServer(t)
-	defer cleanup()
-
-	for _, body := range []string{`{"petalContent":{"known":"A"}}`, `{"petalContent":{"known":"A"}}`, `{"petalContent":{"known":"A\nB"}}`} {
-		req := httptest.NewRequest("POST", "/files/projects/testproj/extend/flower.json", strings.NewReader(body))
-		req.SetPathValue("id", "testproj")
-		w := httptest.NewRecorder()
-		srv.handleWriteFile(w, req)
-		if w.Code != http.StatusOK {
-			t.Fatalf("write flower: expected 200, got %d — %s", w.Code, w.Body.String())
-		}
-	}
-	store, err := progressstore.NewProgressStore("testproj")
-	if err != nil {
-		t.Fatal(err)
-	}
-	events, err := store.ReadEvents()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(events) != 2 {
-		t.Fatalf("expected two distinct flower activity events, got %d: %+v", len(events), events)
-	}
-	if events[0].SourceType != "extend-flower" || events[0].ActivityDelta != 1 {
-		t.Fatalf("unexpected flower activity: %+v", events[0])
 	}
 }
 

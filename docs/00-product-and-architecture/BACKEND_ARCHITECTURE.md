@@ -77,6 +77,7 @@ POST teacher turn
 -> assemble bounded conversation, scope, assets, disclosed sources, and preferences
 -> stream normalized reasoning-summary / answer / tool-use blocks
 -> append durable teacher events and run state
+-> append provider-reported nonzero token usage by response
 -> expose final conversation projection through REST
 ```
 
@@ -119,6 +120,7 @@ terminal, and LLL records the exit result.
 | task state, attempts, leases, sealed manifests | assistant task/dispatcher service |
 | formal asset versions and merge journals | asset application/store |
 | source revisions and tombstones | source application/store |
+| teacher provider usage | teacher usage store |
 | global preferences | explicit learner preference endpoint only |
 | CLI attempt files | selected native CLI, inside its declared attempt workspace |
 
@@ -194,10 +196,13 @@ a one-click retry contract.
 
 ## Compatibility Boundary
 
-Legacy zone/session routes and stores remain for old projects, migration,
-rollback, and existing Ask-AI/practice/flashcard readers. New teacher,
-assistant, asset, source, and preference behavior must use the application
-services above and must not be added to legacy route-local orchestration.
+Legacy Intro/Explain/Practice zone/session routes and stores remain for old
+projects, migration, rollback, and existing Ask-AI/practice readers. Summary,
+Extend, and Knowledge Garden have no backend routes, stores, or generic file
+access; their historical directories are deliberately ignored by runtime
+services. New teacher, assistant, asset, source, and preference behavior must
+use the application services above and must not be added to legacy route-local
+orchestration.
 
 ## Non-Goals
 

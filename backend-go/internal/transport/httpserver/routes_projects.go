@@ -1,8 +1,6 @@
 package httpserver
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"io"
 	"net/http"
@@ -14,7 +12,6 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
-	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 )
@@ -265,7 +262,7 @@ func (s *Server) handleGetZone(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleReadFile returns the raw text of a project file by relative path.
-// Restricted to summary/ and zone folders. Global learner preferences use the
+// Restricted to active legacy-reader folders. Global learner preferences use the
 // dedicated workspace-level preferences endpoint.
 func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
@@ -297,7 +294,7 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	top := parts[0]
-	allowedTop := map[string]bool{"summary": true, "intro": true, "explain": true, "practice": true, "extend": true}
+	allowedTop := map[string]bool{"intro": true, "explain": true, "practice": true}
 	if !allowedTop[top] {
 		httpx.Error(w, http.StatusForbidden, "directory not readable")
 		return
@@ -316,8 +313,8 @@ func (s *Server) handleReadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleWriteFile is the POST counterpart of handleReadFile.
-// Write whitelist: summary/<file>, explain/notes.md, intro/survey.json,
-// extend/flower.json. The retired project-memory path is intentionally absent.
+// Write whitelist: explain/notes.md and intro/survey.json. Retired Summary,
+// Extend, and project-memory paths are intentionally absent.
 func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
 	if !workspace.ValidateSlug(slug) {
@@ -346,15 +343,12 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	dir, file := parts[0], parts[1]
-	allowed := dir == "summary"
+	allowed := false
 	// explain/ is read-only except for explain/notes.md (learner-owned notes).
 	if dir == "explain" && file == "notes.md" {
 		allowed = true
 	}
 	if dir == "intro" && file == "survey.json" {
-		allowed = true
-	}
-	if dir == "extend" && file == "flower.json" {
 		allowed = true
 	}
 	if !allowed {
@@ -377,21 +371,6 @@ func (s *Server) handleWriteFile(w http.ResponseWriter, r *http.Request) {
 	if err := workspace.AtomicWriteFile(abs, body, 0o644); err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
 		return
-	}
-	if dir == "extend" && file == "flower.json" {
-		digest := sha256.Sum256(body)
-		_, _, err := awardLearningEvent(slug, progressstore.ProgressEvent{
-			ID:            "extend-flower:" + hex.EncodeToString(digest[:12]),
-			SourceType:    "extend-flower",
-			SourceID:      rel,
-			ActivityDelta: 1,
-			Title:         "编辑知识花朵",
-			Detail:        "补充或调整花瓣内容",
-		})
-		if err != nil {
-			httpx.Error(w, http.StatusInternalServerError, "record flower activity: "+err.Error())
-			return
-		}
 	}
 	s.cache.Invalidate(slug)
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "bytes": len(body)})

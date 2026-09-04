@@ -22,8 +22,9 @@ SystemLearningProject
 A WorkspaceProject that owns one conversation-first LearningUnit.
 
 LearningZone
-A legacy fixed phase: Intro, Explain, Practice, Extend, or Summary. It remains
-readable for migration and rollback but is not an active target object.
+A legacy compatibility phase: Intro, Explain, or Practice. It remains readable
+for migration and rollback but is not an active target object. Historical
+Extend/Summary folders are deliberately not LearningZone values.
 
 LearningUnit
 The active system-learning aggregate: one TeacherConversation, three
@@ -39,7 +40,8 @@ generated artifact.
 
 SourceMaterial
 A learner-provided local source with immutable revisions, privacy decisions,
-and optional assistant-produced derived content.
+and exactly one ready canonical Markdown citation (`content.md`) after supported
+background parsing.
 
 AssistantTask
 A durable approved supporting-work objective, separate from its CLI RunAttempts.
@@ -53,7 +55,8 @@ It is content, not a project or sidebar node.
 
 TopicBoundary
 The map-owned goal, inclusion, exclusion, prerequisite, concept ownership, and
-reuse contract for one actionable topic.
+reuse contract for one actionable topic. It may include a natural-language
+`teachingOutline` injected as soft teacher guidance.
 
 LearningScope
 The system-learning project's durable objective content boundary. It is either
@@ -153,8 +156,9 @@ map-backed folder in navigation.
 
 ADR-0012 defines the canonical LearningUnit inside the same flat
 SystemLearningProject root. Migration adapts Intro, Explain, Practice, and
-Explain Ask-AI data to assets and annotations. Summary and Extend remain legacy
-records only. Project type, map provenance, folder classification, and scope
+Explain Ask-AI data to assets and annotations. Summary and Extend remain
+preserved historical records only, outside the runtime data model. Project type,
+map provenance, folder classification, and scope
 snapshot identity do not change. LearningUnit objects are implemented contracts
 owned by code and the current iteration documents.
 

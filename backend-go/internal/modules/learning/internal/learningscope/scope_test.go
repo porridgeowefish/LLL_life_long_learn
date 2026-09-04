@@ -9,8 +9,9 @@ func TestSnapshotFromTopicCopiesCanonicalBoundary(t *testing.T) {
 	now := time.Date(2026, 7, 28, 10, 0, 0, 0, time.UTC)
 	topic := Topic{
 		ID: "classical-mechanics", Title: "经典力学", ChapterTitle: "力学",
-		Goal:    "解释宏观低速物体的运动规律",
-		InScope: []string{"牛顿运动定律"}, OutOfScope: []string{"连续介质力学"},
+		Goal:            "解释宏观低速物体的运动规律",
+		TeachingOutline: "从受力和运动状态的关系建立牛顿模型。",
+		InScope:         []string{"牛顿运动定律"}, OutOfScope: []string{"连续介质力学"},
 		Prerequisites: []string{"向量"}, OwnedConcepts: []string{"惯性参考系"},
 		ReusedConcepts: []string{"微积分"},
 	}
@@ -19,7 +20,7 @@ func TestSnapshotFromTopicCopiesCanonicalBoundary(t *testing.T) {
 	if scope.Status != StatusReady || scope.Source.TopicID != "classical-mechanics" {
 		t.Fatalf("unexpected scope: %+v", scope)
 	}
-	if scope.InScope[0] != "牛顿运动定律" {
+	if scope.InScope[0] != "牛顿运动定律" || scope.TeachingOutline != "从受力和运动状态的关系建立牛顿模型。" {
 		t.Fatal("scope must copy rather than alias the catalog topic")
 	}
 }

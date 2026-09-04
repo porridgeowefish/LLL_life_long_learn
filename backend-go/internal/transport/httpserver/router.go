@@ -107,6 +107,19 @@ func (s *Server) AttachExecution(execution AgentExecutionService, dispatcher *as
 	s.dispatcher = dispatcher
 }
 
+// teacherResponses returns the server-wide registry used by every teacher
+// request. New normally initializes it, but keeping the fallback behind the
+// server mutex makes partial/test composition safe when the first requests
+// arrive concurrently.
+func (s *Server) teacherResponses() *teacher.ActiveResponses {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.activeTeacher == nil {
+		s.activeTeacher = teacher.NewActiveResponses()
+	}
+	return s.activeTeacher
+}
+
 // Broadcaster exposes the SSE event bus for the composition root (tests,
 // future integrations). Read-only use only.
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
@@ -129,6 +142,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings/appearance", s.handleGetAppearance)
 	mux.HandleFunc("PUT /api/settings/appearance", s.handlePutAppearance)
 	mux.HandleFunc("GET /api/activity", s.handleGetActivity)
+	mux.HandleFunc("GET /api/usage/teacher", s.handleListTeacherUsage)
 
 	// Projects
 	mux.HandleFunc("GET /api/projects", s.handleListProjects)
@@ -159,6 +173,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
 	mux.HandleFunc("DELETE /api/projects/{id}/sources/{sourceId}", s.handleDeleteSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/permanent-delete", s.handlePermanentDeleteSource)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content", s.handleReadSourceContent)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}", s.handleReadSourceFile)
 	mux.HandleFunc("GET /api/projects/{id}/generated", s.handleListGeneratedArtifacts)
 	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}", s.handleGetGeneratedArtifact)
@@ -214,10 +229,6 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/evaluation", s.handleRequestPracticeEvaluation)
 	mux.HandleFunc("GET /api/projects/{id}/practice/evaluation", s.handleGetPracticeEvaluation)
 	mux.HandleFunc("GET /api/projects/{id}/progress", s.handleGetProgress)
-
-	// Summary (flashcards)
-	mux.HandleFunc("GET /api/projects/{id}/summary/flashcards", s.handleListFlashcards)
-	mux.HandleFunc("POST /api/projects/{id}/summary/flashcards/grade", s.handleGradeFlashcard)
 
 	// Explain infographic
 	mux.HandleFunc("POST /api/projects/{id}/explain/infographic", s.handleRequestExplainInfographic)

@@ -9,6 +9,7 @@ import (
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
 	providers "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/providers"
 	service "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/service"
+	usage "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
 )
 
 const (
@@ -36,6 +37,8 @@ type (
 	SequencedMessage  = conversation.SequencedMessage
 	ResponseRecord    = conversation.ResponseRecord
 	ConversationStore = conversation.Store
+	UsageRecord       = usage.Record
+	UsageConversation = usage.Conversation
 
 	Gateway        = gateway.Gateway
 	GatewayMessage = gateway.Message
@@ -59,6 +62,10 @@ func New(gateway Gateway) *Service { return service.New(gateway) }
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }
 
 func NewConversation(slug string) (*ConversationStore, error) { return conversation.New(slug) }
+
+func ListTeacherUsage() ([]UsageConversation, error) { return usage.ListAll() }
+
+func RecordTeacherUsage(slug string, record UsageRecord) error { return usage.Append(slug, record) }
 
 func ReconcileAllInterruptedResponses() { conversation.ReconcileAllInterruptedResponses() }
 

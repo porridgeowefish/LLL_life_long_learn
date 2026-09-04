@@ -14,7 +14,7 @@ import (
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
-// ZoneName is the canonical name of one of the five learning zones.
+// ZoneName is the canonical name of one of the active learning zones.
 type ZoneName string
 
 // ProjectType distinguishes broad orientation maps from focused learning work.
@@ -24,15 +24,13 @@ const (
 	ZoneIntro    ZoneName = "Intro"
 	ZoneExplain  ZoneName = "Explain"
 	ZonePractice ZoneName = "Practice"
-	ZoneExtend   ZoneName = "Extend"
-	ZoneSummary  ZoneName = "Summary"
 
 	ProjectTypeDisciplineMap  ProjectType = "discipline-map"
 	ProjectTypeSystemLearning ProjectType = "system-learning"
 )
 
-// AllZones enumerates the five fixed zones in canonical order.
-var AllZones = []ZoneName{ZoneIntro, ZoneExplain, ZonePractice, ZoneExtend, ZoneSummary}
+// AllZones enumerates the active zones in canonical order.
+var AllZones = []ZoneName{ZoneIntro, ZoneExplain, ZonePractice}
 
 // validSlugPattern is the strict slug validator for URL/path parameters.
 // Allows lowercase ASCII letters/digits/hyphens AND CJK / other lowercase
@@ -45,8 +43,6 @@ var zoneFilenames = map[ZoneName]string{
 	ZoneIntro:    "output.md",
 	ZoneExplain:  "output.md",
 	ZonePractice: "tasks.json",
-	ZoneExtend:   "prompts.md",
-	ZoneSummary:  "summary.md",
 }
 
 // ProjectState is the persistent per-project state.
@@ -222,7 +218,7 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	// Folder tree. Discipline maps deliberately do not own learning zones.
 	dirs := []string{"", "runs", "runs/_index", "assets"}
 	if projectType == ProjectTypeSystemLearning {
-		dirs = append(dirs, "intro", "explain", "practice", "extend", "summary", "progress")
+		dirs = append(dirs, "intro", "explain", "practice", "progress")
 	}
 	for _, d := range dirs {
 		if err := os.MkdirAll(filepath.Join(root, d), 0o755); err != nil {
@@ -267,10 +263,6 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 			return fmt.Errorf("encode learning scope: %w", err)
 		}
 		if err := AtomicWriteFile(filepath.Join(root, "learning-scope.json"), scopeBytes, 0o644); err != nil {
-			return err
-		}
-		// summary/summary.md — empty learner-owned file
-		if err := AtomicWriteFile(filepath.Join(root, "summary", "summary.md"), []byte(""), 0o644); err != nil {
 			return err
 		}
 	} else {
@@ -326,15 +318,6 @@ func detectGeneratedZones(root string) []ZoneName {
 	if validTaskSet(filepath.Join(root, "practice", "tasks.json")) {
 		generated = append(generated, ZonePractice)
 	}
-	if nonEmptyFile(filepath.Join(root, "extend", "relation-notes.md")) ||
-		nonEmptyFile(filepath.Join(root, "extend", "prompts.md")) {
-		generated = append(generated, ZoneExtend)
-	}
-	if nonEmptyFile(filepath.Join(root, "summary", "review-pack.md")) ||
-		validFlashcardsFile(filepath.Join(root, "summary", "flashcards.json")) ||
-		nonEmptyFile(filepath.Join(root, "summary", "summary.md")) {
-		generated = append(generated, ZoneSummary)
-	}
 	return generated
 }
 
@@ -350,40 +333,6 @@ func validJSONObject(path string) bool {
 	}
 	var value map[string]any
 	return json.Unmarshal(data, &value) == nil
-}
-
-func validFlashcardsFile(path string) bool {
-	data, err := os.ReadFile(path)
-	if err != nil || len(strings.TrimSpace(string(data))) == 0 {
-		return false
-	}
-	data = []byte(stripJSONFence(strings.TrimSpace(strings.TrimPrefix(string(data), "\ufeff"))))
-	var versioned struct {
-		Cards      []json.RawMessage `json:"cards"`
-		Flashcards []json.RawMessage `json:"flashcards"`
-		Items      []json.RawMessage `json:"items"`
-	}
-	if json.Unmarshal(data, &versioned) == nil &&
-		(len(versioned.Cards) > 0 || len(versioned.Flashcards) > 0 || len(versioned.Items) > 0) {
-		return true
-	}
-	var legacy []json.RawMessage
-	return json.Unmarshal(data, &legacy) == nil && len(legacy) > 0
-}
-
-func stripJSONFence(text string) string {
-	if !strings.HasPrefix(text, "```") {
-		return text
-	}
-	lines := strings.Split(text, "\n")
-	if len(lines) < 2 {
-		return text
-	}
-	end := len(lines)
-	if strings.HasPrefix(strings.TrimSpace(lines[end-1]), "```") {
-		end--
-	}
-	return strings.TrimSpace(strings.Join(lines[1:end], "\n"))
 }
 
 func validExplainManifest(path string) bool {
@@ -483,9 +432,7 @@ func walkProjects(dir string, out *[]ProjectMeta) error {
 // according to the dependency graph:
 //
 //	Intro -> Explain
-//	Explain -> Practice, Extend
-//	Practice -> Extend
-//	Intro + Explain + Practice + Extend -> Summary
+//	Explain -> Practice
 func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, error) {
 	root, err := projectRoot(slug)
 	if err != nil {
@@ -499,10 +446,6 @@ func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, err
 		preds = []ZoneName{ZoneIntro}
 	case ZonePractice:
 		preds = []ZoneName{ZoneExplain}
-	case ZoneExtend:
-		preds = []ZoneName{ZoneExplain, ZonePractice}
-	case ZoneSummary:
-		preds = []ZoneName{ZoneIntro, ZoneExplain, ZonePractice, ZoneExtend}
 	default:
 		return nil, fmt.Errorf("unknown zone: %s", zone)
 	}
@@ -513,10 +456,6 @@ func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, err
 		relPath := filepath.ToSlash(filepath.Join(strings.ToLower(string(p)), filename))
 		_, err := os.Stat(absPath)
 		exists := err == nil
-		// For Summary zone, summary.md is a learner-owned output, not a predecessor.
-		if p == ZoneSummary {
-			continue
-		}
 		// Skip predecessors whose file doesn't exist (pending).
 		if !exists && p != ZoneIntro {
 			// Still include the path so prompt-assembly can list pending predecessors,
@@ -532,14 +471,10 @@ func ResolvePredecessorFiles(slug string, zone ZoneName) ([]PredecessorFile, err
 	return out, nil
 }
 
-// SafeWriteArtifact writes content into a zone folder atomically.
-// Refuses to write to summary/summary.md; route through SafeWriteSummary instead.
+// SafeWriteArtifact writes content into an active zone folder atomically.
 func SafeWriteArtifact(slug string, zone ZoneName, filename string, content []byte) error {
 	if !ValidateZoneName(string(zone)) {
 		return fmt.Errorf("invalid zone: %s", zone)
-	}
-	if zone == ZoneSummary && filename == "summary.md" {
-		return errors.New("SafeWriteArtifact refuses summary/summary.md; call SafeWriteSummary instead")
 	}
 	if !validFilename(filename) {
 		return fmt.Errorf("invalid filename: %q", filename)
@@ -549,22 +484,6 @@ func SafeWriteArtifact(slug string, zone ZoneName, filename string, content []by
 		return err
 	}
 	target := filepath.Join(root, strings.ToLower(string(zone)), filename)
-	return AtomicWriteFile(target, content, 0o644)
-}
-
-// SafeWriteSummary writes summary/summary.md. Refuses to overwrite a non-empty
-// existing file unless force is true. This is the learner-protection chokepoint.
-func SafeWriteSummary(slug string, content []byte, force bool) error {
-	root, err := projectRoot(slug)
-	if err != nil {
-		return err
-	}
-	target := filepath.Join(root, "summary", "summary.md")
-	if !force {
-		if existing, err := os.ReadFile(target); err == nil && len(strings.TrimSpace(string(existing))) > 0 {
-			return errors.New("summary/summary.md is learner-owned; pass force=true to overwrite")
-		}
-	}
 	return AtomicWriteFile(target, content, 0o644)
 }
 

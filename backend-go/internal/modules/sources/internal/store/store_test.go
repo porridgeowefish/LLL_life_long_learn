@@ -70,3 +70,30 @@ func TestRejectsDeclaredSizeMismatch(t *testing.T) {
 		t.Fatal("expected byte mismatch")
 	}
 }
+
+func TestCommitDerivedAcceptsOnlyCanonicalMarkdownContent(t *testing.T) {
+	s := newTestStore(t)
+	data := []byte("source")
+	source, revision, err := s.Add("教材", "book.pdf", "application/pdf", int64(len(data)), bytes.NewReader(data), true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := s.CommitDerived(source.SourceID, revision.RevisionID, map[string][]byte{"notes.md": []byte("extra")}, map[string]string{"notes.md": "text/markdown"}); err == nil {
+		t.Fatal("non-canonical derived content must be rejected")
+	}
+	updated, err := s.CommitDerived(source.SourceID, revision.RevisionID, map[string][]byte{"content.md": []byte("# 提取内容")}, map[string]string{"content.md": "text/markdown; charset=utf-8"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(updated.DerivedFiles) != 1 || updated.DerivedFiles[0].Key != "content" || updated.DerivedFiles[0].Path != "derived/content.md" {
+		t.Fatalf("expected exactly canonical content.md, got %#v", updated.DerivedFiles)
+	}
+	if _, err := s.SetStatus(source.SourceID, "ready", "", "task_parse"); err != nil {
+		t.Fatal(err)
+	}
+	content, err := s.ReadContent(source.SourceID)
+	if err != nil || content != "# 提取内容" {
+		t.Fatalf("ready source content was not readable: %q %v", content, err)
+	}
+}

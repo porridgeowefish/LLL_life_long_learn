@@ -2,15 +2,13 @@
 // backend-go/internal/workspace/workspace.go and agentregistry/registry.go.
 // Keep these the single source of truth; api.ts DTOs extend / pick from them.
 
-export type ZoneName = 'Intro' | 'Explain' | 'Practice' | 'Extend' | 'Summary';
+export type ZoneName = 'Intro' | 'Explain' | 'Practice';
 export type ProjectType = 'discipline-map' | 'system-learning';
 
 export const ALL_ZONES: ZoneName[] = [
   'Intro',
   'Explain',
   'Practice',
-  'Extend',
-  'Summary',
 ];
 
 // Chinese display names — zone ID stays English internally, only the
@@ -19,8 +17,6 @@ export const ZONE_DISPLAY: Record<ZoneName, string> = {
   Intro: '引入',
   Explain: '讲解',
   Practice: '练习',
-  Extend: '拓展',
-  Summary: '总结',
 };
 
 // ZoneName → canonical file each zone writes to (mirrors zoneFilenames in
@@ -29,8 +25,6 @@ export const ZONE_FILENAME: Record<ZoneName, string> = {
   Intro: 'output.md',
   Explain: 'output.md',
   Practice: 'tasks.json',
-  Extend: 'prompts.md',
-  Summary: 'summary.md',
 };
 
 export interface ArtifactRef {

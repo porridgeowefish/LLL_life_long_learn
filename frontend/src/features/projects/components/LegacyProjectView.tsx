@@ -3,10 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { ConfusionPanel } from '@/features/learning';
 import { ExplainReader } from '@/features/learning';
-import { ExtendPage } from '@/features/legacy-zones';
 import { IntroPage } from '@/features/legacy-zones';
 import { PracticeFlow } from '@/features/legacy-zones';
-import { SummaryPage } from '@/features/legacy-zones';
 import { ZoneTimeline } from '@/features/projects/components/ZoneTimeline';
 import { useProjectStore } from '@/shared/store/slices/project';
 import type { ProjectState, ZoneName } from '@/shared/types/domain';
@@ -17,12 +15,19 @@ interface LegacyProjectViewProps {
   project: ProjectState;
 }
 
+export function normalizeLegacyZone(value: string | undefined): ZoneName {
+  return value === 'Intro' || value === 'Practice' || value === 'Explain'
+    ? value
+    : 'Explain';
+}
+
 export function LegacyProjectView({ project }: LegacyProjectViewProps) {
   const navigate = useNavigate();
   const { zone: zoneParam } = useParams<{ zone?: string }>();
   const storedZone = useProjectStore((state) => state.currentZone);
   const setZone = useProjectStore((state) => state.setZone);
-  const zone = ((zoneParam as ZoneName) || storedZone || project.activeZone || 'Explain') as ZoneName;
+  const requestedZone = zoneParam || storedZone || project.activeZone;
+  const zone = normalizeLegacyZone(requestedZone);
 
   useEffect(() => {
     if (zone !== storedZone) setZone(zone);
@@ -34,10 +39,6 @@ export function LegacyProjectView({ project }: LegacyProjectViewProps) {
         return <IntroPage projectSlug={project.slug} />;
       case 'Practice':
         return <PracticeFlow projectSlug={project.slug} />;
-      case 'Extend':
-        return <ExtendPage projectSlug={project.slug} projectTitle={project.title} />;
-      case 'Summary':
-        return <SummaryPage projectSlug={project.slug} />;
       case 'Explain':
       default:
         return (

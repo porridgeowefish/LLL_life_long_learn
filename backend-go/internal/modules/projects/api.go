@@ -21,8 +21,6 @@ const (
 	ZoneIntro                 = workspace.ZoneIntro
 	ZoneExplain               = workspace.ZoneExplain
 	ZonePractice              = workspace.ZonePractice
-	ZoneExtend                = workspace.ZoneExtend
-	ZoneSummary               = workspace.ZoneSummary
 	ProjectTypeDisciplineMap  = workspace.ProjectTypeDisciplineMap
 	ProjectTypeSystemLearning = workspace.ProjectTypeSystemLearning
 )
@@ -41,7 +39,6 @@ var WriteProjectState = workspace.WriteProjectState
 var IndexAll = workspace.IndexAll
 var ResolvePredecessorFiles = workspace.ResolvePredecessorFiles
 var SafeWriteArtifact = workspace.SafeWriteArtifact
-var SafeWriteSummary = workspace.SafeWriteSummary
 var ReadArtifact = workspace.ReadArtifact
 var WriteRunFile = workspace.WriteRunFile
 var IsSlugConflict = workspace.IsSlugConflict

@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest';
 
-import { ZONE_DISPLAY, ALL_ZONES } from './domain';
+import { ALL_ZONES, ZONE_DISPLAY, ZONE_FILENAME } from './domain';
 
 describe('ZONE_DISPLAY', () => {
   it('maps every zone to a Chinese string', () => {
     for (const zone of ALL_ZONES) {
       expect(ZONE_DISPLAY[zone]).toBeTruthy();
-      // Chinese characters — no ASCII
       expect(ZONE_DISPLAY[zone]).toMatch(/[一-鿿]+/);
     }
   });
 
-  it('has exactly 5 entries', () => {
-    expect(Object.keys(ZONE_DISPLAY)).toHaveLength(5);
+  it('has exactly the active zone entries', () => {
+    expect(Object.keys(ZONE_DISPLAY)).toHaveLength(3);
+    expect(ALL_ZONES).toEqual(['Intro', 'Explain', 'Practice']);
   });
 
   it('values are unique', () => {
     const values = Object.values(ZONE_DISPLAY);
     expect(new Set(values).size).toBe(values.length);
   });
+});
+
+it('does not expose retired zone metadata', () => {
+  expect(ZONE_DISPLAY).not.toHaveProperty('Extend');
+  expect(ZONE_DISPLAY).not.toHaveProperty('Summary');
+  expect(ZONE_FILENAME).not.toHaveProperty('Extend');
+  expect(ZONE_FILENAME).not.toHaveProperty('Summary');
 });

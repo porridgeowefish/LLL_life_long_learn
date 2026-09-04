@@ -11,16 +11,16 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 14 | Enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) |
+| 16 | Completed conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) |
 
 ## Active Delivery Slice
 
 | Iteration | Goal | Directory | State |
 |---|---|---|---|
-| 14 | Reorganize LLL as an enforced business-capability modular monolith with unified configuration and quality gates | [iteration-14-modular-monolith-architecture](./iteration-14-modular-monolith-architecture/README.md) | delivered; native browser acceptance remains user-run |
+| 16 | Complete conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) | delivered; native browser acceptance remains user-run |
 
-Iteration 13 is retained under `foundations/`; iteration 14 is the current
-implemented baseline.
+Iteration 13 is retained under `foundations/`; iteration 16 is the current
+implemented baseline. Iteration 14 remains the architecture baseline.
 
 Iterations 01–13 are retained as [delivered foundations](./foundations/README.md).
 They explain reusable capabilities that still support the current architecture.

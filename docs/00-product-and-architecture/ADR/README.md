@@ -35,6 +35,8 @@ an active owner and the historical index records the move.
 | [0013](./0013-stable-stream-rendering-and-global-preferences.md) | Stable Stream Rendering And Global Learner Preferences | accepted | extends 0012 rendering and supersedes project/learner memory growth in 0002 and 0003 |
 | [0014](./0014-current-documentation-surface-and-archive-boundary.md) | Current Documentation Surface And Archive Boundary | accepted | keeps only current decisions and delivery in the default AI reading surface |
 | [0015](./0015-business-modular-monolith-boundaries.md) | Business-Capability Modular Monolith Boundaries | accepted; implementation planned | defines enforceable capability modules, selective hexagonal responsibilities, centralized configuration, and architecture quality gates for iteration 14 |
+| [0016](./0016-retire-legacy-summary-extend-and-knowledge-garden.md) | Retire Legacy Summary, Extend, and Knowledge Garden | accepted | removes product code and public interfaces while preserving historical project files |
+| [0017](./0017-conversation-learning-sources-consolidation-and-usage.md) | Conversation Learning Sources, Consolidation, And Usage | accepted | extends 0012 and 0016 with canonical source citations, teaching outlines, approved consolidation, and teacher usage |
 
 ## Historical Decisions
 

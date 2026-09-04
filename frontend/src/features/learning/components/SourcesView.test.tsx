@@ -10,16 +10,10 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/features/learning/api/learningWorkspace', () => ({
-  useSources: () => ({ data: [], isLoading: false }),
-  useSource: () => ({ data: undefined, isLoading: false }),
-  sourceFileURL: () => '/source/file',
+  useSources: () => ({ data: [{ sourceId: 'source_ready', displayName: 'notes.pdf', status: 'ready', updatedAt: '2026-09-04T00:00:00Z' }], isLoading: false }),
   useUploadSource: () => ({ mutate: apiMocks.upload, isPending: false, isError: false }),
   useTombstoneSource: () => ({ mutate: apiMocks.tombstone }),
   usePermanentlyDeleteSource: () => ({ mutate: apiMocks.permanent }),
-}));
-
-vi.mock('./GeneratedMaterials', () => ({
-  GeneratedMaterials: () => <div data-testid="generated-materials">已提交的助教资料</div>,
 }));
 
 describe('SourcesView upload confirmation', () => {
@@ -27,22 +21,6 @@ describe('SourcesView upload confirmation', () => {
     apiMocks.upload.mockReset();
     apiMocks.tombstone.mockReset();
     apiMocks.permanent.mockReset();
-  });
-
-  it('saves an original without granting cloud parsing permission', () => {
-    const { container } = render(<SourcesView slug="calculus" />);
-    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File(['derivative'], 'notes.md', { type: 'text/markdown' });
-
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(screen.getByRole('dialog', { name: '确认资料处理' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '保存并解析' })).toBeDisabled();
-
-    fireEvent.click(screen.getByRole('button', { name: '仅保存原件' }));
-    expect(apiMocks.upload).toHaveBeenCalledWith(
-      { file, parseApproved: false, cloudDisclosureAccepted: false },
-      expect.objectContaining({ onSuccess: expect.any(Function) }),
-    );
   });
 
   it('only enables parsing after the learner accepts the cloud disclosure', () => {
@@ -62,9 +40,10 @@ describe('SourcesView upload confirmation', () => {
     );
   });
 
-  it('includes assistant-generated materials in the same sources page', () => {
+  it('shows only source file records without parsed previews or assistant assets', () => {
     render(<SourcesView slug="calculus" />);
-    expect(screen.getByTestId('generated-materials')).toHaveTextContent('已提交的助教资料');
-    expect(screen.getByText('总结、调研、实验与图表')).toBeInTheDocument();
+    expect(screen.getByText('notes.pdf')).toBeInTheDocument();
+    expect(screen.queryByText('查看解析内容')).not.toBeInTheDocument();
+    expect(screen.queryByText('助教生成资料')).not.toBeInTheDocument();
   });
 });

@@ -64,6 +64,15 @@
 .sourceMenu > strong { display: block; padding: 3px 5px 8px; font-size: 11px; }
 .sourceMenu label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px 5px; cursor: pointer; font-size: 12px; }
 .sourceMenu small { color: var(--muted); font-size: 10px; }
+.sourceMenu label button { min-width: auto; height: auto; padding: 3px 5px; color: var(--accent-ink); background: transparent; font-size: 10px; }
+.citationChips { position: absolute; left: 11px; bottom: calc(100% + 8px); display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 22px); }
+.citationChips button { min-width: auto; height: 25px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--fg); background: var(--card); box-shadow: var(--shadow-sm); font-size: 10px; }
+.citationPreview { margin-top: 8px; padding: 9px; border-top: 1px solid var(--border); background: var(--surface-raised); }
+.citationPreview > div, .citationPreview footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.citationPreview strong { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citationPreview pre { max-height: 104px; margin: 7px 0; overflow: auto; white-space: pre-wrap; color: var(--muted); font: 10px/1.45 var(--font-mono, monospace); }
+.citationPreview button { min-width: auto; height: 24px; padding: 0 7px; color: var(--fg); background: var(--surface-sunken); font-size: 10px; }
+.citationPreview footer span { color: var(--muted); font-size: 10px; }
 .composerMeta { position: absolute; left: 13px; right: 13px; bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
 .modelSelect { display: inline-flex; align-items: center; gap: 5px; }
 .modelSelect select { max-width: 190px; border: 0; color: var(--muted); background: transparent; font: inherit; outline: none; }
@@ -83,6 +92,7 @@
 .dataRail dt { color: var(--muted); font-size: 11px; }
 .dataRail dd { font: 650 15px/1.2 Georgia, serif; }
 .dataRail dd small { color: var(--muted); font: 400 9px/1.2 'DM Sans', sans-serif; }
+.parsingSource { margin: 2px 0 8px; padding: 7px 8px; border-radius: 7px; color: var(--accent-ink); background: var(--accent-soft); font-size: 10px; }
 .dataRail section { padding: 13px 0; border-bottom: 1px solid var(--border); }
 .dataRail section strong, .dataRail section > small { display: block; overflow-wrap: anywhere; }
 .dataRail section strong { margin-top: 6px; font-size: 11px; line-height: 1.45; }

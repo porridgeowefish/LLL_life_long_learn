@@ -120,6 +120,7 @@ var frozenRoutes = map[string]string{
 	"GET /api/settings/appearance":                                                     "",
 	"PUT /api/settings/appearance":                                                     "",
 	"GET /api/activity":                                                                "",
+	"GET /api/usage/teacher":                                                           "",
 	"GET /api/projects":                                                                "",
 	"POST /api/projects":                                                               "",
 	"DELETE /api/projects/{id}":                                                        "",
@@ -148,6 +149,7 @@ var frozenRoutes = map[string]string{
 	"GET /api/projects/{id}/sources/{sourceId}":                                        "",
 	"DELETE /api/projects/{id}/sources/{sourceId}":                                     "",
 	"POST /api/projects/{id}/sources/{sourceId}/permanent-delete":                      "",
+	"GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content":         "",
 	"GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}": "",
 	"GET /api/projects/{id}/generated":                                                 "",
 	"GET /api/projects/{id}/generated/{artifactId}":                                    "",
@@ -190,8 +192,6 @@ var frozenRoutes = map[string]string{
 	"POST /api/projects/{id}/practice/attempts/{attempt}/evaluation":                   "",
 	"GET /api/projects/{id}/practice/evaluation":                                       "",
 	"GET /api/projects/{id}/progress":                                                  "",
-	"GET /api/projects/{id}/summary/flashcards":                                        "",
-	"POST /api/projects/{id}/summary/flashcards/grade":                                 "",
 	"POST /api/projects/{id}/explain/infographic":                                      "",
 	"GET /api/projects/{id}/explain/infographic":                                       "",
 	"POST /api/runs/{runId}/status":                                                    "",
@@ -432,13 +432,6 @@ func TestLegacyFixtureReadableWithoutMutation(t *testing.T) {
 	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/projects/legacy-wuqu/practice/tasks", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("legacy practice read status = %d", rec.Code)
-	}
-
-	// Flashcards read.
-	rec = httptest.NewRecorder()
-	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/projects/legacy-wuqu/summary/flashcards", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy flashcards read status = %d", rec.Code)
 	}
 
 	// Confusions (annotation-compat) read.

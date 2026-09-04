@@ -481,43 +481,6 @@ func TestBuild_PracticeEvaluationUsesAttemptSpecificContract(t *testing.T) {
 	}
 }
 
-func TestBuild_ProductionSummaryPromptRequiresStructuredFlashcards(t *testing.T) {
-	dir := t.TempDir()
-	oldWS := workspace.ProjectsRootForTest()
-	workspace.SetProjectsRootForTest(dir)
-	defer workspace.SetProjectsRootForTest(oldWS)
-
-	if err := workspace.CreateProjectSkeleton("test", "Test", ""); err != nil {
-		t.Fatal(err)
-	}
-	reg := agentregistry.New()
-	if err := reg.Load(); err != nil {
-		t.Fatalf("load registry: %v", err)
-	}
-	pkg, err := Build(Request{
-		ProjectSlug: "test",
-		ZoneName:    workspace.ZoneSummary,
-		AgentID:     "summary",
-	}, reg)
-	if err != nil {
-		t.Fatalf("Build: %v", err)
-	}
-	for _, fragment := range []string{
-		"summary/flashcards.json",
-		"前端闪卡的唯一事实源",
-		"卡片必须贴近概念和核心理解",
-		`"category"`,
-		`"sourceRefs"`,
-	} {
-		if !strings.Contains(pkg.PromptMd, fragment) {
-			t.Errorf("summary prompt missing %q", fragment)
-		}
-	}
-	if len(pkg.PackageMeta.OutputTargets) != 2 {
-		t.Fatalf("summary output targets = %#v", pkg.PackageMeta.OutputTargets)
-	}
-}
-
 func TestBuild_PracticeGenerationUsesExactQuestionCount(t *testing.T) {
 	dir := t.TempDir()
 	oldWS := workspace.ProjectsRootForTest()

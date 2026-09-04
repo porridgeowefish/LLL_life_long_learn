@@ -11,6 +11,7 @@ import (
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	usagestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
 )
 
 const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者进行清晰、耐心、有针对性的教学对话，而不是生产文件或代替 IDE。
@@ -56,6 +57,7 @@ type DelegationInput struct {
 	TaskType              string
 	Objective             string
 	SourceRefs            []string
+	PracticeRequested     bool
 	OperationID           string
 	ProposalMessageID     string
 	ApprovalMessageID     string
@@ -153,14 +155,16 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 	tool := teachergateway.Tool{Name: "delegate_learning_work", Description: "在教师已经向学习者披露助教方案、且学习者在后续消息中明确同意后，创建一个异步助教任务。", Schema: map[string]any{
 		"type": "object", "additionalProperties": false,
 		"properties": map[string]any{
-			"taskType":   map[string]any{"type": "string", "enum": []string{"consolidate", "verify", "produce-material"}},
-			"objective":  map[string]any{"type": "string", "maxLength": 8192},
-			"sourceRefs": map[string]any{"type": "array", "description": "仅填写学习者在消息中明确选择的本地资料 sourceId。公开网页、论文标题和普通名称不要填写；没有本地资料时必须传空数组。", "items": map[string]any{"type": "string", "pattern": "^source_"}},
+			"taskType":          map[string]any{"type": "string", "enum": []string{"consolidate", "verify", "produce-material"}},
+			"objective":         map[string]any{"type": "string", "maxLength": 8192},
+			"sourceRefs":        map[string]any{"type": "array", "description": "仅填写学习者在消息中明确选择的本地资料 sourceId。公开网页、论文标题和普通名称不要填写；没有本地资料时必须传空数组。", "items": map[string]any{"type": "string", "pattern": "^source_"}},
+			"practiceRequested": map[string]any{"type": "boolean", "description": "仅当 taskType=consolidate 且教师已在经学习者同意的方案中明确承诺同时出题时为 true；其他情况必须为 false。"},
 		},
 		"required": []string{"taskType", "objective", "sourceRefs"},
 	}}
 
 	var text, reasoning strings.Builder
+	usage := map[string]int{}
 	acceptedTool := false
 	providerErr := s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: providerMessages, Tools: []teachergateway.Tool{tool}, ProviderID: in.ProviderID}, func(event teachergateway.Event) {
 		switch event.Type {
@@ -171,6 +175,9 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 			reasoning.WriteString(event.Delta)
 			emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
 		case "usage":
+			for key, value := range event.Usage {
+				usage[key] = value
+			}
 			emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
 		case "tool-call-ready":
 			if event.ToolCall == nil {
@@ -226,6 +233,11 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		return persistErr
 	}
 	_, _ = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": teacherMessageID, "status": status})
+	if meta, metaErr := conversation.Meta(); metaErr == nil {
+		if unit, unitErr := conversation.Unit(); unitErr == nil {
+			_ = usagestore.Append(slug, usagestore.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: responseID, ProviderID: in.ProviderID, InputTokens: usage["inputTokens"], OutputTokens: usage["outputTokens"]})
+		}
+	}
 	if providerErr != nil {
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": providerFailureCode(providerErr), "partialPreserved": len(blocks) > 0}})
 		return providerErr
@@ -256,6 +268,10 @@ func (s *Service) acceptDelegation(slug string, conversation *conversationstore.
 	}
 	taskType, _ := call.Arguments["taskType"].(string)
 	objective, _ := call.Arguments["objective"].(string)
+	practiceRequested, _ := call.Arguments["practiceRequested"].(bool)
+	if taskType != "consolidate" {
+		practiceRequested = false
+	}
 	if !isExplicitApproval(messageText(approval)) {
 		return DelegatedTask{}, false, errors.New("delegation not approved")
 	}
@@ -322,7 +338,7 @@ func (s *Service) acceptDelegation(slug string, conversation *conversationstore.
 	if s.Authorizer == nil {
 		return DelegatedTask{}, false, errors.New("task authorizer unavailable")
 	}
-	task, created, err := s.Authorizer.CreateDelegation(slug, DelegationInput{TaskType: taskType, Objective: authorizedObjective, SourceRefs: refs, OperationID: operationID + ":delegate", ProposalMessageID: proposalID, ApprovalMessageID: approval.ID, ToolCallID: call.CallID, ConversationCutoffSeq: cutoff})
+	task, created, err := s.Authorizer.CreateDelegation(slug, DelegationInput{TaskType: taskType, Objective: authorizedObjective, SourceRefs: refs, PracticeRequested: practiceRequested, OperationID: operationID + ":delegate", ProposalMessageID: proposalID, ApprovalMessageID: approval.ID, ToolCallID: call.CallID, ConversationCutoffSeq: cutoff})
 	return task, created, err
 }
 

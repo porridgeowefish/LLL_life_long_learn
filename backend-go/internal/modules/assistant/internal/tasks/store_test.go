@@ -59,3 +59,14 @@ func TestOperationConflict(t *testing.T) {
 		t.Fatalf("expected operation conflict, got %v", err)
 	}
 }
+
+func TestConsolidationPersistsWhetherPracticeWasRequested(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	s := testStore(t, "topic")
+	task, created, err := s.Create(CreateInput{Type: "consolidate", Objective: "沉淀本轮教学稿", PracticeRequested: true, Origin: Origin{OperationID: "op_consolidate"}})
+	if err != nil || !created || !task.PracticeRequested {
+		t.Fatalf("practice request was not persisted: %#v %v", task, err)
+	}
+}

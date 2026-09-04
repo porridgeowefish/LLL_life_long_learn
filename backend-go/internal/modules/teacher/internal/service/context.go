@@ -171,13 +171,14 @@ func softScopeAppendix(slug string) string {
 		return ""
 	}
 	view := struct {
-		Title         string   `json:"title,omitempty"`
-		Chapter       string   `json:"chapter,omitempty"`
-		Goal          string   `json:"goal,omitempty"`
-		InScope       []string `json:"inScope,omitempty"`
-		Prerequisites []string `json:"prerequisites,omitempty"`
-		Concepts      []string `json:"concepts,omitempty"`
-	}{scope.Title, scope.ChapterTitle, scope.Goal, scope.InScope, scope.Prerequisites, scope.OwnedConcepts}
+		Title           string   `json:"title,omitempty"`
+		Chapter         string   `json:"chapter,omitempty"`
+		Goal            string   `json:"goal,omitempty"`
+		TeachingOutline string   `json:"teachingOutline,omitempty"`
+		InScope         []string `json:"inScope,omitempty"`
+		Prerequisites   []string `json:"prerequisites,omitempty"`
+		Concepts        []string `json:"concepts,omitempty"`
+	}{scope.Title, scope.ChapterTitle, scope.Goal, scope.TeachingOutline, scope.InScope, scope.Prerequisites, scope.OwnedConcepts}
 	encoded, _ := json.Marshal(view)
 	return "\n\n以下学习范围只用于开场定位和教学引导，不是拒答或拆分对话的硬边界。学习者可以在同一对话中自然跨越相关主题：\n" + string(encoded)
 }
@@ -235,7 +236,13 @@ func toProviderMessages(slug string, messages []conversationstore.SequencedMessa
 			}
 			if block.Type == "attachment" && block.ArtifactRef != "" && sources != nil {
 				if source, _, err := sources.Get(block.ArtifactRef); err == nil {
-					content.WriteString("[学习者选择了资料：sourceId=" + source.SourceID + "，名称=" + source.DisplayName + "，状态=" + source.Status + "。这里只提供资料身份，不代表教师已经读取内容。]\n")
+					content.WriteString("[学习者选择了资料：sourceId=" + source.SourceID + "，名称=" + source.DisplayName + "，状态=" + source.Status + "。]\n")
+					if cited, readErr := sources.ReadContent(block.ArtifactRef); readErr == nil {
+						if len(cited) > 48<<10 {
+							cited = cited[:48<<10] + "\n\n[引用文本已截断]"
+						}
+						content.WriteString("<selected_source_markdown>\n" + cited + "\n</selected_source_markdown>\n")
+					}
 				}
 			}
 		}

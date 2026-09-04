@@ -16,8 +16,10 @@ Iteration 14       enforced modular monolith, unified configuration, quality gat
 ```
 
 The active system-learning experience is `教师 / 资产 / 资料`. The earlier
-Intro / Explain / Practice / Extend / Summary implementation remains a
-compatibility reader and migration source, not the product's primary workflow.
+Intro / Explain / Practice implementation remains a compatibility reader and
+migration source, not the product's primary workflow. Summary, Extend, and
+Knowledge Garden are retired product surfaces; their historical files remain on
+disk only.
 
 ## Current Architecture Commitments
 
@@ -40,6 +42,12 @@ project schemas. It introduces no microservices, database, broker, or product
 feature. Delivery proceeds in verified waves on one branch and merges only
 after the complete compatibility gate passes.
 
+## Iteration 16 Delivered
+
+Canonical asynchronous source parsing/citation, map teaching outlines,
+approved Intro/Body consolidation with optional practice, and teacher-only
+token usage are delivered. Browser E2E remains the learner's acceptance step.
+
 ## Later Candidates
 
 These remain candidates after iteration 14 and are not part of its committed
@@ -51,8 +59,8 @@ scope:
    or message anchors.
 3. Add a user-visible import/export flow for `preferences.md` while retaining
    one canonical file.
-4. Continue removing inactive five-zone UI/code only after compatibility usage
-   is measured and a recovery export exists.
+4. Keep retired historical directories recoverable while avoiding new runtime
+   readers, writers, or product interfaces for them.
 
 ## Permanently Out Of Scope
 

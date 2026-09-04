@@ -146,8 +146,6 @@ practice/attempts/*.json
 practice/submissions/*.json
 practice/evaluations/*.json + *.md
 progress/events.jsonl + progress/summary.json
-summary/flashcards.json
-summary/flashcard-progress.json
 runs/_index/*.json
 preferences.md
 ```
@@ -165,11 +163,11 @@ conversation-first API teacher with durable response recovery
 visible asynchronous CLI assistant tasks and sealed inputs
 versioned intro/body/practice assets plus generated deliverables
 source upload, immutable revisions, and assistant parsing
+one ready `derived/content.md` source citation and teacher token usage ledger
 single learner-owned global preferences file
-legacy five-zone and agent invoke/session compatibility
+legacy Intro/Explain/Practice and agent invoke/session compatibility
 Explain confusion CRUD
 Practice task reading + batch submit + evaluation reading
-Summary flashcard reading + grading
 Markdown editor for learner-owned files
 file-first project/runs persistence
 ```
@@ -177,9 +175,11 @@ file-first project/runs persistence
 Compatibility retained intentionally:
 
 ```text
-old projects may still contain `memory/`, Summary, and Extend files
-those files remain recoverable but are not active teacher assets or prompt memory
+old projects may still contain `memory/`, `summary/`, and `extend/` files
+those files remain recoverable but are not active teacher assets, prompt memory,
+file-API targets, migration input, or agent outputs
 the `/memory` frontend route redirects to `/preferences`
+the standalone Agent-management frontend route is retired; legacy invoke/session APIs remain compatibility-only
 ```
 
 ### Iteration 04 Additions

@@ -46,11 +46,10 @@ for an explicit history, migration, compatibility, or regression question.
 ## Active Delivery
 
 The implemented product baseline is
-[Iteration 14](./01-iterations/iteration-14-modular-monolith-architecture/README.md).
-The approved next architecture slice is
-[Iteration 14](./01-iterations/iteration-14-modular-monolith-architecture/README.md),
-which reorganizes source code, configuration, tests, and quality enforcement
-without changing learner-visible behavior or persisted project schemas.
+[Iteration 16](./01-iterations/iteration-16-conversation-learning-workflow/README.md).
+Iteration 16 completes the conversation source/citation workflow, confirmed
+asset consolidation, map teaching outlines, and teacher token usage. Browser
+E2E acceptance remains learner-run.
 
 ## Required Entry Points
 

@@ -60,7 +60,7 @@ Prefer:
 shared project folders
 well-known target files
 readable run artifacts
-editable summary documents
+declared learning artifacts
 ```
 
 Avoid early reliance on:
@@ -80,8 +80,9 @@ system-learning -> one API teacher conversation + optional assistant CLI tasks
 
 A choice advisor may recommend a type but never creates. A discipline map has
 no teacher conversation or learning-stage navigation. A system-learning unit
-does not run the five legacy zone Agents as its active flow; those registrations
-and contracts remain compatibility inputs for old projects and migration only.
+does not run legacy zone Agents as its active flow; Intro, Explain, and Practice
+compatibility registrations remain migration inputs only. Summary and Extend
+registrations are retired.
 
 The registered `encyclopedia` agent is project-type-bound to `discipline-map`,
 has no allowed learning zone, and owns a versioned charter that first plans the
@@ -101,7 +102,7 @@ prerequisite support, explanation depth, examples, scaffolding, and practice
 difficulty, but it cannot broaden the objective boundary. For a standalone
 draft it finalizes `learning-scope.json` after survey evidence exists.
 
-Explain, Practice, Extend, and Summary consume the same scope. Included and
+Explain and Practice consume the same scope. Included and
 owned concepts receive full treatment; prerequisites and reused concepts receive
 minimum support; excluded sibling content does not become a core artifact.
 
@@ -140,6 +141,11 @@ Formal files are committed only by Go after validation and merge. Legacy Agent
 charters remain compatibility inputs until migration; new assistant prompts are
 grounded in the approved objective, exact conversation range, asset bases, and
 authorized source revisions.
+
+For confirmed `consolidate` work, the assistant uses sealed conversation and
+source evidence to update Intro for significance and Body for a self-contained
+teaching manuscript plus critical-thinking conclusion. Practice is untouched
+unless the approved task explicitly requests questions.
 
 Raw hidden chain of thought is never part of the product contract. Only a
 provider-designated reasoning summary may be shown or persisted.

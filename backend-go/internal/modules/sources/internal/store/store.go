@@ -272,6 +272,10 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 	if !safeID(sourceID, "source_") || !safeID(revisionID, "srev_") {
 		return Revision{}, errors.New("invalid source identity")
 	}
+	content, ok := files["content.md"]
+	if !ok || len(files) != 1 || len(mediaTypes) != 1 || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaTypes["content.md"])), "text/markdown") {
+		return Revision{}, errors.New("derived source content must be exactly one content.md markdown file")
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	revisionPath := filepath.Join(s.root, sourceID, "revisions", revisionID, "revision.json")
@@ -281,7 +285,7 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 	}
 	derivedDir := filepath.Join(filepath.Dir(revisionPath), "derived")
 	var refs []FileRef
-	for key, data := range files {
+	for key, data := range map[string][]byte{"content.md": content} {
 		clean := filepath.Clean(filepath.FromSlash(key))
 		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
 			return Revision{}, fmt.Errorf("invalid derived path: %q", key)
@@ -299,6 +303,24 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 		return Revision{}, err
 	}
 	return revision, nil
+}
+
+// ReadContent returns the canonical parsed Markdown for a ready source. It is
+// the only source body that a teacher citation may place in provider context.
+func (s *Store) ReadContent(sourceID string) (string, error) {
+	source, revision, err := s.Get(sourceID)
+	if err != nil || source.Status != "ready" || len(revision.DerivedFiles) != 1 {
+		return "", os.ErrNotExist
+	}
+	file := revision.DerivedFiles[0]
+	if file.Key != "content" || file.Path != "derived/content.md" || !strings.HasPrefix(strings.ToLower(file.MediaType), "text/markdown") {
+		return "", os.ErrNotExist
+	}
+	data, err := os.ReadFile(filepath.Join(s.root, source.SourceID, "revisions", revision.RevisionID, filepath.FromSlash(file.Path)))
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 func (s *Store) Tombstone(sourceID string) (Source, error) {

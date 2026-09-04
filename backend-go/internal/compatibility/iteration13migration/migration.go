@@ -94,7 +94,7 @@ func Migrate(slug string) error {
 		if !errors.Is(recordErr, os.ErrNotExist) {
 			return recordErr
 		}
-		inventory, inventoryErr := inventoryLegacy(root)
+		inventory, inventoryErr := inventoryActiveLegacy(root)
 		if inventoryErr != nil {
 			return inventoryErr
 		}
@@ -150,8 +150,8 @@ func Migrate(slug string) error {
 	return writeJSON(recordPath, record)
 }
 
-func inventoryLegacy(root string) ([]FileInventory, error) {
-	legacy := map[string]bool{"intro": true, "explain": true, "practice": true, "extend": true, "summary": true}
+func inventoryActiveLegacy(root string) ([]FileInventory, error) {
+	legacy := map[string]bool{"intro": true, "explain": true, "practice": true}
 	var files []FileInventory
 	for dir := range legacy {
 		base := filepath.Join(root, dir)

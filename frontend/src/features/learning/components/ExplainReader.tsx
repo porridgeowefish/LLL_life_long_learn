@@ -213,6 +213,10 @@ function ExplainPage({
       return;
     }
     const markdown = markdownRef.current;
+    if (selected.rangeCount === 0) {
+      setSelection(null);
+      return;
+    }
     const range = selected.getRangeAt(0);
     if (!markdown || !markdown.contains(range.commonAncestorContainer)) {
       setSelection(null);
@@ -238,15 +242,20 @@ function ExplainPage({
   }, [pageConfusions]);
 
   useEffect(() => {
-    let selectionTimer = 0;
+    let selectionFrame = 0;
     const finishAtPoint = (event: MouseEvent | PointerEvent) => {
       selectingRef.current = false;
-      window.clearTimeout(selectionTimer);
-      updateSelection({ x: event.clientX, y: event.clientY });
+      window.cancelAnimationFrame(selectionFrame);
+      // Native selection is finalized after pointerup in some browsers. Read
+      // the range on the next frame so the toolbar is anchored to the actual
+      // release line instead of a stale/middle range box.
+      selectionFrame = window.requestAnimationFrame(() => {
+        updateSelection({ x: event.clientX, y: event.clientY });
+      });
     };
     const finishWithoutPoint = () => {
       selectingRef.current = false;
-      window.clearTimeout(selectionTimer);
+      window.cancelAnimationFrame(selectionFrame);
       updateSelection();
     };
     const handlePointerDown = (event: PointerEvent) => {
@@ -257,28 +266,18 @@ function ExplainPage({
     const handleWindowExit = (event: MouseEvent) => {
       if (selectingRef.current && event.relatedTarget === null) finishWithoutPoint();
     };
-    const handleSelectionChange = () => {
-      if (selectingRef.current) return;
-      window.clearTimeout(selectionTimer);
-      selectionTimer = window.setTimeout(finishWithoutPoint, 120);
-    };
-
     window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('pointerup', finishAtPoint);
-    window.addEventListener('mouseup', finishAtPoint);
     window.addEventListener('pointercancel', finishWithoutPoint);
     window.addEventListener('mouseout', handleWindowExit);
     window.addEventListener('blur', finishWithoutPoint);
-    document.addEventListener('selectionchange', handleSelectionChange);
     return () => {
-      window.clearTimeout(selectionTimer);
+      window.cancelAnimationFrame(selectionFrame);
       window.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('pointerup', finishAtPoint);
-      window.removeEventListener('mouseup', finishAtPoint);
       window.removeEventListener('pointercancel', finishWithoutPoint);
       window.removeEventListener('mouseout', handleWindowExit);
       window.removeEventListener('blur', finishWithoutPoint);
-      document.removeEventListener('selectionchange', handleSelectionChange);
     };
   }, [updateSelection]);
 

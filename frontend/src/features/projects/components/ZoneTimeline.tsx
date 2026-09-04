@@ -9,8 +9,6 @@ const ZONE_ICON: Record<ZoneName, IconName> = {
   Intro: 'leaf',
   Explain: 'book',
   Practice: 'pen',
-  Extend: 'link',
-  Summary: 'file',
 };
 
 interface ZoneTimelineProps {

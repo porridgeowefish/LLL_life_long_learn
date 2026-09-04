@@ -8,7 +8,7 @@ import { AppShell } from '@/app/layout/AppShell';
 // the terminal drawer.
 const HomePage = lazy(() => import('@/features/projects/HomePage').then((m) => ({ default: m.HomePage })));
 const ProjectPage = lazy(() => import('@/features/projects/ProjectPage').then((m) => ({ default: m.ProjectPage })));
-const AgentsPage = lazy(() => import('@/features/agents/AgentsPage').then((m) => ({ default: m.AgentsPage })));
+const UsagePage = lazy(() => import('@/features/usage/UsagePage').then((m) => ({ default: m.UsagePage })));
 const PreferencesPage = lazy(() => import('@/features/preferences/PreferencesPage').then((m) => ({ default: m.PreferencesPage })));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const ModelsPage = lazy(() => import('@/features/settings/ModelsPage').then((m) => ({ default: m.ModelsPage })));
@@ -36,10 +36,7 @@ export const routes: RouteObject[] = [
         path: 'project/:id/:zone?',
         element: withShell(<ProjectPage />),
       },
-      {
-        path: 'agents',
-        element: withShell(<AgentsPage />),
-      },
+      { path: 'usage', element: withShell(<UsagePage />) },
       {
         path: 'preferences',
         element: withShell(<PreferencesPage />),

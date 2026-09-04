@@ -20,7 +20,7 @@ function invalidatePractice(
  * project (in ProjectPage). On artifact-updated for this project, invalidate the
  * affected file/practice queries; on confusion-updated, invalidate the
  * confusions list. The 'files' prefix covers explain manifest/pages and the
- * intro/extend/summary outputs read via qk.files.raw.
+ * intro/explain/practice outputs read via qk.files.raw.
  */
 export function useArtifactRefresh(projectSlug: string): void {
   const qc = useQueryClient();

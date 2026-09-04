@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
@@ -44,9 +44,13 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const upload = useUploadSource(slug);
   const [input, setInput] = useState('');
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
+	const [previewSourceId, setPreviewSourceId] = useState('');
+	const [previewContent, setPreviewContent] = useState('');
+	const [previewPage, setPreviewPage] = useState(0);
   const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
   const [pendingUpload, setPendingUpload] = useState<File | null>(null);
   const [cloudAccepted, setCloudAccepted] = useState(false);
+	const [parsingSourceName, setParsingSourceName] = useState('');
   const [live, setLive] = useState<LiveResponse | null>(null);
   const [error, setError] = useState('');
   const [taskNotice, setTaskNotice] = useState<{ task: AssistantTask; text: string } | null>(null);
@@ -59,13 +63,22 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const pendingDeltas = useRef({ text: '', reasoning: '' });
   const deltaTimer = useRef<number | null>(null);
   const previousTaskStates = useRef<Map<string, AssistantTask['status']> | null>(null);
+  const reasoningOpen = useRef(new Map<string, boolean>());
+  const getReasoningOpen = useCallback((messageID: string) => reasoningOpen.current.get(messageID) ?? false, []);
+  const setReasoningOpen = useCallback((messageID: string, open: boolean) => {
+    reasoningOpen.current.set(messageID, open);
+  }, []);
   const tasksById = useMemo(() => new Map((tasksQuery.data ?? []).map((task) => [task.id, task])), [tasksQuery.data]);
   const sourceNames = useMemo(() => new Map((sourcesQuery.data ?? []).map((source) => [source.sourceId, source.displayName])), [sourcesQuery.data]);
-  const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status !== 'tombstoned' && source.status !== 'deleted'), [sourcesQuery.data]);
+  const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status === 'ready'), [sourcesQuery.data]);
+  const selectedSources = useMemo(() => availableSources.filter((source) => selectedSourceIds.includes(source.sourceId)), [availableSources, selectedSourceIds]);
   const availableModels = useMemo(() => (modelSettings.data?.providers ?? []).filter((provider) => provider.id && provider.model && provider.baseURL), [modelSettings.data?.providers]);
   const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === 'queued' || task.status === 'running'), [tasksQuery.data]);
   const selectedModel = availableModels.find((provider) => provider.id === providerId);
   const conversationReady = Boolean(conversation.data);
+	useEffect(() => {
+		if (parsingSourceName && (sourcesQuery.data ?? []).some((source) => source.displayName === parsingSourceName && source.status !== 'processing')) setParsingSourceName('');
+	}, [parsingSourceName, sourcesQuery.data]);
 
   useEffect(() => {
     const current = new Map((tasksQuery.data ?? []).map((task) => [task.id, task.status]));
@@ -260,7 +273,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const finishUpload = async (parseApproved: boolean) => {
     if (!pendingUpload) return;
     const result = await upload.mutateAsync({ file: pendingUpload, parseApproved, cloudDisclosureAccepted: parseApproved && cloudAccepted });
-    if (result.source?.sourceId) setSelectedSourceIds((current) => [...new Set([...current, result.source.sourceId])]);
+    if (result.source?.status === 'processing') setParsingSourceName(result.source.displayName);
     setPendingUpload(null);
     setCloudAccepted(false);
   };
@@ -287,6 +300,22 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     setTaskNotice(null);
   };
 
+	const previewCitation = async (sourceId: string) => {
+		const source = availableSources.find((item) => item.sourceId === sourceId);
+		if (!source) return;
+		setPreviewSourceId(sourceId);
+		setPreviewContent('正在载入引用文本…');
+		setPreviewPage(0);
+		try {
+			const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(source.sourceId)}/revisions/${encodeURIComponent(source.currentRevisionId)}/content`);
+			if (!response.ok) throw new Error('引用文本暂不可用');
+			setPreviewContent(await response.text());
+		} catch (cause) {
+			setPreviewContent((cause as Error).message || '引用文本暂不可用');
+		}
+	};
+	const previewPages = useMemo(() => previewContent ? previewContent.match(/[\s\S]{1,900}/g) ?? [''] : [], [previewContent]);
+
   return (
     <section className={s.teacher}>
       <div className={s.conversationPane}>
@@ -298,15 +327,15 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {conversation.isLoading && <div className={s.loading}>教师正在准备对话…</div>}
         {conversation.hasPrevious && <button type="button" className={s.loadPrevious} onClick={() => void loadPrevious()} disabled={conversation.isLoadingPrevious}>{conversation.isLoadingPrevious ? '正在加载…' : '加载更早对话'}</button>}
         {(conversation.data?.messages ?? []).filter((message) => message.id !== live?.learner.id).map((message) => (
-          <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} />
+          <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
         ))}
         {live && (
           <>
-            <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} />
+            <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
             <Message slug={slug} message={{ id: live.teacherId ?? 'streaming-teacher', role: 'teacher', status: 'completed', blocks: [
               ...(live.reasoning ? [{ id: 'reasoning', type: 'reasoning-summary' as const, source: live.reasoning }] : []),
               ...(live.text ? [{ id: 'text', type: 'markdown' as const, source: live.text }] : []),
-            ], createdAt: new Date().toISOString() }} tasks={live.taskIds.map((id) => tasksById.get(id) ?? { id, type: 'consolidate', objective: '助教任务', status: 'queued', createdAt: '', updatedAt: '' })} sourceNames={sourceNames} notice={live.notice} streaming />
+            ], createdAt: new Date().toISOString() }} tasks={live.taskIds.map((id) => tasksById.get(id) ?? { id, type: 'consolidate', objective: '助教任务', status: 'queued', createdAt: '', updatedAt: '' })} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} notice={live.notice} streaming />
           </>
         )}
         {taskNotice && <div className={s.taskNotice} role="status"><div><strong>{taskNotice.text}</strong><span>{taskNotice.task.objective}</span></div><div>{(taskNotice.task.type === 'source-processing' || !!taskNotice.task.result?.deliverables?.length) && <a href={`/project/${encodeURIComponent(slug)}/sources`}>到资料页查看</a>}<button type="button" onClick={dismissTaskNotice}>知道了</button></div></div>}
@@ -315,6 +344,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         </div>
       </div>
       <form className={s.composer} onSubmit={submit}>
+		{selectedSources.length > 0 && <div className={s.citationChips} aria-label="已引用资料">{selectedSources.map((source) => <button key={source.sourceId} type="button" onClick={() => setSelectedSourceIds((current) => current.filter((id) => id !== source.sourceId))}>{source.displayName} ×</button>)}</div>}
         <label className={s.uploadButton} title="上传资料">
           <span aria-hidden="true">＋</span><span className={s.srOnly}>上传资料</span>
           <input type="file" onChange={chooseUpload} />
@@ -325,8 +355,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             <strong>本条消息引用</strong>
             {availableSources.map((source) => <label key={source.sourceId}>
               <input type="checkbox" checked={selectedSourceIds.includes(source.sourceId)} onChange={(event) => setSelectedSourceIds((current) => event.target.checked ? [...current, source.sourceId] : current.filter((id) => id !== source.sourceId))} />
-              <span>{source.displayName}</span><small>{source.status}</small>
+              <span>{source.displayName}</span><button type="button" onClick={(event) => { event.preventDefault(); void previewCitation(source.sourceId); }}>查看文本</button>
             </label>)}
+			{previewSourceId && <div className={s.citationPreview} role="dialog" aria-label="引用文本预览"><div><strong>{availableSources.find((source) => source.sourceId === previewSourceId)?.displayName}</strong><button type="button" onClick={() => setPreviewSourceId('')}>关闭</button></div><pre>{previewPages[previewPage] ?? ''}</pre>{previewPages.length > 1 && <footer><button type="button" disabled={previewPage === 0} onClick={() => setPreviewPage((page) => page - 1)}>上一页</button><span>{previewPage + 1} / {previewPages.length}</span><button type="button" disabled={previewPage >= previewPages.length - 1} onClick={() => setPreviewPage((page) => page + 1)}>下一页</button></footer>}</div>}
           </div>
         </details>}
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
@@ -357,6 +388,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
           <div><dt>资料</dt><dd>{availableSources.length}<small> 份可引用</small></dd></div>
           <div><dt>助教</dt><dd>{activeTasks.length ? activeTasks.length : (tasksQuery.data?.length ?? 0)}<small>{activeTasks.length ? ' 项进行中' : ' 项记录'}</small></dd></div>
         </dl>
+		{parsingSourceName && <p className={s.parsingSource} role="status">正在解析资料 · {parsingSourceName}</p>}
         <section>
           <span>当前模型</span>
           <strong>{selectedModel?.name || selectedModel?.model || '使用默认配置'}</strong>
@@ -410,7 +442,7 @@ function rejectionText(code: string) {
   return '助教任务没有创建，你可以继续和教师确认方案。';
 }
 
-const Message = memo(function Message({ slug, message, tasks, sourceNames, notice, streaming = false }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; notice?: string; streaming?: boolean }) {
+const Message = memo(function Message({ slug, message, tasks, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean }) {
   const teacher = message.role === 'teacher';
   return (
     <article className={teacher ? s.teacherMessage : s.learnerMessage}>
@@ -418,7 +450,7 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, notic
       <div className={s.messageBody}>
         {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
-          ? <ReasoningBlock key={block.id} source={block.source ?? ''} streaming={streaming} />
+          ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={block.source ?? ''} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {notice && <div className={s.notice}>{notice}</div>}
@@ -432,10 +464,22 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, notic
   && previous.sourceNames === next.sourceNames
   && sameTasks(previous.tasks, next.tasks));
 
-function ReasoningBlock({ source, streaming }: { source: string; streaming: boolean }) {
-  const [open, setOpen] = useState(false);
+function ReasoningBlock({ messageID, source, streaming, initialOpen, onOpenChange }: { messageID: string; source: string; streaming: boolean; initialOpen: boolean; onOpenChange: (messageID: string, open: boolean) => void }) {
+  const [open, setOpen] = useState(() => initialOpen);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+  const initialOpenRef = useRef(initialOpen);
+  useLayoutEffect(() => {
+    if (initialOpenRef.current && detailsRef.current) detailsRef.current.open = true;
+  }, []);
   return (
-    <details className={s.reasoning} open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+    // Let the browser own the disclosure state. A controlled <details> can be
+    // written back while Markdown is replaced during streaming, which makes
+    // an expanded reasoning block appear stuck or unexpectedly re-opened.
+    <details ref={detailsRef} className={s.reasoning} onToggle={(event) => {
+      const nextOpen = event.currentTarget.open;
+      setOpen(nextOpen);
+      onOpenChange(messageID, nextOpen);
+    }}>
       <summary>思考过程</summary>
       {open && <MarkdownView source={source} streaming={streaming} />}
     </details>

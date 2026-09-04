@@ -48,6 +48,20 @@ plan.
 | 7 — frontend feature boundaries | delivered | The SPA is organized into `app/`, `features/{learning,projects,agents,legacy-zones,preferences,settings}`, and `shared/`. Every feature has an `index.ts` public surface, and all 24 initially detected cross-feature private imports were redirected through those surfaces. Query-key strings, routes, the single app-level SSE mount, legacy components, and API behavior were preserved. Frontend architecture check, ESLint, all 44 files/149 tests, and the production TypeScript/Vite build PASS. |
 | 8 — cleanup and final cutover | delivered | Retired `internal/paths` moved to `platform/filesystem`; iteration 13 moved into delivered foundations; repository, backend, system, API, data, roadmap, frontend, ADR, and iteration docs now describe delivered reality. Playwright configuration plus critical project-creation and `/memory` compatibility paths were added and statically discovered (2 tests); execution on this machine requires `npx playwright install chromium`, so native browser acceptance remains assigned to the user. Final `npm run check:full` PASSED: archcheck 44 packages/122 edges; Go short/full, compatibility/recovery and frozen HTTP contracts; frontend ESLint and 44 files/149 tests; Go coverage 32.15% (2629/8177) against 28.35% floor; both production builds; and the Windows fake-CLI UTF-8/long-prompt smoke. |
 
+## Post-Acceptance Interaction Fixes
+
+The teacher-response registry now initializes behind the server mutex even for
+partially assembled servers, while remaining scoped per learning unit. A
+regression test verifies that turns in different learning units can stream in
+parallel; one unit still intentionally permits only one active canonical turn.
+
+Teacher reasoning disclosure state is preserved by teacher-message ID when a
+streamed response becomes persisted history, so reasoning remains a separate,
+collapsible block after completion. Text-selection toolbars in both the
+multi-page reader and legacy Explain fallback now finalize once on `pointerup`
+after native selection settles, rather than processing duplicate `mouseup` and
+delayed selection-change events.
+
 ## Residual Risk
 
 Automated checks close the structural, compatibility, recovery, contract,

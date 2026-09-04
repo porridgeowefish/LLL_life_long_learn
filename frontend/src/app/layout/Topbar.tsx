@@ -17,7 +17,7 @@ interface NavItem {
 
 const NAV_ITEMS: readonly NavItem[] = [
   { to: '/', label: '主页', exact: true },
-  { to: '/agents', label: '智能体' },
+  { to: '/usage', label: '用量' },
   { to: '/preferences', label: '偏好' },
   { to: '/settings', label: '配置' },
 ];
