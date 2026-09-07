@@ -2,7 +2,7 @@
 
 Status: implemented
 Owner: project maintainer
-Last reviewed: 2026-07-14
+Last reviewed: 2026-09-07
 Source of truth: this directory defines the eighth LLL delivery slice.
 
 ## Goal
@@ -33,6 +33,6 @@ accessible appearance choices plus clear open-source collaboration entry points.
 - activity measures investment; growth measures verifiable learning outcomes;
 - automated agent file generation awards neither activity nor growth by itself;
 - the learner's explicit invocation is an activity, while Practice keeps its existing growth policy;
-- the accepted visual handoff is `frontend-designs/learning-overview-activity.html`;
+- the historical visual handoff was retired during repository cleanup; implemented code and current documents remain authoritative;
 - `progress/events.jsonl` remains the durable per-project source and is extended compatibly;
 - themes change semantic roles, never component-local hard-coded colors.

@@ -1,5 +1,5 @@
 // Projects API — TanStack Query hooks wrapping the backend endpoints.
-// Mirrors the legacy frontend/legacy/js/api.js shape but with typed responses
+// Provides the project API shape with typed responses.
 // and proper cache invalidation.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';

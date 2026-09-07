@@ -30,7 +30,6 @@ When sources conflict, use:
 3. Long-lived documents and effective ADRs in docs/00-product-and-architecture/
 4. Task-relevant delivered foundations selected through docs/01-iterations/foundations/README.md
 5. Explicitly requested historical evidence in docs/99-archive/
-6. research/raw/ materials
 ```
 
 Raw material informs the product, but does not by itself expand the current implementation scope.

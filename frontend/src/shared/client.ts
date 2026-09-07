@@ -1,5 +1,5 @@
 // Fetch wrapper used by every API call. Centralizes error shape, base URL,
-// and AbortController wiring. Replaces legacy `jsonOrThrow` (frontend/legacy/js/api.js).
+// and AbortController wiring.
 
 import { API_BASE } from '@/shared/lib/constants';
 

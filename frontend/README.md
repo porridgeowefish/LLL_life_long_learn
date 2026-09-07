@@ -104,11 +104,6 @@ npm run test:watch # Vitest watch mode
 Critical browser paths live in `e2e/critical.spec.ts`. Install Chromium once
 with `npx playwright install chromium`, then run `npm run test:e2e`.
 
-## Legacy Reference
-
-`frontend/legacy/` is archive/reference material from the older static UI.
-It is not a product fallback and should not be treated as the active frontend contract.
-
 ## Decisions
 
 See the refactor plan at `~/.claude/plans/snazzy-launching-beaver.md` and

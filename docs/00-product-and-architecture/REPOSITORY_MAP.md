@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-03
+Last reviewed: 2026-09-07
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -87,44 +87,17 @@ Within `docs/`:
 99-archive/                    retired ADRs, iterations, designs, and references
 ```
 
-## 4. Reference Attachments And Design Inputs
-
-These are useful, but they are not executable truth and should not override code:
-
-```text
-frontend-designs/v3/           mock pages + DESIGN.md for alignment/reference
-docs/00-product-and-architecture/ALIGNMENT_MODE.md
-docs/99-archive/references/     legacy visual references; historical only
-荔枝读书.png                    standalone visual reference
-research/                      raw research / source material
-```
-
-Rule:
-
-```text
-reference attachments may explain intent
-they do not by themselves prove a feature is implemented
-new alignment handoff should use Markdown, not HTML
-```
-
-## 5. Legacy / Archive / Superseded Material
+## 4. Legacy / Archive / Superseded Material
 
 These should be treated as archive or migration reference, not fallback product:
 
 ```text
-frontend/legacy/               old static frontend implementation
 docs/99-archive/               retired docs; excluded from default AI context
 ```
 
-Current stance:
+The archive is retained for traceability only and never acts as a product fallback.
 
-```text
-frontend/legacy/ is no longer a product fallback
-```
-
-If we keep them, we keep them for comparison or migration history, not as a second UI to maintain.
-
-## 6. Current Reality Check
+## 5. Current Reality Check
 
 ### Database
 

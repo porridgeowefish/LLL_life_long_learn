@@ -16,7 +16,7 @@ BASE_URL = os.environ.get("LLL_BASE_URL", "http://127.0.0.1:8787")
 EXPECTED_WORKSPACE = os.environ.get("LLL_EXPECTED_WORKSPACE", "").strip()
 SCREENSHOT = Path(os.environ.get(
     "LLL_QA_SCREENSHOT",
-    str(Path.cwd() / "frontend-designs" / "v2" / "iteration13-learning-workspace.png"),
+    str(Path.cwd() / ".artifacts" / "quality" / "screenshots" / "iteration13-learning-workspace.png"),
 ))
 CHAT_SCREENSHOT = SCREENSHOT.with_name(SCREENSHOT.stem + "-teacher" + SCREENSHOT.suffix)
 MODEL_SCREENSHOT = SCREENSHOT.with_name(SCREENSHOT.stem + "-models" + SCREENSHOT.suffix)

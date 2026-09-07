@@ -3,8 +3,6 @@
 
 LLL 是一个**本地优先的教师—助教型 AI 学习工作台**。它不再先生成一套固定教程再让用户阅读，而是让 API 教师持续和学习者对话，并把讨论中形成的理解异步沉淀为可编辑、可追溯的学习资产。
 
-![教师—助教学习工作台](frontend-designs/v2/iteration13-learning-workspace-refined-teacher.png)
-
 ## 当前产品形态
 
 ### 教师：同步教学对话

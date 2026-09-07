@@ -2,7 +2,7 @@
 
 Status: draft
 Owner: project maintainer
-Last reviewed: 2026-06-09
+Last reviewed: 2026-09-07
 Source of truth: this directory defines the third LLL delivery slice.
 
 > 本文件是 iter-03 单一入口。原 DECISIONS.md / CARRYOVER.md 内容已并入下文
@@ -258,7 +258,7 @@ Each decision records: 选项 / 拒绝方案 / 理由 / 影响 / 数据落点 / 
 
 理由：
 - 用户的原话："采用我的设计"。
-- 事实源追溯：`frontend-designs/v3/DESIGN.md` D4（line 187-189）原文：
+- 事实源追溯：已清理的历史设计稿 D4（原文保留如下）：
   > D4. AI 产出主舞台的"批注/写困惑"是绑定到段落还是字符级？
   > - 段落：实现简单，覆盖 90% 场景
   > - 字符：类似 Google Docs，体验好但复杂度上一个台阶
