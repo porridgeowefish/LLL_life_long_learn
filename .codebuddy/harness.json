@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "adapterVersion": "0.4.0",
+  "project": {
+    "stack": [
+      "node",
+      "go"
+    ],
+    "packageManager": "go",
+    "sourceRoots": [],
+    "testRoots": [
+      "tests"
+    ]
+  },
+  "protectedContracts": [
+    "CODEBUDDY.md",
+    "docs/",
+    ".codebuddy/settings.json",
+    ".codebuddy/harness.json",
+    ".codebuddy/onboarding-checklist.json",
+    ".codebuddy/rules/",
+    ".codebuddy/agents/"
+  ],
+  "gates": {
+    "preCommit": [],
+    "ci": []
+  },
+  "integrations": {
+    "workItem": "none",
+    "codeReview": "none",
+    "ci": "none"
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1.0",
+  "items": [
+    {
+      "id": "context_sources",
+      "label": "已登记全部上下文来源与唯一事实位置",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "integration_boundaries",
+      "label": "已列清外部系统的读写边界",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "integration_access",
+      "label": "已确认对接权限、刷新方式与不可用降级",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "knowledge_accuracy",
+      "label": "已审核工程知识库的准确性与导航覆盖",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "function_currency",
+      "label": "已审核业务功能知识库的分类与当前性",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "rules_assembly",
+      "label": "已审核 Rules 模块是否完整、正确且可装配",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "workflow_templates",
+      "label": "已具备完整 workflow 模板与审核模板",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    },
+    {
+      "id": "project_materials",
+      "label": "已具备项目专属的素材、配置与适配模板",
+      "status": "pending",
+      "actor": null,
+      "confirmedAt": null
+    }
+  ]
+}

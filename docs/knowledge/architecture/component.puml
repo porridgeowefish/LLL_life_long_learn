@@ -1,0 +1,4 @@
+@startuml
+title <system-component-title>
+<runtime-confirmed-component-relations>
+@enduml
