@@ -227,7 +227,33 @@ PowerShell 5.1 的 legacy native-argument passing：把一个**含 ASCII 双引�
 
 ---
 
-## 引用方式
+## 14. 集成协议字段位置要对着规范验，不要看着像就解析（Anthropic usage 嵌套陷阱）
+
+### 症状
+用户反馈"token 记录有误，前端看不到输入 token"。usage.jsonl 里 anthropic kind 的 provider（glm-5.3）全部 `inputTokens:0`，而 openai kind（deepseek）有正常值。代码自 iter-16 后零改动，"最近才出现"。
+
+### 根因
+`gateway.go streamAnthropic` 在 `message_start` 事件里读**顶层** `usage` 字段。但 Anthropic SSE 规范中，`message_start` 的 usage 嵌套在 `message.usage` 里；只有 `message_delta` 的 usage 才在顶层。所以 input_tokens 永远读不到。openai 路径的 usage 在 chunk 顶层、解析正确——同一文件里两条路径一个对一个错，写的时候没对着协议文档逐一核对嵌套位置。
+
+### 铁律
+- **对接第三方流式协议时，每个事件类型的字段路径要对着官方规范抄，不要"看下一个样例就推广"**。SSE 事件里同一概念（usage）在不同事件类型中的嵌套位置可能不同。
+- **换 provider 是隐式回归测试**。usage 解析 bug 一直存在，只是之前一直用 openai kind 没触发。"代码没变"≠"行为没变"——先查数据侧（本例：usage.jsonl 新旧记录对比直接定位）。
+- 验证手段：httptest 假 SSE 服务器按规范发事件，断言 usage 两个字段都被捕获。
+
+---
+
+## 15. 流式 markdown 管线必须处理"未闭合围栏"（代码墙陷阱）
+
+### 症状
+用户反馈老师对话页"文字乱排"，且"偶尔出现、过会儿又没了"。事后检查渲染完成的历史消息完全正常——问题只出现在**流式生成期间**。
+
+### 根因
+`useMarkdown.ts` 的 extractMermaid/extractSVG 正则要求**闭合**围栏（```` ```mermaid...``` ````）。流式输出期间围栏还没闭合，正则不匹配 → 原文直接进 marked → marked 把未闭合围栏后的**整段剩余消息**渲染成一个巨型 `<pre>` 代码块（等宽、无样式、和正文完全不同排版）——用户看到"乱排"。围栏闭合后（生成完成）重新渲染又正常——所以"偶尔出现、事后查不到"。
+
+### 铁律
+- **任何消费"增量/半成品 markdown"的管线，都要显式处理未闭合围栏**：把 dangling 的围栏尾巴替换成"生成中"占位符，而不是让它落进通用渲染器。
+- **"完成后正常、过程中异常"的渲染 bug，要在流式路径上复现**——只测最终态 HTML 永远测不到。测试要覆盖"只有开围栏没有闭围栏"的输入。
+- 用户说"偶尔出现、现在没了"时，优先怀疑生命周期相关（流式中/加载中/竞态），别只查静态渲染。
 
 下次 agent 进入项目时：
 
@@ -236,3 +262,5 @@ PowerShell 5.1 的 legacy native-argument passing：把一个**含 ASCII 双引�
 3. 再读相关 docs/00-product-and-architecture/* 文档
 
 每个 wave 完成后，如果发现新的"如果当初…就不会…"，追加到本文档对应章节。
+
+当前共 15 条。

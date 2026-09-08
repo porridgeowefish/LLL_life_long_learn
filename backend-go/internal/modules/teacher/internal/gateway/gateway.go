@@ -218,6 +218,12 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				Summary     string `json:"summary"`
 				PartialJSON string `json:"partial_json"`
 			} `json:"delta"`
+			Message struct {
+				Usage struct {
+					InputTokens  int `json:"input_tokens"`
+					OutputTokens int `json:"output_tokens"`
+				} `json:"usage"`
+			} `json:"message"`
 			Usage struct {
 				InputTokens  int `json:"input_tokens"`
 				OutputTokens int `json:"output_tokens"`
@@ -228,8 +234,10 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 		switch event.Type {
 		case "message_start":
-			if event.Usage.InputTokens > 0 {
-				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Usage.InputTokens}})
+			// message_start carries usage nested inside its message envelope;
+			// input token counts only exist there.
+			if event.Message.Usage.InputTokens > 0 {
+				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Message.Usage.InputTokens}})
 			}
 		case "content_block_start":
 			if event.ContentBlock.Type == "tool_use" {

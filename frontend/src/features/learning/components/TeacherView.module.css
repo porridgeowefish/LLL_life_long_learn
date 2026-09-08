@@ -9,7 +9,7 @@
 .welcome span, .speaker { color: var(--accent-ink); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .welcome h2 { margin: 12px 0 13px; font: 500 28px/1.25 Georgia, 'Songti SC', serif; }
 .welcome p { max-width: 580px; color: var(--muted); line-height: 1.75; }
-.teacherMessage, .learnerMessage { margin: 0 auto 24px; max-width: 820px; contain: inline-size style; content-visibility: auto; contain-intrinsic-size: auto 150px; }
+.teacherMessage, .learnerMessage { margin: 0 auto 24px; max-width: 820px; }
 .learnerMessage { display: flex; justify-content: flex-end; }
 .learnerMessage .messageBody { max-width: 78%; padding: 11px 15px; border-radius: 16px 16px 4px 16px; background: var(--surface-sunken); }
 .teacherMessage .speaker { margin-bottom: 9px; }

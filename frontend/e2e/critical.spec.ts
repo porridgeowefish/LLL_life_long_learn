@@ -37,3 +37,35 @@ test('/memory keeps the compatibility redirect to preferences', async ({ page })
   await expect(page).toHaveURL(/\/preferences$/);
   await expect(page.getByRole('heading', { name: '全局学习偏好' })).toBeVisible();
 });
+
+test('lays out completed teacher rich text without content-visibility skipping', async ({ page }) => {
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/health') return json(route, { status: 'ok', workspace: 'E2E', learningWorkspace: { failedProjects: [] } });
+    if (path === '/api/projects/streaming-layout') {
+      return json(route, { project: { id: 'streaming-layout', slug: 'streaming-layout', title: '流式布局验收', projectType: 'system-learning', status: 'active' } });
+    }
+    if (path === '/api/projects/streaming-layout/conversation') {
+      return json(route, {
+        conversationId: 'conversation-1', unitId: 'streaming-layout', latestSeq: 1, pageFromSeq: 1, pageThroughSeq: 1,
+        hasMore: false, hasPrevious: false, totalMessages: 1, taskLinks: [],
+        messages: [{ id: 'teacher-1', role: 'teacher', status: 'completed', createdAt: '', blocks: [{
+          id: 'body', type: 'markdown', source: '## 两道小题检验今天的内容\n\n| 目的网段 | 下一跳 |\n|---|---|\n| 0.0.0.0/0 | NAT 网关 |\n| 172.16.0.0/12 | 对等连接 |\n\n1. 你要在广州用 3 个 AZ 做高可用，至少要建几个子网？',
+        }] }],
+      });
+    }
+    if (path === '/api/projects/streaming-layout/assistant-tasks') return json(route, { tasks: [] });
+    if (path === '/api/projects/streaming-layout/assets') return json(route, { assets: [] });
+    if (path === '/api/projects/streaming-layout/sources') return json(route, { sources: [] });
+    if (path === '/api/projects/streaming-layout/conversation/responses/active') return route.fulfill({ status: 204 });
+    if (path === '/api/settings/ask-ai') return json(route, { default: '', providers: [], bindings: {} });
+    return json(route, {});
+  });
+
+  await page.goto('/project/streaming-layout/teacher');
+  const message = page.locator('article').filter({ hasText: '两道小题检验今天的内容' });
+  await expect(message).toBeVisible();
+  await expect(message.locator('table')).toHaveCount(1);
+  await expect(message.locator('ol > li')).toHaveCount(1);
+  expect(await message.evaluate((element) => getComputedStyle(element).contentVisibility)).toBe('visible');
+});

@@ -111,6 +111,35 @@ func TestAnthropicDoesNotExposeThinkingDelta(t *testing.T) {
 	}
 }
 
+func TestAnthropicStreamsUsageFromMessageEnvelope(t *testing.T) {
+	// Per Anthropic SSE spec, message_start carries usage nested inside the
+	// "message" object; only message_delta carries a top-level usage.
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"type":"message_start","message":{"usage":{"input_tokens":1384,"output_tokens":1}}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"message_delta","delta":{},"usage":{"output_tokens":594}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+	}))
+	defer server.Close()
+	provider := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "model"}
+	usage := map[string]int{}
+	err := streamAnthropic(context.Background(), provider, Request{}, func(event Event) {
+		if event.Type == "usage" {
+			for key, value := range event.Usage {
+				usage[key] = value
+			}
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if usage["inputTokens"] != 1384 || usage["outputTokens"] != 594 {
+		t.Fatalf("usage was not captured from message envelope: %#v", usage)
+	}
+}
+
 func TestAnthropicThinkingIsRequestedAndStreamedWhenEnabled(t *testing.T) {
 	var body string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
