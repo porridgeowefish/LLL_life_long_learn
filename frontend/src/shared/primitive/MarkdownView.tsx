@@ -19,7 +19,7 @@ const STREAM_MARKDOWN_INTERVAL_MS = 120;
 
 export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(function MarkdownView({ source, className, streaming = false }, forwardedRef) {
   const bufferedSource = useBufferedStreamValue(source, streaming);
-  const { html, mermaid } = useMarkdown(bufferedSource);
+  const { html, mermaid } = useMarkdown(bufferedSource, streaming);
   const hostRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(forwardedRef, () => hostRef.current as HTMLDivElement, []);
 

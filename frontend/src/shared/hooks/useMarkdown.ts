@@ -49,7 +49,7 @@ interface ExtractedMath {
 function extractSVG(md: string): { stripped: string; placeholders: Map<string, string> } {
   const placeholders = new Map<string, string>();
   let index = 0;
-  const stripped = md.replace(/```svg\s*\n([\s\S]*?)```/gi, (_, source: string) => {
+  let stripped = md.replace(/```svg\s*\n([\s\S]*?)```/gi, (_, source: string) => {
     const id = `INLINEVECTOR${index++}X`;
     const clean = DOMPurify.sanitize(source.trim(), {
       USE_PROFILES: { svg: true, svgFilters: true, html: false },
@@ -60,6 +60,14 @@ function extractSVG(md: string): { stripped: string; placeholders: Map<string, s
     placeholders.set(id, clean);
     return `<div class="inline-svg" data-inline-svg="${id}">${id}</div>`;
   });
+  // Streaming tail: an svg fence whose closing ``` has not arrived yet must
+  // not fall through to marked — an unclosed fence turns the entire rest of
+  // the message into one giant <pre> code wall.
+  const danglingSvg = /```svg\s*\n[\s\S]*$/i.exec(stripped);
+  if (danglingSvg) {
+    stripped = stripped.slice(0, danglingSvg.index)
+      + '<div class="mermaid-placeholder"><span class="mermaid-pending">图示正在生成…</span></div>';
+  }
   return { stripped, placeholders };
 }
 
@@ -115,12 +123,77 @@ function extractMermaid(md: string): { mdStripped: string; blocks: MermaidBlock[
   const blocks: MermaidBlock[] = [];
   const re = /```[ \t]*mermaid[ \t]*\r?\n([\s\S]*?)```/gi;
   let i = 0;
-  const mdStripped = md.replace(re, (_, code: string) => {
+  let mdStripped = md.replace(re, (_, code: string) => {
     const id = `mermaid-${i++}`;
     blocks.push({ id, code: code.trim() });
     return `<div data-mermaid-id="${id}" class="mermaid-placeholder"><span class="mermaid-pending">图表将在回答完成后渲染</span></div>`;
   });
+  // Streaming tail: same unclosed-fence hazard as svg — stage the unfinished
+  // code as a pending block instead of letting marked build a code wall.
+  const dangling = /```[ \t]*mermaid[ \t]*\r?\n[\s\S]*$/i.exec(mdStripped);
+  if (dangling) {
+    const code = mdStripped.slice(dangling.index + dangling[0].indexOf('\n') + 1);
+    mdStripped = mdStripped.slice(0, dangling.index)
+      + '<div data-mermaid-id="mermaid-pending" class="mermaid-placeholder"><span class="mermaid-pending">图表正在生成…</span></div>';
+    blocks.push({ id: 'mermaid-pending', code: code.trim() });
+  }
   return { mdStripped, blocks };
+}
+
+// healDanglingFence — guard against an unterminated plain code fence.
+// marked follows CommonMark: an unclosed fence swallows every character
+// after it into one giant <pre> (raw line breaks + code background —
+// the "text disappears into a box" glitch). svg/mermaid already guard
+// their own fences in their extractors; this covers plain ```/~~~ ones:
+//   - empty tail: drop the stray opening fence (no empty box flash).
+//   - streaming: append a temporary closing fence so the code that HAS
+//     arrived renders as a stable block until the real closer lands.
+//   - final: if the tail still looks like code, close the fence; if it
+//     looks like prose the model never meant to fence, drop the opening
+//     fence and hand the text back to normal markdown rendering.
+function healDanglingFence(md: string, streaming: boolean): string {
+  // Tolerate \r\n line endings like the mermaid extractor does; healed
+  // output is only rebuilt when a dangling fence exists, and marked is
+  // fine with plain \n.
+  const lines = md.split('\n').map((line) => line.replace(/\r$/, ''));
+  const fence = /^( {0,3})(`{3,}|~{3,})(.*)$/;
+  let openMarker = '';
+  let openLength = 0;
+  let openLine = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const m = fence.exec(lines[i]);
+    if (!m) continue;
+    const marker = m[2][0];
+    const info = m[3].trim();
+    if (openMarker === '') {
+      // A backtick fence's info string must not contain backticks —
+      // otherwise the line is just prose/inline-code, not a fence.
+      if (marker === '`' && info.includes('`')) continue;
+      openMarker = marker;
+      openLength = m[2].length;
+      openLine = i;
+    } else if (marker === openMarker && m[2].length >= openLength && info === '') {
+      openMarker = '';
+    }
+  }
+  if (openMarker === '') return md;
+  const tail = lines.slice(openLine + 1);
+  if (!tail.join('\n').trim()) return lines.slice(0, openLine).join('\n');
+  if (streaming || looksLikeCode(tail)) return `${md}\n\`\`\``;
+  return [...lines.slice(0, openLine), ...tail].join('\n');
+}
+
+// looksLikeCode — cheap heuristic over non-blank lines: code tends to
+// carry assignment/brace characters, leading indentation, or keyword
+// openings. Prose (especially CJK prose) rarely hits any of these.
+function looksLikeCode(lines: string[]): boolean {
+  const content = lines.filter((line) => line.trim());
+  if (content.length === 0) return false;
+  const codeish = content.filter((line) =>
+    /[{};=<>]/.test(line)
+    || /^ {2,}\S/.test(line)
+    || /^(?:def |class |function |const |let |var |import |from |return |if |for |while |print\(|console\.)/.test(line));
+  return codeish.length * 4 >= content.length;
 }
 
 // KaTeX emits MathML + nested HTML spans. DOMPurify's default allowlist
@@ -164,7 +237,9 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
   }
 });
 
-export function renderMarkdown(input: string): MarkdownRender {
+export function renderMarkdown(input: string, options?: { streaming?: boolean }): MarkdownRender {
+  const streaming = options?.streaming ?? false;
+
   // Step 1: extract math BEFORE marked touches anything.
   const { stripped, placeholders } = extractMath(input);
 
@@ -176,8 +251,12 @@ export function renderMarkdown(input: string): MarkdownRender {
   // Step 3: extract mermaid blocks (placeholder form).
   const { mdStripped, blocks } = extractMermaid(svg.stripped);
 
-  // Step 3: parse remaining markdown.
-  const rawHtml = marked.parse(mdStripped) as string;
+  // Step 3.5: heal an unterminated plain code fence before marked can
+  // turn the rest of the message into one giant <pre>.
+  const healed = healDanglingFence(mdStripped, streaming);
+
+  // Step 4: parse remaining markdown.
+  const rawHtml = marked.parse(healed) as string;
 
   // Step 4: splice KaTeX-rendered HTML back into placeholders.
   // Placeholder IDs are alphanumeric tokens (MATHBLOCK0X / MATHINLINE3X),
@@ -201,6 +280,6 @@ export function renderMarkdown(input: string): MarkdownRender {
   return { html: safe, mermaid: blocks };
 }
 
-export function useMarkdown(input: string): MarkdownRender {
-  return useMemo<MarkdownRender>(() => renderMarkdown(input), [input]);
+export function useMarkdown(input: string, streaming = false): MarkdownRender {
+  return useMemo<MarkdownRender>(() => renderMarkdown(input, { streaming }), [input, streaming]);
 }
