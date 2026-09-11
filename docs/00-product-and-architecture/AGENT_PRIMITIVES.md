@@ -14,7 +14,7 @@ Source of truth: file-shape rules for the reusable reasoning-primitives library 
 LLL agents share a common library of **reasoning primitives**: reusable thinking mechanisms (MECE decomposition, first-principles reasoning, misconception hunting, etc.) loaded into the prompt at assembly time.
 
 ```text
-one primitive = one mechanism = one .md file under agents/primitives/
+one primitive = one mechanism = one .md file under learning-agents/primitives/
 each agent charter declares which primitives it requires / optionally uses
 promptassembly expands primitives into the prompt before Claude is launched
 ```
@@ -39,7 +39,7 @@ They cannot be linted or unit-tested.
 They leak across projects and across users.
 ```
 
-Primitives live inside the repo (`agents/primitives/*.md`), so they:
+Primitives live inside the repo (`learning-agents/primitives/*.md`), so they:
 
 ```text
 travel with the code (git tracked)
@@ -116,7 +116,7 @@ One complete example for reference (not for copying).
 ## How To Add A New Primitive
 
 ```text
-1. Write agents/primitives/<name>.md following the five-section shape.
+1. Write learning-agents/primitives/<name>.md following the five-section shape.
 2. Decide ownership: which agent's user story needs this mechanism.
 3. Add the primitive id to that agent's registry JSON under primitives.required or primitives.optional.
 4. Add or update the corresponding row in the Mechanism Ownership Table above.
@@ -191,11 +191,11 @@ docs/00-product-and-architecture/AGENT_ARCHITECTURE.md
 docs/00-product-and-architecture/API_CONTRACT_STRATEGY.md
   HTTP surface for agent invocation.
 
-agents/charters/explain.md
+learning-agents/charters/explain.md
   First production charter, demonstrating the User Story + Required
   Primitives + Optional Primitives + Output Contract + Out of Scope shape.
 
-agents/registry/explain.json
+learning-agents/registry/explain.json
   First production registry entry, demonstrating the
   userStory + primitives.{required,optional} schema.
 ```

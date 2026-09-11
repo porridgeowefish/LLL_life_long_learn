@@ -221,3 +221,69 @@ func TestAnthropicClassifiesDeltasByTheirContentBlock(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenAIRoundTripToolMessages(t *testing.T) {
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(raw))
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"choices":[{"delta":{"content":"基于检索结果回答。"}}]}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: [DONE]`)
+	}))
+	defer server.Close()
+	provider := askaiconfig.Provider{Kind: "openai", BaseURL: server.URL, APIKey: "key", Model: "model"}
+	in := Request{Messages: []Message{
+		{Role: "user", Content: "问一个时效问题"},
+		{Role: "assistant", Content: "我先检索。", ToolCalls: []ToolCall{{CallID: "call_local", ProviderCallID: "call_provider_1", ToolName: "search_web", Arguments: map[string]any{"query": "go 1.24"}}}},
+		{Role: "tool", ToolCallID: "call_provider_1", Content: "[1] 结果"},
+	}}
+	if err := streamOpenAI(context.Background(), provider, in, func(Event) {}); err != nil {
+		t.Fatal(err)
+	}
+	if len(bodies) != 1 {
+		t.Fatalf("expected one request, got %d", len(bodies))
+	}
+	body := bodies[0]
+	if !strings.Contains(body, `"tool_calls"`) || !strings.Contains(body, `"id":"call_provider_1"`) || !strings.Contains(body, `"name":"search_web"`) {
+		t.Fatalf("assistant tool_calls payload wrong: %s", body)
+	}
+	if !strings.Contains(body, `"role":"tool"`) || !strings.Contains(body, `"tool_call_id":"call_provider_1"`) {
+		t.Fatalf("tool result payload wrong: %s", body)
+	}
+}
+
+func TestAnthropicRoundTripToolMessagesAndThinkingSuppressed(t *testing.T) {
+	var bodies []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(raw))
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprintln(w, `data: {"type":"message_start","message":{"usage":{"input_tokens":10,"output_tokens":1}}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"message_delta","usage":{"output_tokens":2}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+	}))
+	defer server.Close()
+	provider := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "model", Thinking: true}
+	in := Request{Tools: []Tool{{Name: "search_web", Schema: map[string]any{"type": "object"}}}, Messages: []Message{
+		{Role: "user", Content: "问题"},
+		{Role: "assistant", Content: "检索中", ToolCalls: []ToolCall{{ProviderCallID: "toolu_provider_1", ToolName: "search_web", Arguments: map[string]any{"query": "x"}}}},
+		{Role: "tool", ToolCallID: "toolu_provider_1", Content: "结果"},
+	}}
+	if err := streamAnthropic(context.Background(), provider, in, func(Event) {}); err != nil {
+		t.Fatal(err)
+	}
+	body := bodies[0]
+	if strings.Contains(body, `"thinking"`) {
+		t.Fatalf("thinking must be suppressed when tools are registered: %s", body)
+	}
+	if !strings.Contains(body, `"type":"tool_use"`) || !strings.Contains(body, `"id":"toolu_provider_1"`) || !strings.Contains(body, `"name":"search_web"`) {
+		t.Fatalf("assistant tool_use block wrong: %s", body)
+	}
+	if !strings.Contains(body, `"type":"tool_result"`) || !strings.Contains(body, `"tool_use_id":"toolu_provider_1"`) {
+		t.Fatalf("tool_result block wrong: %s", body)
+	}
+}

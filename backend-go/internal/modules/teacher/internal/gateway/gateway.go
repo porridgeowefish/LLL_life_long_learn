@@ -15,9 +15,16 @@ import (
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 )
 
+// Message is one provider-facing conversation turn. ToolCalls is set on
+// assistant messages that carry tool invocations; ToolCallID is set on
+// role-"tool" messages answering a specific provider call. Both kinds map to
+// the openai tool_calls/role=tool shape and the anthropic tool_use/tool_result
+// blocks when present.
 type Message struct {
-	Role    string
-	Content string
+	Role       string
+	Content    string
+	ToolCalls  []ToolCall
+	ToolCallID string
 }
 
 type Tool struct {
@@ -78,7 +85,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 		messages = append(messages, map[string]any{"role": "system", "content": in.System})
 	}
 	for _, message := range in.Messages {
-		messages = append(messages, map[string]any{"role": message.Role, "content": message.Content})
+		messages = append(messages, openAIMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
 	if len(in.Tools) > 0 {
@@ -184,13 +191,57 @@ func (s *toolBufferSet) drain() []openAIBuffer {
 	return out
 }
 
+// openAIMessage maps one gateway message to the openai chat-completions shape,
+// including tool_calls and role=tool continuations for the search loop.
+func openAIMessage(message Message) map[string]any {
+	out := map[string]any{"role": message.Role, "content": message.Content}
+	if message.ToolCallID != "" {
+		out["role"] = "tool"
+		out["tool_call_id"] = message.ToolCallID
+	}
+	if len(message.ToolCalls) > 0 {
+		calls := make([]map[string]any, 0, len(message.ToolCalls))
+		for _, call := range message.ToolCalls {
+			args, _ := json.Marshal(call.Arguments)
+			calls = append(calls, map[string]any{"id": call.ProviderCallID, "type": "function", "function": map[string]any{"name": call.ToolName, "arguments": string(args)}})
+		}
+		out["tool_calls"] = calls
+	}
+	return out
+}
+
+// anthropicMessage maps one gateway message to the anthropic messages shape,
+// using tool_use/tool_result content blocks for the search loop.
+func anthropicMessage(message Message) map[string]any {
+	if message.ToolCallID != "" {
+		return map[string]any{"role": "user", "content": []map[string]any{{
+			"type":        "tool_result",
+			"tool_use_id": message.ToolCallID,
+			"content":     []map[string]any{{"type": "text", "text": message.Content}},
+		}}}
+	}
+	if len(message.ToolCalls) > 0 {
+		blocks := make([]map[string]any, 0, len(message.ToolCalls)+1)
+		if message.Content != "" {
+			blocks = append(blocks, map[string]any{"type": "text", "text": message.Content})
+		}
+		for _, call := range message.ToolCalls {
+			blocks = append(blocks, map[string]any{"type": "tool_use", "id": call.ProviderCallID, "name": call.ToolName, "input": call.Arguments})
+		}
+		return map[string]any{"role": "assistant", "content": blocks}
+	}
+	return map[string]any{"role": message.Role, "content": message.Content}
+}
+
 func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	var messages []map[string]any
 	for _, message := range in.Messages {
-		messages = append(messages, map[string]any{"role": message.Role, "content": message.Content})
+		messages = append(messages, anthropicMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": 8192}
-	if p.Thinking {
+	// Re-synthesized assistant messages cannot replay signed thinking blocks,
+	// so tool-capable turns disable thinking rather than risk protocol errors.
+	if p.Thinking && len(in.Tools) == 0 {
 		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": 2048}
 		body["max_tokens"] = 10240
 	}

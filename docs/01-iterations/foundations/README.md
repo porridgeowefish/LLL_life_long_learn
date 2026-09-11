@@ -25,5 +25,7 @@ behavior in code and active architecture documents.
 | [11](./iteration-11-hierarchical-discipline-planning/README.md) | H3/H4 maps and learner-owned plans | overview/topic/learning-plan contracts |
 | [12](./iteration-12-learning-scope-contract/README.md) | canonical topic boundaries and scope snapshots | learning-scope store and teacher/assistant context |
 | [13](./iteration-13-teacher-assistant-learning-workspace/README.md) | teacher conversation, asynchronous assistance, assets, sources, and global preferences | current teacher/assistant/assets/sources/preferences modules |
+| [16](./iteration-16-conversation-learning-workflow/README.md) | conversation sources, consolidation, teaching outlines, and teacher token usage | teacher conversation context, sources, usage store |
 
-The current integrated product contract is [Iteration 14](../iteration-14-modular-monolith-architecture/README.md).
+The current integrated product contract is [Iteration 14](../iteration-14-modular-monolith-architecture/README.md);
+the current delivered product baseline is [Iteration 17](../iteration-17-teacher-agent-refinements/README.md).

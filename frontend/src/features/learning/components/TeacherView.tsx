@@ -1,9 +1,16 @@
 import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { CopyIcon, DownloadIcon, EditIcon, RegenerateIcon, SearchIcon, SteerIcon, TrashIcon } from '@/shared/primitive/Icons';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import {
+  conversationExportURL,
+  discardQueuedTurn,
+  editQueuedTurn,
+  queueTeacherTurn,
+  regenerateTeacherResponse,
   stopTeacherResponse,
+  steerQueuedTurn,
   streamTeacherTurn,
   resumeTeacherTurn,
   learningWorkspaceKeys,
@@ -14,11 +21,18 @@ import {
   useUploadSource,
   type AssistantTask,
   type ConversationMessage,
+  type QueuedTurn,
   type TeacherStreamFrame,
 } from '@/features/learning/api/learningWorkspace';
 import { useAskAiSettings } from '@/features/settings';
 
 import s from './TeacherView.module.css';
+
+interface SearchStatus {
+  query: string;
+  count?: number;
+  failed?: boolean;
+}
 
 interface LiveResponse {
   learner: ConversationMessage;
@@ -27,6 +41,7 @@ interface LiveResponse {
   text: string;
   reasoning: string;
   taskIds: string[];
+  searches: SearchStatus[];
   notice?: string;
 }
 
@@ -53,6 +68,8 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
 	const [parsingSourceName, setParsingSourceName] = useState('');
   const [live, setLive] = useState<LiveResponse | null>(null);
   const [error, setError] = useState('');
+  const [editingQueue, setEditingQueue] = useState<{ queueId: string; content: string } | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState('');
   const [taskNotice, setTaskNotice] = useState<{ task: AssistantTask; text: string } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
@@ -188,7 +205,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       if (frame.type === 'turn-accepted') {
         setLive((current) => current ?? {
           learner: latestLearner ?? { id: String(frame.data.learnerMessageId), role: 'learner', status: 'completed', blocks: [], createdAt: new Date().toISOString() },
-          responseId: String(frame.data.responseId), text: '', reasoning: '', taskIds: [],
+          responseId: String(frame.data.responseId), text: '', reasoning: '', taskIds: [], searches: [],
         });
       }
       handleTeacherFrame(frame);
@@ -198,8 +215,12 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       if (!next.signal.aborted) setError((cause as Error).message || '教师响应恢复失败');
     }).finally(() => {
       recoveryStarted.current = false;
-      if (controller.current === next) controller.current = null;
-      if (!next.signal.aborted) setLive(null);
+      // Only the stream that still owns the controller may clear live; a
+      // superseded recovery attempt must not stomp an in-flight turn.
+      if (controller.current === next) {
+        controller.current = null;
+        if (!next.signal.aborted) setLive(null);
+      }
     });
     return () => {
       next.abort();
@@ -208,38 +229,135 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     };
   }, [conversation.data, handleTeacherFrame, queryClient, slug]);
 
+  // runStream owns the AbortController + post-stream refresh shared by every
+  // stream origin (direct send, steer, regenerate). Returns false on failure.
+  const runStream = useCallback(async (run: (signal: AbortSignal) => Promise<void>): Promise<boolean> => {
+    const next = new AbortController();
+    controller.current = next;
+    try {
+      await run(next.signal);
+      flushDeltas();
+      await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+      setLive(null);
+      return true;
+    } catch (cause) {
+      if (!next.signal.aborted) setError((cause as Error).message || '教师暂时无法响应');
+      await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+      setLive(null);
+      return false;
+    } finally {
+      if (controller.current === next) controller.current = null;
+    }
+  }, [flushDeltas, queryClient, slug]);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const content = input.trim();
-    if (!content || live) return;
+    if (!content) return;
+    setError('');
+    const attachmentRefs = [...selectedSourceIds];
+    if (live) {
+      // Sending while streaming queues durably server-side; the queue chips
+      // above the composer reflect and edit that state.
+      setInput('');
+      setSelectedSourceIds([]);
+      try {
+        await queueTeacherTurn(slug, { operationId: crypto.randomUUID(), content, attachmentRefs, providerId: providerId || undefined });
+        await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+      } catch (cause) {
+        setError((cause as Error).message || '排队失败，请稍后重试');
+        setInput(content);
+        setSelectedSourceIds(attachmentRefs);
+      }
+      return;
+    }
     setInput('');
     setSelectedSourceIds([]);
-    setError('');
     followStream.current = true;
     pendingDeltas.current = { text: '', reasoning: '' };
     const operationId = crypto.randomUUID();
     const temporary: LiveResponse = {
       learner: { id: `local-${operationId}`, role: 'learner', status: 'completed', blocks: [
         { id: 'local', type: 'markdown', source: content },
-        ...selectedSourceIds.map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
+        ...attachmentRefs.map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
-      text: '', reasoning: '', taskIds: [],
+      text: '', reasoning: '', taskIds: [], searches: [],
     };
     setLive(temporary);
-    const next = new AbortController();
-    controller.current = next;
+    const ok = await runStream(async (signal) => {
+      await streamTeacherTurn(slug, { operationId, content, attachmentRefs, providerId: providerId || undefined }, signal, handleTeacherFrame);
+    });
+    if (!ok) setSelectedSourceIds(attachmentRefs);
+  };
+
+  // Steer interrupts the active response server-side; we detach from the old
+  // stream and subscribe to the follow-up turn over this connection.
+  const steer = async (item: QueuedTurn) => {
+    if (live && !live.responseId) return;
+    setError('');
+    followStream.current = true;
+    pendingDeltas.current = { text: '', reasoning: '' };
+    controller.current?.abort();
+    setLive({
+      learner: { id: `local-steer-${item.queueId}`, role: 'learner', status: 'completed', blocks: [
+        { id: 'local', type: 'markdown', source: item.content },
+        ...(item.attachmentRefs ?? []).map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
+      ], createdAt: new Date().toISOString() },
+      text: '', reasoning: '', taskIds: [], searches: [],
+    });
+    await runStream(async (signal) => {
+      await steerQueuedTurn(slug, item.queueId, signal, handleTeacherFrame);
+    });
+  };
+
+  const regenerate = useCallback(async () => {
+    const responseId = latestResponseRef.current;
+    if (!responseId) return;
+    const trigger = [...(conversation.data?.messages ?? [])].reverse().find((message) => message.role === 'learner');
+    if (!trigger) return;
+    setError('');
+    followStream.current = true;
+    pendingDeltas.current = { text: '', reasoning: '' };
+    setLive({ learner: trigger, text: '', reasoning: '', taskIds: [], searches: [] });
+    await runStream(async (signal) => {
+      await regenerateTeacherResponse(slug, responseId, signal, handleTeacherFrame);
+    });
+  }, [conversation.data?.messages, runStream, slug]);
+
+  const copyMessage = useCallback(async (message: ConversationMessage) => {
+    const markdown = (message.blocks ?? []).filter((block) => block.type === 'markdown').map((block) => block.source ?? '').join('\n\n').trim();
     try {
-      await streamTeacherTurn(slug, { operationId, content, attachmentRefs: selectedSourceIds, providerId: providerId || undefined }, next.signal, handleTeacherFrame);
-      flushDeltas();
-      await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
-      setLive(null);
+      await navigator.clipboard.writeText(markdown);
+      setCopiedMessageId(message.id);
+      window.setTimeout(() => setCopiedMessageId(''), 1600);
+    } catch {
+      setError('复制失败：浏览器未授权剪贴板访问');
+    }
+  }, []);
+
+  const refreshQueue = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+  }, [queryClient, slug]);
+
+  const submitQueueEdit = async () => {
+    if (!editingQueue) return;
+    const content = editingQueue.content.trim();
+    if (!content) return;
+    try {
+      await editQueuedTurn(slug, editingQueue.queueId, { content });
+      setEditingQueue(null);
+      await refreshQueue();
     } catch (cause) {
-      if (!next.signal.aborted) setError((cause as Error).message || '教师暂时无法响应');
-      if (!next.signal.aborted) setSelectedSourceIds(selectedSourceIds);
-      await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
-      setLive(null);
-    } finally {
-      controller.current = null;
+      setError((cause as Error).message || '编辑排队消息失败');
+    }
+  };
+
+  const discardQueueItem = async (queueId: string) => {
+    try {
+      await discardQueuedTurn(slug, queueId);
+      await refreshQueue();
+    } catch (cause) {
+      setError((cause as Error).message || '移除排队消息失败');
     }
   };
 
@@ -262,6 +380,16 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     }
     return links;
   }, [conversation.data?.taskLinks]);
+  const queueItems = useMemo(() => conversation.data?.queue ?? [], [conversation.data?.queue]);
+  const lastTeacherMessage = useMemo(() => {
+    const messages = conversation.data?.messages ?? [];
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'teacher') return messages[i];
+    return null;
+  }, [conversation.data?.messages]);
+  const latestResponseRef = useRef('');
+  useEffect(() => {
+    latestResponseRef.current = conversation.data?.latestResponseId ?? '';
+  }, [conversation.data?.latestResponseId]);
 
   const chooseUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
@@ -327,11 +455,27 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {conversation.isLoading && <div className={s.loading}>教师正在准备对话…</div>}
         {conversation.hasPrevious && <button type="button" className={s.loadPrevious} onClick={() => void loadPrevious()} disabled={conversation.isLoadingPrevious}>{conversation.isLoadingPrevious ? '正在加载…' : '加载更早对话'}</button>}
         {(conversation.data?.messages ?? []).filter((message) => message.id !== live?.learner.id).map((message) => (
-          <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
+          <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} actions={{
+            copied: copiedMessageId === message.id,
+            onCopy: copyMessage,
+            canRegenerate: !live && message.id === lastTeacherMessage?.id && Boolean(latestResponseRef.current),
+            onRegenerate: regenerate,
+          }} />
         ))}
         {live && (
           <>
             <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
+            {live.searches.length > 0 && (
+              <div className={s.searches} role="status">
+                {live.searches.map((search, index) => (
+                  <span key={index} className={s.searchChip} data-failed={search.failed || undefined}>
+                    <SearchIcon size={12} />
+                    已搜索：{search.query}
+                    {typeof search.count === 'number' ? ` · ${search.count} 条结果` : search.failed ? ' · 暂不可用' : ' · 检索中…'}
+                  </span>
+                ))}
+              </div>
+            )}
             <Message slug={slug} message={{ id: live.teacherId ?? 'streaming-teacher', role: 'teacher', status: 'completed', blocks: [
               ...(live.reasoning ? [{ id: 'reasoning', type: 'reasoning-summary' as const, source: live.reasoning }] : []),
               ...(live.text ? [{ id: 'text', type: 'markdown' as const, source: live.text }] : []),
@@ -344,6 +488,29 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         </div>
       </div>
       <form className={s.composer} onSubmit={submit}>
+        {queueItems.length > 0 && (
+          <div className={s.queueBar} aria-label="等待队列">
+            {queueItems.map((item) => editingQueue?.queueId === item.queueId ? (
+              <div key={item.queueId} className={s.queueEdit}>
+                <textarea value={editingQueue.content} rows={2} onChange={(event) => setEditingQueue({ queueId: item.queueId, content: event.target.value })} onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submitQueueEdit(); }
+                  if (event.key === 'Escape') setEditingQueue(null);
+                }} aria-label="编辑排队消息" autoFocus />
+                <button type="button" className={s.iconButton} title="保存" onClick={() => void submitQueueEdit()}>保存</button>
+                <button type="button" className={s.iconButton} title="取消" onClick={() => setEditingQueue(null)}>取消</button>
+              </div>
+            ) : (
+              <div key={item.queueId} className={s.queueChip}>
+                <span className={s.queueContent}>{item.content}</span>
+                <span className={s.queueActions}>
+                  <button type="button" className={s.iconButton} title="编辑这条排队消息" aria-label={`编辑排队消息 ${item.content}`} onClick={() => setEditingQueue({ queueId: item.queueId, content: item.content })}><EditIcon /></button>
+                  <button type="button" className={s.iconButton} title="立即引导：打断当前回答，先回应这条" aria-label={`立即引导 ${item.content}`} onClick={() => void steer(item)} disabled={Boolean(live && !live.responseId)}><SteerIcon /></button>
+                  <button type="button" className={s.iconButton} title="移出队列" aria-label={`移除排队消息 ${item.content}`} onClick={() => void discardQueueItem(item.queueId)}><TrashIcon /></button>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 		{selectedSources.length > 0 && <div className={s.citationChips} aria-label="已引用资料">{selectedSources.map((source) => <button key={source.sourceId} type="button" onClick={() => setSelectedSourceIds((current) => current.filter((id) => id !== source.sourceId))}>{source.displayName} ×</button>)}</div>}
         <label className={s.uploadButton} title="上传资料">
           <span aria-hidden="true">＋</span><span className={s.srOnly}>上传资料</span>
@@ -362,8 +529,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         </details>}
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
-        }} placeholder={`和 ${title} 的教师继续讨论…`} rows={1} disabled={Boolean(live)} />
-        {live ? <button type="button" className={s.stop} onClick={stop} disabled={!live.responseId}>停止</button> : <button type="submit" disabled={!input.trim()}>发送</button>}
+        }} placeholder={live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
+        {live ? <button type="submit" className={s.stop} disabled={!input.trim()}>排队</button> : <button type="submit" disabled={!input.trim()}>发送</button>}
+        {live?.responseId && <button type="button" className={s.stop} onClick={stop}>停止</button>}
         <div className={s.composerMeta}>
           {availableModels.length > 0 && <label className={s.modelSelect}>模型
             <select value={providerId} onChange={(event) => { setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value); }}>
@@ -371,6 +539,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             </select>
           </label>}
           <span>Enter 发送 · Shift + Enter 换行</span>
+          <a className={s.iconButton} href={conversationExportURL(slug)} download title="导出整段对话为 Markdown" aria-label="导出对话"><DownloadIcon /></a>
         </div>
         {pendingUpload && <div className={s.uploadPanel} role="dialog" aria-label="上传资料">
           <strong>{pendingUpload.name}</strong>
@@ -432,6 +601,12 @@ function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.Se
     if (frame.type === 'reasoning-summary-delta') return { ...current, reasoning: current.reasoning + String(frame.data.delta ?? '') };
     if (frame.type === 'task-accepted') return { ...current, taskIds: [...current.taskIds, String(frame.data.taskId)] };
     if (frame.type === 'tool-rejected') return { ...current, notice: rejectionText(String(frame.data.code)) };
+    if (frame.type === 'search-started') return { ...current, searches: [...current.searches, { query: String(frame.data.query ?? '') }] };
+    if (frame.type === 'search-completed' || frame.type === 'search-failed') {
+      return { ...current, searches: current.searches.map((search, index) => index === current.searches.length - 1 && !search.count && !search.failed
+        ? (frame.type === 'search-completed' ? { ...search, count: Number(frame.data.count ?? 0) } : { ...search, failed: true })
+        : search) };
+    }
     return current;
   });
 }
@@ -442,7 +617,16 @@ function rejectionText(code: string) {
   return '助教任务没有创建，你可以继续和教师确认方案。';
 }
 
-const Message = memo(function Message({ slug, message, tasks, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean }) {
+// MessageActions stays primitive-valued (or stable callbacks) so the memo
+// comparator can keep history messages frozen while live text streams.
+interface MessageActions {
+  copied: boolean;
+  onCopy: (message: ConversationMessage) => void;
+  canRegenerate: boolean;
+  onRegenerate: () => void;
+}
+
+const Message = memo(function Message({ slug, message, tasks, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
   return (
     <article className={teacher ? s.teacherMessage : s.learnerMessage}>
@@ -455,6 +639,12 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, getRe
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {notice && <div className={s.notice}>{notice}</div>}
         {tasks.map((task) => <TaskCard key={task.id} slug={slug} task={task} />)}
+        {actions && !streaming && (
+          <div className={s.messageActions}>
+            <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
+            {actions.canRegenerate && <button type="button" className={s.iconButton} title="重新生成这条回复" aria-label="重新生成这条回复" onClick={actions.onRegenerate}><RegenerateIcon /></button>}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -462,7 +652,11 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, getRe
   && previous.streaming === next.streaming
   && previous.notice === next.notice
   && previous.sourceNames === next.sourceNames
-  && sameTasks(previous.tasks, next.tasks));
+  && sameTasks(previous.tasks, next.tasks)
+  && previous.actions?.copied === next.actions?.copied
+  && previous.actions?.canRegenerate === next.actions?.canRegenerate
+  && previous.actions?.onCopy === next.actions?.onCopy
+  && previous.actions?.onRegenerate === next.actions?.onRegenerate);
 
 function ReasoningBlock({ messageID, source, streaming, initialOpen, onOpenChange }: { messageID: string; source: string; streaming: boolean; initialOpen: boolean; onOpenChange: (messageID: string, open: boolean) => void }) {
   const [open, setOpen] = useState(() => initialOpen);

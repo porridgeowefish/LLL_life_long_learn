@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -398,4 +399,292 @@ func TestTeacherUsageIsListedPerConversation(t *testing.T) {
 
 func teacherUsageForTest(slug string) error {
 	return teacher.RecordTeacherUsage(slug, teacher.UsageRecord{ConversationID: "conv_test", UnitID: "unit_test", ResponseID: "resp_test", InputTokens: 3, OutputTokens: 5})
+}
+
+// firstBlockThenCompleteGateway blocks its first stream until release (or
+// context cancellation, so steering can interrupt it) so a test can queue
+// while streaming; every later stream completes immediately.
+type firstBlockThenCompleteGateway struct {
+	started chan struct{}
+	release chan struct{}
+	once    sync.Once
+
+	mu      sync.Mutex
+	systems []string
+}
+
+func (g *firstBlockThenCompleteGateway) systems_() []string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return append([]string(nil), g.systems...)
+}
+
+func (g *firstBlockThenCompleteGateway) Stream(ctx context.Context, in teacher.GatewayRequest, emit func(teacher.GatewayEvent)) error {
+	g.mu.Lock()
+	g.systems = append(g.systems, in.System)
+	g.mu.Unlock()
+	cancelled := false
+	g.once.Do(func() {
+		close(g.started)
+		select {
+		case <-g.release:
+		case <-ctx.Done():
+			cancelled = true
+		}
+	})
+	if cancelled {
+		// Real providers surface cancellation through the request context.
+		return ctx.Err()
+	}
+	question := ""
+	if len(in.Messages) > 0 {
+		question = in.Messages[len(in.Messages)-1].Content
+	}
+	emit(teacher.GatewayEvent{Type: "text-delta", Delta: "回答：" + question})
+	emit(teacher.GatewayEvent{Type: "response-completed"})
+	return nil
+}
+
+func TestQueuedTurnAdvancesAfterActiveResponse(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	gateway := &firstBlockThenCompleteGateway{started: make(chan struct{}), release: make(chan struct{})}
+	server.teacher = teacher.New(gateway)
+	// First turn blocks so the queue path can be exercised while streaming.
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns", strings.NewReader(`{"operationId":"op_block","content":"第一个问题"}`))
+		req.Header.Set("Content-Type", "application/json")
+		server.Handler().ServeHTTP(httptest.NewRecorder(), req)
+	}()
+	select {
+	case <-gateway.started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first turn never started")
+	}
+
+	queueReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns/queue", strings.NewReader(`{"operationId":"op_q1","content":"排队的问题"}`))
+	queueReq.Header.Set("Content-Type", "application/json")
+	queueResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(queueResp, queueReq)
+	if queueResp.Code != http.StatusAccepted {
+		t.Fatalf("queue endpoint failed: %d %s", queueResp.Code, queueResp.Body.String())
+	}
+	var queued struct {
+		QueueID  string `json:"queueId"`
+		Promoted bool   `json:"promoted"`
+	}
+	if err := json.Unmarshal(queueResp.Body.Bytes(), &queued); err != nil || queued.Promoted {
+		t.Fatalf("queue response wrong: %s err=%v", queueResp.Body.String(), err)
+	}
+
+	// Editing works while queued.
+	editReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/queue/"+queued.QueueID+"/edit", strings.NewReader(`{"content":"编辑后的排队问题"}`))
+	editReq.Header.Set("Content-Type", "application/json")
+	editResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(editResp, editReq)
+	if editResp.Code != http.StatusOK {
+		t.Fatalf("edit failed: %d %s", editResp.Code, editResp.Body.String())
+	}
+	read := httptest.NewRecorder()
+	server.Handler().ServeHTTP(read, httptest.NewRequest(http.MethodGet, "/api/projects/topic/conversation?limit=500", nil))
+	var projection struct {
+		Queue []struct {
+			Content string `json:"content"`
+		} `json:"queue"`
+	}
+	if err := json.Unmarshal(read.Body.Bytes(), &projection); err != nil || len(projection.Queue) != 1 || projection.Queue[0].Content != "编辑后的排队问题" {
+		t.Fatalf("queue projection wrong: %s err=%v", read.Body.String(), err)
+	}
+
+	// Release the blocking first turn; the queue must auto-advance.
+	close(gateway.release)
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		store, err := teacher.NewConversation("topic")
+		if err == nil {
+			if items, qErr := store.QueueItems(); qErr == nil && len(items) == 0 {
+				messages, _ := store.AllMessages()
+				if len(messages) >= 5 {
+					break
+				}
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	store, _ := teacher.NewConversation("topic")
+	if items, _ := store.QueueItems(); len(items) != 0 {
+		t.Fatalf("queue did not drain: %#v", items)
+	}
+	messages, _ := store.AllMessages()
+	if len(messages) != 5 {
+		t.Fatalf("expected greeting + first turn pair + promoted pair, got %d: %#v", len(messages), messages)
+	}
+	found := false
+	for _, message := range messages {
+		for _, block := range message.Blocks {
+			if block.Source == "编辑后的排队问题" {
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("promoted edited content missing: %#v", messages)
+	}
+}
+
+func TestQueueEndpointStartsImmediatelyWhenIdle(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	queueReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns/queue", strings.NewReader(`{"operationId":"op_idle","content":"空闲时排队"}`))
+	queueReq.Header.Set("Content-Type", "application/json")
+	queueResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(queueResp, queueReq)
+	if queueResp.Code != http.StatusAccepted {
+		t.Fatalf("queue endpoint failed: %d %s", queueResp.Code, queueResp.Body.String())
+	}
+	var queued struct {
+		QueueID  string `json:"queueId"`
+		Promoted bool   `json:"promoted"`
+	}
+	if err := json.Unmarshal(queueResp.Body.Bytes(), &queued); err != nil || !queued.Promoted {
+		t.Fatalf("idle queue should promote immediately: %s err=%v", queueResp.Body.String(), err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		store, _ := teacher.NewConversation("topic")
+		if items, _ := store.QueueItems(); len(items) == 0 {
+			messages, _ := store.AllMessages()
+			if len(messages) == 3 {
+				return
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatal("idle queued turn never became a durable turn")
+}
+
+func TestDiscardUnknownQueueItemReturns404(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	req := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/queue/q_missing/discard", nil)
+	resp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d %s", resp.Code, resp.Body.String())
+	}
+}
+
+func TestRegenerateLatestResponseAndExport(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	turnReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns", strings.NewReader(`{"operationId":"op_reg","content":"解释递归"}`))
+	turnReq.Header.Set("Content-Type", "application/json")
+	server.Handler().ServeHTTP(httptest.NewRecorder(), turnReq)
+
+	store, err := teacher.NewConversation("topic")
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest, ok, err := store.LatestResponseID()
+	if err != nil || !ok {
+		t.Fatalf("no response to regenerate: %v %v", ok, err)
+	}
+	regenReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/responses/"+latest+"/regenerate", strings.NewReader(`{}`))
+	regenReq.Header.Set("Content-Type", "application/json")
+	regenResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(regenResp, regenReq)
+	if regenResp.Code != http.StatusOK || !strings.Contains(regenResp.Body.String(), "text-delta") {
+		t.Fatalf("regenerate failed: %d %s", regenResp.Code, regenResp.Body.String())
+	}
+
+	// Old reply is hidden: conversation shows greeting + learner + one teacher reply.
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if items, _ := store.AllMessages(); len(items) == 3 {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	messages, _ := store.AllMessages()
+	if len(messages) != 3 {
+		t.Fatalf("superseded reply still visible: %d messages", len(messages))
+	}
+	// Regenerating the superseded old id is rejected.
+	again := httptest.NewRecorder()
+	server.Handler().ServeHTTP(again, httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/responses/"+latest+"/regenerate", nil))
+	if again.Code != http.StatusConflict {
+		t.Fatalf("regenerating a superseded response must conflict: %d %s", again.Code, again.Body.String())
+	}
+
+	exportResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(exportResp, httptest.NewRequest(http.MethodGet, "/api/projects/topic/conversation/export.md", nil))
+	body := exportResp.Body.String()
+	if exportResp.Code != http.StatusOK || !strings.Contains(body, "解释递归") || !strings.Contains(body, "我们先从定义开始") || !strings.Contains(body, "学习者") {
+		t.Fatalf("export wrong: %d %s", exportResp.Code, body)
+	}
+	if strings.Contains(exportResp.Header().Get("Content-Type"), "text/markdown") != true {
+		t.Fatalf("export content type wrong: %s", exportResp.Header().Get("Content-Type"))
+	}
+}
+
+func TestSteerInterruptsActiveResponse(t *testing.T) {
+	server := learningWorkspaceServer(t)
+	gateway := &firstBlockThenCompleteGateway{started: make(chan struct{}), release: make(chan struct{})}
+	server.teacher = teacher.New(gateway)
+	go func() {
+		req := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns", strings.NewReader(`{"operationId":"op_block","content":"第一个问题"}`))
+		req.Header.Set("Content-Type", "application/json")
+		server.Handler().ServeHTTP(httptest.NewRecorder(), req)
+	}()
+	select {
+	case <-gateway.started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("first turn never started")
+	}
+
+	queueReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/turns/queue", strings.NewReader(`{"operationId":"op_steer","content":"引导内容"}`))
+	queueReq.Header.Set("Content-Type", "application/json")
+	queueResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(queueResp, queueReq)
+	if queueResp.Code != http.StatusAccepted {
+		t.Fatalf("queue endpoint failed: %d %s", queueResp.Code, queueResp.Body.String())
+	}
+	var queued struct {
+		QueueID string `json:"queueId"`
+	}
+	if err := json.Unmarshal(queueResp.Body.Bytes(), &queued); err != nil || queued.QueueID == "" {
+		t.Fatalf("queue response wrong: %s err=%v", queueResp.Body.String(), err)
+	}
+
+	steerReq := httptest.NewRequest(http.MethodPost, "/api/projects/topic/conversation/queue/"+queued.QueueID+"/steer", nil)
+	steerResp := httptest.NewRecorder()
+	server.Handler().ServeHTTP(steerResp, steerReq)
+	if steerResp.Code != http.StatusOK || !strings.Contains(steerResp.Body.String(), "引导内容") {
+		t.Fatalf("steer stream failed: %d %s", steerResp.Code, steerResp.Body.String())
+	}
+
+	deadline := time.Now().Add(5 * time.Second)
+	var messages []teacher.Message
+	for time.Now().Before(deadline) {
+		store, err := teacher.NewConversation("topic")
+		if err == nil {
+			messages, _ = store.AllMessages()
+			if len(messages) >= 5 {
+				break
+			}
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if len(messages) != 5 {
+		t.Fatalf("expected 5 messages after steer, got %d: %#v", len(messages), messages)
+	}
+	interrupted := false
+	for _, message := range messages {
+		if message.Role == "teacher" && message.Status == "interrupted" {
+			interrupted = true
+		}
+	}
+	if !interrupted {
+		t.Fatalf("first response was not interrupted: %#v", messages)
+	}
+	systems := gateway.systems_()
+	if len(systems) < 2 || !strings.Contains(systems[len(systems)-1], "生成中引导") || !strings.Contains(systems[len(systems)-1], "引导内容") {
+		t.Fatalf("steering appendix missing from provider system prompt")
+	}
 }

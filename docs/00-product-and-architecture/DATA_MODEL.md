@@ -148,10 +148,33 @@ migration backup and recovery journals
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE
 state are derived. Provider deltas, rendered rich content, and compact context
-are projections. Exact product paths and schemas remain owned by iteration 13
-`DATA_DESIGN.md`; code is current truth. A ready source revision has exactly one
-canonical `content.md`; `conversation/usage.jsonl` records only nonzero,
+are projections. Exact product paths and schemas remain owned by the current
+iteration `DATA_DESIGN.md`; code is current truth. A ready source revision has
+exactly one canonical `content.md` — for images with a configured
+`askAiProviders.bindings.ocr`, that file is produced by the vision-model OCR
+step (ADR-0019); `conversation/usage.jsonl` records only nonzero,
 provider-reported teacher token usage. Assistant usage is not yet modelled.
+
+### Conversation queue, steering, and regeneration (ADR-0018)
+
+The event log remains append-only. New event families, all replayed into the
+live `queue` projection:
+
+```text
+learner-queued {queueId, content, attachmentRefs, operationId, providerId}
+queue-item-edited {queueId, content, attachmentRefs}
+queue-item-discarded {queueId}
+queue-item-promoted {queueId, learnerMessageId, mode: auto|steer}
+steering-note {learnerMessageId, responseId}
+response-superseded {responseId, newResponseId}
+```
+
+Superseded teacher messages are hidden from every projection and from provider
+context but never deleted. `projects/folders.json` is the folder ledger's
+canonical location; a legacy workspace-root `folders.json` is copied forward
+once on first open (ADR-0019). The optional `webSearch` config section
+(`provider`, `apiKey|apiKeyEnv`, `engine`) enables the teacher `search_web`
+tool; absent means disabled.
 
 ## Delivery State
 

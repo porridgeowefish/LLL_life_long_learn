@@ -105,3 +105,116 @@
 @keyframes pulse { 50% { opacity: .45; } }
 @media (max-width: 1050px) { .teacher { grid-template-columns: minmax(0, 1fr); } .dataRail { display: none; } }
 @media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 92px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composer { width: calc(100% - 20px); } .composerMeta > span { display: none; } }
+
+/* ---- hover-revealed icon actions (iteration 17) ---- */
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+}
+.iconButton:hover { opacity: 1; background: rgba(0, 0, 0, 0.06); }
+.iconButton:focus-visible { opacity: 1; outline: 2px solid currentColor; outline-offset: 1px; }
+
+.messageActions {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.teacherMessage:hover .messageActions,
+.learnerMessage:hover .messageActions,
+.messageActions:focus-within { opacity: 1; }
+
+.copiedMark { color: #3a7d44; }
+
+/* Touch devices have no hover: keep actions visible but quiet. */
+@media (hover: none) {
+  .messageActions { opacity: 0.7; }
+  .queueActions { opacity: 0.7; }
+}
+
+/* ---- durable waiting queue ---- */
+
+.queueBar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+}
+.queueChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.03);
+  font-size: 13px;
+}
+.queueContent {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queueActions {
+  display: inline-flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.queueChip:hover .queueActions,
+.queueActions:focus-within { opacity: 1; }
+.queueEdit {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.queueEdit textarea {
+  flex: 1;
+  resize: vertical;
+  min-height: 44px;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+/* ---- web-search status chips ---- */
+
+.searches {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0;
+}
+.searchChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(58, 125, 68, 0.35);
+  background: rgba(58, 125, 68, 0.08);
+  color: #2f5e37;
+  font-size: 12px;
+}
+.searchChip[data-failed] {
+  border-color: rgba(140, 60, 40, 0.35);
+  background: rgba(140, 60, 40, 0.08);
+  color: #7a3a2a;
+}

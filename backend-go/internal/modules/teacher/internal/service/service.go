@@ -12,6 +12,7 @@ import (
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
 	usagestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
+	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
 
 const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者进行清晰、耐心、有针对性的教学对话，而不是生产文件或代替 IDE。
@@ -86,6 +87,9 @@ type Service struct {
 	OnTask     func(projectSlug string, task DelegatedTask)
 }
 
+// resolveSearcher is a seam for tests; production always resolves from config.
+var resolveSearcher = websearch.Configured
+
 func New(gateway teachergateway.Gateway) *Service {
 	if gateway == nil {
 		gateway = teachergateway.Configured{}
@@ -130,7 +134,67 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": prior.TeacherMessageID, "latestSeq": meta.LatestSeq}})
 		return nil
 	}
+	return s.streamTeacherResponse(ctx, slug, conversation, learner, learnerEvent.Seq, idgen.New("resp"), idgen.New("msg"), in.ProviderID, "", emit)
+}
+
+// StreamPromotedTurn runs a turn for a queue item that was already recorded as
+// a learner message by the store's promotion step. steering=true adds the
+// mid-generation guidance appendix for interrupt-and-redirect turns.
+func (s *Service) StreamPromotedTurn(ctx context.Context, slug string, promoted conversationstore.PromotedTurn, steering bool, emit func(StreamFrame)) error {
+	conversation, err := conversationstore.New(slug)
+	if err != nil {
+		return err
+	}
 	responseID, teacherMessageID := idgen.New("resp"), idgen.New("msg")
+	steerNote := ""
+	if steering {
+		steerNote = messageText(promoted.Learner)
+		_, _ = conversation.Append("steering-note", map[string]any{"learnerMessageId": promoted.Learner.ID, "responseId": responseID})
+	}
+	return s.streamTeacherResponse(ctx, slug, conversation, promoted.Learner, promoted.LearnerSeq, responseID, teacherMessageID, promoted.Item.ProviderID, steerNote, emit)
+}
+
+// RegenerateResponse supersedes an old response and immediately re-runs the
+// same triggering learner message. The old reply stays in the event log but is
+// hidden from every projection.
+func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, providerID string, emit func(StreamFrame)) error {
+	conversation, err := conversationstore.New(slug)
+	if err != nil {
+		return err
+	}
+	info, found, err := conversation.ResponseByID(oldResponseID)
+	if err != nil || !found || info.Superseded || info.Active {
+		return errors.New("response cannot be regenerated")
+	}
+	if latest, ok, latestErr := conversation.LatestResponseID(); latestErr != nil || !ok || latest != oldResponseID {
+		return errors.New("response cannot be regenerated: not the latest response")
+	}
+	learner, foundLearner, err := conversation.FindMessage(info.TriggeringLearnerMessageID)
+	if err != nil || !foundLearner || learner.Role != "learner" {
+		return errors.New("triggering learner message missing")
+	}
+	var learnerSeq uint64
+	sequenced, err := conversation.SequencedMessages()
+	if err != nil {
+		return err
+	}
+	for _, item := range sequenced {
+		if item.Message.ID == learner.ID {
+			learnerSeq = item.Seq
+			break
+		}
+	}
+	responseID, teacherMessageID := idgen.New("resp"), idgen.New("msg")
+	if err := conversation.SupersedeResponse(oldResponseID, responseID); err != nil {
+		return err
+	}
+	return s.streamTeacherResponse(ctx, slug, conversation, learner, learnerSeq, responseID, teacherMessageID, providerID, "", emit)
+}
+
+// streamTeacherResponse is the shared streaming core for every turn origin:
+// direct send, queued promotion, steering, and regeneration.
+func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conversation *conversationstore.Store, learner conversationstore.Message, learnerSeq uint64, responseID, teacherMessageID, providerID, steerNote string, emit func(StreamFrame)) error {
+	learnerText := messageText(learner)
 	textBlockID, reasoningBlockID := idgen.New("blk"), idgen.New("blk")
 	emit(StreamFrame{Type: "turn-accepted", Data: map[string]any{"learnerMessageId": learner.ID, "responseId": responseID}})
 	if _, err := conversation.Append("teacher-response-started", map[string]any{"responseId": responseID, "teacherMessageId": teacherMessageID, "triggeringLearnerMessageId": learner.ID}); err != nil {
@@ -146,10 +210,13 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": "context_preparation_failed", "partialPreserved": false}})
 		return err
 	}
-	if isExplicitApproval(in.Content) {
+	if isExplicitApproval(learnerText) {
 		systemPrompt += "\n\n【当前回合工具门禁】当前学习者消息包含明确同意或明确要求重试。若最近一项尚未成功创建的助教方案已经完整说明内容、资料、产出和学习意义，可立即调用 delegate_learning_work；中间的技术拒绝提示不会撤销同意，无需复述方案或再次索要确认。若任务范围已经变化，才重新说明新方案。"
 	} else {
 		systemPrompt += "\n\n【当前回合工具门禁】当前学习者消息不是对紧邻助教方案的明确同意，本回合严禁调用 delegate_learning_work。若仍有待办助教工作，请重新完整说明方案并询问是否同意。"
+	}
+	if steerNote != "" {
+		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
 	}
 
 	tool := teachergateway.Tool{Name: "delegate_learning_work", Description: "在教师已经向学习者披露助教方案、且学习者在后续消息中明确同意后，创建一个异步助教任务。", Schema: map[string]any{
@@ -162,55 +229,105 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		},
 		"required": []string{"taskType", "objective", "sourceRefs"},
 	}}
+	tools := []teachergateway.Tool{tool}
+	searcher := resolveSearcher()
+	if searcher != nil {
+		tools = append(tools, teachergateway.Tool{Name: "search_web", Description: "检索公开网络信息。适用于时效性强或需要事实核对的问题；搜索结果是外部信息，回答中需辨析可靠性并给出来源链接。", Schema: map[string]any{
+			"type": "object", "additionalProperties": false,
+			"properties": map[string]any{
+				"query": map[string]any{"type": "string", "maxLength": 256, "description": "面向搜索引擎的检索词，用最可能命中的自然语言关键词。"},
+			},
+			"required": []string{"query"},
+		}})
+		systemPrompt += "\n\n你可以使用 search_web 工具检索公开网络信息（一次回答最多调用 2 次）。仅在需要时效性信息或事实核对时使用；搜索结果来自外部站点，需要辨析可靠性与时效，并在回答中给出来源链接。"
+	}
 
 	var text, reasoning strings.Builder
 	usage := map[string]int{}
 	acceptedTool := false
-	providerErr := s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: providerMessages, Tools: []teachergateway.Tool{tool}, ProviderID: in.ProviderID}, func(event teachergateway.Event) {
-		switch event.Type {
-		case "text-delta":
-			text.WriteString(event.Delta)
-			emit(StreamFrame{Type: "text-delta", Data: map[string]any{"blockId": textBlockID, "delta": event.Delta}})
-		case "reasoning-summary-delta":
-			reasoning.WriteString(event.Delta)
-			emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
-		case "usage":
-			for key, value := range event.Usage {
-				usage[key] = value
-			}
-			emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
-		case "tool-call-ready":
-			if event.ToolCall == nil {
-				return
-			}
-			_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
-			if acceptedTool {
-				_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": "one_task_per_response"})
-				emit(StreamFrame{Type: "tool-rejected", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "code": "one_task_per_response"}})
-				appendToolNotice(&text, textBlockID, "one_task_per_response", emit)
-				return
-			}
-			task, ok, toolErr := s.acceptDelegation(slug, conversation, learner, learnerEvent.Seq, in.OperationID, *event.ToolCall)
-			if toolErr != nil {
-				data := map[string]any{"toolCallId": event.ToolCall.CallID, "code": delegationCode(toolErr)}
-				var classified taskAuthorizationError
-				if errors.As(toolErr, &classified) && classified.ExistingTaskIDValue() != "" {
-					data["existingTaskId"] = classified.ExistingTaskIDValue()
+	// The search loop: stream once; if the model calls search_web and the
+	// round budget allows it, answer the call and stream again with the
+	// results appended. Two search rounds maximum keeps the turn bounded.
+	const maxSearchRounds = 2
+	var providerErr error
+	roundMessages := providerMessages
+	for round := 0; ; round++ {
+		roundTextStart := text.Len()
+		var pendingSearch *teachergateway.ToolCall
+		providerErr = s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: providerID}, func(event teachergateway.Event) {
+			switch event.Type {
+			case "text-delta":
+				text.WriteString(event.Delta)
+				emit(StreamFrame{Type: "text-delta", Data: map[string]any{"blockId": textBlockID, "delta": event.Delta}})
+			case "reasoning-summary-delta":
+				reasoning.WriteString(event.Delta)
+				emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
+			case "usage":
+				for key, value := range event.Usage {
+					usage[key] = value
 				}
-				emit(StreamFrame{Type: "tool-rejected", Data: data})
-				appendToolNotice(&text, textBlockID, data["code"].(string), emit)
-				_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": data["code"]})
-				return
+				emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
+			case "tool-call-ready":
+				if event.ToolCall == nil {
+					return
+				}
+				if event.ToolCall.ToolName == "search_web" && searcher != nil && pendingSearch == nil {
+					pendingSearch = event.ToolCall
+					_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
+					return
+				}
+				_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
+				if acceptedTool {
+					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": "one_task_per_response"})
+					emit(StreamFrame{Type: "tool-rejected", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "code": "one_task_per_response"}})
+					appendToolNotice(&text, textBlockID, "one_task_per_response", emit)
+					return
+				}
+				task, ok, toolErr := s.acceptDelegation(slug, conversation, learner, learnerSeq, learner.OperationID, *event.ToolCall)
+				if toolErr != nil {
+					data := map[string]any{"toolCallId": event.ToolCall.CallID, "code": delegationCode(toolErr)}
+					var classified taskAuthorizationError
+					if errors.As(toolErr, &classified) && classified.ExistingTaskIDValue() != "" {
+						data["existingTaskId"] = classified.ExistingTaskIDValue()
+					}
+					emit(StreamFrame{Type: "tool-rejected", Data: data})
+					appendToolNotice(&text, textBlockID, data["code"].(string), emit)
+					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": data["code"]})
+					return
+				}
+				acceptedTool = true
+				_, _ = conversation.Append("task-linked", conversationstore.TaskLink{MessageID: teacherMessageID, TaskID: task.ID, ToolCallID: event.ToolCall.CallID})
+				_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "accepted", "taskId": task.ID, "taskStatus": task.Status})
+				emit(StreamFrame{Type: "task-accepted", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "taskId": task.ID, "status": task.Status}})
+				if ok && s.OnTask != nil {
+					s.OnTask(slug, task)
+				}
 			}
-			acceptedTool = true
-			_, _ = conversation.Append("task-linked", conversationstore.TaskLink{MessageID: teacherMessageID, TaskID: task.ID, ToolCallID: event.ToolCall.CallID})
-			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "accepted", "taskId": task.ID, "taskStatus": task.Status})
-			emit(StreamFrame{Type: "task-accepted", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "taskId": task.ID, "status": task.Status}})
-			if ok && s.OnTask != nil {
-				s.OnTask(slug, task)
-			}
+		})
+		if providerErr != nil || pendingSearch == nil || acceptedTool || round >= maxSearchRounds {
+			break
 		}
-	})
+		query, _ := pendingSearch.Arguments["query"].(string)
+		if strings.TrimSpace(query) == "" {
+			query = learnerText
+		}
+		emit(StreamFrame{Type: "search-started", Data: map[string]any{"query": query}})
+		resultText := ""
+		results, searchErr := searcher.Search(ctx, query)
+		if searchErr != nil {
+			emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "code": "websearch_unavailable"}})
+			resultText = "搜索服务暂时不可用，请基于已有知识回答并说明未能检索。"
+			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": pendingSearch.CallID, "status": "failed", "code": "websearch_unavailable"})
+		} else {
+			emit(StreamFrame{Type: "search-completed", Data: map[string]any{"query": query, "count": len(results)}})
+			resultText = websearch.FormatResults(results)
+			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": pendingSearch.CallID, "status": "executed", "resultCount": len(results)})
+		}
+		roundMessages = append(roundMessages,
+			teachergateway.Message{Role: "assistant", Content: text.String()[roundTextStart:], ToolCalls: []teachergateway.ToolCall{*pendingSearch}},
+			teachergateway.Message{Role: "tool", ToolCallID: pendingSearch.ProviderCallID, Content: resultText},
+		)
+	}
 
 	status := "completed"
 	if providerErr != nil {
@@ -235,7 +352,7 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 	_, _ = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": teacherMessageID, "status": status})
 	if meta, metaErr := conversation.Meta(); metaErr == nil {
 		if unit, unitErr := conversation.Unit(); unitErr == nil {
-			_ = usagestore.Append(slug, usagestore.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: responseID, ProviderID: in.ProviderID, InputTokens: usage["inputTokens"], OutputTokens: usage["outputTokens"]})
+			_ = usagestore.Append(slug, usagestore.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: responseID, ProviderID: providerID, InputTokens: usage["inputTokens"], OutputTokens: usage["outputTokens"]})
 		}
 	}
 	if providerErr != nil {

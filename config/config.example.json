@@ -20,8 +20,14 @@
     "bindings": {
       "teacher": { "providerId": "primary", "model": "" },
       "conversationCompaction": { "providerId": "primary", "model": "" },
-      "annotationAskAI": { "providerId": "primary", "model": "" }
+      "annotationAskAI": { "providerId": "primary", "model": "" },
+      "ocr": { "providerId": "primary", "model": "" }
     }
+  },
+  "webSearch": {
+    "provider": "zhipu",
+    "apiKeyEnv": "LLL_WEB_SEARCH_API_KEY",
+    "engine": "search_std"
   },
   "assistant": {
     "runtime": "claude",

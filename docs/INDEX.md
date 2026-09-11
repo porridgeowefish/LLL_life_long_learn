@@ -45,10 +45,11 @@ for an explicit history, migration, compatibility, or regression question.
 ## Active Delivery
 
 The implemented product baseline is
-[Iteration 16](./01-iterations/iteration-16-conversation-learning-workflow/README.md).
-Iteration 16 completes the conversation source/citation workflow, confirmed
-asset consolidation, map teaching outlines, and teacher token usage. Browser
-E2E acceptance remains learner-run.
+[Iteration 17](./01-iterations/iteration-17-teacher-agent-refinements/README.md).
+Iteration 17 refines the teacher agent: vision-model OCR for image sources, a
+durable streaming queue with steering, message copy/regenerate and transcript
+export, a bounded web-search tool, and repository normalization. Manual
+OCR/web-search smoke with real keys remains learner-run.
 
 ## Required Entry Points
 

@@ -20,6 +20,12 @@ vi.mock('@/features/learning/api/learningWorkspace', () => ({
   streamTeacherTurn: vi.fn(async () => undefined),
   resumeTeacherTurn: vi.fn(async () => false),
   stopTeacherResponse: vi.fn(async () => undefined),
+  queueTeacherTurn: vi.fn(async () => ({ queueId: 'q_test', promoted: false })),
+  editQueuedTurn: vi.fn(async () => ({ queueId: 'q_test' })),
+  discardQueuedTurn: vi.fn(async () => ({ queueId: 'q_test', discarded: true })),
+  steerQueuedTurn: vi.fn(async () => true),
+  regenerateTeacherResponse: vi.fn(async () => undefined),
+  conversationExportURL: (slug: string) => `/api/projects/${slug}/conversation/export.md`,
 }));
 
 vi.mock('@/features/settings', () => ({
@@ -253,5 +259,100 @@ describe('TeacherView source references', () => {
     view.unmount();
     render(<QueryClientProvider client={client}><TeacherView slug="offline" title="离线恢复" /></QueryClientProvider>);
     await waitFor(() => expect(screen.queryByRole('status')).toBeNull());
+  });
+});
+
+describe('TeacherView iteration-17 conversation actions', () => {
+  it('queues a message instead of blocking while the teacher streams', async () => {
+    let finish!: () => void;
+    vi.mocked(streamTeacherTurn).mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => { finish = resolve; });
+    });
+    workspaceMocks.conversation = {
+      totalMessages: 1,
+      taskLinks: [],
+      queue: [],
+      messages: [{ id: 'teacher-history', role: 'teacher', status: 'completed', blocks: [{ id: 'b1', type: 'markdown', source: '历史回答' }], createdAt: '' }],
+    };
+    const { queueTeacherTurn } = await import('@/features/learning/api/learningWorkspace');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="queue-chat" title="排队" /></QueryClientProvider>);
+
+    fireEvent.change(screen.getByPlaceholderText('和 排队 的教师继续讨论…'), { target: { value: '第一条' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '排队' })).toBeTruthy());
+
+    // The composer stays usable while streaming.
+    const composer = screen.getByPlaceholderText('教师正在回答…发送将进入等待队列');
+    fireEvent.change(composer, { target: { value: '补充问题' } });
+    fireEvent.click(screen.getByRole('button', { name: '排队' }));
+    await waitFor(() => expect(queueTeacherTurn).toHaveBeenCalledWith('queue-chat', expect.objectContaining({ content: '补充问题' })));
+    await act(async () => { finish(); });
+  });
+
+  it('renders queue chips with edit / steer / discard actions from the projection', async () => {
+    workspaceMocks.conversation = {
+      totalMessages: 1,
+      taskLinks: [],
+      latestResponseId: 'resp_current',
+      queue: [{ queueId: 'q_1', content: '排队中的问题', queuedAt: '' }],
+      messages: [{ id: 'teacher-history', role: 'teacher', status: 'completed', blocks: [{ id: 'b1', type: 'markdown', source: '回答' }], createdAt: '' }],
+    };
+    const { steerQueuedTurn, discardQueuedTurn } = await import('@/features/learning/api/learningWorkspace');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="queue-view" title="队列" /></QueryClientProvider>);
+
+    expect(await screen.findByText('排队中的问题')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '立即引导 排队中的问题' }));
+    await waitFor(() => expect(steerQueuedTurn).toHaveBeenCalledWith('queue-view', 'q_1', expect.anything(), expect.anything()));
+    fireEvent.click(screen.getByRole('button', { name: '移除排队消息 排队中的问题' }));
+    await waitFor(() => expect(discardQueuedTurn).toHaveBeenCalledWith('queue-view', 'q_1'));
+  });
+
+  it('offers copy on messages and regenerate on the last teacher reply only', async () => {
+    workspaceMocks.conversation = {
+      totalMessages: 3,
+      taskLinks: [],
+      latestResponseId: 'resp_last',
+      messages: [
+        { id: 'learner-1', role: 'learner', status: 'completed', blocks: [{ id: 'b1', type: 'markdown', source: '第一问' }], createdAt: '' },
+        { id: 'teacher-1', role: 'teacher', status: 'completed', blocks: [{ id: 'b2', type: 'markdown', source: '旧回答' }], createdAt: '' },
+        { id: 'teacher-2', role: 'teacher', status: 'completed', blocks: [{ id: 'b3', type: 'markdown', source: '最新回答' }], createdAt: '' },
+      ],
+    };
+    Object.assign(navigator, { clipboard: { writeText: vi.fn(async () => undefined) } });
+    const { regenerateTeacherResponse } = await import('@/features/learning/api/learningWorkspace');
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="regen" title="重生成" /></QueryClientProvider>);
+
+    await screen.findByText('最新回答');
+    // Copy exists on every message (3 here), regenerate only once.
+    const copyButtons = screen.getAllByRole('button', { name: '复制原文' });
+    expect(copyButtons.length).toBe(3);
+    const regenerateButton = screen.getByRole('button', { name: '重新生成这条回复' });
+    expect(regenerateButton).toBeTruthy();
+
+    fireEvent.click(copyButtons[2]);
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('最新回答'));
+
+    fireEvent.click(regenerateButton);
+    await waitFor(() => expect(regenerateTeacherResponse).toHaveBeenCalledWith('regen', 'resp_last', expect.anything(), expect.anything()));
+  });
+
+  it('renders web-search status chips while streaming', async () => {
+    let finish!: () => void;
+    vi.mocked(streamTeacherTurn).mockImplementationOnce(async (_slug, _input, _signal, onFrame) => {
+      onFrame({ type: 'message-started', data: { teacherMessageId: 'msg-t' } });
+      onFrame({ type: 'search-started', data: { query: 'go 1.24 发布' } });
+      onFrame({ type: 'search-completed', data: { query: 'go 1.24 发布', count: 5 } });
+      await new Promise<void>((resolve) => { finish = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="search-chat" title="搜索" /></QueryClientProvider>);
+
+    fireEvent.change(screen.getByPlaceholderText('和 搜索 的教师继续讨论…'), { target: { value: '有什么新特性' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    expect(await screen.findByText(/go 1\.24 发布 · 5 条结果/)).toBeTruthy();
+    await act(async () => { finish(); });
   });
 });

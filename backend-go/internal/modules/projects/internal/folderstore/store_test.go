@@ -1,6 +1,8 @@
 package folderstore
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
@@ -139,5 +141,33 @@ func TestRemoveProjectPrunesMembershipAndMapBinding(t *testing.T) {
 	}
 	if len(out.Folders[0].SlugOrder) != 1 || out.Folders[0].SlugOrder[0] != "optics" {
 		t.Fatalf("membership not pruned: %+v", out.Folders[0])
+	}
+}
+
+func TestLegacyRootFoldersJSONMigratesIntoProjects(t *testing.T) {
+	root := t.TempDir()
+	prev := paths.WORKSPACE
+	paths.WORKSPACE = root
+	t.Cleanup(func() { paths.WORKSPACE = prev })
+	if err := os.MkdirAll(paths.PROJECTS_ROOT, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	legacy := filepath.Join(root, "folders.json")
+	if err := os.WriteFile(legacy, []byte(`{"folders":[{"id":"f_1","name":"编译原理","slug":"bianyi","sortOrder":1}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(store.data.Folders) != 1 || store.data.Folders[0].Name != "编译原理" {
+		t.Fatalf("legacy folders not migrated: %#v", store.data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "projects", "folders.json")); err != nil {
+		t.Fatalf("projects/folders.json not created: %v", err)
+	}
+	// Legacy file stays untouched; new location is authoritative from now on.
+	if _, err := os.Stat(legacy); err != nil {
+		t.Fatalf("legacy file must not be deleted: %v", err)
 	}
 }

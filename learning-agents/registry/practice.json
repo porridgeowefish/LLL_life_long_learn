@@ -10,7 +10,7 @@
     ]
   },
   "allowedZones": ["Practice"],
-  "charterPath": "agents/charters/practice.md",
+  "charterPath": "learning-agents/charters/practice.md",
   "defaultOutputTargets": [
     {"zone": "Practice", "filename": "tasks.json"}
   ]

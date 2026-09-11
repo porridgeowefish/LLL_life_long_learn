@@ -68,16 +68,36 @@ type Unit struct {
 }
 
 type Projection struct {
-	ConversationID string     `json:"conversationId"`
-	UnitID         string     `json:"unitId"`
-	LatestSeq      uint64     `json:"latestSeq"`
-	PageFromSeq    uint64     `json:"pageFromSeq,omitempty"`
-	PageThroughSeq uint64     `json:"pageThroughSeq"`
-	HasMore        bool       `json:"hasMore"`
-	HasPrevious    bool       `json:"hasPrevious,omitempty"`
-	TotalMessages  int        `json:"totalMessages"`
-	Messages       []Message  `json:"messages"`
-	TaskLinks      []TaskLink `json:"taskLinks"`
+	ConversationID   string      `json:"conversationId"`
+	UnitID           string      `json:"unitId"`
+	LatestSeq        uint64      `json:"latestSeq"`
+	PageFromSeq      uint64      `json:"pageFromSeq,omitempty"`
+	PageThroughSeq   uint64      `json:"pageThroughSeq"`
+	HasMore          bool        `json:"hasMore"`
+	HasPrevious      bool        `json:"hasPrevious,omitempty"`
+	TotalMessages    int         `json:"totalMessages"`
+	Messages         []Message   `json:"messages"`
+	TaskLinks        []TaskLink  `json:"taskLinks"`
+	Queue            []QueueItem `json:"queue"`
+	LatestResponseID string      `json:"latestResponseId,omitempty"`
+}
+
+// QueueItem is one learner message waiting for the current turn to finish.
+type QueueItem struct {
+	QueueID        string    `json:"queueId"`
+	Content        string    `json:"content"`
+	AttachmentRefs []string  `json:"attachmentRefs,omitempty"`
+	OperationID    string    `json:"operationId,omitempty"`
+	ProviderID     string    `json:"providerId,omitempty"`
+	QueuedAt       time.Time `json:"queuedAt"`
+}
+
+// PromotedTurn is the durable result of moving a queue item into a real turn.
+type PromotedTurn struct {
+	Item       QueueItem
+	Learner    Message
+	LearnerSeq uint64
+	Mode       string // "auto" | "steer" | "manual"
 }
 
 type TaskLink struct {
@@ -284,9 +304,14 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 	if err != nil {
 		return Projection{}, err
 	}
-	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}}
+	hidden := hiddenTeacherMessages(events)
+	proj := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: meta.LatestSeq, Messages: []Message{}, TaskLinks: []TaskLink{}, Queue: replayQueue(events), LatestResponseID: replayResponses(events).latest}
 	for _, event := range events {
-		if event.Type == "message-recorded" {
+		if event.Type != "message-recorded" {
+			continue
+		}
+		var msg Message
+		if json.Unmarshal(event.Data, &msg) == nil && !(msg.Role == "teacher" && hidden[msg.ID]) {
 			proj.TotalMessages++
 		}
 	}
@@ -306,7 +331,7 @@ func (s *Store) Read(afterSeq uint64, limit int) (Projection, error) {
 		switch event.Type {
 		case "message-recorded":
 			var msg Message
-			if json.Unmarshal(event.Data, &msg) == nil {
+			if json.Unmarshal(event.Data, &msg) == nil && !(msg.Role == "teacher" && hidden[msg.ID]) {
 				proj.Messages = append(proj.Messages, msg)
 			}
 		case "task-linked":
@@ -340,13 +365,14 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 		seq     uint64
 		message Message
 	}
+	hidden := hiddenTeacherMessages(events)
 	messages := make([]sequenced, 0)
 	links := make([]TaskLink, 0)
 	for _, event := range events {
 		switch event.Type {
 		case "message-recorded":
 			var message Message
-			if json.Unmarshal(event.Data, &message) == nil {
+			if json.Unmarshal(event.Data, &message) == nil && !(message.Role == "teacher" && hidden[message.ID]) {
 				messages = append(messages, sequenced{seq: event.Seq, message: message})
 			}
 		case "task-linked":
@@ -369,13 +395,15 @@ func (s *Store) ReadRecent(beforeSeq uint64, limit int) (Projection, error) {
 		start = 0
 	}
 	projection := Projection{
-		ConversationID: meta.ID,
-		UnitID:         meta.UnitID,
-		LatestSeq:      meta.LatestSeq,
-		HasPrevious:    start > 0,
-		TotalMessages:  len(messages),
-		Messages:       []Message{},
-		TaskLinks:      []TaskLink{},
+		ConversationID:   meta.ID,
+		UnitID:           meta.UnitID,
+		LatestSeq:        meta.LatestSeq,
+		HasPrevious:      start > 0,
+		TotalMessages:    len(messages),
+		Messages:         []Message{},
+		TaskLinks:        []TaskLink{},
+		Queue:            replayQueue(events),
+		LatestResponseID: replayResponses(events).latest,
 	}
 	selected := map[string]bool{}
 	for _, item := range messages[start:end] {
@@ -449,13 +477,14 @@ func (s *Store) SequencedMessages() ([]SequencedMessage, error) {
 	if err != nil {
 		return nil, err
 	}
+	hidden := hiddenTeacherMessages(events)
 	var messages []SequencedMessage
 	for _, event := range events {
 		if event.Type != "message-recorded" {
 			continue
 		}
 		var message Message
-		if json.Unmarshal(event.Data, &message) == nil {
+		if json.Unmarshal(event.Data, &message) == nil && !(message.Role == "teacher" && hidden[message.ID]) {
 			messages = append(messages, SequencedMessage{Seq: event.Seq, EventID: event.EventID, Message: message})
 		}
 	}
@@ -485,7 +514,34 @@ func (s *Store) ResponseForLearner(learnerMessageID string) (ResponseRecord, boo
 	if err != nil {
 		return ResponseRecord{}, false, err
 	}
-	var record ResponseRecord
+	record, _ := replayResponses(events).byLearner[learnerMessageID]
+	return record, record.ResponseID != "", nil
+}
+
+// replayResponses folds the event log into response records, queue state, and
+// supersession. It is the single source for every projection that must hide
+// superseded teacher messages or expose the live queue.
+type conversationState struct {
+	byLearner map[string]ResponseRecord
+	byID      map[string]ResponseInfo
+	latest    string // newest non-superseded response id
+	latestAll string // newest response id including superseded ones
+	queue     []QueueItem
+}
+
+type ResponseInfo struct {
+	ResponseID                 string
+	TeacherMessageID           string
+	TriggeringLearnerMessageID string
+	Active                     bool
+	Superseded                 bool
+	Message                    *Message
+}
+
+func replayResponses(events []Event) conversationState {
+	state := conversationState{byLearner: map[string]ResponseRecord{}, byID: map[string]ResponseInfo{}}
+	current := map[string]*ResponseInfo{}
+	var order []string
 	for _, event := range events {
 		switch event.Type {
 		case "teacher-response-started":
@@ -494,25 +550,305 @@ func (s *Store) ResponseForLearner(learnerMessageID string) (ResponseRecord, boo
 				TeacherMessageID           string `json:"teacherMessageId"`
 				TriggeringLearnerMessageID string `json:"triggeringLearnerMessageId"`
 			}
-			if json.Unmarshal(event.Data, &started) == nil && started.TriggeringLearnerMessageID == learnerMessageID {
-				record.ResponseID, record.TeacherMessageID, record.Active = started.ResponseID, started.TeacherMessageID, true
+			if json.Unmarshal(event.Data, &started) != nil || started.ResponseID == "" {
+				continue
 			}
+			current[started.ResponseID] = &ResponseInfo{ResponseID: started.ResponseID, TeacherMessageID: started.TeacherMessageID, TriggeringLearnerMessageID: started.TriggeringLearnerMessageID, Active: true}
+			order = append(order, started.ResponseID)
+			state.latestAll = started.ResponseID
 		case "message-recorded":
 			var message Message
-			if json.Unmarshal(event.Data, &message) == nil && record.TeacherMessageID != "" && message.ID == record.TeacherMessageID {
-				copy := message
-				record.Message = &copy
+			if json.Unmarshal(event.Data, &message) != nil {
+				continue
+			}
+			for _, response := range current {
+				if response.TeacherMessageID == message.ID {
+					copyMsg := message
+					response.Message = &copyMsg
+				}
 			}
 		case "teacher-response-finished":
 			var finished struct {
 				ResponseID string `json:"responseId"`
 			}
-			if json.Unmarshal(event.Data, &finished) == nil && record.ResponseID != "" && finished.ResponseID == record.ResponseID {
-				record.Active = false
+			if json.Unmarshal(event.Data, &finished) == nil {
+				if response, ok := current[finished.ResponseID]; ok {
+					response.Active = false
+				}
+			}
+		case "response-superseded":
+			var superseded struct {
+				ResponseID string `json:"responseId"`
+			}
+			if json.Unmarshal(event.Data, &superseded) == nil {
+				if response, ok := current[superseded.ResponseID]; ok {
+					response.Superseded = true
+				}
 			}
 		}
 	}
-	return record, record.ResponseID != "", nil
+	for _, id := range order {
+		snapshot := *current[id]
+		state.byID[id] = snapshot
+		if snapshot.Superseded {
+			continue
+		}
+		state.latest = id
+		if snapshot.TriggeringLearnerMessageID != "" {
+			state.byLearner[snapshot.TriggeringLearnerMessageID] = ResponseRecord{ResponseID: snapshot.ResponseID, TeacherMessageID: snapshot.TeacherMessageID, Active: snapshot.Active, Message: snapshot.Message}
+		}
+	}
+	return state
+}
+
+// replayQueue folds queue events in order. Pointers allow in-place removal.
+func replayQueue(events []Event) []QueueItem {
+	var items []*QueueItem
+	index := map[string]int{}
+	for _, event := range events {
+		switch event.Type {
+		case "learner-queued":
+			var item QueueItem
+			if json.Unmarshal(event.Data, &item) != nil || item.QueueID == "" {
+				continue
+			}
+			if _, exists := index[item.QueueID]; exists {
+				continue
+			}
+			index[item.QueueID] = len(items)
+			items = append(items, &item)
+		case "queue-item-edited":
+			var patch struct {
+				QueueID        string   `json:"queueId"`
+				Content        string   `json:"content"`
+				AttachmentRefs []string `json:"attachmentRefs"`
+			}
+			if json.Unmarshal(event.Data, &patch) != nil {
+				continue
+			}
+			if at, ok := index[patch.QueueID]; ok {
+				items[at].Content = patch.Content
+				items[at].AttachmentRefs = patch.AttachmentRefs
+			}
+		case "queue-item-discarded", "queue-item-promoted":
+			var ref struct {
+				QueueID string `json:"queueId"`
+			}
+			if json.Unmarshal(event.Data, &ref) != nil {
+				continue
+			}
+			if at, ok := index[ref.QueueID]; ok {
+				items[at] = nil
+				delete(index, ref.QueueID)
+			}
+		}
+	}
+	live := make([]QueueItem, 0, len(items))
+	for _, item := range items {
+		if item != nil {
+			live = append(live, *item)
+		}
+	}
+	return live
+}
+
+// hiddenTeacherMessages returns teacher message ids whose response was
+// superseded; projections must not show them.
+func hiddenTeacherMessages(events []Event) map[string]bool {
+	startedBy := map[string]string{}
+	superseded := map[string]bool{}
+	for _, event := range events {
+		switch event.Type {
+		case "teacher-response-started":
+			var started struct {
+				ResponseID       string `json:"responseId"`
+				TeacherMessageID string `json:"teacherMessageId"`
+			}
+			if json.Unmarshal(event.Data, &started) == nil {
+				startedBy[started.ResponseID] = started.TeacherMessageID
+			}
+		case "response-superseded":
+			var mark struct {
+				ResponseID string `json:"responseId"`
+			}
+			if json.Unmarshal(event.Data, &mark) == nil {
+				superseded[mark.ResponseID] = true
+			}
+		}
+	}
+	hidden := map[string]bool{}
+	for responseID, messageID := range startedBy {
+		if superseded[responseID] && messageID != "" {
+			hidden[messageID] = true
+		}
+	}
+	return hidden
+}
+
+var ErrQueueItemNotFound = errors.New("queue item not found")
+
+func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, providerID string) (QueueItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return QueueItem{}, err
+	}
+	if operationID != "" {
+		for _, event := range events {
+			if event.Type != "learner-queued" {
+				continue
+			}
+			var item QueueItem
+			if json.Unmarshal(event.Data, &item) == nil && item.OperationID == operationID {
+				return item, nil
+			}
+		}
+	}
+	item := QueueItem{QueueID: idgen.New("q"), Content: content, AttachmentRefs: attachmentRefs, OperationID: operationID, ProviderID: providerID, QueuedAt: time.Now().UTC()}
+	if _, err := s.appendLocked("learner-queued", item); err != nil {
+		return QueueItem{}, err
+	}
+	return item, nil
+}
+
+func (s *Store) EditQueueItem(queueID, content string, attachmentRefs []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	for _, item := range replayQueue(events) {
+		if item.QueueID == queueID {
+			_, err := s.appendLocked("queue-item-edited", struct {
+				QueueID        string   `json:"queueId"`
+				Content        string   `json:"content"`
+				AttachmentRefs []string `json:"attachmentRefs"`
+			}{queueID, content, attachmentRefs})
+			return err
+		}
+	}
+	return ErrQueueItemNotFound
+}
+
+func (s *Store) DiscardQueueItem(queueID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return err
+	}
+	for _, item := range replayQueue(events) {
+		if item.QueueID == queueID {
+			_, err := s.appendLocked("queue-item-discarded", struct {
+				QueueID string `json:"queueId"`
+			}{queueID})
+			return err
+		}
+	}
+	return ErrQueueItemNotFound
+}
+
+func (s *Store) QueueItems() ([]QueueItem, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return nil, err
+	}
+	return replayQueue(events), nil
+}
+
+// PromoteQueueItem atomically converts one queued item into a recorded learner
+// message plus a promotion event. mode documents why it left the queue.
+func (s *Store) PromoteQueueItem(queueID, mode string) (PromotedTurn, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return PromotedTurn{}, err
+	}
+	for _, item := range replayQueue(events) {
+		if item.QueueID == queueID {
+			return s.promoteLocked(item, mode)
+		}
+	}
+	return PromotedTurn{}, ErrQueueItemNotFound
+}
+
+// PromoteQueueHead promotes the oldest queued item, if any.
+func (s *Store) PromoteQueueHead(mode string) (PromotedTurn, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return PromotedTurn{}, false, err
+	}
+	queue := replayQueue(events)
+	if len(queue) == 0 {
+		return PromotedTurn{}, false, nil
+	}
+	promoted, err := s.promoteLocked(queue[0], mode)
+	return promoted, err == nil, err
+}
+
+func (s *Store) promoteLocked(item QueueItem, mode string) (PromotedTurn, error) {
+	blocks := []Block{{Type: "markdown", Source: item.Content}}
+	for _, ref := range item.AttachmentRefs {
+		blocks = append(blocks, Block{Type: "attachment", ArtifactRef: ref})
+	}
+	learner := Message{ID: idgen.New("msg"), Role: "learner", Status: "completed", Blocks: blocks, OperationID: item.OperationID, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
+	for i := range learner.Blocks {
+		if learner.Blocks[i].ID == "" {
+			learner.Blocks[i].ID = idgen.New("blk")
+		}
+	}
+	e, err := s.appendLocked("message-recorded", learner)
+	if err != nil {
+		return PromotedTurn{}, err
+	}
+	if _, err := s.appendLocked("queue-item-promoted", struct {
+		QueueID          string `json:"queueId"`
+		LearnerMessageID string `json:"learnerMessageId"`
+		Mode             string `json:"mode"`
+	}{item.QueueID, learner.ID, mode}); err != nil {
+		return PromotedTurn{}, err
+	}
+	return PromotedTurn{Item: item, Learner: learner, LearnerSeq: e.Seq, Mode: mode}, nil
+}
+
+// SupersedeResponse hides an old response after regeneration replaced it.
+func (s *Store) SupersedeResponse(oldResponseID, newResponseID string) error {
+	_, err := s.Append("response-superseded", struct {
+		ResponseID    string `json:"responseId"`
+		NewResponseID string `json:"newResponseId"`
+	}{oldResponseID, newResponseID})
+	return err
+}
+
+// ResponseByID resolves one response record including supersession state.
+func (s *Store) ResponseByID(responseID string) (ResponseInfo, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return ResponseInfo{}, false, err
+	}
+	info, ok := replayResponses(events).byID[responseID]
+	return info, ok, nil
+}
+
+// LatestResponseID returns the newest non-superseded response, if any.
+func (s *Store) LatestResponseID() (string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return "", false, err
+	}
+	state := replayResponses(events)
+	return state.latest, state.latest != "", nil
 }
 
 // ReconcileInterruptedResponses closes response-start records left active by a

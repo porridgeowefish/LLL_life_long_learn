@@ -35,6 +35,15 @@ export interface ConversationProjection {
   totalMessages: number;
   messages: ConversationMessage[];
   taskLinks: TaskLink[];
+  queue?: QueuedTurn[];
+  latestResponseId?: string;
+}
+
+export interface QueuedTurn {
+  queueId: string;
+  content: string;
+  attachmentRefs?: string[];
+  queuedAt: string;
 }
 
 export interface AssistantTask {
@@ -133,6 +142,9 @@ export type TeacherStreamFrame =
   | { type: 'text-delta' | 'reasoning-summary-delta'; data: { blockId: string; delta: string } }
   | { type: 'task-accepted'; data: { toolCallId: string; taskId: string; status: string } }
   | { type: 'tool-rejected'; data: { toolCallId: string; code: string; existingTaskId?: string } }
+  | { type: 'search-started'; data: { query: string } }
+  | { type: 'search-completed'; data: { query: string; count: number } }
+  | { type: 'search-failed'; data: { query: string; code: string } }
   | { type: 'message-completed'; data: { messageId: string; latestSeq: number } }
   | { type: 'message-failed'; data: { messageId?: string; code: string; partialPreserved: boolean } }
   | { type: string; data: Record<string, unknown> };
@@ -319,25 +331,7 @@ export function usePermanentlyDeleteSource(slug: string) {
 export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; providerId?: string }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/turns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
   if (!response.ok || !response.body) throw new ApiError(response.status, '教师响应无法开始', await response.text());
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  while (true) {
-    const { value, done } = await reader.read();
-    buffer += decoder.decode(value, { stream: !done });
-    const chunks = buffer.split(/\r?\n\r?\n/);
-    buffer = chunks.pop() ?? '';
-    for (const chunk of chunks) {
-      let type = '';
-      let data = '';
-      for (const line of chunk.split(/\r?\n/)) {
-        if (line.startsWith('event:')) type = line.slice(6).trim();
-        if (line.startsWith('data:')) data += line.slice(5).trim();
-      }
-      if (type && data) onFrame({ type, data: JSON.parse(data) } as TeacherStreamFrame);
-    }
-    if (done) break;
-  }
+  await consumeSSE(response, onFrame);
 }
 
 // Reconnects to a teacher response that is still running in the backend. The
@@ -346,7 +340,47 @@ export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFra
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/active`, { signal });
   if (response.status === 204) return false;
   if (!response.ok || !response.body) throw new ApiError(response.status, '教师响应无法恢复', await response.text());
-  const reader = response.body.getReader();
+  await consumeSSE(response, onFrame);
+  return true;
+}
+
+export async function stopTeacherResponse(slug: string, responseId: string) {
+  return http.post(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/stop`, { operationId: crypto.randomUUID() });
+}
+
+// Queued turns: durable server-side waiting line for messages sent while the
+// teacher is streaming. promoted=true means no response was active and the
+// item already became a normal turn (reattach via resumeTeacherTurn).
+export async function queueTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; providerId?: string }) {
+  return http.post<{ queueId: string; promoted: boolean }>(`/api/projects/${encodeURIComponent(slug)}/conversation/turns/queue`, input);
+}
+
+export async function editQueuedTurn(slug: string, queueId: string, input: { content: string; attachmentRefs?: string[] }) {
+  return http.post<{ queueId: string }>(`/api/projects/${encodeURIComponent(slug)}/conversation/queue/${encodeURIComponent(queueId)}/edit`, input);
+}
+
+export async function discardQueuedTurn(slug: string, queueId: string) {
+  return http.post<{ queueId: string; discarded: boolean }>(`/api/projects/${encodeURIComponent(slug)}/conversation/queue/${encodeURIComponent(queueId)}/discard`, {});
+}
+
+// Steaming an immediate steer: interrupts the active response server-side and
+// streams the follow-up turn over this connection.
+export async function steerQueuedTurn(slug: string, queueId: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/queue/${encodeURIComponent(queueId)}/steer`, { method: 'POST', signal });
+  if (response.status === 204) return false;
+  if (!response.ok || !response.body) throw new ApiError(response.status, '引导未能开始', await response.text());
+  await consumeSSE(response, onFrame);
+  return true;
+}
+
+export async function regenerateTeacherResponse(slug: string, responseId: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/regenerate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' , signal });
+  if (!response.ok || !response.body) throw new ApiError(response.status, '重新生成未能开始', await response.text());
+  await consumeSSE(response, onFrame);
+}
+
+async function consumeSSE(response: Response, onFrame: (frame: TeacherStreamFrame) => void) {
+  const reader = response.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
   while (true) {
@@ -365,11 +399,10 @@ export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFra
     }
     if (done) break;
   }
-  return true;
 }
 
-export async function stopTeacherResponse(slug: string, responseId: string) {
-  return http.post(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/${encodeURIComponent(responseId)}/stop`, { operationId: crypto.randomUUID() });
+export function conversationExportURL(slug: string) {
+  return `/api/projects/${encodeURIComponent(slug)}/conversation/export.md`;
 }
 
 export function invalidateLearningWorkspace(client: ReturnType<typeof useQueryClient>, slug: string) {

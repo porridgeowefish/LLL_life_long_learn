@@ -136,8 +136,14 @@ var frozenRoutes = map[string]string{
 	"POST /api/projects/{id}/activity":                                                 "",
 	"GET /api/projects/{id}/conversation":                                              "",
 	"POST /api/projects/{id}/conversation/turns":                                       "",
+	"POST /api/projects/{id}/conversation/turns/queue":                                 "",
 	"GET /api/projects/{id}/conversation/responses/active":                             "",
 	"POST /api/projects/{id}/conversation/responses/{responseId}/stop":                 "",
+	"POST /api/projects/{id}/conversation/responses/{responseId}/regenerate":           "",
+	"POST /api/projects/{id}/conversation/queue/{queueId}/edit":                        "",
+	"POST /api/projects/{id}/conversation/queue/{queueId}/discard":                     "",
+	"POST /api/projects/{id}/conversation/queue/{queueId}/steer":                       "",
+	"GET /api/projects/{id}/conversation/export.md":                                    "",
 	"GET /api/projects/{id}/assistant-tasks":                                           "",
 	"GET /api/projects/{id}/assistant-tasks/{taskId}":                                  "",
 	"GET /api/projects/{id}/assets":                                                    "",
@@ -199,7 +205,7 @@ var frozenRoutes = map[string]string{
 }
 
 func TestRouteTableFrozen(t *testing.T) {
-	if len(frozenRoutes) != 89 {
+	if len(frozenRoutes) != 95 {
 		t.Fatalf("route table snapshot has %d entries; update this test deliberately if the iteration-13 surface changed", len(frozenRoutes))
 	}
 	s := newTestServer(t)
@@ -217,7 +223,7 @@ func TestRouteTableFrozen(t *testing.T) {
 		}
 		// Normalize wildcard patterns for probing.
 		probePath := strings.ReplaceAll(path, "{path...}", "x")
-		for _, token := range [][2]string{{"{id}", "lingo-duihua"}, {"{zone}", "Explain"}, {"{taskId}", "task_x"}, {"{assetKey}", "body"}, {"{sourceId}", "source_x"}, {"{revisionId}", "srev_x"}, {"{fileKey}", "original"}, {"{artifactId}", "artifact_x"}, {"{responseId}", "resp_x"}, {"{confusionId}", "cf_x"}, {"{annotationId}", "ann_x"}, {"{attempt}", "1"}, {"{runId}", "run_x"}} {
+		for _, token := range [][2]string{{"{id}", "lingo-duihua"}, {"{zone}", "Explain"}, {"{taskId}", "task_x"}, {"{assetKey}", "body"}, {"{sourceId}", "source_x"}, {"{revisionId}", "srev_x"}, {"{fileKey}", "original"}, {"{artifactId}", "artifact_x"}, {"{responseId}", "resp_x"}, {"{queueId}", "q_x"}, {"{confusionId}", "cf_x"}, {"{annotationId}", "ann_x"}, {"{attempt}", "1"}, {"{runId}", "run_x"}} {
 			probePath = strings.ReplaceAll(probePath, token[0], token[1])
 		}
 		if probePath == path && strings.Contains(path, "{") {

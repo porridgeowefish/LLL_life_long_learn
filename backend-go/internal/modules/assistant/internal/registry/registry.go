@@ -99,7 +99,7 @@ func (r *Registry) Load() error {
 			return fmt.Errorf("agent %s: %w", a.ID, err)
 		}
 		// Resolve charter path. Registry entries commonly use a path
-		// relative to the workspace root (e.g. "agents/charters/explain.md"),
+		// relative to the workspace root (e.g. "learning-agents/charters/explain.md"),
 		// so we anchor relative paths to the workspace root — the parent
 		// of AGENTS_ROOT — to make loading robust against the process
 		// working directory.

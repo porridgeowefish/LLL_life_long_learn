@@ -10,7 +10,7 @@ const path = require('path');
 
 const mode = process.argv[2] || 'fast';
 if (!['fast', 'complete', 'full'].includes(mode)) {
-  console.error('usage: node scripts/run-check.js fast|complete|full');
+  console.error('usage: node tools/check/run-check.js fast|complete|full');
   process.exit(2);
 }
 
@@ -70,7 +70,7 @@ if (mode !== 'fast') {
     'go',
     ['test', '-count=1', '-timeout', '900s', '-coverprofile', `${artifacts}/coverage/go.out`, './backend-go/...'],
   );
-  if (!failed) run('Go coverage gate', 'node', ['scripts/check-coverage.js', 'go', `${artifacts}/coverage/go.out`]);
+  if (!failed) run('Go coverage gate', 'node', ['tools/check/check-coverage.js', 'go', `${artifacts}/coverage/go.out`]);
   run('frontend production build', 'npm', ['--prefix', 'frontend', 'run', 'build']);
   run('backend production build', 'go', ['build', '-o', 'dist/lll.exe', './backend-go/cmd/lll']);
 }

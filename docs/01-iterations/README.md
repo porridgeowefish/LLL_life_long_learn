@@ -11,16 +11,16 @@ Each iteration should be independently understandable and testable.
 
 | Iteration | Goal | Directory |
 |---|---|---|
-| 16 | Completed conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) |
+| 17 | Teacher agent refinements: OCR, queue with steering, copy/regenerate/export, web search, repository normalization | [iteration-17-teacher-agent-refinements](./iteration-17-teacher-agent-refinements/README.md) |
 
 ## Active Delivery Slice
 
 | Iteration | Goal | Directory | State |
 |---|---|---|---|
-| 16 | Complete conversation sources, consolidation, teaching outlines, and teacher token usage | [iteration-16-conversation-learning-workflow](./iteration-16-conversation-learning-workflow/README.md) | delivered; native browser acceptance remains user-run |
+| 17 | Teacher agent refinements: OCR image sources, streaming queue with steering, copy/regenerate/export, web search tool, repository normalization | [iteration-17-teacher-agent-refinements](./iteration-17-teacher-agent-refinements/README.md) | delivered; manual OCR/web-search smoke remains learner-run |
 
-Iteration 13 is retained under `foundations/`; iteration 16 is the current
-implemented baseline. Iteration 14 remains the architecture baseline.
+Iterations 13 and 16 are retained under `foundations/`; iteration 17 is the
+current implemented baseline. Iteration 14 remains the architecture baseline.
 
 Iterations 01–13 are retained as [delivered foundations](./foundations/README.md).
 They explain reusable capabilities that still support the current architecture.

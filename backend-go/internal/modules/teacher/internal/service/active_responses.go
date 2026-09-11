@@ -7,11 +7,12 @@ import (
 
 // ActiveResponse owns a provider response independently from an HTTP connection.
 type ActiveResponse struct {
-	cancel context.CancelFunc
-	mu     sync.Mutex
-	frames []StreamFrame
-	done   bool
-	notify chan struct{}
+	cancel   context.CancelFunc
+	mu       sync.Mutex
+	frames   []StreamFrame
+	done     bool
+	finished chan struct{}
+	notify   chan struct{}
 }
 
 func (r *ActiveResponse) Append(frame StreamFrame) {
@@ -22,10 +23,25 @@ func (r *ActiveResponse) Append(frame StreamFrame) {
 	r.mu.Unlock()
 }
 
+// Done is closed exactly once when the response reaches its terminal state.
+// Steering waits on it so a new turn never races the old one's persistence.
+func (r *ActiveResponse) Done() <-chan struct{} {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.finished == nil {
+		r.finished = make(chan struct{})
+	}
+	return r.finished
+}
+
 func (r *ActiveResponse) Finish() {
 	r.mu.Lock()
 	if !r.done {
 		r.done = true
+		if r.finished == nil {
+			r.finished = make(chan struct{})
+		}
+		close(r.finished)
 		close(r.notify)
 	}
 	r.mu.Unlock()

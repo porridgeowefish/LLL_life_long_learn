@@ -51,6 +51,7 @@ type Server struct {
 	cache            *projectindex.Index
 	infographicJobs  sync.Map
 	practiceEvalJobs sync.Map
+	teacherTurnMu    sync.Map // project slug → *sync.Mutex for turn lifecycle
 	mu               sync.RWMutex
 }
 
@@ -160,8 +161,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/turns", s.handleTeacherTurn)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/turns/queue", s.handleQueueTeacherTurn)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/responses/active", s.handleActiveTeacherResponse)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/responses/{responseId}/stop", s.handleStopTeacherResponse)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/responses/{responseId}/regenerate", s.handleRegenerateTeacherResponse)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/queue/{queueId}/edit", s.handleEditQueuedTurn)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/queue/{queueId}/discard", s.handleDiscardQueuedTurn)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/queue/{queueId}/steer", s.handleSteerQueuedTurn)
+	mux.HandleFunc("GET /api/projects/{id}/conversation/export.md", s.handleExportConversation)
 	mux.HandleFunc("GET /api/projects/{id}/assistant-tasks", s.handleListAssistantTasks)
 	mux.HandleFunc("GET /api/projects/{id}/assistant-tasks/{taskId}", s.handleGetAssistantTask)
 	mux.HandleFunc("GET /api/projects/{id}/assets", s.handleListLearningAssets)

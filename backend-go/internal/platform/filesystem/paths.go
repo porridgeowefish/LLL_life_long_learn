@@ -45,7 +45,7 @@ func init() {
 		WORKSPACE = PROJECT_ROOT
 	}
 	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
-	AGENTS_ROOT = filepath.Join(WORKSPACE, "agents")
+	AGENTS_ROOT = filepath.Join(WORKSPACE, "learning-agents")
 	// FRONTEND_ROOT points at the Vite build output (frontend/dist) so a
 	// single Go binary can serve the React SPA in production. In dev the
 	// frontend runs on Vite :5173 and proxies API calls here.

@@ -7,6 +7,6 @@
   "primitives": { "required": [], "optional": [] },
   "allowedZones": [],
   "allowedProjectTypes": ["discipline-map"],
-  "charterPath": "agents/charters/encyclopedia.md",
+  "charterPath": "learning-agents/charters/encyclopedia.md",
   "defaultOutputTargets": []
 }

@@ -44,7 +44,7 @@ uploaded source contents, or unrestricted absolute paths.
 ## Coverage Policy
 
 `tests/baseline.json` records the pre-refactor statement coverage
-(iteration-13 code: Go 29.35%, frontend 40.24%). `scripts/check-coverage.js`
+(iteration-13 code: Go 29.35%, frontend 40.24%). `tools/check/check-coverage.js`
 fails the gate when measured coverage drops more than one percentage point
 below the baseline. The baseline is re-recorded deliberately — never lowered
 silently to make a failing gate pass.

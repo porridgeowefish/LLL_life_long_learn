@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"context"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/xmz14/lll/backend-go/internal/idgen"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
 
 type fakeGateway struct {
@@ -261,4 +264,128 @@ func TestDelegationAcceptsLearnerSelectedSourceDisclosedByName(t *testing.T) {
 	if !accepted {
 		t.Fatal("learner-selected and name-disclosed source was not authorized")
 	}
+}
+
+type fakeSearcher struct {
+	queries []string
+}
+
+func (f *fakeSearcher) Search(_ context.Context, query string) ([]websearch.Result, error) {
+	f.queries = append(f.queries, query)
+	return []websearch.Result{{Title: "Go 1.24 发布说明", URL: "https://go.dev/doc/go1.24", Snippet: "泛型别名正式落地。"}}, nil
+}
+
+type searchLoopGateway struct {
+	mu       sync.Mutex
+	requests []teachergateway.Request
+}
+
+func (g *searchLoopGateway) record(request teachergateway.Request) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.requests = append(g.requests, request)
+}
+
+func (g *searchLoopGateway) count() int {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return len(g.requests)
+}
+
+func (g *searchLoopGateway) Stream(_ context.Context, in teachergateway.Request, emit func(teachergateway.Event)) error {
+	g.record(in)
+	if g.count() == 1 {
+		emit(teachergateway.Event{Type: "text-delta", Delta: "我先查一下。"})
+		emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_search", ProviderCallID: "provider_call_search", ToolName: "search_web", Arguments: map[string]any{"query": "go 1.24 发布"}}})
+		return nil
+	}
+	emit(teachergateway.Event{Type: "text-delta", Delta: "根据检索结果回答。"})
+	return nil
+}
+
+func swapSearcherForTest(t *testing.T, searcher websearch.Searcher) {
+	t.Helper()
+	previous := resolveSearcher
+	resolveSearcher = func() websearch.Searcher { return searcher }
+	t.Cleanup(func() { resolveSearcher = previous })
+}
+
+func TestSearchToolLoopFeedsResultsBack(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("searchloop", "搜索", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	gateway := &searchLoopGateway{}
+	service := New(gateway)
+	searcher := &fakeSearcher{}
+	swapSearcherForTest(t, searcher)
+
+	var frames []StreamFrame
+	if err := service.StreamTurn(context.Background(), "searchloop", TurnInput{OperationID: "op_search", Content: "go 1.24 有什么新特性？"}, func(frame StreamFrame) {
+		frames = append(frames, frame)
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if gateway.count() != 2 {
+		t.Fatalf("expected two provider rounds, got %d", gateway.count())
+	}
+	if len(searcher.queries) != 1 || searcher.queries[0] != "go 1.24 发布" {
+		t.Fatalf("search query wrong: %#v", searcher.queries)
+	}
+	second := gateway.requests[len(gateway.requests)-1]
+	if len(second.Messages) < 2 {
+		t.Fatalf("follow-up messages missing: %#v", second.Messages)
+	}
+	assistantCall := second.Messages[len(second.Messages)-2]
+	toolResult := second.Messages[len(second.Messages)-1]
+	if len(assistantCall.ToolCalls) != 1 || assistantCall.ToolCalls[0].ToolName != "search_web" {
+		t.Fatalf("assistant tool_calls message wrong: %#v", assistantCall)
+	}
+	if toolResult.ToolCallID != "provider_call_search" || !strings.Contains(toolResult.Content, "Go 1.24 发布说明") {
+		t.Fatalf("tool result message wrong: %#v", toolResult)
+	}
+	var started, completed bool
+	for _, frame := range frames {
+		if frame.Type == "search-started" {
+			started = true
+		}
+		if frame.Type == "search-completed" {
+			completed = frame.Data["count"] == 1
+		}
+	}
+	if !started || !completed {
+		t.Fatalf("search frames missing: %#v", frames)
+	}
+}
+
+func TestSearchLoopBoundedToTwoSearches(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("searchbound", "有界", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	// Every round emits another search call; the loop must stop after two.
+	gateway := &alwaysSearchGateway{}
+	service := New(gateway)
+	swapSearcherForTest(t, &fakeSearcher{})
+	if err := service.StreamTurn(context.Background(), "searchbound", TurnInput{OperationID: "op_bound", Content: "持续检索"}, func(StreamFrame) {}); err != nil {
+		t.Fatal(err)
+	}
+	if rounds := gateway.count(); rounds != 3 {
+		t.Fatalf("expected 3 provider rounds (2 search + 1 final), got %d", rounds)
+	}
+}
+
+type alwaysSearchGateway struct {
+	searchLoopGateway
+}
+
+func (g *alwaysSearchGateway) Stream(_ context.Context, in teachergateway.Request, emit func(teachergateway.Event)) error {
+	g.record(in)
+	emit(teachergateway.Event{Type: "text-delta", Delta: "再查一次。"})
+	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: idgen.New("call"), ProviderCallID: idgen.New("pcall"), ToolName: "search_web", Arguments: map[string]any{"query": "x"}}})
+	return nil
 }

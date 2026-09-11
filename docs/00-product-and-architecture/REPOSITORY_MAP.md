@@ -23,15 +23,18 @@ These directories are the current implementation surface:
 ```text
 backend-go/        Go backend, API routes, session runtime, file stores
 frontend/          Vite + React 18 + TypeScript SPA
-agents/            agent registry, charters, primitives
+learning-agents/   learning-runtime agent registry, charters, primitives
 ```
 
 Use these as executable truth before trusting any design/mock document.
+`learning-agents/` was renamed from `agents/` in iteration 17 (ADR-0019) to
+stop colliding with the repo-maintenance "coding agents" concept governed by
+AGENTS.md.
 
-### Current Iteration-14 Source Layout
+### Current Source Layout
 
-Iteration 14 reorganized the internals without moving the top-level
-`backend-go/`, `frontend/`, or `agents/` roots or runtime data:
+Iteration 14 reorganized the internals; iteration 17 normalized the
+top-level operator layout:
 
 ```text
 backend-go/internal/app/              composition and cross-module glue
@@ -44,8 +47,11 @@ frontend/src/app/                     router, providers, app shell, single SSE m
 frontend/src/features/                business feature public entries and private implementation
 frontend/src/shared/                  proven cross-feature UI and pure utilities
 
-tests/                                cross-module contracts, fixtures, recovery, smoke
+scripts/                              operator entry points only (Start/Stop/Install + assets)
+tests/                                cross-module contracts, fixtures, smoke, manual QA scripts
+tests/manual/                         human-run one-off QA scripts (not in npm run check)
 tools/archcheck/                      executable dependency policy
+tools/check/                          developer check pipeline (run-check.js, check-coverage.js)
 .artifacts/quality/                   ignored generated test and coverage evidence
 config/                               committed schema and non-secret example
 ```
@@ -59,11 +65,15 @@ These directories are runtime state or generated local data, not product contrac
 
 ```text
 projects/          learner projects, conversations, assets, sources, tasks, runs
+                   plus projects/folders.json (workspace folder ledger, ADR-0019)
 preferences.md     local learner-owned global preferences (gitignored)
 dist/              built desktop/backend artifacts
 learning/          local learning artifacts / workspace data
 repro-shell/       local repro helpers
 ```
+
+A legacy workspace-root `folders.json` is migrated into `projects/` by a
+one-time copy on first open; the legacy file is left in place.
 
 Do not write long-lived product rules here.
 

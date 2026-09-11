@@ -19,7 +19,7 @@
     ]
   },
   "allowedZones": ["Explain"],
-  "charterPath": "agents/charters/explain.md",
+  "charterPath": "learning-agents/charters/explain.md",
   "defaultOutputTargets": [
     {"zone": "Explain", "filename": "output.md"}
   ]

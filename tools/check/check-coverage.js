@@ -1,13 +1,13 @@
 // Compares measured coverage against the recorded iteration-14 baseline
 // (tests/baseline.json). Fails when coverage drops more than one percentage
 // point below the baseline. Usage:
-//   node scripts/check-coverage.js go <profile-file>
-//   node scripts/check-coverage.js frontend <coverage-final.json>
+//   node tools/check/check-coverage.js go <profile-file>
+//   node tools/check/check-coverage.js frontend <coverage-final.json>
 const fs = require('fs');
 
 const [, , kind, path] = process.argv;
 if (!kind || !path) {
-  console.error('usage: node scripts/check-coverage.js go|frontend <file>');
+  console.error('usage: node tools/check/check-coverage.js go|frontend <file>');
   process.exit(2);
 }
 const baseline = JSON.parse(fs.readFileSync('tests/baseline.json', 'utf8'));

@@ -36,6 +36,9 @@ type (
 	TaskLink          = conversation.TaskLink
 	SequencedMessage  = conversation.SequencedMessage
 	ResponseRecord    = conversation.ResponseRecord
+	ResponseInfo      = conversation.ResponseInfo
+	QueueItem         = conversation.QueueItem
+	PromotedTurn      = conversation.PromotedTurn
 	ConversationStore = conversation.Store
 	UsageRecord       = usage.Record
 	UsageConversation = usage.Conversation
@@ -56,6 +59,10 @@ type (
 	AIMessage = providers.Message
 	AIFrame   = providers.Frame
 )
+
+// ErrQueueItemNotFound marks queue operations against an item that already
+// left the queue (promoted or discarded).
+var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
 
 func New(gateway Gateway) *Service { return service.New(gateway) }
 

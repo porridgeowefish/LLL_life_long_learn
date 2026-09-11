@@ -45,9 +45,22 @@ type Store struct {
 	data     Layout
 }
 
-// New opens (or creates) the workspace folder store.
+// New opens (or creates) the workspace folder store. The canonical location
+// is <workspace>/projects/folders.json (runtime data lives under projects/);
+// a legacy root-level folders.json is migrated in one read-only copy on first
+// open. The projects dir is derived from WORKSPACE at call time so workspace
+// overrides in tests keep driving every path.
 func New() (*Store, error) {
-	s := &Store{filePath: filepath.Join(paths.WORKSPACE, "folders.json")}
+	projectsDir := filepath.Join(paths.WORKSPACE, "projects")
+	newPath := filepath.Join(projectsDir, "folders.json")
+	legacyPath := filepath.Join(paths.WORKSPACE, "folders.json")
+	if _, err := os.Stat(newPath); err != nil {
+		if data, readErr := os.ReadFile(legacyPath); readErr == nil && len(data) > 0 {
+			_ = os.MkdirAll(projectsDir, 0o755)
+			_ = os.WriteFile(newPath, data, 0o644)
+		}
+	}
+	s := &Store{filePath: newPath}
 	if err := s.load(); err != nil {
 		return nil, err
 	}

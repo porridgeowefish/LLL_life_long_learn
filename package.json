@@ -13,9 +13,9 @@
     "test": "go test ./...",
     "test:verbose": "go test -v ./...",
     "archcheck": "go run ./tools/archcheck -repo . -report .artifacts/quality/architecture/dependency-report.json",
-    "check:fast": "node scripts/run-check.js fast",
-    "check": "node scripts/run-check.js complete",
-    "check:full": "node scripts/run-check.js full"
+    "check:fast": "node tools/check/run-check.js fast",
+    "check": "node tools/check/run-check.js complete",
+    "check:full": "node tools/check/run-check.js full"
   },
   "engines": {
     "go": ">=1.22"

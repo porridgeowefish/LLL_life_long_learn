@@ -37,6 +37,8 @@ an active owner and the historical index records the move.
 | [0015](./0015-business-modular-monolith-boundaries.md) | Business-Capability Modular Monolith Boundaries | accepted; implementation planned | defines enforceable capability modules, selective hexagonal responsibilities, centralized configuration, and architecture quality gates for iteration 14 |
 | [0016](./0016-retire-legacy-summary-extend-and-knowledge-garden.md) | Retire Legacy Summary, Extend, and Knowledge Garden | accepted | removes product code and public interfaces while preserving historical project files |
 | [0017](./0017-conversation-learning-sources-consolidation-and-usage.md) | Conversation Learning Sources, Consolidation, And Usage | accepted | extends 0012 and 0016 with canonical source citations, teaching outlines, approved consolidation, and teacher usage |
+| [0018](./0018-teacher-conversation-queue-steering-and-regeneration.md) | Teacher Conversation Queue, Steering, And Regeneration | accepted | durable event-log queue, explicit interrupt-and-redirect steering, latest-response regeneration via supersession |
+| [0019](./0019-vision-ocr-web-search-and-repository-normalization.md) | Vision OCR, Web Search Tool, And Repository Normalization | accepted | vision-model OCR for image sources, bounded search_web tool loop, learning-agents rename and script relocation |
 
 ## Historical Decisions
 
