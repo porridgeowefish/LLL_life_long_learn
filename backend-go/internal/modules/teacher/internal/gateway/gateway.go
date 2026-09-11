@@ -202,9 +202,11 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		body["tools"] = tools
 	}
 	var toolName, providerID, arguments string
+	blockTypes := map[int]string{}
 	return streamJSONLines(ctx, strings.TrimRight(p.BaseURL, "/")+"/v1/messages", p, body, func(payload []byte) error {
 		var event struct {
 			Type         string `json:"type"`
+			Index        int    `json:"index"`
 			ContentBlock struct {
 				Type     string `json:"type"`
 				ID       string `json:"id"`
@@ -240,6 +242,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Message.Usage.InputTokens}})
 			}
 		case "content_block_start":
+			blockTypes[event.Index] = event.ContentBlock.Type
 			if event.ContentBlock.Type == "tool_use" {
 				toolName, providerID, arguments = event.ContentBlock.Name, event.ContentBlock.ID, ""
 			} else if p.Reasoning && event.ContentBlock.Type == "thinking" && event.ContentBlock.Thinking != "" {
@@ -248,17 +251,32 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		case "content_block_delta":
 			switch event.Delta.Type {
 			case "text_delta":
-				emit(Event{Type: "text-delta", Delta: event.Delta.Text})
+				if blockTypes[event.Index] == "thinking" {
+					if p.Reasoning && event.Delta.Text != "" {
+						emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Text})
+					}
+				} else {
+					emit(Event{Type: "text-delta", Delta: event.Delta.Text})
+				}
 			case "summary_delta":
-				emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Summary})
+				if blockTypes[event.Index] == "text" {
+					emit(Event{Type: "text-delta", Delta: event.Delta.Summary})
+				} else {
+					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Summary})
+				}
 			case "thinking_delta":
-				if p.Reasoning && event.Delta.Thinking != "" {
+				if blockTypes[event.Index] == "text" {
+					if event.Delta.Thinking != "" {
+						emit(Event{Type: "text-delta", Delta: event.Delta.Thinking})
+					}
+				} else if p.Reasoning && event.Delta.Thinking != "" {
 					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Thinking})
 				}
 			case "input_json_delta":
 				arguments += event.Delta.PartialJSON
 			}
 		case "content_block_stop":
+			delete(blockTypes, event.Index)
 			if toolName != "" {
 				var args map[string]any
 				if json.Unmarshal([]byte(arguments), &args) == nil {

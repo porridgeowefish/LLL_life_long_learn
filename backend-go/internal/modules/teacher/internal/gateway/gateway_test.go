@@ -164,3 +164,60 @@ func TestAnthropicThinkingIsRequestedAndStreamedWhenEnabled(t *testing.T) {
 		t.Fatalf("thinking request/stream mismatch: body=%s got=%q", body, got)
 	}
 }
+
+func TestAnthropicClassifiesDeltasByTheirContentBlock(t *testing.T) {
+	tests := []struct {
+		name        string
+		blockType   string
+		delta       string
+		wantType    string
+		wantContent string
+	}{
+		{
+			name:        "thinking block wins over a mislabeled text delta",
+			blockType:   "thinking",
+			delta:       `{"type":"text_delta","text":"internal plan"}`,
+			wantType:    "reasoning-summary-delta",
+			wantContent: "internal plan",
+		},
+		{
+			name:        "text block wins over a mislabeled thinking delta",
+			blockType:   "text",
+			delta:       `{"type":"thinking_delta","thinking":"learner-facing answer"}`,
+			wantType:    "text-delta",
+			wantContent: "learner-facing answer",
+		},
+		{
+			name:        "text block wins over a mislabeled summary delta",
+			blockType:   "text",
+			delta:       `{"type":"summary_delta","summary":"final explanation"}`,
+			wantType:    "text-delta",
+			wantContent: "final explanation",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "text/event-stream")
+				fmt.Fprintf(w, "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":%q}}\n\n", tt.blockType)
+				fmt.Fprintf(w, "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":%s}\n\n", tt.delta)
+				fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+			}))
+			defer server.Close()
+
+			provider := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "model", Thinking: true, Reasoning: true}
+			var events []Event
+			if err := streamAnthropic(context.Background(), provider, Request{}, func(event Event) {
+				if event.Type == "text-delta" || event.Type == "reasoning-summary-delta" {
+					events = append(events, event)
+				}
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if len(events) != 1 || events[0].Type != tt.wantType || events[0].Delta != tt.wantContent {
+				t.Fatalf("delta crossed the reasoning/text boundary: %#v", events)
+			}
+		})
+	}
+}

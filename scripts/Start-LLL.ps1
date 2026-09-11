@@ -1,5 +1,6 @@
 param(
   [int]$Port = 8787,
+  [string]$WorkspaceRoot = '',
   [switch]$NoBrowser,
   [switch]$SkipBuild
 )
@@ -164,6 +165,11 @@ function Stop-ExistingRootServer {
 
 try {
   $repoRoot = Get-RepoRoot
+  if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
+    $workspaceRoot = $repoRoot
+  } else {
+    $workspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+  }
   $exePath = Join-Path $repoRoot 'dist\lll.exe'
   $tmpDir = Join-Path $repoRoot 'tmp\desktop-launcher'
   $pidFile = Join-Path $tmpDir 'lll.pid'
@@ -177,7 +183,9 @@ try {
 
   $ownerPid = Get-PortOwner -Port $Port
   if ($ownerPid) {
-    if ((-not $buildNeeded) -and (Test-Health -Port $Port)) {
+    $ownerPath = Get-ProcessPath -ProcessId $ownerPid
+    $isCurrentBuild = $ownerPath -and ([string]::Compare($ownerPath, $exePath, $true) -eq 0)
+    if ((-not $buildNeeded) -and $isCurrentBuild -and (Test-Health -Port $Port)) {
       if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" | Out-Null }
       exit 0
     }
@@ -192,12 +200,19 @@ try {
     throw "Missing $exePath after build. Check $buildErrLog and $buildOutLog."
   }
 
-  $proc = Start-Process -FilePath $exePath `
-    -WorkingDirectory $repoRoot `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput $outLog `
-    -RedirectStandardError $errLog `
-    -PassThru
+  $previousWorkspace = $env:WORKSPACE
+  try {
+    $env:WORKSPACE = $workspaceRoot
+    $proc = Start-Process -FilePath $exePath `
+      -ArgumentList @('--port', "$Port", '--workspace', $workspaceRoot) `
+      -WorkingDirectory $repoRoot `
+      -WindowStyle Hidden `
+      -RedirectStandardOutput $outLog `
+      -RedirectStandardError $errLog `
+      -PassThru
+  } finally {
+    $env:WORKSPACE = $previousWorkspace
+  }
 
   Set-Content -LiteralPath $pidFile -Encoding ASCII -Value $proc.Id
 

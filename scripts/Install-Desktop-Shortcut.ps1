@@ -1,5 +1,6 @@
 param(
-  [string]$ShortcutName = 'LifeLongLearn'
+  [string]$ShortcutName = 'LifeLongLearn',
+  [string]$WorkspaceRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +25,12 @@ if (-not (Test-Path -LiteralPath $iconPath)) {
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
 $shortcut.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`""
+$arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`""
+if (-not [string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
+  $resolvedWorkspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+  $arguments += " -WorkspaceRoot `"$resolvedWorkspace`""
+}
+$shortcut.Arguments = $arguments
 $shortcut.WorkingDirectory = $repoRoot
 $shortcut.IconLocation = $iconPath
 $shortcut.Description = 'Start LifeLongLearn'
