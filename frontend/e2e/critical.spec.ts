@@ -38,6 +38,15 @@ test('/memory keeps the compatibility redirect to preferences', async ({ page })
   await expect(page.getByRole('heading', { name: '全局学习偏好' })).toBeVisible();
 });
 
+test('usage page styles stay inside the usage records', async ({ page }) => {
+  await page.setContent('<ul><li data-testid="foreign-list-item">教师回复</li></ul>');
+  await page.addStyleTag({ path: 'src/features/usage/UsagePage.module.css' });
+  const item = page.getByTestId('foreign-list-item');
+
+  expect(await item.evaluate((element) => getComputedStyle(element).display)).toBe('list-item');
+  expect(await item.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+});
+
 test('lays out completed teacher rich text without content-visibility skipping', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
