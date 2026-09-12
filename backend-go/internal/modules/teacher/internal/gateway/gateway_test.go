@@ -6,11 +6,16 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
+
+func originalWorkspaceForTest() string { return paths.WORKSPACE }
 
 func TestOpenAIToolArgumentsBufferUntilComplete(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -285,5 +290,40 @@ func TestAnthropicRoundTripToolMessagesAndThinkingSuppressed(t *testing.T) {
 	}
 	if !strings.Contains(body, `"type":"tool_result"`) || !strings.Contains(body, `"tool_use_id":"toolu_provider_1"`) {
 		t.Fatalf("tool_result block wrong: %s", body)
+	}
+}
+
+func TestStreamShapeLoggedForSuspiciousLabeling(t *testing.T) {
+	root := t.TempDir()
+	paths.WORKSPACE = root
+	t.Cleanup(func() { paths.WORKSPACE = originalWorkspaceForTest() })
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		// Provider-mislabelled shape: a "text"-typed block whose deltas arrive
+		// as summary_delta (the suspected 2026-09-12 mixing mechanism).
+		fmt.Fprintln(w, `data: {"type":"content_block_start","index":0,"content_block":{"type":"text"}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"content_block_delta","index":0,"delta":{"type":"summary_delta","summary":"The learner asks..."}}`)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, `data: {"type":"message_stop"}`)
+		fmt.Fprintln(w)
+	}))
+	defer server.Close()
+	provider := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "glm-test", Reasoning: true}
+	var events []Event
+	if err := streamAnthropic(context.Background(), provider, Request{}, func(event Event) { events = append(events, event) }); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(root, "tmp", "teacher-stream-shapes.log")
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("stream shape log not written: %v", err)
+	}
+	line := string(data)
+	if !strings.Contains(line, "model=glm-test") || !strings.Contains(line, "0:text") || !strings.Contains(line, "0:summary_delta") {
+		t.Fatalf("shape fingerprint wrong: %s", line)
+	}
+	if strings.Contains(line, "learner asks") {
+		t.Fatalf("shape log must never capture content: %s", line)
 	}
 }

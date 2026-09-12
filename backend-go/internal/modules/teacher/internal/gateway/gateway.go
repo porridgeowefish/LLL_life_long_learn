@@ -9,7 +9,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
+
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
@@ -254,6 +259,12 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 	}
 	var toolName, providerID, arguments string
 	blockTypes := map[int]string{}
+	// shape records the block/delta type fingerprint of this provider stream.
+	// GLM's anthropic-compat endpoint intermittently mislabels thinking or
+	// body deltas (the 2026-09-12 mixed reasoning incidents); this log pins
+	// the raw shape on the next occurrence without capturing any content.
+	shape := newStreamShape(p.Model)
+	defer shape.flush()
 	return streamJSONLines(ctx, strings.TrimRight(p.BaseURL, "/")+"/v1/messages", p, body, func(payload []byte) error {
 		var event struct {
 			Type         string `json:"type"`
@@ -294,12 +305,14 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			}
 		case "content_block_start":
 			blockTypes[event.Index] = event.ContentBlock.Type
+			shape.blockStart(event.Index, event.ContentBlock.Type)
 			if event.ContentBlock.Type == "tool_use" {
 				toolName, providerID, arguments = event.ContentBlock.Name, event.ContentBlock.ID, ""
 			} else if p.Reasoning && event.ContentBlock.Type == "thinking" && event.ContentBlock.Thinking != "" {
 				emit(Event{Type: "reasoning-summary-delta", Delta: event.ContentBlock.Thinking})
 			}
 		case "content_block_delta":
+			shape.delta(event.Index, event.Delta.Type)
 			switch event.Delta.Type {
 			case "text_delta":
 				if blockTypes[event.Index] == "thinking" {
@@ -405,4 +418,55 @@ func streamJSONLines(ctx context.Context, url string, p askaiconfig.Provider, bo
 		onEnd()
 	}
 	return nil
+}
+
+// streamShape fingerprints one anthropic stream's block/delta labeling so
+// provider-side mislabeling (thinking content routed to the 正文 channel on
+// 2026-09-12) leaves hard evidence in tmp/teacher-stream-shapes.log. It
+// records types and counts only — never message content.
+type streamShape struct {
+	model  string
+	blocks []string
+	deltas []string
+	total  int
+}
+
+func newStreamShape(model string) *streamShape { return &streamShape{model: model} }
+
+func (s *streamShape) blockStart(index int, blockType string) {
+	s.blocks = append(s.blocks, fmt.Sprintf("%d:%s", index, blockType))
+}
+
+func (s *streamShape) delta(index int, deltaType string) {
+	s.total++
+	s.deltas = append(s.deltas, fmt.Sprintf("%d:%s", index, deltaType))
+}
+
+func (s *streamShape) fingerprint() string {
+	counts := map[string]int{}
+	for _, d := range s.deltas {
+		counts[d]++
+	}
+	pairs := make([]string, 0, len(counts))
+	for _, d := range s.deltas { // preserve first-seen order deterministically
+		if counts[d] > 0 {
+			pairs = append(pairs, fmt.Sprintf("%s×%d", d, counts[d]))
+			counts[d] = 0
+		}
+	}
+	return "blocks=[" + strings.Join(s.blocks, ",") + "] deltas=[" + strings.Join(pairs, ",") + "]"
+}
+
+func (s *streamShape) flush() {
+	if s.total == 0 {
+		return
+	}
+	path := filepath.Join(paths.WORKSPACE, "tmp", "teacher-stream-shapes.log")
+	_ = os.MkdirAll(filepath.Dir(path), 0o755)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	fmt.Fprintf(f, "%s model=%s %s\n", time.Now().UTC().Format(time.RFC3339), s.model, s.fingerprint())
 }

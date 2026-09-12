@@ -45,6 +45,19 @@ Also added in the hotfix round: OCR binding UI on the models settings page
 (provider + model override), and a learning-investment heatmap on the usage
 page (same activity source and heat scale as the homepage).
 
+## Reasoning/body mixing investigation (2026-09-12 evening)
+
+Three turns (14:26–14:34, GLM anthropic-compat) persisted thinking text as
+正文 with no reasoning block. 34 controlled turns through the live backend
+(short/long-context/cancel-race) plus 13 raw endpoint experiments could not
+reproduce; adjacent turns on the same provider separated correctly. The
+suspected mechanism is provider-side intermittent mislabeling (thinking
+deltas riding summary/thinking_delta inside text-typed blocks — the exact
+ambiguity e81b62d traded against). No classification change without
+evidence; the anthropic gateway now fingerprints every stream's block/delta
+labeling to tmp/teacher-stream-shapes.log so the next occurrence pins the
+raw shape.
+
 ## Residual risks
 
 - Zhipu web-search request/response field names were implemented from the
