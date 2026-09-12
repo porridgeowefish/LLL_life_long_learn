@@ -3,6 +3,8 @@ package teacherservice
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -388,4 +390,71 @@ func (g *alwaysSearchGateway) Stream(_ context.Context, in teachergateway.Reques
 	emit(teachergateway.Event{Type: "text-delta", Delta: "再查一次。"})
 	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: idgen.New("call"), ProviderCallID: idgen.New("pcall"), ToolName: "search_web", Arguments: map[string]any{"query": "x"}}})
 	return nil
+}
+
+// captureTextGateway records every provider request and emits one distinct
+// reply per call so tests can identify which reply belongs to which turn.
+type captureTextGateway struct {
+	searchLoopGateway
+}
+
+func (g *captureTextGateway) Stream(_ context.Context, in teachergateway.Request, emit func(teachergateway.Event)) error {
+	g.record(in)
+	emit(teachergateway.Event{Type: "text-delta", Delta: "回答" + strconv.Itoa(g.count())})
+	return nil
+}
+
+func TestRegenerateRemovesOldReplyFromProviderContext(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("regenctx", "重生成上下文", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	gateway := &captureTextGateway{}
+	service := New(gateway)
+
+	if err := service.StreamTurn(context.Background(), "regenctx", TurnInput{OperationID: "op_r1", Content: "第一个问题"}, func(StreamFrame) {}); err != nil {
+		t.Fatal(err)
+	}
+	if err := service.StreamTurn(context.Background(), "regenctx", TurnInput{OperationID: "op_r2", Content: "第二个问题"}, func(StreamFrame) {}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := conversationstore.New("regenctx")
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest, ok, err := store.LatestResponseID()
+	if err != nil || !ok {
+		t.Fatalf("no latest response: %v %v", ok, err)
+	}
+	var frames []StreamFrame
+	if err := service.RegenerateResponse(context.Background(), "regenctx", latest, "", func(frame StreamFrame) { frames = append(frames, frame) }); err != nil {
+		t.Fatal(err)
+	}
+
+	// The regeneration request must carry the full history minus the
+	// superseded reply: turn-1 Q&A present, turn-2 question present,
+	// turn-2's old reply ("回答2") gone.
+	last := gateway.requests[len(gateway.requests)-1]
+	joined, _ := json.Marshal(last.Messages)
+	payload := string(joined)
+	for _, needle := range []string{"第一个问题", "回答1", "第二个问题"} {
+		if !strings.Contains(payload, needle) {
+			t.Fatalf("regenerated context missing %q: %s", needle, payload)
+		}
+	}
+	if strings.Contains(payload, "回答2") {
+		t.Fatalf("superseded reply leaked into provider context: %s", payload)
+	}
+	// The fresh reply streams out of the regenerated turn.
+	var streamed bool
+	for _, frame := range frames {
+		if frame.Type == "text-delta" && strings.Contains(frame.Data["delta"].(string), "回答3") {
+			streamed = true
+		}
+	}
+	if !streamed {
+		t.Fatalf("regenerated reply was not streamed: %#v", frames)
+	}
 }
