@@ -46,18 +46,23 @@ type Store struct {
 }
 
 // New opens (or creates) the workspace folder store. The canonical location
-// is <workspace>/projects/folders.json (runtime data lives under projects/);
-// a legacy root-level folders.json is migrated in one read-only copy on first
-// open. The projects dir is derived from WORKSPACE at call time so workspace
-// overrides in tests keep driving every path.
+// is <projects root>/folders.json, resolved through the workspace module so
+// the test override isolates every store the same way. A legacy root-level
+// folders.json is migrated in one copy on first open; a failed copy is a hard
+// error — proceeding silently would let the next sync persist an empty ledger
+// over the learner's classification (the iteration-17 data-loss bug).
 func New() (*Store, error) {
-	projectsDir := filepath.Join(paths.WORKSPACE, "projects")
+	projectsDir := workspace.ProjectsRoot()
 	newPath := filepath.Join(projectsDir, "folders.json")
 	legacyPath := filepath.Join(paths.WORKSPACE, "folders.json")
 	if _, err := os.Stat(newPath); err != nil {
 		if data, readErr := os.ReadFile(legacyPath); readErr == nil && len(data) > 0 {
-			_ = os.MkdirAll(projectsDir, 0o755)
-			_ = os.WriteFile(newPath, data, 0o644)
+			if err := os.MkdirAll(projectsDir, 0o755); err != nil {
+				return nil, err
+			}
+			if err := os.WriteFile(newPath, data, 0o644); err != nil {
+				return nil, err
+			}
 		}
 	}
 	s := &Store{filePath: newPath}

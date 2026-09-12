@@ -1,4 +1,8 @@
-.section { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; box-shadow: var(--shadow); }
+/* flex-shrink:0 — this section lives in a fixed-height scrolling flex
+   column. With overflow:hidden its automatic minimum size is 0, so a long
+   sibling (e.g. an unclassified project flood) squeezed it to its borders
+   and hid the heatmap entirely. Sections in a scroll column never shrink. */
+.section { display: flex; flex-direction: column; flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; box-shadow: var(--shadow); }
 .head { display: flex; align-items: flex-start; gap: 18px; padding: 17px 18px 14px; }
 .head h2, .detail h3, .weekPanel h3 { font-size: 1rem; font-weight: 700; }
 .head p { margin-top: 3px; color: var(--muted); font-size: .73rem; }

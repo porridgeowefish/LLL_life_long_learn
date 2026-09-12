@@ -21,6 +21,30 @@ Last reviewed: 2026-09-12
       results, queue persistence across restart, exported .md review
       (learner-run; automated coverage exists via httptest fakes)
 
+## Hotfix (2026-09-12, same iteration)
+
+The folders.json relocation shipped with two structural flaws that together
+caused learner-visible data loss; both are fixed and lesson-logged
+(LESSONS_LEARNED 16/17):
+
+- folderstore resolved its path from `paths.WORKSPACE` while every other
+  store used the workspace projects-root override — a divergent process
+  (test or partial startup) could persist a foreign/empty layout over the
+  canonical ledger. The store now resolves through `workspace.ProjectsRoot()`
+  and the migration copy hard-fails instead of silently continuing empty.
+  User data was restored from the intact root snapshot (18 folders, 20
+  memberships); the damaged file is kept at
+  `tmp/folder-recovery/folders-damaged-backup-1246.json`.
+- The homepage rhythm heatmap collapsed to 2px (border-only) because its
+  section was the lone shrinkable flex child of a fixed-height scrolling
+  column with `overflow:hidden`; the unclassified-project flood triggered
+  it. `flex-shrink: 0` added; Playwright-verified at 509px/181 cells with
+  the restored folders visible.
+
+Also added in the hotfix round: OCR binding UI on the models settings page
+(provider + model override), and a learning-investment heatmap on the usage
+page (same activity source and heat scale as the homepage).
+
 ## Residual risks
 
 - Zhipu web-search request/response field names were implemented from the

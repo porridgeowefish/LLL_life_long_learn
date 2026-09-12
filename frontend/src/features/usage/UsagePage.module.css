@@ -19,3 +19,29 @@ li small { color: var(--muted); }
 .empty { padding: 40px 0; text-align: center; }
 .error { color: var(--pink); font-size: 12px; }
 @media (max-width: 650px) { .list article > header { display: grid; } li { grid-template-columns: 1fr; gap: 3px; } }
+
+/* ---- learning-investment heatmap (mirrors homepage heat scale) ---- */
+
+.heatSection { margin: 0 0 16px; padding: 16px 18px 13px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--card); box-shadow: var(--shadow-subtle); }
+.heatHead { display: flex; align-items: flex-start; gap: 18px; }
+.heatHead span { color: var(--accent-ink); font-size: .64rem; font-weight: 800; letter-spacing: .14em; }
+.heatHead h2 { margin: 3px 0; font-size: .94rem; }
+.heatHead p { color: var(--muted); font-size: .75rem; line-height: 1.55; }
+.heatFilters { margin-left: auto; display: flex; gap: 6px; }
+.heatFilters button { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 5px 7px; color: var(--muted); background: var(--card); font-size: .7rem; cursor: pointer; }
+.heatFilters button.heatActive { color: var(--accent-ink); border-color: var(--accent); background: var(--surface-tint); }
+.heatScroll { margin-top: 12px; min-width: 0; overflow-x: auto; }
+.heatMonths { display: grid; gap: 4px; padding-left: 28px; min-width: max-content; height: 17px; color: var(--muted); font-size: .6rem; }
+.heatMonths span { width: 15px; white-space: nowrap; }
+.heatLine { display: flex; min-width: max-content; }
+.heatWeekdays { width: 28px; display: grid; grid-template-rows: repeat(7, 15px); gap: 4px; color: var(--muted); font-size: .58rem; }
+.heatWeekdays span:nth-child(1) { grid-row: 1; }.heatWeekdays span:nth-child(2) { grid-row: 3; }.heatWeekdays span:nth-child(3) { grid-row: 5; }
+.heatGrid { display: grid; grid-template-rows: repeat(7, 15px); grid-auto-flow: column; grid-auto-columns: 15px; gap: 4px; }
+.heatDay { width: 15px; height: 15px; padding: 0; border: 0; border-radius: 4px; background: var(--heat-0); cursor: pointer; }
+.heatDay[data-level='1'] { background: var(--heat-1); }.heatDay[data-level='2'] { background: var(--heat-2); }.heatDay[data-level='3'] { background: var(--heat-3); }.heatDay[data-level='4'] { background: var(--heat-4); }
+.heatDay:hover, .heatDay:focus-visible { transform: scale(1.2); outline: 2px solid var(--card); box-shadow: 0 0 0 1px var(--accent); }
+.heatDay.heatSelected { outline: 2px solid var(--fg); outline-offset: 1px; }
+.heatLegend { display: flex; justify-content: space-between; align-items: center; margin-top: 11px; color: var(--muted); font-size: .61rem; }
+.heatLegend span:last-child { display: flex; gap: 4px; align-items: center; }
+.heatLegend i { display: block; width: 11px; height: 11px; border-radius: 3px; background: var(--heat-0); }
+.heatLegend i[data-level='1'] { background: var(--heat-1); }.heatLegend i[data-level='2'] { background: var(--heat-2); }.heatLegend i[data-level='3'] { background: var(--heat-3); }.heatLegend i[data-level='4'] { background: var(--heat-4); }

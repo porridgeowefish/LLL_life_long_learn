@@ -82,6 +82,21 @@ export function ModelsPage() {
     } : current);
   };
 
+  // OCR binding: an empty provider disables the dedicated image-OCR path
+  // (uploads fall back to the CLI-agent parse flow).
+  const setOcrBinding = (providerId: string, model?: string) => {
+    setDraft((current) => {
+      if (!current) return current;
+      const bindings = { ...(current.bindings ?? {}) };
+      if (!providerId) {
+        delete bindings.ocr;
+      } else {
+        bindings.ocr = { providerId, ...(model !== undefined ? { model } : {}) };
+      }
+      return { ...current, bindings };
+    });
+  };
+
   if (settings.isLoading || !draft) return <main className={s.page}>加载模型配置…</main>;
   if (settings.isError) return <main className={s.page} role="alert">模型配置读取失败：{(settings.error as Error).message}</main>;
 
@@ -111,7 +126,7 @@ export function ModelsPage() {
         <div>
           <span>服务绑定</span>
           <h2 id="service-bindings-title">教师与 Ask AI</h2>
-          <p>教师默认模型可在下方连接卡片中选择；Ask AI 使用轻量提示词，但复用同一组 API 连接。</p>
+          <p>教师默认模型可在下方连接卡片中选择；Ask AI 使用轻量提示词，但复用同一组 API 连接。OCR 绑定一个视觉模型后，图片资料会走专用识别，产出可引用文本。</p>
         </div>
         <label>
           Ask AI 默认模型
@@ -123,6 +138,26 @@ export function ModelsPage() {
             {draft.providers.length === 0 && <option value="">请先添加模型</option>}
             {draft.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}
           </select>
+        </label>
+        <label>
+          OCR 图片识别
+          <select
+            value={draft.bindings?.ocr?.providerId ?? ''}
+            onChange={(event) => setOcrBinding(event.target.value, event.target.value ? '' : undefined)}
+            disabled={draft.providers.length === 0}
+          >
+            <option value="">停用（图片走原解析流程）</option>
+            {draft.providers.map((provider) => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}
+          </select>
+        </label>
+        <label>
+          OCR 模型覆盖
+          <input
+            value={draft.bindings?.ocr?.model ?? ''}
+            placeholder="留空使用连接的模型名；例如 glm-4v-plus"
+            disabled={!draft.bindings?.ocr?.providerId}
+            onChange={(event) => setOcrBinding(draft.bindings?.ocr?.providerId ?? '', event.target.value)}
+          />
         </label>
       </section>
 

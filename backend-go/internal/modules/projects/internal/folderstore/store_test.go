@@ -3,18 +3,28 @@ package folderstore
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
+	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects/internal/workspace"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
-// setTempWorkspace points the store at a per-test workspace dir and restores it
-// afterwards. folderstore.New resolves paths.WORKSPACE at call time.
-func setTempWorkspace(t *testing.T) {
+// setTempWorkspace points the store at a per-test workspace dir and restores
+// it afterwards. Both the legacy location (paths.WORKSPACE) and the canonical
+// projects root (workspace override) must move together, mirroring how every
+// other projects-root store is isolated in tests.
+func setTempWorkspace(t *testing.T) string {
 	t.Helper()
+	root := t.TempDir()
 	prev := paths.WORKSPACE
-	paths.WORKSPACE = t.TempDir()
-	t.Cleanup(func() { paths.WORKSPACE = prev })
+	paths.WORKSPACE = root
+	workspace.SetProjectsRootForTest(filepath.Join(root, "projects"))
+	t.Cleanup(func() {
+		paths.WORKSPACE = prev
+		workspace.SetProjectsRootForTest("")
+	})
+	return root
 }
 
 func TestReplaceSanitizes(t *testing.T) {
@@ -145,11 +155,8 @@ func TestRemoveProjectPrunesMembershipAndMapBinding(t *testing.T) {
 }
 
 func TestLegacyRootFoldersJSONMigratesIntoProjects(t *testing.T) {
-	root := t.TempDir()
-	prev := paths.WORKSPACE
-	paths.WORKSPACE = root
-	t.Cleanup(func() { paths.WORKSPACE = prev })
-	if err := os.MkdirAll(paths.PROJECTS_ROOT, 0o755); err != nil {
+	root := setTempWorkspace(t)
+	if err := os.MkdirAll(filepath.Join(root, "projects"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	legacy := filepath.Join(root, "folders.json")
@@ -169,5 +176,89 @@ func TestLegacyRootFoldersJSONMigratesIntoProjects(t *testing.T) {
 	// Legacy file stays untouched; new location is authoritative from now on.
 	if _, err := os.Stat(legacy); err != nil {
 		t.Fatalf("legacy file must not be deleted: %v", err)
+	}
+}
+
+func TestStoreRespectsProjectsRootOverrideOverWorkspace(t *testing.T) {
+	// The iteration-17 data-loss bug: folderstore resolved its file from
+	// paths.WORKSPACE while every other store used the projects-root override.
+	// A test process (or any divergent root) could then write a foreign
+	// layout into the real workspace ledger. The store must follow the
+	// override exclusively.
+	workspaceA := t.TempDir()
+	projectsB := t.TempDir()
+	prev := paths.WORKSPACE
+	paths.WORKSPACE = workspaceA
+	workspace.SetProjectsRootForTest(projectsB)
+	t.Cleanup(func() {
+		paths.WORKSPACE = prev
+		workspace.SetProjectsRootForTest("")
+	})
+	// A legacy ledger under workspace A must NOT be read into store B here:
+	// migration only fires when the legacy file sits in the active WORKSPACE,
+	// and the canonical path must land under the override root.
+	if err := os.WriteFile(filepath.Join(workspaceA, "folders.json"), []byte(`{"folders":[{"id":"f_x","name":"WorkspaceA","slugOrder":["p1"]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.SyncMapFolders([]MapFolderSpec{{Slug: "map-slug", Title: "地图文件夹"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(projectsB, "folders.json")); err != nil {
+		t.Fatalf("canonical file must live under the projects-root override: %v", err)
+	}
+	// The legacy file is copied forward on first open, so workspace A's
+	// folders appear in store B — but only via the migration copy, and the
+	// legacy file itself is never modified.
+	legacy, err := os.ReadFile(filepath.Join(workspaceA, "folders.json"))
+	if err != nil || !strings.Contains(string(legacy), "WorkspaceA") {
+		t.Fatalf("legacy ledger must stay untouched: %v %s", err, legacy)
+	}
+	layout, err := store.SyncMapFolders(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, folder := range layout.Folders {
+		names[folder.Name] = true
+	}
+	if !names["地图文件夹"] || !names["WorkspaceA"] {
+		t.Fatalf("sync must merge, not replace: %#v", layout.Folders)
+	}
+}
+
+func TestSyncMapFoldersNeverDropsCustomFoldersOrMembership(t *testing.T) {
+	root := setTempWorkspace(t)
+	if err := os.WriteFile(filepath.Join(root, "folders.json"), []byte(`{"folders":[
+		{"id":"f_1","name":"腾讯云","slugOrder":["proj-a","proj-b"]},
+		{"id":"f_2","name":"机器学习","slugOrder":["proj-c"],"mapProjectSlug":"ml-map"}
+	]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	layout, err := store.SyncMapFolders([]MapFolderSpec{{Slug: "ml-map", Title: "机器学习"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var custom, classified, promoted bool
+	for _, folder := range layout.Folders {
+		if folder.Name == "腾讯云" {
+			custom = true
+			if len(folder.SlugOrder) == 2 {
+				classified = true
+			}
+		}
+		if folder.Name == "机器学习" && folder.MapProjectSlug == "ml-map" {
+			promoted = true
+		}
+	}
+	if !custom || !classified || !promoted {
+		t.Fatalf("sync lost learner data: custom=%v classified=%v promoted=%v", custom, classified, promoted)
 	}
 }

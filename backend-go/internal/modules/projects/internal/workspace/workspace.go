@@ -688,6 +688,11 @@ func EnsureProjectsRoot() error {
 	return os.MkdirAll(activeProjectsRoot(), 0o755)
 }
 
+// ProjectsRoot returns the effective projects root, honoring the test
+// override. Every file-backed store under projects/ must resolve through it
+// so tests can never touch the real workspace.
+func ProjectsRoot() string { return activeProjectsRoot() }
+
 // ProjectRootForSlug returns the absolute path to a project's folder for
 // external callers (stores, launchers, etc.). Validates the slug.
 func ProjectRootForSlug(slug string) (string, error) {

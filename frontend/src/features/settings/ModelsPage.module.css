@@ -14,7 +14,7 @@
 .serviceBindings h2 { margin: 3px 0; font-size: .94rem; }
 .serviceBindings p { color: var(--muted); font-size: .75rem; line-height: 1.55; }
 .serviceBindings label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: .72rem; font-weight: 700; }
-.serviceBindings select { min-height: 36px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); background: var(--card); }
+.serviceBindings select, .serviceBindings input { min-height: 36px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); background: var(--card); font: inherit; }
 .card { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-subtle); }
 .cardHead, .cardFoot { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .cardHead { padding-bottom: 14px; border-bottom: 1px solid var(--border); }

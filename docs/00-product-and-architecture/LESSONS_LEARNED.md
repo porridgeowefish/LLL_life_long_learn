@@ -263,4 +263,36 @@ PowerShell 5.1 的 legacy native-argument passing：把一个**含 ASCII 双引�
 
 每个 wave 完成后，如果发现新的"如果当初…就不会…"，追加到本文档对应章节。
 
-当前共 15 条。
+---
+
+## 16. 存储根路径必须同源解析，测试隔离要覆盖每一个存储（folders.json 数据丢失）
+
+### 症状
+用户升级后：18 个分类文件夹只剩 13 个（腾讯云/Agent/编译原理等自定义文件夹消失）、已分类学习单元全部落入"未分类"。projects/folders.json 被 sync 从空台账重建（新式 ID 指纹）。
+
+### 根因
+folderstore 用 `paths.WORKSPACE` 拼路径，而全仓其他存储走 workspace 模块的 projectsRootOverride。两者在测试进程/异常启动时分叉：某个进程以空台账 + 真实项目缓存跑了一次 sync，把"仅含地图文件夹"的布局固化覆盖了 canonical 位置；自定义文件夹与 slugOrder 从此不可见。迁移复制失败还被 `_ =` 静默吞掉，空台账继续运行。
+
+### 铁律
+- **同类数据位置的解析必须收敛到同一个函数**（workspace.ProjectsRoot()），不许各自拼路径——一处 override 一处漏，就是一处数据丢失面。
+- **迁移/复制失败必须显式报错**，绝不带着空状态继续——下一个写操作会把空状态固化为"事实"。
+- 写"条件性迁移"代码时，必须写一个"测试进程绝不触真实磁盘"的回归测试（override 分叉场景）。
+- 数据可恢复性优先：旧位置文件在迁移后保留（copy-forward），这次 18 个文件夹正是靠根目录快照救回的。
+
+---
+
+## 17. 定高 flex 列里的 overflow:hidden 子项会被压成边框（热力图消失）
+
+### 症状
+首页"学习节律"热力图整个消失。DOM 里 181 个格子都在、数据正常，但 section 高度只剩 2px（= 上下边框）。
+
+### 根因
+`.scroll` 是定高（视口驱动）flex 列容器。热力图 section 是唯一 `flex-shrink:1` 的子项，且自带 `overflow:hidden`（为圆角）——CSS 规范规定 overflow 非 visible 的 flex 子项 `min-height:auto` 下限为 0，于是它吸收了全部超额收缩。触发条件：项目区因另一个 bug（未分类洪泛）膨胀到 1393px。平时内容少时不触发，"偶尔出现、事后查不到"。
+
+### 铁律
+- **滚动列（overflow:auto 的 flex column）里的直接子块一律 `flex-shrink: 0`**——它们要靠滚动容纳，不是靠挤压。
+- **"元素存在但看不见"先量盒子**：`getBoundingClientRect().height` 2px = 只剩边框，是 flex 塌缩/被隐藏的指纹。
+- flex 子项加 `overflow:hidden` 时记住你同时交出了 `min-height:auto` 保护——这两个属性组合是塌缩高危。
+- 消融法定位快：`flex:none` 一改就弹回 509px，根因当场锁定。
+
+当前共 17 条。
