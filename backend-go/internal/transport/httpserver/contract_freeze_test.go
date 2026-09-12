@@ -21,6 +21,7 @@ import (
 
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // copyFixture copies one fixture family below dst and returns the projects root.
@@ -208,6 +209,16 @@ func TestRouteTableFrozen(t *testing.T) {
 	if len(frozenRoutes) != 95 {
 		t.Fatalf("route table snapshot has %d entries; update this test deliberately if the iteration-13 surface changed", len(frozenRoutes))
 	}
+	oldWorkspace := paths.WORKSPACE
+	if err := paths.ConfigureWorkspace(t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := paths.ConfigureWorkspace(oldWorkspace); err != nil {
+			t.Errorf("restore workspace: %v", err)
+		}
+	})
+
 	s := newTestServer(t)
 	handler := s.Handler()
 	// The ServeMux pattern list is not exported; instead walk the registration
@@ -215,7 +226,7 @@ func TestRouteTableFrozen(t *testing.T) {
 	// 405, unknown method still proves the pattern exists). See TestRoutesRespond.
 	for route := range frozenRoutes {
 		parts := strings.SplitN(route, " ", 2)
-		method, path := parts[0], parts[1]
+		path := parts[1]
 		if path == "/api/events" {
 			// The SSE handler streams forever on a test recorder; its
 			// registration is asserted by TestEventsEndpointRegistered.
@@ -229,7 +240,16 @@ func TestRouteTableFrozen(t *testing.T) {
 		if probePath == path && strings.Contains(path, "{") {
 			t.Fatalf("unmapped pattern token in %s", path)
 		}
-		req := httptest.NewRequest(method, probePath, nil)
+		// Deliberately use a method that no route registers. ServeMux still
+		// returns 405 when the path pattern exists, without executing handlers
+		// such as PUT /api/preferences against the developer's real workspace.
+		probeMethod := "ROUTE_PROBE"
+		// net/http gives paths ending in .md special fallback behavior for an
+		// unknown method. HEAD safely matches this read-only GET route.
+		if path == "/api/projects/{id}/conversation/export.md" {
+			probeMethod = http.MethodHead
+		}
+		req := httptest.NewRequest(probeMethod, probePath, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		// A pattern that exists answers 405 (method mismatch) or any status

@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-07
+Last reviewed: 2026-09-12
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -132,6 +132,11 @@ progress/events.jsonl + progress/summary.json
 runs/_index/*.json
 preferences.md
 ```
+
+`preferences.md` remains the only editable preference source. A recovery-only,
+workspace-keyed mirror lives outside the repository under the operating system
+user configuration directory so repository replacement does not erase the last
+saved preference content.
 
 There is no active SQLite / Postgres / MySQL / embedded DB integration in the current codebase.
 Any future database is documented only as a possible acceleration/index layer, not present runtime truth.

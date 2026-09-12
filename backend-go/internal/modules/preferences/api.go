@@ -11,4 +11,5 @@ type Snapshot = impl.Snapshot
 func Path() string                           { return impl.Path() }
 func Read() (Snapshot, error)                { return impl.Read() }
 func Ensure() (Snapshot, error)              { return impl.Ensure() }
+func BackupExisting() error                  { return impl.BackupExisting() }
 func Write(content string) (Snapshot, error) { return impl.Write(content) }

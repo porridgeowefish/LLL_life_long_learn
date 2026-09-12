@@ -17,6 +17,8 @@ func TestPreferencesEndpointOwnsOneWorkspaceGlobalFile(t *testing.T) {
 	old := paths.WORKSPACE
 	paths.WORKSPACE = t.TempDir()
 	t.Cleanup(func() { paths.WORKSPACE = old })
+	t.Setenv("APPDATA", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	srv := &Server{}
 
 	put := httptest.NewRequest(http.MethodPut, "/api/preferences", strings.NewReader("# 偏好\n\n先给结论。\n"))

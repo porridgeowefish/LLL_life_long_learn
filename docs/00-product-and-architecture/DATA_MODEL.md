@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-09-12
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -92,6 +92,14 @@ Markdown, capped at 256 KiB, and edited only through the explicit learner UI or
 direct file editing. Teacher prompts receive its content as bounded read-only
 context. Assistant attempts receive an immutable snapshot at
 `workspace/inputs/preferences.md`. No AI path writes the canonical file.
+An existing canonical file is mirrored at startup and after explicit saves to
+`<USER_CONFIG>/LifeLongLearn/backups/<workspace-id>/preferences.md`. The mirror
+is recovery-only: reads fall back to it when the workspace file is missing, and
+opening the editor restores the canonical workspace file. If the canonical file
+is unexpectedly empty while the mirror is non-empty, startup or editor access
+restores the mirror; an explicit empty save writes both copies. Runtime workspace
+configuration is applied once to `WORKSPACE`, `PROJECTS_ROOT`, and `AGENTS_ROOT`
+after CLI, environment, and config-file precedence is resolved.
 
 Legacy `projects/<slug>/memory/` files are preserved but ignored. New project
 skeletons do not create them, and the generic project file API rejects reads or

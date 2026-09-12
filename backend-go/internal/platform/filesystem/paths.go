@@ -40,15 +40,35 @@ func init() {
 	}
 
 	if env := os.Getenv("WORKSPACE"); env != "" {
-		WORKSPACE = env
+		if err := ConfigureWorkspace(env); err != nil {
+			panic("paths: configure workspace: " + err.Error())
+		}
 	} else {
-		WORKSPACE = PROJECT_ROOT
+		if err := ConfigureWorkspace(PROJECT_ROOT); err != nil {
+			panic("paths: configure workspace: " + err.Error())
+		}
 	}
-	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
-	AGENTS_ROOT = filepath.Join(WORKSPACE, "learning-agents")
 	// FRONTEND_ROOT points at the Vite build output (frontend/dist) so a
 	// single Go binary can serve the React SPA in production. In dev the
 	// frontend runs on Vite :5173 and proxies API calls here.
 	FRONTEND_ROOT = filepath.Join(PROJECT_ROOT, "frontend", "dist")
 	FRONTEND_INDEX = filepath.Join(FRONTEND_ROOT, "index.html")
+}
+
+// ConfigureWorkspace applies one resolved workspace root to every mutable
+// runtime data path. Call it after loading CLI/environment/file configuration;
+// changing WORKSPACE in the process environment after package initialization
+// does not update Go package variables by itself.
+func ConfigureWorkspace(root string) error {
+	if root == "" {
+		return os.ErrInvalid
+	}
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	WORKSPACE = filepath.Clean(abs)
+	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
+	AGENTS_ROOT = filepath.Join(WORKSPACE, "learning-agents")
+	return nil
 }

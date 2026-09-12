@@ -20,6 +20,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
+	preferences "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
@@ -33,6 +34,9 @@ type App struct {
 
 // Build assembles the application with production wiring.
 func Build() *App {
+	if err := preferences.BackupExisting(); err != nil {
+		println("preferences: backup warning:", err.Error())
+	}
 	bin := envOr("CLAUDE_BIN", "claude")
 	runtimeCfg, err := assistant.LoadRuntime()
 	if err != nil {

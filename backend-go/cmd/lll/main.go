@@ -31,10 +31,15 @@ func main() {
 	for _, warning := range cfg.Warnings {
 		fmt.Println("config:", warning)
 	}
-	// Flag/env workspace wins over the file value for the runtime roots.
-	if cfg.Workspace.Root != "" {
-		os.Setenv("WORKSPACE", cfg.Workspace.Root)
+	// Apply the resolved workspace after config loading. Package-level path
+	// variables were initialized before main, so changing only the environment
+	// here would leave stores pointing at the launch directory.
+	workspaceRoot := cfg.WorkspaceRootResolved()
+	if err := paths.ConfigureWorkspace(workspaceRoot); err != nil {
+		fmt.Fprintln(os.Stderr, "workspace:", err)
+		os.Exit(1)
 	}
+	os.Setenv("WORKSPACE", paths.WORKSPACE)
 
 	srv := bootstrap.Build()
 	defer srv.Server.Close()

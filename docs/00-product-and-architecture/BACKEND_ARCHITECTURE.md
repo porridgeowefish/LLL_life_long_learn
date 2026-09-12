@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-09-12
 Source of truth: current Go backend boundaries and write ownership; package code owns implementation details.
 
 ## Intent
@@ -168,6 +168,10 @@ SSE is never the only copy of a state transition.
 page and direct learner file editing are the only write paths. Teacher context
 and assistant sealed input receive bounded read-only snapshots. Preferences do
 not authorize tools, establish facts, or override explicit learner choices.
+Startup and explicit saves maintain a recovery mirror below the operating
+system user configuration directory, keyed by workspace. If the canonical file
+is missing, AI reads use the mirror and the preferences editor restores it.
+The mirror is not a second editable preference source.
 
 There is no active project/learner memory service. Existing project `memory/`
 directories remain untouched but are not indexed, exposed, or supplied to AI.

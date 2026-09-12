@@ -3,7 +3,7 @@
 Status: accepted
 Owner: project maintainer
 Date: 2026-09-02
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-12
 Source of truth: teacher rich-stream performance boundary and active learner-preference persistence.
 Supersedes: project and learner memory growth decisions in ADR-0002 and ADR-0003
 Extends: ADR-0012
@@ -41,6 +41,12 @@ creates an unclear AI-write boundary.
 - `<WORKSPACE>/preferences.md` is the only active preference-memory file.
 - It is learner-owned Markdown with a 256 KiB limit.
 - The preferences page and direct file editing are the only write paths.
+- Successful editor saves and application startup mirror an existing file to
+  `<USER_CONFIG>/LifeLongLearn/backups/<workspace-id>/preferences.md`. This is
+  recovery-only data: when the canonical file is missing, readers use the
+  mirror and the editor restores the canonical file before returning it. A
+  non-empty mirror also wins when the canonical file is unexpectedly truncated
+  to zero bytes; an explicit empty save updates both files and remains valid.
 - The API teacher receives bounded content as read-only system context.
 - Each assistant attempt receives `workspace/inputs/preferences.md`, a sealed
   read-only snapshot recorded in its input manifest.
@@ -59,4 +65,6 @@ unchanged.
 
 Personalization becomes simpler and auditable: one file, one explicit editor,
 one read-only AI contract. Automatic preference learning is intentionally out
-of scope until a future decision defines review, provenance, and consent.
+of scope until a future decision defines review, provenance, and consent. The
+recovery mirror survives repository rebuilds while canonical ownership and all
+learner-facing writes remain at `<WORKSPACE>/preferences.md`.

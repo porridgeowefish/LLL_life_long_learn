@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-09-12
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -152,6 +152,12 @@ recoverable file operations. The CLI cannot write canonical records directly.
 explicit preferences editor or direct user file editing may write it. Teacher
 and assistant prompts receive bounded read-only snapshots. Existing project
 `memory/` folders are preserved as ignored legacy data and are not supplied to AI.
+The server mirrors an existing canonical preference file to a workspace-keyed
+recovery copy under the OS user configuration directory at startup and after
+explicit saves. A missing canonical file can be read from that copy and is
+restored when the learner opens the preferences editor. A non-empty recovery
+copy also repairs an unexpectedly zero-byte canonical file; explicit empty
+saves remain valid because they update both copies together.
 
 ## Compatibility Boundary
 
