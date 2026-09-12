@@ -10,8 +10,10 @@
 
 .head {
   display: flex;
+  flex: 0 0 var(--workspace-header-h);
   justify-content: space-between;
   align-items: center;
+  height: var(--workspace-header-h);
   padding: 10px 12px;
   font-size: 0.6rem;
   text-transform: uppercase;

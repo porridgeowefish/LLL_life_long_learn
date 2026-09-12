@@ -2,8 +2,8 @@
   height: var(--header-h);
   display: flex;
   align-items: center;
-  padding: 0 12px;
-  gap: 6px;
+  padding: 0 12px 0 0;
+  gap: 0;
   background: var(--card);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -14,7 +14,11 @@
 .logo {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 var(--sidebar-w);
+  min-width: 0;
   gap: 7px;
+  height: 100%;
+  padding: 0 12px;
   font-family: 'Lora', Georgia, serif;
   font-style: italic;
   font-weight: 500;
@@ -40,16 +44,16 @@
 }
 
 .sep {
+  flex: 0 0 1px;
   width: 1px;
   height: 18px;
   background: var(--border);
-  margin: 0 2px;
 }
 
 .nav {
   display: flex;
   gap: 1px;
-  margin-left: 2px;
+  margin-left: 8px;
 }
 
 .link {

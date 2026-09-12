@@ -47,6 +47,37 @@ test('usage page styles stay inside the usage records', async ({ page }) => {
   expect(await item.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
 
+test('shell dividers align with the brand rail and workspace header', async ({ page }) => {
+  await page.setContent(`
+    <style>* { box-sizing: border-box; } body { margin: 0; }</style>
+    <header class="topbar">
+      <a class="logo"><img class="logoMark"><span>LifeLongLearn</span></a>
+      <span class="sep" data-testid="brand-divider"></span>
+      <nav class="nav"></nav>
+    </header>
+    <div style="display:flex;height:300px">
+      <aside class="sidebar" data-testid="sidebar"><div class="head" data-testid="navigation-head">导航</div></aside>
+      <main style="flex:1"><header class="header" data-testid="workspace-header">教师</header></main>
+    </div>
+  `);
+  await page.addStyleTag({ path: 'src/shared/styles/tokens.css' });
+  await page.addStyleTag({ path: 'src/app/layout/Topbar.module.css' });
+  await page.addStyleTag({ path: 'src/app/layout/Sidebar.module.css' });
+  await page.addStyleTag({ path: 'src/features/learning/components/LearningWorkspace.module.css' });
+
+  const sidebar = await page.getByTestId('sidebar').boundingBox();
+  const brandDivider = await page.getByTestId('brand-divider').boundingBox();
+  const navigationHead = await page.getByTestId('navigation-head').boundingBox();
+  const workspaceHeader = await page.getByTestId('workspace-header').boundingBox();
+
+  expect(sidebar).not.toBeNull();
+  expect(brandDivider).not.toBeNull();
+  expect(navigationHead).not.toBeNull();
+  expect(workspaceHeader).not.toBeNull();
+  expect(sidebar!.x + sidebar!.width).toBe(brandDivider!.x);
+  expect(navigationHead!.y + navigationHead!.height).toBe(workspaceHeader!.y + workspaceHeader!.height);
+});
+
 test('lays out completed teacher rich text without content-visibility skipping', async ({ page }) => {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;

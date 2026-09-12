@@ -137,6 +137,7 @@
   --shadow: 0 2px 8px rgb(var(--shadow-color) / 0.08);
   --shadow-md: 0 6px 18px rgb(var(--shadow-color) / 0.10);
   --shadow-lg: 0 18px 44px rgb(var(--shadow-color) / 0.18);
-  --sidebar-w: 144px;
+  --sidebar-w: 176px;
   --header-h: 44px;
+  --workspace-header-h: 52px;
 }
