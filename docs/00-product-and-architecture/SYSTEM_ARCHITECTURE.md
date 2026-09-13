@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -122,6 +122,7 @@ authorized teacher tool call
 -> CLI writes only declared attempt outputs
 -> Go validates result.json and declared deliverables
 -> valid candidates are versioned/merged into assets; generic outputs remain declared generated assets
+-> a failed artifact-only promotion with unchanged core assets is retried once from the same sealed attempt, never by rerunning the CLI (ADR-0020)
 -> task state and global invalidation events update the conversation UI
 ```
 

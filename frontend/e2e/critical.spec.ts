@@ -47,6 +47,43 @@ test('usage page styles stay inside the usage records', async ({ page }) => {
   expect(await item.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
 
+test('body asset tables keep the document table treatment', async ({ page }) => {
+  await page.route('http://127.0.0.1:4173/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/health') return json(route, { status: 'ok', workspace: 'E2E', learningWorkspace: { failedProjects: [] } });
+    if (path === '/api/projects/body-table') {
+      return json(route, { project: { id: 'body-table', slug: 'body-table', title: '正文表格验收', projectType: 'system-learning', status: 'active' } });
+    }
+    if (path === '/api/projects/body-table/assets') {
+      return json(route, { assets: [
+        { assetId: 'intro', key: 'intro', title: '引入', currentVersionId: 'intro-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
+        { assetId: 'body', key: 'body', title: '正文', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
+        { assetId: 'practice', key: 'practice', title: '练习', currentVersionId: 'practice-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
+      ] });
+    }
+    if (path === '/api/projects/body-table/assets/body') {
+      return json(route, { meta: { assetId: 'body', key: 'body', title: '正文', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' }, contentKind: 'markdown', content: '# 容器编排\n\n## 副本与 Deployment\n\n| 组件 | 职责 |\n| --- | --- |\n| Deployment | 管理副本 |' });
+    }
+    if (path === '/api/projects/body-table/generated') return json(route, { artifacts: [] });
+    if (path === '/api/projects/body-table/assets/body/annotations') return json(route, { annotations: [] });
+    if (path === '/api/projects') return json(route, { projects: [] });
+    if (path === '/api/folders') return json(route, { folders: [] });
+    if (path === '/api/preferences') return json(route, { content: '' });
+    if (path === '/api/sessions/recent' || path === '/api/sessions/active') return json(route, { sessions: [] });
+    if (path === '/api/settings/ask-ai') return json(route, { default: '', providers: [], bindings: {} });
+    return json(route, {});
+  });
+  await page.goto('/project/body-table/assets');
+
+  const table = page.locator('table').first();
+  await expect(table).toBeVisible();
+  const cell = table.locator('td').first();
+  const heading = table.locator('th').first();
+  expect(await cell.evaluate((element) => getComputedStyle(element).borderTopStyle)).toBe('solid');
+  expect(await cell.evaluate((element) => getComputedStyle(element).paddingTop)).toBe('9px');
+  expect(await heading.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+});
+
 test('shell dividers align with the brand rail and workspace header', async ({ page }) => {
   await page.setContent(`
     <style>* { box-sizing: border-box; } body { margin: 0; }</style>

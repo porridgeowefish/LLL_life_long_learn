@@ -2,7 +2,7 @@
 
 Status: planned
 Owner: project maintainer
-Last reviewed: 2026-09-11
+Last reviewed: 2026-09-13
 
 ## Backend Go tests
 
@@ -15,6 +15,7 @@ Last reviewed: 2026-09-11
 | OCR | `sources/internal/ocr/*_test.go` | httptest fake vision provider: base64 image payload, prompt contract, markdown output pass-through; failure → `ocr-failed` status |
 | routes | `routes_learning_workspace_test.go` | queue/steer/regenerate/export endpoint contracts incl. 404/409 paths; existing contract-freeze suite stays green |
 | config | `platform/config` | `webSearch` section parse/validate/env-key; missing section disables search |
+| artifact recovery | `assistant/internal/tasks/dispatcher_test.go` | completed `commit-failed` journal plus valid artifact-only manifest is promoted without reopening the CLI; an already-promoted artifact repairs a stale failed task state |
 
 ## Frontend Vitest
 
@@ -28,6 +29,9 @@ Last reviewed: 2026-09-11
 
 Queue → completion auto-advance → steer interrupt → regenerate last reply,
 happy path only, using the deterministic fake provider.
+
+The body asset route renders a Markdown table through the production CSS-module
+pipeline; cells keep border/padding and headers keep the document background.
 
 ## Manual smoke (learner-run, real keys)
 

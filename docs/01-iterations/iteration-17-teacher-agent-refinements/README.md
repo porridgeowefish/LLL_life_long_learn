@@ -2,7 +2,7 @@
 
 Status: delivered; manual OCR/web-search smoke remains learner-run
 Owner: project maintainer
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 
 ## Goal
 
@@ -49,10 +49,14 @@ normalized so folders and scripts stop being misleading.
 ## Documentation Impact
 
 Delivered in the same task: ADR-0018 (conversation queue, steering,
-regeneration) and ADR-0019 (vision OCR, web search, repository normalization)
-plus synchronized `DATA_MODEL.md`, `REPOSITORY_MAP.md`, `QUALITY_COMMANDS.md`,
-`AGENT_PRIMITIVES.md`, `config/config.example.json`, the ADR index, and the
-iteration indexes (iteration 16 moved to foundations).
+regeneration), ADR-0019 (vision OCR, web search, repository normalization),
+and ADR-0020 (bounded recovery of validated artifact-only promotion failures).
+The latter synchronizes `DATA_MODEL.md`, `SYSTEM_ARCHITECTURE.md`,
+`BACKEND_ARCHITECTURE.md`, the ADR index, and this iteration's data, API,
+acceptance, test, and delivery records. Earlier delivery synchronized
+`REPOSITORY_MAP.md`, `QUALITY_COMMANDS.md`, `AGENT_PRIMITIVES.md`,
+`config/config.example.json`, and the iteration indexes (iteration 16 moved to
+foundations).
 
 ## Contracts
 

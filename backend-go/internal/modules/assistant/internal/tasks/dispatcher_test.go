@@ -317,6 +317,121 @@ func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T)
 	}
 }
 
+func TestFailedArtifactCommitIsRecoveredWhenManifestRemainsValid(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("artifact-recovery", "成果恢复", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New("artifact-recovery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, _, err := store.Create(CreateInput{Type: "produce-material", Objective: "生成复习材料", Origin: Origin{OperationID: "op_artifact_recovery"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runID := "run_artifact_recovery"
+	task, err = store.Update(task.ID, func(current *Task) error {
+		current.Status, current.AttemptIDs = "failed", []string{runID}
+		current.Failure = &Failure{Code: "commit-failed", Message: "成果未入库"}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectRoot, err := workspace.ProjectRootForSlug("artifact-recovery")
+	if err != nil {
+		t.Fatal(err)
+	}
+	workDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "workspace")
+	d := newTestDispatcher(nil, nil)
+	manifest, _, err := d.sealInputs(task, workDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "input-manifest.json"), manifest); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "commit.json"), commitJournal{
+		SchemaVersion: 1,
+		TaskID:        task.ID,
+		RunID:         runID,
+		State:         "completed",
+		Status:        "failed",
+		Failure:       &Failure{Code: "commit-failed", Message: "成果未入库"},
+		UpdatedAt:     time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	review := []byte("# 考前总复习\n")
+	reviewPath := filepath.Join(workDir, "deliverables", "review", "files", "review.md")
+	if err := os.MkdirAll(filepath.Dir(reviewPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(reviewPath, review, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeJSON(filepath.Join(workDir, "deliverables", "review", "artifact.json"), map[string]any{
+		"schemaVersion": 1,
+		"kind":          "report",
+		"title":         "考前总复习",
+		"entryPoints":   []string{"files/review.md"},
+		"files":         []map[string]any{{"path": "files/review.md", "mediaType": "text/markdown", "sha256": hashBytes(review), "bytes": len(review)}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	result := resultManifest{SchemaVersion: 1, TaskID: task.ID, RunID: runID, Summary: "完整的独立成果", AssetUpdates: map[string]struct {
+		Status    string `json:"status"`
+		Candidate string `json:"candidate"`
+		Code      string `json:"code"`
+	}{"intro": {Status: "unchanged"}, "body": {Status: "unchanged"}, "practice": {Status: "unchanged"}}}
+	result.Deliverables = append(result.Deliverables, struct {
+		Key        string `json:"key"`
+		Descriptor string `json:"descriptor"`
+	}{Key: "review", Descriptor: "deliverables/review/artifact.json"})
+	resultPath := filepath.Join(workDir, "result-manifest.json")
+	if err := writeJSON(resultPath, result); err != nil {
+		t.Fatal(err)
+	}
+	settledAt := time.Now().Add(-2 * time.Second)
+	if err := os.Chtimes(resultPath, settledAt, settledAt); err != nil {
+		t.Fatal(err)
+	}
+
+	d.reconcileLateResults()
+
+	recovered, err := store.Get(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if recovered.Status != "succeeded" || recovered.Result == nil || len(recovered.Result.Deliverables) != 1 {
+		t.Fatalf("artifact-only commit failure was not recovered: %#v", recovered)
+	}
+	artifactID := artifactIDFor(task.ID, runID, "review")
+	if !artifactOwnedBy(filepath.Join(projectRoot, "assets", "generated", artifactID), task.ID, runID) {
+		t.Fatalf("recovered artifact %q was not promoted", artifactID)
+	}
+	if _, err := store.Update(task.ID, func(current *Task) error {
+		current.Status, current.Result = "failed", nil
+		current.Failure = &Failure{Code: "artifact-recovery-failed", Message: "task state was not updated after promotion"}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	d.reconcileLateResults()
+
+	converged, err := store.Get(task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if converged.Status != "succeeded" || converged.Result == nil || len(converged.Result.Deliverables) != 1 {
+		t.Fatalf("promoted artifact did not repair stale task state: %#v", converged)
+	}
+}
+
 func TestUnsafeSVGRejectsGeneralActiveAndExternalContent(t *testing.T) {
 	unsafe := []string{
 		`<svg xmlns="http://www.w3.org/2000/svg"><circle onfocus="alert(1)"/></svg>`,

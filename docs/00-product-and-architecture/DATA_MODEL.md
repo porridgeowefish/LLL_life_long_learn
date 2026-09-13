@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -152,6 +152,16 @@ versioned source originals and derived content
 durable assistant tasks, sealed inputs, and per-attempt workspaces
 migration backup and recovery journals
 ```
+
+### Generated artifact promotion recovery
+
+`commit-failed` is eligible for one dispatcher recovery only when the sealed
+result is a `produce-material` artifact-only output: it has deliverables, no
+source update, and `intro`, `body`, and `practice` all remain `unchanged`.
+The existing `task.json`, attempt `result-manifest.json`, and `commit.json`
+remain the complete durable record. A second failed promotion changes the
+existing task failure code to `artifact-recovery-failed`; no new task, run, or
+file schema is created (ADR-0020).
 
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE

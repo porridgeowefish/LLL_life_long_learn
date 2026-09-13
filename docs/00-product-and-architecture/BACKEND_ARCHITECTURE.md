@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 Source of truth: current Go backend boundaries and write ownership; package code owns implementation details.
 
 ## Intent
@@ -103,6 +103,7 @@ authorized tool call
 -> CLI writes declared attempt outputs and result.json only
 -> Go validates paths, hashes, manifest, and candidates
 -> Go versions/merges formal assets or registers generic generated deliverables
+-> a validated artifact-only promotion failure is reconciled once against the same sealed attempt; the CLI is never rerun (ADR-0020)
 -> durable task state changes and global SSE invalidates affected resources
 ```
 

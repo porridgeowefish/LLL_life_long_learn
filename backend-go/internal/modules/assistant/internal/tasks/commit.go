@@ -18,6 +18,7 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 	_ = writeJSON(journalPath, journal)
 	taskResult := &Result{Summary: result.Summary, AssetUpdates: map[string]string{}}
 	failed, updated := 0, 0
+	failedOutputs := make([]string, 0)
 	for _, key := range d.deps.AssetKeys() {
 		update, ok := result.AssetUpdates[key]
 		if !ok || update.Status == "unchanged" {
@@ -28,18 +29,21 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		if update.Status == "failed" {
 			taskResult.AssetUpdates[key] = "failed"
 			failed++
+			failedOutputs = append(failedOutputs, "“"+key+"”资产候选被任务标记为失败")
 			continue
 		}
 		candidatePath, ok := safeJoin(workDir, update.Candidate)
 		if !ok {
 			taskResult.AssetUpdates[key] = "failed"
 			failed++
+			failedOutputs = append(failedOutputs, "“"+key+"”资产候选路径无效")
 			continue
 		}
 		candidate, err := os.ReadFile(candidatePath)
 		if err != nil {
 			taskResult.AssetUpdates[key] = "failed"
 			failed++
+			failedOutputs = append(failedOutputs, "“"+key+"”资产候选无法读取")
 			continue
 		}
 		base := bases[key]
@@ -47,6 +51,7 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		if err != nil || status != "updated" {
 			taskResult.AssetUpdates[key] = "failed"
 			failed++
+			failedOutputs = append(failedOutputs, "“"+key+"”资产未能提交")
 		} else {
 			taskResult.AssetUpdates[key] = "updated"
 			updated++
@@ -57,6 +62,7 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		artifactID, err := d.commitGeneratedArtifact(projectRoot, task, runID, workDir, manifest, deliverable)
 		if err != nil {
 			failed++
+			failedOutputs = append(failedOutputs, "教学成果“"+deliverable.Key+"”未能写入资产库")
 			continue
 		}
 		taskResult.Deliverables = append(taskResult.Deliverables, artifactID)
@@ -69,11 +75,13 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 			path, ok := safeJoin(workDir, file.Path)
 			if !ok || !strings.Contains(filepath.ToSlash(file.Path), "source-updates/") {
 				failed++
+				failedOutputs = append(failedOutputs, "资料解析成果路径无效")
 				continue
 			}
 			data, err := os.ReadFile(path)
 			if err != nil {
 				failed++
+				failedOutputs = append(failedOutputs, "资料解析成果无法读取")
 				continue
 			}
 			files[file.Path[strings.LastIndex(filepath.ToSlash(file.Path), "/")+1:]] = data
@@ -82,23 +90,31 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		payload, err := d.deps.CommitSourceDerived(task.ProjectSlug, result.SourceUpdate.SourceID, result.SourceUpdate.RevisionID, task.ID, files, media)
 		if err != nil {
 			failed++
+			failedOutputs = append(failedOutputs, "资料解析成果未能写入来源库")
 		} else {
 			d.emitSource(task.ProjectSlug, payload)
 			updated++
 		}
 	}
 	if failed > 0 && updated > 0 {
-		failure := &Failure{Code: "partial-commit", Message: "部分成果已提交，另有输出未通过校验", Retryable: false, Suggestion: "可在 CLI 中查看本次 attempt 的 result-manifest.json 和输出目录。"}
+		failure := &Failure{Code: "partial-commit", Message: "部分成果已提交，另有输出未通过校验", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
 		writeCompletedCommit(journalPath, journal, "partial", taskResult, failure)
 		return "partial", taskResult, failure
 	}
 	if failed > 0 {
-		failure := &Failure{Code: "commit-failed", Message: "助教产出未通过提交校验", Retryable: false, Suggestion: "建议在 CLI 中检查保存的 prompt、结果清单与相对路径。"}
+		failure := &Failure{Code: "commit-failed", Message: "助教产出未通过提交校验", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
 		writeCompletedCommit(journalPath, journal, "failed", taskResult, failure)
 		return "failed", taskResult, failure
 	}
 	writeCompletedCommit(journalPath, journal, "succeeded", taskResult, nil)
 	return "succeeded", taskResult, nil
+}
+
+func commitFailureSuggestion(failedOutputs []string) string {
+	if len(failedOutputs) == 0 {
+		return "建议在 CLI 中检查保存的 prompt、结果清单与相对路径。"
+	}
+	return "未提交的输出：" + strings.Join(failedOutputs, "；") + "。可在 CLI 中检查本次 attempt 的 result-manifest.json 和输出目录。"
 }
 
 func writeCompletedCommit(path string, journal commitJournal, status string, result *Result, failure *Failure) {

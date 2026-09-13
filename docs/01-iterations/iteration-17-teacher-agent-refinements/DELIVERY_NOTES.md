@@ -2,7 +2,7 @@
 
 Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-13
 
 ## Implementation decisions (settled)
 
@@ -44,6 +44,28 @@ caused learner-visible data loss; both are fixed and lesson-logged
 Also added in the hotfix round: OCR binding UI on the models settings page
 (provider + model override), and a learning-investment heatmap on the usage
 page (same activity source and heat scale as the homepage).
+
+## Hotfix (2026-09-13, same iteration)
+
+- Markdown `body` assets render through `BodyAnnotations` for paging and
+  annotation support. Its stylesheet had omitted the shared document-table
+  treatment, so table rows appeared as unstructured text. It now applies the
+  same collapsed border, cell padding, and header background as other Markdown
+  assets; a Playwright route smoke checks the computed production styles.
+- A generated Tencent Cloud review package was valid in its sealed attempt but
+  had a terminal generic `commit-failed` record, so it was absent from both the
+  teacher task projection and `GET /generated`. ADR-0020 adds one bounded,
+  idempotent recovery for this artifact-only case. It never reruns the native
+  CLI or model, and a second failure becomes `artifact-recovery-failed`.
+- Task commit failures now name the output class that failed to enter its
+  durable store instead of leaving only a generic prompt/path suggestion.
+
+Verification for this hotfix: `npm run check` passed (format, vet, build,
+architecture graph, short and full Go tests with coverage, frontend lint/tests,
+and production frontend/backend builds); the focused Playwright body-table
+smoke passed; after restarting the production binary, the Tencent Cloud task
+`task_01M2B1G0VRMHX92DZKNQ0HY9VN` converged to `succeeded` and
+`GET /generated` returned its review artifact.
 
 ## Reasoning/body mixing investigation (2026-09-12 evening)
 

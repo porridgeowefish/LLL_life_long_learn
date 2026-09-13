@@ -28,9 +28,10 @@ func (d *Dispatcher) reconcileLostRuns() {
 
 // reconcileLateResults repairs the durable boundary between a visible CLI and
 // LLL. A terminal window may outlive the process handle observed by a previous
-// server instance and write its final manifest later. A valid late result is
-// therefore authoritative and is committed idempotently instead of remaining
-// stranded inside the attempt workspace.
+// server instance and write its final manifest later. It also repairs an
+// artifact-only result whose prior promotion failed after the manifest had
+// already been validated. A valid sealed result is therefore committed
+// idempotently instead of remaining stranded inside the attempt workspace.
 func (d *Dispatcher) reconcileLateResults() {
 	projects, _ := workspace.IndexAll()
 	for _, project := range projects {
@@ -43,7 +44,7 @@ func (d *Dispatcher) reconcileLateResults() {
 		}
 		tasks, _ := store.List("failed")
 		for _, task := range tasks {
-			if task.Failure == nil || (task.Failure.Code != "executor-state-lost" && task.Failure.Code != "invalid-result-manifest") || len(task.AttemptIDs) == 0 {
+			if task.Failure == nil || (task.Failure.Code != "executor-state-lost" && task.Failure.Code != "invalid-result-manifest" && task.Failure.Code != "commit-failed" && task.Failure.Code != "artifact-recovery-failed") || len(task.AttemptIDs) == 0 {
 				continue
 			}
 			runID := task.AttemptIDs[len(task.AttemptIDs)-1]
@@ -57,7 +58,7 @@ func (d *Dispatcher) reconcileLateResults() {
 				continue
 			}
 			var journal commitJournal
-			if readJSON(filepath.Join(attemptDir, "commit.json"), &journal) == nil && journal.State == "completed" {
+			if readJSON(filepath.Join(attemptDir, "commit.json"), &journal) == nil && journal.State == "completed" && task.Failure.Code != "commit-failed" && task.Failure.Code != "artifact-recovery-failed" {
 				continue
 			}
 			workDir := filepath.Join(attemptDir, "workspace")
@@ -69,15 +70,71 @@ func (d *Dispatcher) reconcileLateResults() {
 			if readErr != nil || validateResult(workDir, task, manifest, result) != nil {
 				continue
 			}
+			if task.Failure.Code == "commit-failed" && !isArtifactOnlyResult(task, result) {
+				continue
+			}
+			if task.Failure.Code == "artifact-recovery-failed" {
+				taskResult, artifactIDs, ok := promotedArtifactResult(projectRoot, task, runID, result)
+				if !ok {
+					continue
+				}
+				recovered, updateErr := store.Update(task.ID, func(current *Task) error {
+					current.Status, current.Phase, current.Result, current.Failure = "succeeded", "", taskResult, nil
+					return nil
+				})
+				if updateErr == nil {
+					for _, artifactID := range artifactIDs {
+						d.emitGenerated(task.ProjectSlug, task.ID, artifactID)
+					}
+					d.emit(recovered)
+					d.Notify()
+				}
+				continue
+			}
 			_, _ = store.Update(task.ID, func(current *Task) error {
 				current.Status, current.Phase, current.Result, current.Failure = "running", "committing", nil, nil
 				return nil
 			})
 			d.emitCurrent(store, task.ID)
 			status, taskResult, failure := d.commitResult(projectRoot, task, runID, workDir, manifest, bases, result)
+			if task.Failure.Code == "commit-failed" && status == "failed" && failure != nil && failure.Code == "commit-failed" {
+				failure.Code = "artifact-recovery-failed"
+				failure.Message = "助教成果再次提交失败，尚未写入项目资产库"
+			}
 			d.finish(store, task.ID, status, taskResult, failure)
 		}
 	}
+}
+
+func isArtifactOnlyResult(task Task, result resultManifest) bool {
+	if task.Type != "produce-material" || len(result.Deliverables) == 0 || result.SourceUpdate != nil {
+		return false
+	}
+	for _, key := range []string{"intro", "body", "practice"} {
+		update, ok := result.AssetUpdates[key]
+		if !ok || update.Status != "unchanged" {
+			return false
+		}
+	}
+	return true
+}
+
+func promotedArtifactResult(projectRoot string, task Task, runID string, result resultManifest) (*Result, []string, bool) {
+	if !isArtifactOnlyResult(task, result) {
+		return nil, nil, false
+	}
+	taskResult := &Result{Summary: result.Summary, AssetUpdates: map[string]string{}}
+	for key, update := range result.AssetUpdates {
+		taskResult.AssetUpdates[key] = update.Status
+	}
+	for _, deliverable := range result.Deliverables {
+		artifactID := artifactIDFor(task.ID, runID, deliverable.Key)
+		if !artifactOwnedBy(filepath.Join(projectRoot, "assets", "generated", artifactID), task.ID, runID) {
+			return nil, nil, false
+		}
+		taskResult.Deliverables = append(taskResult.Deliverables, artifactID)
+	}
+	return taskResult, append([]string(nil), taskResult.Deliverables...), true
 }
 
 func (d *Dispatcher) reconcilePartialDeliverables() {

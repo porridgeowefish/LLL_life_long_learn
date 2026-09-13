@@ -2,7 +2,7 @@
 
 Status: planned
 Owner: project maintainer
-Last reviewed: 2026-09-11
+Last reviewed: 2026-09-13
 
 All persistence stays file-first under `projects/<slug>/`. The conversation
 event log (`conversation/events.jsonl`) remains append-only; every new
@@ -93,6 +93,20 @@ New optional top-level section in `config.local.json`:
   (`Resolve("ocr")`); anthropic-kind vision is also accepted.
 - No new persistent schema; failure marks the source failed via existing
   `SetStatus` codes (`ocr-failed`).
+
+## Generated deliverable promotion recovery
+
+The existing `assistant-tasks/<task-id>/attempts/<run-id>/` files remain the
+recovery source. A `commit-failed` `produce-material` task is eligible exactly
+once only when its revalidated result has at least one deliverable, no source
+update, and unchanged `intro`, `body`, and `practice` updates. Recovery writes
+the normal generated artifact under `assets/generated/` with the original
+task/run provenance; it does not create a new task/run or modify core assets.
+If promotion fails again, `task.json.failure.code` becomes
+`artifact-recovery-failed` and the task stays terminal (ADR-0020).
+If an artifact with the same task/run provenance already exists while that
+failure code remains, reconciliation only repairs `task.json` to `succeeded`;
+the artifact files are not written again.
 
 ## Repository layout changes
 

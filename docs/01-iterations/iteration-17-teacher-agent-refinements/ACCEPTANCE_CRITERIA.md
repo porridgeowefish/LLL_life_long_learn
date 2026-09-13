@@ -2,7 +2,7 @@
 
 Status: planned
 Owner: project maintainer
-Last reviewed: 2026-09-11
+Last reviewed: 2026-09-13
 
 ## AC-1 OCR
 
@@ -79,3 +79,14 @@ Last reviewed: 2026-09-11
 3. Given `npm run check` / `archcheck` / `go test ./...`，when 整理完成，then
    全部通过。
 4. Given HTTP API，then 路径与响应形状不变（契约冻结测试通过）。
+
+## AC-8 已生成教学成果的入库恢复
+
+1. Given 助教已写出有效的独立教学成果、三类核心资产均未变更，when 首次写入
+   `assets/generated/` 失败，then 调度器在后续对账中只重试该成果的入库，不重新
+   调用 CLI 或模型；成功后“助教成果”页显示原成果。
+2. Given 上述恢复再次失败，then 任务变为 `artifact-recovery-failed`，停止自动
+   重试，并明确提示未写入的是哪类输出。
+3. Given 成果文件已有原任务/运行标识但任务状态仍是
+   `artifact-recovery-failed`，when 调度器对账，then 状态收敛为 `succeeded`，
+   不再次写入文件或调用 CLI。
