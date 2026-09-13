@@ -14,7 +14,7 @@ teacher       fast API conversation; teaches and may propose one disclosed deleg
 assistant     visible native CLI; performs learner-authorized substantial work
 encyclopedia visible native CLI; generates or updates a discipline map
 Ask AI        lightweight quote-grounded provider helper; no teacher methods or tools
-LLL           owns authorization, paths, task state, validation, promotion, and recovery
+LLL           owns authorization, paths, task state, atomic publication, and notification
 ```
 
 ## Execution Principle
@@ -43,7 +43,7 @@ When a native CLI role is invoked:
 
 ```text
 LLL resolves the active project context
-LLL resolves sealed conversation, asset, source, scope, and preference inputs
+LLL captures conversation, asset, source, scope, and preference inputs
 LLL builds a role-specific prompt with declared output rules
 LLL launches the selected native Agent CLI through agentexecution.Service
 LLL auto-injects that prompt
@@ -127,9 +127,9 @@ ADR-0012 separates product role from runtime mechanism:
   prompt and five soft methods, and may use only `delegate_learning_work` after
   disclosing the work and receiving a later learner response;
 - `assistant` is substantial asynchronous work executed by a visible native
-  CLI. It consumes a sealed task envelope and writes only attempt staging;
-- `LLL` owns authorization, paths, task state, queueing, validation, promotion,
-  notifications, and recovery.
+  CLI. It consumes a captured task envelope and writes only attempt staging;
+- `LLL` owns authorization, paths, task state, queueing, atomic publication,
+  and notifications; the assistant owns output acceptance.
 
 The API teacher is not a registered CLI Agent and does not violate the rule
 that registered Agents use native CLI execution. Annotation Ask AI remains a
@@ -137,12 +137,14 @@ separate lightweight provider helper with no teacher methods or tools.
 
 The active generated result contract changes from zone-bound direct writes to
 generic declared deliverables plus optional intro/body/practice candidates.
-Formal files are committed only by Go after validation and merge. Legacy Agent
+Formal files are atomically published by Go after the assistant has accepted
+them. Go retains version/merge handling for core assets but does not inspect
+task conformance, file manifests, hashes, or generated content. Legacy Agent
 charters remain compatibility inputs until migration; new assistant prompts are
 grounded in the approved objective, exact conversation range, asset bases, and
 authorized source revisions.
 
-For confirmed `consolidate` work, the assistant uses sealed conversation and
+For confirmed `consolidate` work, the assistant uses captured conversation and
 source evidence to update Intro for significance and Body for a self-contained
 teaching manuscript plus critical-thinking conclusion. Practice is untouched
 unless the approved task explicitly requests questions.

@@ -6,9 +6,9 @@ import (
 	"errors"
 
 	"crypto/sha256"
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 
 	"encoding/hex"
+	"mime"
 	"os"
 	"path/filepath"
 	"time"
@@ -29,8 +29,8 @@ func loadSealedInputs(task Task, projectRoot, workDir string) (inputManifest, ma
 	bases := map[string]AssetSnapshot{}
 	for key, entry := range manifest.Assets {
 		content, err := os.ReadFile(filepath.Join(workDir, "inputs", "assets", key, "current.md"))
-		if err != nil || hashBytes(content) != entry.SHA256 {
-			return manifest, nil, errors.New("sealed asset input mismatch")
+		if err != nil {
+			return manifest, nil, errors.New("attempt asset input is unavailable")
 		}
 		bases[key] = AssetSnapshot{VersionID: entry.VersionID, ConversationCursor: entry.Cursor, Content: string(content)}
 	}
@@ -53,10 +53,6 @@ func safeJoin(root, rel string) (string, bool) {
 	path := filepath.Join(root, clean)
 	back, err := filepath.Rel(root, path)
 	return path, err == nil && !strings.HasPrefix(back, "..")
-}
-func hashBytes(data []byte) string {
-	sum := sha256.Sum256(data)
-	return "sha256:" + hex.EncodeToString(sum[:])
 }
 func sourceRevisionIDs(manifest inputManifest) []string {
 	out := make([]string, 0, len(manifest.Sources))
@@ -98,13 +94,9 @@ func (d *Dispatcher) commitGeneratedArtifact(projectRoot string, task Task, runI
 	if artifactOwnedBy(target, task.ID, runID) {
 		return artifactID, nil
 	}
-	validated, err := validateArtifactDescriptor(workDir, deliverable)
-	if err != nil {
-		return "", err
-	}
 	staging := target + ".staging-" + runID
 	_ = os.RemoveAll(staging)
-	if err := stageArtifactPackage(workDir, filepath.Dir(descriptorPath), staging, validated); err != nil {
+	if err := copyTree(filepath.Dir(descriptorPath), staging); err != nil {
 		_ = os.RemoveAll(staging)
 		return "", err
 	}
@@ -117,6 +109,12 @@ func (d *Dispatcher) commitGeneratedArtifact(projectRoot string, task Task, runI
 	artifact["artifactId"] = artifactID
 	artifact["provenance"] = map[string]any{"taskId": task.ID, "runId": runID, "conversationRange": map[string]uint64{"throughSeq": task.ConversationCutoffSeq}, "sourceRevisionIds": sourceRevisionIDs(manifest)}
 	artifact["createdAt"] = time.Now().UTC()
+	files, indexErr := presentationFileIndex(staging)
+	if indexErr != nil {
+		_ = os.RemoveAll(staging)
+		return "", indexErr
+	}
+	artifact["files"] = files
 	if err := writeJSON(filepath.Join(staging, "artifact.json"), artifact); err != nil {
 		_ = os.RemoveAll(staging)
 		return "", err
@@ -187,29 +185,33 @@ func copyTree(source, destination string) error {
 	})
 }
 
-func stageArtifactPackage(workDir, descriptorDir, destination string, descriptor artifactDescriptor) error {
-	if err := os.MkdirAll(destination, 0o755); err != nil {
-		return err
-	}
-	for _, file := range descriptor.Files {
-		source, packageRel, ok := resolveArtifactFile(workDir, descriptorDir, file.Path)
-		if !ok {
-			return errors.New("invalid staged artifact path")
-		}
-		target, ok := safeJoin(destination, packageRel)
-		if !ok {
-			return errors.New("invalid artifact package path")
-		}
-		data, err := os.ReadFile(source)
+// presentationFileIndex is derived after publication. It supports the reader
+// without acting as an assistant-output acceptance gate.
+func presentationFileIndex(root string) ([]map[string]any, error) {
+	files := make([]map[string]any, 0)
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		if info.IsDir() || !info.Mode().IsRegular() || filepath.Base(path) == "artifact.json" {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
 			return err
 		}
-		if err := workspace.AtomicWriteFile(target, data, 0o644); err != nil {
-			return err
+		mediaType := mime.TypeByExtension(strings.ToLower(filepath.Ext(path)))
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".md", ".markdown":
+			mediaType = "text/markdown"
+		case ".txt":
+			mediaType = "text/plain"
 		}
-	}
-	return writeJSON(filepath.Join(destination, "artifact.json"), descriptor)
+		if mediaType == "" {
+			mediaType = "application/octet-stream"
+		}
+		files = append(files, map[string]any{"path": filepath.ToSlash(rel), "mediaType": mediaType, "bytes": info.Size()})
+		return nil
+	})
+	return files, err
 }

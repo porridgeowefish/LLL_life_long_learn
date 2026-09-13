@@ -52,20 +52,20 @@ page (same activity source and heat scale as the homepage).
   treatment, so table rows appeared as unstructured text. It now applies the
   same collapsed border, cell padding, and header background as other Markdown
   assets; a Playwright route smoke checks the computed production styles.
-- A generated Tencent Cloud review package was valid in its sealed attempt but
-  had a terminal generic `commit-failed` record, so it was absent from both the
-  teacher task projection and `GET /generated`. ADR-0020 adds one bounded,
-  idempotent recovery for this artifact-only case. It never reruns the native
-  CLI or model, and a second failure becomes `artifact-recovery-failed`.
-- Task commit failures now name the output class that failed to enter its
-  durable store instead of leaving only a generic prompt/path suggestion.
+- A generated Tencent Cloud review package demonstrated that a second Go
+  acceptance gate can strand a self-accepted assistant result. ADR-0020's
+  bounded recovery is superseded by ADR-0021: LLL no longer checks output file
+  manifests, hashes, SVG content, or task-type rules. It atomically publishes
+  the assistant's declared directory and records only operational I/O failures
+  as `publish-failed` or `partial-publish`.
 
 Verification for this hotfix: `npm run check` passed (format, vet, build,
 architecture graph, short and full Go tests with coverage, frontend lint/tests,
 and production frontend/backend builds); the focused Playwright body-table
 smoke passed; after restarting the production binary, the Tencent Cloud task
 `task_01M2B1G0VRMHX92DZKNQ0HY9VN` converged to `succeeded` and
-`GET /generated` returned its review artifact.
+`GET /generated` returned its review artifact. The direct-publication change is
+verified by the assistant task package test and the current full quality gate.
 
 ## Reasoning/body mixing investigation (2026-09-12 evening)
 

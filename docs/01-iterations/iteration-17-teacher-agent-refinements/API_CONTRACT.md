@@ -109,14 +109,13 @@ All other frames (`turn-accepted`, `message-started`, `text-delta`,
 `reasoning-summary-delta`, `usage`, `task-accepted`, `tool-rejected`,
 `message-completed`, `message-failed`) are unchanged.
 
-## Generated artifact promotion recovery
+## Assistant-accepted artifact publication
 
 No HTTP request or response shape changes. The existing assistant-task
-projection may move from `failed/commit-failed` to `succeeded` when the
-dispatcher completes the bounded artifact-only promotion recovery in ADR-0020.
-If that one recovery fails, the existing `failure.code` field is
-`artifact-recovery-failed`; its `suggestion` identifies the uncommitted output
-class. No CLI/model execution occurs during either transition.
+projection reports `publish-failed` or `partial-publish` only when the
+filesystem publication itself fails. LLL does not expose a content-validation
+state and does not automatically retry publication; the assistant owns output
+acceptance (ADR-0021).
 
 ## Config additions (config.local.json)
 

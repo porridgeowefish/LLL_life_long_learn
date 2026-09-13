@@ -80,13 +80,12 @@ Last reviewed: 2026-09-13
    全部通过。
 4. Given HTTP API，then 路径与响应形状不变（契约冻结测试通过）。
 
-## AC-8 已生成教学成果的入库恢复
+## AC-8 助教自验收后的直接发布
 
-1. Given 助教已写出有效的独立教学成果、三类核心资产均未变更，when 首次写入
-   `assets/generated/` 失败，then 调度器在后续对账中只重试该成果的入库，不重新
-   调用 CLI 或模型；成功后“助教成果”页显示原成果。
-2. Given 上述恢复再次失败，then 任务变为 `artifact-recovery-failed`，停止自动
-   重试，并明确提示未写入的是哪类输出。
-3. Given 成果文件已有原任务/运行标识但任务状态仍是
-   `artifact-recovery-failed`，when 调度器对账，then 状态收敛为 `succeeded`，
-   不再次写入文件或调用 CLI。
+1. Given 助教已完成自验收并写出 `result-manifest.json`，when 成果目录不含文件
+   清单、字节数或 SHA-256，then LLL 仍将完整目录发布到 `assets/generated/`，教师
+   和“助教成果”页可读取。
+2. Given 助教声明要发布的目录，then LLL 只限制其读取在本次 attempt 工作区内，并
+   原子写入当前项目；不检查产物内容、SVG、文件清单或任务类型规则。
+3. Given 发布时发生文件系统错误，then 任务终态为 `publish-failed` 或
+   `partial-publish`，提示未发布的输出，不自动重试或重新调用 CLI。

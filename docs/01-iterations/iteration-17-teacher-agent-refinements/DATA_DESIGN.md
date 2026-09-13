@@ -94,19 +94,16 @@ New optional top-level section in `config.local.json`:
 - No new persistent schema; failure marks the source failed via existing
   `SetStatus` codes (`ocr-failed`).
 
-## Generated deliverable promotion recovery
+## Assistant-accepted generated deliverables
 
-The existing `assistant-tasks/<task-id>/attempts/<run-id>/` files remain the
-recovery source. A `commit-failed` `produce-material` task is eligible exactly
-once only when its revalidated result has at least one deliverable, no source
-update, and unchanged `intro`, `body`, and `practice` updates. Recovery writes
-the normal generated artifact under `assets/generated/` with the original
-task/run provenance; it does not create a new task/run or modify core assets.
-If promotion fails again, `task.json.failure.code` becomes
-`artifact-recovery-failed` and the task stays terminal (ADR-0020).
-If an artifact with the same task/run provenance already exists while that
-failure code remains, reconciliation only repairs `task.json` to `succeeded`;
-the artifact files are not written again.
+`assistant-tasks/<task-id>/attempts/<run-id>/workspace/deliverables/<key>/`
+is the assistant's accepted artifact directory. On a parseable
+`result-manifest.json`, LLL publishes the directory as a whole under
+`assets/generated/<artifact-id>/` and adds task/run provenance to
+`artifact.json`; LLL derives a presentation-only file index from the published
+directory. An assistant-provided file list, file sizes, SHA-256 values, and
+server-side content inspection are not required. Publication I/O failures remain terminal
+as `publish-failed` or `partial-publish` (ADR-0021).
 
 ## Repository layout changes
 

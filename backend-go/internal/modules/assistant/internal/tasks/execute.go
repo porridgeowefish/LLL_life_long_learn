@@ -74,23 +74,19 @@ func (d *Dispatcher) execute(store *Store, task Task, runID string) {
 		d.finish(store, task.ID, "cancelled", nil, &Failure{Code: "terminal-interrupted", Message: "任务已在 CLI 终端中止", Retryable: false, Suggestion: "如需重试，请在教师对话中重新确认任务，或在 CLI 中手动执行保存的 prompt.md。"})
 		return
 	}
-	_, _ = store.Update(task.ID, func(t *Task) error { t.Phase = "validating"; return nil })
+	_, _ = store.Update(task.ID, func(t *Task) error { t.Phase = "publishing"; return nil })
 	d.emitCurrent(store, task.ID)
 	resultPath := filepath.Join(workDir, "result-manifest.json")
-	result, err := readResult(resultPath, task.ID, runID)
+	result, err := readResult(resultPath)
 	if err != nil {
-		d.fail(store, task.ID, "invalid-result-manifest", "CLI 未产生有效的 result-manifest.json", false)
-		return
-	}
-	if err := validateResult(workDir, task, manifest, result); err != nil {
-		d.fail(store, task.ID, "invalid-result-manifest", "CLI 结果清单或声明产物未通过工作区校验", false)
+		d.fail(store, task.ID, "invalid-result-manifest", "CLI 未产生可解析的 result-manifest.json", false)
 		return
 	}
 	if exitCode != 0 {
 		d.fail(store, task.ID, "executor-exit-failed", fmt.Sprintf("CLI 以状态 %d 结束", exitCode), false)
 		return
 	}
-	_, _ = store.Update(task.ID, func(t *Task) error { t.Phase = "committing"; return nil })
+	_, _ = store.Update(task.ID, func(t *Task) error { t.Phase = "publishing"; return nil })
 	d.emitCurrent(store, task.ID)
 	status, taskResult, failure := d.commitResult(projectRoot, task, runID, workDir, manifest, bases, result)
 	d.finish(store, task.ID, status, taskResult, failure)
@@ -103,7 +99,6 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 		VersionID string `json:"versionId"`
 		Cursor    uint64 `json:"cursor"`
 		Path      string `json:"path"`
-		SHA256    string `json:"sha256"`
 	}{}
 	if d.deps.ConversationSnapshot == nil || d.deps.PreferencesSnapshot == nil || d.deps.ReadAsset == nil || d.deps.SealSource == nil {
 		return manifest, nil, errors.New("assistant dispatcher dependencies are not configured")
@@ -116,7 +111,7 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 	if err := workspace.AtomicWriteFile(conversationPath, conversationBytes, 0o644); err != nil {
 		return manifest, nil, err
 	}
-	manifest.Conversation.ThroughSeq, manifest.Conversation.Snapshot, manifest.Conversation.SHA256 = task.ConversationCutoffSeq, "workspace/inputs/conversation.json", hashBytes(conversationBytes)
+	manifest.Conversation.ThroughSeq, manifest.Conversation.Snapshot = task.ConversationCutoffSeq, "workspace/inputs/conversation.json"
 	preferenceFilename, preferenceBytes, err := d.deps.PreferencesSnapshot()
 	if err != nil {
 		return manifest, nil, err
@@ -125,7 +120,7 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 	if err := workspace.AtomicWriteFile(preferencePath, preferenceBytes, 0o444); err != nil {
 		return manifest, nil, err
 	}
-	manifest.Preferences.Path, manifest.Preferences.SHA256 = "workspace/inputs/"+preferenceFilename, hashBytes(preferenceBytes)
+	manifest.Preferences.Path = "workspace/inputs/" + preferenceFilename
 	bases := map[string]AssetSnapshot{}
 	for _, key := range d.deps.AssetKeys() {
 		asset, err := d.deps.ReadAsset(task.ProjectSlug, key)
@@ -141,8 +136,7 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 			VersionID string `json:"versionId"`
 			Cursor    uint64 `json:"cursor"`
 			Path      string `json:"path"`
-			SHA256    string `json:"sha256"`
-		}{asset.VersionID, asset.ConversationCursor, rel, hashBytes([]byte(asset.Content))}
+		}{asset.VersionID, asset.ConversationCursor, rel}
 	}
 	for _, sourceID := range task.SourceRefs {
 		destinationRoot := filepath.Join(workDir, "inputs", "sources", sourceID)
@@ -150,7 +144,7 @@ func (d *Dispatcher) sealInputs(task Task, workDir string) (inputManifest, map[s
 		if err != nil {
 			return manifest, nil, err
 		}
-		manifest.Sources = append(manifest.Sources, struct{ SourceID, RevisionID, Path, SHA256 string }{sourceID, source.RevisionID, filepath.ToSlash(filepath.Join("workspace", "inputs", "sources", sourceID, source.RevisionID)), source.SHA256})
+		manifest.Sources = append(manifest.Sources, struct{ SourceID, RevisionID, Path string }{sourceID, source.RevisionID, filepath.ToSlash(filepath.Join("workspace", "inputs", "sources", sourceID, source.RevisionID))})
 	}
 	return manifest, bases, nil
 }
@@ -172,7 +166,7 @@ func buildTaskPrompt(task Task, runID string) string {
 3. 可调研、运行代码、作图、生成任意必要文件。一般过程放 scratch/；值得保留的成果放 deliverables/<key>/。
 4. 对引入、正文、练习的候选更新分别写入 asset-updates/intro/current.md、asset-updates/body/current.md、asset-updates/practice/current.md。没有变化就声明 unchanged，不要为了填满而修改。
 5. 资料解析任务的派生文件放 source-updates/<revision-id>/。
-6. 完成后必须写 result-manifest.json。它是清单，不是成果容器；不得使用绝对路径或 ..。
+6. 完成后写 result-manifest.json，登记本次需要发布的资产候选、资料派生结果和 deliverables。它不是成果容器。
 
 %s
 
@@ -191,25 +185,16 @@ result-manifest.json 示例：
   }
 }
 
-artifact.json 必须完整声明每个保留文件，不能留下未声明文件。例如：
+artifact.json 记录成果在界面中的名称、说明和默认打开文件。例如：
 
 {
   "schemaVersion": 1,
   "kind": "report",
   "title": "实验报告",
   "description": "产出及其用途",
-  "entryPoints": ["files/report.md"],
-  "files": [
-    {
-      "path": "files/report.md",
-      "mediaType": "text/markdown",
-      "sha256": "sha256:<64位小写十六进制>",
-      "bytes": 123
-    }
-  ]
+  "entryPoints": ["files/report.md"]
 }
-
-sha256 和 bytes 必须按最终文件实际内容计算。SVG 不得含脚本、事件处理器、foreignObject 或外部资源。`, task.ID, runID, task.Type, task.Objective, taskSpecificInstructions(task), task.ID, runID)
+`, task.ID, runID, task.Type, task.Objective, taskSpecificInstructions(task), task.ID, runID)
 }
 
 func taskSpecificInstructions(task Task) string {

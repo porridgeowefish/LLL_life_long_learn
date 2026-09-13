@@ -130,14 +130,16 @@ ordinary movable folder members.
   other assistant deliverables that do not fit the three teaching sections.
 - `sources/` holds learner-provided immutable revisions and, after supported
   background parsing, exactly one `derived/content.md` citation per ready revision.
-- `runs/` and task attempts hold raw execution evidence; they never become
-  curated assets merely because a CLI wrote them.
+- `runs/` and task attempts hold execution evidence until the assistant declares
+  an output for publication; scratch files remain attempt-local.
 - `<WORKSPACE>/preferences.md` is one learner-owned global preference document,
   read-only to AI and never tool authorization or factual evidence.
 
-Formal assets are written by Go after validation and version/merge handling.
-The visible CLI writes only its attempt workspace and declared result manifest.
-Confirmed consolidation always rewrites Intro and Body from sealed conversation
+Formal assets are written by Go after assistant acceptance and version/merge
+handling. The visible CLI writes only its attempt workspace and declared result
+manifest; Go atomically publishes declared deliverable directories without
+content or hash validation.
+Confirmed consolidation always rewrites Intro and Body from captured conversation
 evidence; Practice changes only when the approved task explicitly requests it.
 
 ## Compatibility Boundary

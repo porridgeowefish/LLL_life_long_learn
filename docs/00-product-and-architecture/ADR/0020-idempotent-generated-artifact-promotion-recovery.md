@@ -1,11 +1,12 @@
 # ADR-0020: Idempotent Generated Artifact Promotion Recovery
 
-Status: accepted
+Status: superseded by ADR-0021
 Owner: project maintainer
 Date: 2026-09-13
 Last reviewed: 2026-09-13
 Source of truth: recovery boundary for a validated assistant deliverable that did not reach the project asset store.
 Supersedes: ADR-0012's rejected general automatic Agent retry only for the narrow sealed artifact-promotion recovery defined here.
+Superseded by: ADR-0021
 Extends: ADR-0012 and ADR-0015
 
 ## Context

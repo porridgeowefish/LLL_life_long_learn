@@ -39,7 +39,8 @@ an active owner and the historical index records the move.
 | [0017](./0017-conversation-learning-sources-consolidation-and-usage.md) | Conversation Learning Sources, Consolidation, And Usage | accepted | extends 0012 and 0016 with canonical source citations, teaching outlines, approved consolidation, and teacher usage |
 | [0018](./0018-teacher-conversation-queue-steering-and-regeneration.md) | Teacher Conversation Queue, Steering, And Regeneration | accepted | durable event-log queue, explicit interrupt-and-redirect steering, latest-response regeneration via supersession |
 | [0019](./0019-vision-ocr-web-search-and-repository-normalization.md) | Vision OCR, Web Search Tool, And Repository Normalization | accepted | vision-model OCR for image sources, bounded search_web tool loop, learning-agents rename and script relocation |
-| [0020](./0020-idempotent-generated-artifact-promotion-recovery.md) | Idempotent Generated Artifact Promotion Recovery | accepted | one bounded retry of a valid, artifact-only promotion; does not rerun the CLI |
+| [0020](./0020-idempotent-generated-artifact-promotion-recovery.md) | Idempotent Generated Artifact Promotion Recovery | superseded by 0021 | historical bounded retry of a validated artifact-only promotion |
+| [0021](./0021-assistant-self-accepted-direct-publication.md) | Assistant Self-Accepted Direct Publication | accepted | assistant accepts output; LLL directly and atomically publishes its declared directories |
 
 ## Historical Decisions
 

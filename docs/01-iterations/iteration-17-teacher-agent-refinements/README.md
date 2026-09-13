@@ -50,8 +50,9 @@ normalized so folders and scripts stop being misleading.
 
 Delivered in the same task: ADR-0018 (conversation queue, steering,
 regeneration), ADR-0019 (vision OCR, web search, repository normalization),
-and ADR-0020 (bounded recovery of validated artifact-only promotion failures).
-The latter synchronizes `DATA_MODEL.md`, `SYSTEM_ARCHITECTURE.md`,
+ADR-0020 (historical artifact-promotion recovery), and ADR-0021 (assistant
+self-accepted direct publication). ADR-0021 synchronizes `AGENT_ARCHITECTURE.md`,
+`LEARNING_PROJECT_STRUCTURE.md`, `DATA_MODEL.md`, `SYSTEM_ARCHITECTURE.md`,
 `BACKEND_ARCHITECTURE.md`, the ADR index, and this iteration's data, API,
 acceptance, test, and delivery records. Earlier delivery synchronized
 `REPOSITORY_MAP.md`, `QUALITY_COMMANDS.md`, `AGENT_PRIMITIVES.md`,

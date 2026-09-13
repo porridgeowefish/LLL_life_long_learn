@@ -74,7 +74,7 @@ generic generated assistant deliverables
 body annotations and Ask-AI history
 versioned source originals and derived content
 append-only provider-reported teacher usage by response
-assistant tasks, sealed inputs, attempts, and run records
+assistant tasks, captured inputs, attempts, and run records
 ```
 
 Legacy zone protocols (`intro/assessment.json`, Explain manifests/pages,
@@ -149,19 +149,19 @@ append-only conversation events plus rebuildable compact context
 versioned intro, body, and practice assets plus generated artifacts
 body-owned annotation and Ask-AI history
 versioned source originals and derived content
-durable assistant tasks, sealed inputs, and per-attempt workspaces
+durable assistant tasks, captured inputs, and per-attempt workspaces
 migration backup and recovery journals
 ```
 
-### Generated artifact promotion recovery
+### Assistant-accepted publication
 
-`commit-failed` is eligible for one dispatcher recovery only when the sealed
-result is a `produce-material` artifact-only output: it has deliverables, no
-source update, and `intro`, `body`, and `practice` all remain `unchanged`.
-The existing `task.json`, attempt `result-manifest.json`, and `commit.json`
-remain the complete durable record. A second failed promotion changes the
-existing task failure code to `artifact-recovery-failed`; no new task, run, or
-file schema is created (ADR-0020).
+`result-manifest.json` is an assistant-authored publication declaration, not a
+server-verified acceptance checklist. Its artifact metadata may omit file lists,
+byte counts, and hashes. LLL copies each declared deliverable directory into
+`assets/generated/`, then writes task/run provenance and a presentation-only
+file index to `artifact.json`.
+`publish-failed` and `partial-publish` record operational write failures; no
+automatic validation or promotion retry follows (ADR-0021).
 
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE

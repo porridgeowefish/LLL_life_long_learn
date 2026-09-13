@@ -57,7 +57,7 @@ project-file schemas.
 |---|---|---|
 | Transport | `internal/transport/httpserver`, `internal/httpx` | decode, size-limit, call one operation, encode, stream |
 | Teacher | `modules/teacher` | context assembly, provider-neutral blocks, tool loop, durable recovery |
-| Assistant | `modules/assistant` | authorization, task state, queue/leases, sealed input, visible CLI lifecycle |
+| Assistant | `modules/assistant` | authorization, task state, queue/leases, captured input, visible CLI lifecycle |
 | Assets and sources | `modules/assets`, `modules/sources` | versions, edits, annotations, immutable source revisions and disclosure |
 | Projects and learning | `modules/projects`, `modules/learning` | project roots, folders, scope, activity, progress and live run state |
 | Preferences | `modules/preferences` | learner-owned global file and bounded read-only prompt snapshots |
@@ -98,12 +98,11 @@ authorized tool call
 -> assistanttask service performs atomic check-and-create
 -> durable task enters queued state
 -> dispatcher acquires global/unit slots and attempt lease
--> exact conversation range, asset bases, source revisions, scope, and preferences are copied into sealed inputs
+-> exact conversation range, asset bases, source revisions, scope, and preferences are copied into attempt inputs
 -> agentexecution.Service opens the selected visible CLI in the learning-unit folder
--> CLI writes declared attempt outputs and result.json only
--> Go validates paths, hashes, manifest, and candidates
--> Go versions/merges formal assets or registers generic generated deliverables
--> a validated artifact-only promotion failure is reconciled once against the same sealed attempt; the CLI is never rerun (ADR-0020)
+-> CLI accepts its outputs and writes result-manifest.json plus output directories
+-> Go versions/merges declared formal assets and atomically publishes generic generated directories
+-> a publication I/O failure is terminal; there is no validator or automatic retry (ADR-0021)
 -> durable task state changes and global SSE invalidates affected resources
 ```
 
@@ -118,7 +117,7 @@ terminal, and LLL records the exit result.
 | Data | Canonical writer |
 |---|---|
 | conversation events and teacher run state | teacher application service |
-| task state, attempts, leases, sealed manifests | assistant task/dispatcher service |
+| task state, attempts, leases, captured input manifests | assistant task/dispatcher service |
 | formal asset versions and merge journals | asset application/store |
 | source revisions and tombstones | source application/store |
 | teacher provider usage | teacher usage store |
@@ -167,7 +166,7 @@ SSE is never the only copy of a state transition.
 
 `<WORKSPACE>/preferences.md` is Markdown capped at 256 KiB. The preferences
 page and direct learner file editing are the only write paths. Teacher context
-and assistant sealed input receive bounded read-only snapshots. Preferences do
+and assistant captured input receive bounded read-only snapshots. Preferences do
 not authorize tools, establish facts, or override explicit learner choices.
 Startup and explicit saves maintain a recovery mirror below the operating
 system user configuration directory, keyed by workspace. If the canonical file

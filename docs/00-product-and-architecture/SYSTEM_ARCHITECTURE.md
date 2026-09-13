@@ -117,12 +117,11 @@ live-message rerenders.
 ```text
 authorized teacher tool call
 -> assistant task service validates proposal identity and creates durable task.json
--> dispatcher seals exact conversation/assets/sources/preferences into an attempt workspace
+-> dispatcher captures conversation/assets/sources/preferences into an attempt workspace
 -> shared execution service opens the selected native CLI in the project folder and injects one prompt
--> CLI writes only declared attempt outputs
--> Go validates result.json and declared deliverables
--> valid candidates are versioned/merged into assets; generic outputs remain declared generated assets
--> a failed artifact-only promotion with unchanged core assets is retried once from the same sealed attempt, never by rerunning the CLI (ADR-0020)
+-> CLI accepts its own outputs and writes result-manifest.json plus output directories
+-> Go versions/merges declared core candidates and atomically publishes every declared generated directory
+-> a publication I/O failure is terminal; the CLI is not rerun or server-side revalidated (ADR-0021)
 -> task state and global invalidation events update the conversation UI
 ```
 

@@ -44,7 +44,7 @@ func (d *Dispatcher) reconcileLateResults() {
 		}
 		tasks, _ := store.List("failed")
 		for _, task := range tasks {
-			if task.Failure == nil || (task.Failure.Code != "executor-state-lost" && task.Failure.Code != "invalid-result-manifest" && task.Failure.Code != "commit-failed" && task.Failure.Code != "artifact-recovery-failed") || len(task.AttemptIDs) == 0 {
+			if task.Failure == nil || (task.Failure.Code != "executor-state-lost" && task.Failure.Code != "invalid-result-manifest") || len(task.AttemptIDs) == 0 {
 				continue
 			}
 			runID := task.AttemptIDs[len(task.AttemptIDs)-1]
@@ -58,7 +58,7 @@ func (d *Dispatcher) reconcileLateResults() {
 				continue
 			}
 			var journal commitJournal
-			if readJSON(filepath.Join(attemptDir, "commit.json"), &journal) == nil && journal.State == "completed" && task.Failure.Code != "commit-failed" && task.Failure.Code != "artifact-recovery-failed" {
+			if readJSON(filepath.Join(attemptDir, "commit.json"), &journal) == nil && journal.State == "completed" {
 				continue
 			}
 			workDir := filepath.Join(attemptDir, "workspace")
@@ -66,135 +66,17 @@ func (d *Dispatcher) reconcileLateResults() {
 			if loadErr != nil {
 				continue
 			}
-			result, readErr := readResult(resultPath, task.ID, runID)
-			if readErr != nil || validateResult(workDir, task, manifest, result) != nil {
-				continue
-			}
-			if task.Failure.Code == "commit-failed" && !isArtifactOnlyResult(task, result) {
-				continue
-			}
-			if task.Failure.Code == "artifact-recovery-failed" {
-				taskResult, artifactIDs, ok := promotedArtifactResult(projectRoot, task, runID, result)
-				if !ok {
-					continue
-				}
-				recovered, updateErr := store.Update(task.ID, func(current *Task) error {
-					current.Status, current.Phase, current.Result, current.Failure = "succeeded", "", taskResult, nil
-					return nil
-				})
-				if updateErr == nil {
-					for _, artifactID := range artifactIDs {
-						d.emitGenerated(task.ProjectSlug, task.ID, artifactID)
-					}
-					d.emit(recovered)
-					d.Notify()
-				}
+			result, readErr := readResult(resultPath)
+			if readErr != nil {
 				continue
 			}
 			_, _ = store.Update(task.ID, func(current *Task) error {
-				current.Status, current.Phase, current.Result, current.Failure = "running", "committing", nil, nil
+				current.Status, current.Phase, current.Result, current.Failure = "running", "publishing", nil, nil
 				return nil
 			})
 			d.emitCurrent(store, task.ID)
 			status, taskResult, failure := d.commitResult(projectRoot, task, runID, workDir, manifest, bases, result)
-			if task.Failure.Code == "commit-failed" && status == "failed" && failure != nil && failure.Code == "commit-failed" {
-				failure.Code = "artifact-recovery-failed"
-				failure.Message = "助教成果再次提交失败，尚未写入项目资产库"
-			}
 			d.finish(store, task.ID, status, taskResult, failure)
-		}
-	}
-}
-
-func isArtifactOnlyResult(task Task, result resultManifest) bool {
-	if task.Type != "produce-material" || len(result.Deliverables) == 0 || result.SourceUpdate != nil {
-		return false
-	}
-	for _, key := range []string{"intro", "body", "practice"} {
-		update, ok := result.AssetUpdates[key]
-		if !ok || update.Status != "unchanged" {
-			return false
-		}
-	}
-	return true
-}
-
-func promotedArtifactResult(projectRoot string, task Task, runID string, result resultManifest) (*Result, []string, bool) {
-	if !isArtifactOnlyResult(task, result) {
-		return nil, nil, false
-	}
-	taskResult := &Result{Summary: result.Summary, AssetUpdates: map[string]string{}}
-	for key, update := range result.AssetUpdates {
-		taskResult.AssetUpdates[key] = update.Status
-	}
-	for _, deliverable := range result.Deliverables {
-		artifactID := artifactIDFor(task.ID, runID, deliverable.Key)
-		if !artifactOwnedBy(filepath.Join(projectRoot, "assets", "generated", artifactID), task.ID, runID) {
-			return nil, nil, false
-		}
-		taskResult.Deliverables = append(taskResult.Deliverables, artifactID)
-	}
-	return taskResult, append([]string(nil), taskResult.Deliverables...), true
-}
-
-func (d *Dispatcher) reconcilePartialDeliverables() {
-	projects, _ := workspace.IndexAll()
-	for _, project := range projects {
-		if project.ProjectType != workspace.ProjectTypeSystemLearning {
-			continue
-		}
-		store, err := New(project.Slug)
-		if err != nil {
-			continue
-		}
-		tasks, _ := store.List("partial")
-		for _, task := range tasks {
-			if task.Failure == nil || task.Failure.Code != "partial-commit" || task.Result == nil || len(task.AttemptIDs) == 0 {
-				continue
-			}
-			runID := task.AttemptIDs[len(task.AttemptIDs)-1]
-			projectRoot, rootErr := workspace.ProjectRootForSlug(task.ProjectSlug)
-			if rootErr != nil {
-				continue
-			}
-			workDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "workspace")
-			manifest, _, loadErr := loadSealedInputs(task, projectRoot, workDir)
-			result, readErr := readResult(filepath.Join(workDir, "result-manifest.json"), task.ID, runID)
-			if loadErr != nil || readErr != nil || validateResult(workDir, task, manifest, result) != nil || result.SourceUpdate != nil {
-				continue
-			}
-			cleanAssets := true
-			for _, status := range task.Result.AssetUpdates {
-				if status == "failed" {
-					cleanAssets = false
-				}
-			}
-			if !cleanAssets {
-				continue
-			}
-			deliverables := append([]string(nil), task.Result.Deliverables...)
-			allCommitted := true
-			for _, declared := range result.Deliverables {
-				artifactID, commitErr := d.commitGeneratedArtifact(projectRoot, task, runID, workDir, manifest, declared)
-				if commitErr != nil {
-					allCommitted = false
-					continue
-				}
-				if !containsString(deliverables, artifactID) {
-					deliverables = append(deliverables, artifactID)
-				}
-			}
-			if !allCommitted {
-				continue
-			}
-			recovered, updateErr := store.Update(task.ID, func(current *Task) error {
-				current.Status, current.Failure = "succeeded", nil
-				current.Result.Deliverables = deliverables
-				return nil
-			})
-			if updateErr == nil {
-				d.emit(recovered)
-			}
 		}
 	}
 }
@@ -347,22 +229,18 @@ func (d *Dispatcher) recoverAttempt(store *Store, task Task, runID string, exitC
 		d.fail(store, task.ID, "input-recovery-failed", "无法恢复助教任务的封存输入", false)
 		return
 	}
-	_, _ = store.Update(task.ID, func(current *Task) error { current.Phase = "validating"; return nil })
+	_, _ = store.Update(task.ID, func(current *Task) error { current.Phase = "publishing"; return nil })
 	d.emitCurrent(store, task.ID)
-	result, err := readResult(filepath.Join(workDir, "result-manifest.json"), task.ID, runID)
+	result, err := readResult(filepath.Join(workDir, "result-manifest.json"))
 	if err != nil {
-		d.fail(store, task.ID, "invalid-result-manifest", "CLI 未产生有效的 result-manifest.json", false)
-		return
-	}
-	if err := validateResult(workDir, task, manifest, result); err != nil {
-		d.fail(store, task.ID, "invalid-result-manifest", "恢复的 CLI 结果清单或声明产物未通过工作区校验", false)
+		d.fail(store, task.ID, "invalid-result-manifest", "恢复的 CLI 结果清单不可解析", false)
 		return
 	}
 	if exitCode != 0 {
 		d.fail(store, task.ID, "executor-exit-failed", fmt.Sprintf("CLI 以状态 %d 结束", exitCode), false)
 		return
 	}
-	_, _ = store.Update(task.ID, func(current *Task) error { current.Phase = "committing"; return nil })
+	_, _ = store.Update(task.ID, func(current *Task) error { current.Phase = "publishing"; return nil })
 	d.emitCurrent(store, task.ID)
 	status, taskResult, failure := d.commitResult(projectRoot, task, runID, workDir, manifest, bases, result)
 	d.finish(store, task.ID, status, taskResult, failure)

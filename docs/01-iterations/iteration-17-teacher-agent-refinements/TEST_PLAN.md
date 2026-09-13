@@ -15,7 +15,7 @@ Last reviewed: 2026-09-13
 | OCR | `sources/internal/ocr/*_test.go` | httptest fake vision provider: base64 image payload, prompt contract, markdown output pass-through; failure → `ocr-failed` status |
 | routes | `routes_learning_workspace_test.go` | queue/steer/regenerate/export endpoint contracts incl. 404/409 paths; existing contract-freeze suite stays green |
 | config | `platform/config` | `webSearch` section parse/validate/env-key; missing section disables search |
-| artifact recovery | `assistant/internal/tasks/dispatcher_test.go` | completed `commit-failed` journal plus valid artifact-only manifest is promoted without reopening the CLI; an already-promoted artifact repairs a stale failed task state |
+| direct artifact publication | `assistant/internal/tasks/dispatcher_test.go` | assistant-accepted directory without a file manifest, byte counts, or hashes is atomically published in full with task/run provenance |
 
 ## Frontend Vitest
 

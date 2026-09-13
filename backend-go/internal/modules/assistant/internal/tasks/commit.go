@@ -3,18 +3,13 @@ package assistanttask
 import (
 	"os"
 	"path/filepath"
-
 	"strings"
-
-	"encoding/json"
-
 	"time"
 )
 
 func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir string, manifest inputManifest, bases map[string]AssetSnapshot, result resultManifest) (string, *Result, *Failure) {
-	resultBytes, _ := json.Marshal(result)
 	journalPath := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "commit.json")
-	journal := commitJournal{SchemaVersion: 1, TaskID: task.ID, RunID: runID, State: "committing", ResultHash: hashBytes(resultBytes), UpdatedAt: time.Now().UTC()}
+	journal := commitJournal{SchemaVersion: 1, TaskID: task.ID, RunID: runID, State: "publishing", UpdatedAt: time.Now().UTC()}
 	_ = writeJSON(journalPath, journal)
 	taskResult := &Result{Summary: result.Summary, AssetUpdates: map[string]string{}}
 	failed, updated := 0, 0
@@ -97,12 +92,12 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 		}
 	}
 	if failed > 0 && updated > 0 {
-		failure := &Failure{Code: "partial-commit", Message: "部分成果已提交，另有输出未通过校验", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
+		failure := &Failure{Code: "partial-publish", Message: "部分助教成果已发布，另有输出未能写入项目", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
 		writeCompletedCommit(journalPath, journal, "partial", taskResult, failure)
 		return "partial", taskResult, failure
 	}
 	if failed > 0 {
-		failure := &Failure{Code: "commit-failed", Message: "助教产出未通过提交校验", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
+		failure := &Failure{Code: "publish-failed", Message: "助教产出未能发布到项目", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
 		writeCompletedCommit(journalPath, journal, "failed", taskResult, failure)
 		return "failed", taskResult, failure
 	}
@@ -114,7 +109,7 @@ func commitFailureSuggestion(failedOutputs []string) string {
 	if len(failedOutputs) == 0 {
 		return "建议在 CLI 中检查保存的 prompt、结果清单与相对路径。"
 	}
-	return "未提交的输出：" + strings.Join(failedOutputs, "；") + "。可在 CLI 中检查本次 attempt 的 result-manifest.json 和输出目录。"
+	return "未发布的输出：" + strings.Join(failedOutputs, "；") + "。可在 CLI 中检查本次 attempt 的 result-manifest.json 和输出目录。"
 }
 
 func writeCompletedCommit(path string, journal commitJournal, status string, result *Result, failure *Failure) {

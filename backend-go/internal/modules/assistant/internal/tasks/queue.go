@@ -60,7 +60,6 @@ func (d *Dispatcher) loop() {
 	d.reconcileLostRuns()
 	for {
 		d.reconcileLateResults()
-		d.reconcilePartialDeliverables()
 		d.dispatch()
 		select {
 		case <-d.stop:

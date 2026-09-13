@@ -13,20 +13,17 @@ type inputManifest struct {
 	Conversation  struct {
 		ThroughSeq uint64 `json:"throughSeq"`
 		Snapshot   string `json:"snapshot"`
-		SHA256     string `json:"sha256"`
 	} `json:"conversation"`
 	Preferences struct {
-		Path   string `json:"path"`
-		SHA256 string `json:"sha256"`
+		Path string `json:"path"`
 	} `json:"preferences"`
 	Assets map[string]struct {
 		VersionID string `json:"versionId"`
 		Cursor    uint64 `json:"cursor"`
 		Path      string `json:"path"`
-		SHA256    string `json:"sha256"`
 	} `json:"assets"`
-	Sources   []struct{ SourceID, RevisionID, Path, SHA256 string } `json:"sources"`
-	CreatedAt time.Time                                             `json:"createdAt"`
+	Sources   []struct{ SourceID, RevisionID, Path string } `json:"sources"`
+	CreatedAt time.Time                                     `json:"createdAt"`
 }
 
 type resultManifest struct {
@@ -52,20 +49,6 @@ type resultManifest struct {
 			MediaType string `json:"mediaType"`
 		} `json:"files"`
 	} `json:"sourceUpdate,omitempty"`
-}
-
-type artifactDescriptor struct {
-	SchemaVersion int      `json:"schemaVersion"`
-	Kind          string   `json:"kind"`
-	Title         string   `json:"title"`
-	Description   string   `json:"description"`
-	EntryPoints   []string `json:"entryPoints"`
-	Files         []struct {
-		Path      string `json:"path"`
-		MediaType string `json:"mediaType"`
-		SHA256    string `json:"sha256"`
-		Bytes     int64  `json:"bytes"`
-	} `json:"files"`
 }
 
 type executorRecord struct {
@@ -113,7 +96,6 @@ type commitJournal struct {
 	TaskID        string    `json:"taskId"`
 	RunID         string    `json:"runId"`
 	State         string    `json:"state"`
-	ResultHash    string    `json:"resultHash"`
 	Status        string    `json:"status,omitempty"`
 	Result        *Result   `json:"result,omitempty"`
 	Failure       *Failure  `json:"failure,omitempty"`

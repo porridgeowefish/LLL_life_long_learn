@@ -182,77 +182,53 @@ func TestDispatcherEmitsResultProjectionEvents(t *testing.T) {
 	}
 }
 
-func TestValidateResultRequiresDeclaredHashedOutputs(t *testing.T) {
+func TestGeneratedArtifactPublishesAssistantAcceptedDirectoryWithoutFileManifest(t *testing.T) {
+	projectRoot := t.TempDir()
 	workDir := t.TempDir()
-	fileDir := filepath.Join(workDir, "deliverables", "report", "files")
-	if err := os.MkdirAll(fileDir, 0o755); err != nil {
+	artifactDir := filepath.Join(workDir, "deliverables", "review")
+	if err := os.MkdirAll(filepath.Join(artifactDir, "files"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	data := []byte("# report\n")
-	if err := os.WriteFile(filepath.Join(fileDir, "report.md"), data, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(artifactDir, "files", "review.md"), []byte("# 复习资料\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	descriptor := map[string]any{"schemaVersion": 1, "kind": "report", "title": "报告", "entryPoints": []string{"files/report.md"}, "files": []map[string]any{{"path": "files/report.md", "mediaType": "text/markdown", "sha256": hashBytes(data), "bytes": len(data)}}}
-	if err := writeJSON(filepath.Join(workDir, "deliverables", "report", "artifact.json"), descriptor); err != nil {
+	if err := os.WriteFile(filepath.Join(artifactDir, "files", "diagram.svg"), []byte("<svg/>"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	result := resultManifest{SchemaVersion: 1, TaskID: "task_x", RunID: "run_x", Summary: "完成", AssetUpdates: map[string]struct {
-		Status    string `json:"status"`
-		Candidate string `json:"candidate"`
-		Code      string `json:"code"`
-	}{"intro": {Status: "unchanged"}, "body": {Status: "unchanged"}, "practice": {Status: "unchanged"}}}
-	result.Deliverables = append(result.Deliverables, struct {
-		Key        string `json:"key"`
-		Descriptor string `json:"descriptor"`
-	}{Key: "report", Descriptor: "deliverables/report/artifact.json"})
-	if err := validateResult(workDir, Task{Type: "produce-material"}, inputManifest{}, result); err != nil {
-		t.Fatalf("valid result rejected: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(fileDir, "undeclared.txt"), []byte("x"), 0o644); err != nil {
+	if err := writeJSON(filepath.Join(artifactDir, "artifact.json"), map[string]any{
+		"title":       "考前总复习",
+		"entryPoints": []string{"files/review.md"},
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if err := validateResult(workDir, Task{Type: "produce-material"}, inputManifest{}, result); err == nil {
-		t.Fatal("undeclared deliverable file was accepted")
-	}
-}
 
-func TestArtifactDescriptorAcceptsWorkspaceRelativeDeclaredFiles(t *testing.T) {
-	workDir := t.TempDir()
-	filePath := filepath.Join(workDir, "deliverables", "report", "files", "report.md")
-	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	data := []byte("# report\n")
-	if err := os.WriteFile(filePath, data, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	descriptorPath := filepath.Join(workDir, "deliverables", "report", "artifact.json")
-	descriptor := map[string]any{
-		"schemaVersion": 1, "kind": "report", "title": "报告",
-		"entryPoints": []string{"deliverables/report/files/report.md"},
-		"files":       []map[string]any{{"path": "deliverables/report/files/report.md", "mediaType": "text/markdown", "sha256": hashBytes(data), "bytes": len(data)}},
-	}
-	if err := writeJSON(descriptorPath, descriptor); err != nil {
-		t.Fatal(err)
-	}
-	deliverable := struct {
+	task := Task{ID: "task_publish", ProjectSlug: "publish", ConversationCutoffSeq: 12}
+	d := newTestDispatcher(nil, nil)
+	artifactID, err := d.commitGeneratedArtifact(projectRoot, task, "run_publish", workDir, inputManifest{}, struct {
 		Key        string `json:"key"`
 		Descriptor string `json:"descriptor"`
-	}{Key: "report", Descriptor: "deliverables/report/artifact.json"}
-	parsed, err := validateArtifactDescriptor(workDir, deliverable)
+	}{Key: "review", Descriptor: "deliverables/review/artifact.json"})
 	if err != nil {
-		t.Fatalf("workspace-relative artifact path rejected: %v", err)
+		t.Fatalf("assistant-accepted directory was not published: %v", err)
 	}
-	staged := filepath.Join(t.TempDir(), "artifact")
-	if err := stageArtifactPackage(workDir, filepath.Dir(descriptorPath), staged, parsed); err != nil {
+	published := filepath.Join(projectRoot, "assets", "generated", artifactID)
+	if got, err := os.ReadFile(filepath.Join(published, "files", "diagram.svg")); err != nil || string(got) != "<svg/>" {
+		t.Fatalf("unlisted assistant file was not published: %q %v", got, err)
+	}
+	if !artifactOwnedBy(published, task.ID, "run_publish") {
+		t.Fatal("published artifact is missing system provenance")
+	}
+	var descriptor map[string]any
+	if err := readJSON(filepath.Join(published, "artifact.json"), &descriptor); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := os.ReadFile(filepath.Join(staged, "deliverables", "report", "files", "report.md")); err != nil || string(got) != string(data) {
-		t.Fatalf("workspace-relative artifact was not packaged: %q %v", got, err)
+	files, _ := descriptor["files"].([]any)
+	if len(files) != 2 {
+		t.Fatalf("published artifact did not receive a presentation file index: %#v", descriptor["files"])
 	}
 }
 
-func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T) {
+func TestLateAssistantResultPublishesWithoutTaskSpecificOutputChecks(t *testing.T) {
 	root := t.TempDir()
 	workspace.SetProjectsRootForTest(root)
 	defer workspace.SetProjectsRootForTest("")
@@ -260,7 +236,7 @@ func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T)
 		t.Fatal(err)
 	}
 	store, _ := New("late")
-	task, _, err := store.Create(CreateInput{Type: "produce-material", Objective: "生成材料", Origin: Origin{OperationID: "op_late"}})
+	task, _, err := store.Create(CreateInput{Type: "consolidate", Objective: "生成材料", Origin: Origin{OperationID: "op_late"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +267,7 @@ func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T)
 		Status    string `json:"status"`
 		Candidate string `json:"candidate"`
 		Code      string `json:"code"`
-	}{"intro": {Status: "unchanged"}, "body": {Status: "updated", Candidate: "asset-updates/body/current.md"}, "practice": {Status: "unchanged"}}}
+	}{"body": {Status: "updated", Candidate: "asset-updates/body/current.md"}}}
 	resultPath := filepath.Join(workDir, "result-manifest.json")
 	if err := writeJSON(resultPath, result); err != nil {
 		t.Fatal(err)
@@ -314,144 +290,6 @@ func TestLateVisibleTerminalResultIsCommittedAfterPrematureFailure(t *testing.T)
 	body, _ := asset.Get("body")
 	if body.Content != "助教迟到的正文" {
 		t.Fatalf("late asset was not committed: %q", body.Content)
-	}
-}
-
-func TestFailedArtifactCommitIsRecoveredWhenManifestRemainsValid(t *testing.T) {
-	root := t.TempDir()
-	workspace.SetProjectsRootForTest(root)
-	defer workspace.SetProjectsRootForTest("")
-	if err := workspace.CreateProjectSkeletonWithInput("artifact-recovery", "成果恢复", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
-		t.Fatal(err)
-	}
-	store, err := New("artifact-recovery")
-	if err != nil {
-		t.Fatal(err)
-	}
-	task, _, err := store.Create(CreateInput{Type: "produce-material", Objective: "生成复习材料", Origin: Origin{OperationID: "op_artifact_recovery"}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	runID := "run_artifact_recovery"
-	task, err = store.Update(task.ID, func(current *Task) error {
-		current.Status, current.AttemptIDs = "failed", []string{runID}
-		current.Failure = &Failure{Code: "commit-failed", Message: "成果未入库"}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	projectRoot, err := workspace.ProjectRootForSlug("artifact-recovery")
-	if err != nil {
-		t.Fatal(err)
-	}
-	workDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "workspace")
-	d := newTestDispatcher(nil, nil)
-	manifest, _, err := d.sealInputs(task, workDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "input-manifest.json"), manifest); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "commit.json"), commitJournal{
-		SchemaVersion: 1,
-		TaskID:        task.ID,
-		RunID:         runID,
-		State:         "completed",
-		Status:        "failed",
-		Failure:       &Failure{Code: "commit-failed", Message: "成果未入库"},
-		UpdatedAt:     time.Now().UTC(),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	review := []byte("# 考前总复习\n")
-	reviewPath := filepath.Join(workDir, "deliverables", "review", "files", "review.md")
-	if err := os.MkdirAll(filepath.Dir(reviewPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(reviewPath, review, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeJSON(filepath.Join(workDir, "deliverables", "review", "artifact.json"), map[string]any{
-		"schemaVersion": 1,
-		"kind":          "report",
-		"title":         "考前总复习",
-		"entryPoints":   []string{"files/review.md"},
-		"files":         []map[string]any{{"path": "files/review.md", "mediaType": "text/markdown", "sha256": hashBytes(review), "bytes": len(review)}},
-	}); err != nil {
-		t.Fatal(err)
-	}
-	result := resultManifest{SchemaVersion: 1, TaskID: task.ID, RunID: runID, Summary: "完整的独立成果", AssetUpdates: map[string]struct {
-		Status    string `json:"status"`
-		Candidate string `json:"candidate"`
-		Code      string `json:"code"`
-	}{"intro": {Status: "unchanged"}, "body": {Status: "unchanged"}, "practice": {Status: "unchanged"}}}
-	result.Deliverables = append(result.Deliverables, struct {
-		Key        string `json:"key"`
-		Descriptor string `json:"descriptor"`
-	}{Key: "review", Descriptor: "deliverables/review/artifact.json"})
-	resultPath := filepath.Join(workDir, "result-manifest.json")
-	if err := writeJSON(resultPath, result); err != nil {
-		t.Fatal(err)
-	}
-	settledAt := time.Now().Add(-2 * time.Second)
-	if err := os.Chtimes(resultPath, settledAt, settledAt); err != nil {
-		t.Fatal(err)
-	}
-
-	d.reconcileLateResults()
-
-	recovered, err := store.Get(task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if recovered.Status != "succeeded" || recovered.Result == nil || len(recovered.Result.Deliverables) != 1 {
-		t.Fatalf("artifact-only commit failure was not recovered: %#v", recovered)
-	}
-	artifactID := artifactIDFor(task.ID, runID, "review")
-	if !artifactOwnedBy(filepath.Join(projectRoot, "assets", "generated", artifactID), task.ID, runID) {
-		t.Fatalf("recovered artifact %q was not promoted", artifactID)
-	}
-	if _, err := store.Update(task.ID, func(current *Task) error {
-		current.Status, current.Result = "failed", nil
-		current.Failure = &Failure{Code: "artifact-recovery-failed", Message: "task state was not updated after promotion"}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	d.reconcileLateResults()
-
-	converged, err := store.Get(task.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if converged.Status != "succeeded" || converged.Result == nil || len(converged.Result.Deliverables) != 1 {
-		t.Fatalf("promoted artifact did not repair stale task state: %#v", converged)
-	}
-}
-
-func TestUnsafeSVGRejectsGeneralActiveAndExternalContent(t *testing.T) {
-	unsafe := []string{
-		`<svg xmlns="http://www.w3.org/2000/svg"><circle onfocus="alert(1)"/></svg>`,
-		`<svg xmlns="http://www.w3.org/2000/svg"><image href="//tracker.example/pixel.png"/></svg>`,
-		`<svg xmlns="http://www.w3.org/2000/svg"><rect style="fill:url(https://tracker.example/a.svg#x)"/></svg>`,
-		`<!DOCTYPE svg><svg xmlns="http://www.w3.org/2000/svg"/>`,
-		`<svg xmlns="http://www.w3.org/2000/svg"><style>@import url(https://tracker.example/x.css)</style></svg>`,
-	}
-	for _, source := range unsafe {
-		if !unsafeSVG([]byte(source)) {
-			t.Fatalf("unsafe SVG accepted: %s", source)
-		}
-	}
-	safe := `<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g"/></defs><rect style="fill:url(#g)"/></svg>`
-	if unsafeSVG([]byte(safe)) {
-		t.Fatal("internal paint reference was rejected")
-	}
-	adaptive := `<svg xmlns="http://www.w3.org/2000/svg"><style>@media (prefers-color-scheme: dark) { .label { fill: #fff; } }</style><text class="label">安全图表</text></svg>`
-	if unsafeSVG([]byte(adaptive)) {
-		t.Fatal("safe adaptive SVG style was rejected")
 	}
 }
 
@@ -536,7 +374,7 @@ func TestRecoverAttemptFinishesCompletedCommitJournal(t *testing.T) {
 	}
 	runID := "run_recovered"
 	task, err = store.Update(task.ID, func(current *Task) error {
-		current.Status, current.Phase = "running", "committing"
+		current.Status, current.Phase = "running", "publishing"
 		current.AttemptIDs = []string{runID}
 		return nil
 	})
