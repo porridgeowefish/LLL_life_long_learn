@@ -323,17 +323,15 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 					emit(Event{Type: "text-delta", Delta: event.Delta.Text})
 				}
 			case "summary_delta":
-				if blockTypes[event.Index] == "text" {
-					emit(Event{Type: "text-delta", Delta: event.Delta.Summary})
-				} else {
+				// Delta semantics are stricter than a provider's outer block label:
+				// a summary is never learner-answer Markdown.
+				if event.Delta.Summary != "" {
 					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Summary})
 				}
 			case "thinking_delta":
-				if blockTypes[event.Index] == "text" {
-					if event.Delta.Thinking != "" {
-						emit(Event{Type: "text-delta", Delta: event.Delta.Thinking})
-					}
-				} else if p.Reasoning && event.Delta.Thinking != "" {
+				// GLM's anthropic-compatible stream has emitted thinking deltas in
+				// text blocks. Never let that label error mix reasoning into body.
+				if p.Reasoning && event.Delta.Thinking != "" {
 					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Thinking})
 				}
 			case "input_json_delta":

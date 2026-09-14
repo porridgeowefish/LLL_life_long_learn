@@ -170,7 +170,7 @@ func TestAnthropicThinkingIsRequestedAndStreamedWhenEnabled(t *testing.T) {
 	}
 }
 
-func TestAnthropicClassifiesDeltasByTheirContentBlock(t *testing.T) {
+func TestAnthropicKeepsThinkingAndSummaryDeltasOutOfText(t *testing.T) {
 	tests := []struct {
 		name        string
 		blockType   string
@@ -186,18 +186,18 @@ func TestAnthropicClassifiesDeltasByTheirContentBlock(t *testing.T) {
 			wantContent: "internal plan",
 		},
 		{
-			name:        "text block wins over a mislabeled thinking delta",
+			name:        "thinking delta stays out of a text block",
 			blockType:   "text",
-			delta:       `{"type":"thinking_delta","thinking":"learner-facing answer"}`,
-			wantType:    "text-delta",
-			wantContent: "learner-facing answer",
+			delta:       `{"type":"thinking_delta","thinking":"raw hidden thought"}`,
+			wantType:    "reasoning-summary-delta",
+			wantContent: "raw hidden thought",
 		},
 		{
-			name:        "text block wins over a mislabeled summary delta",
+			name:        "summary delta stays out of a text block",
 			blockType:   "text",
-			delta:       `{"type":"summary_delta","summary":"final explanation"}`,
-			wantType:    "text-delta",
-			wantContent: "final explanation",
+			delta:       `{"type":"summary_delta","summary":"safe summary"}`,
+			wantType:    "reasoning-summary-delta",
+			wantContent: "safe summary",
 		},
 	}
 

@@ -81,18 +81,19 @@ smoke passed; after restarting the production binary, the Tencent Cloud task
 `GET /generated` returned its review artifact. The direct-publication change is
 verified by the assistant task package test and the current full quality gate.
 
-## Reasoning/body mixing investigation (2026-09-12 evening)
+## Reasoning/body mixing repair (2026-09-14)
 
 Three turns (14:26–14:34, GLM anthropic-compat) persisted thinking text as
 正文 with no reasoning block. 34 controlled turns through the live backend
 (short/long-context/cancel-race) plus 13 raw endpoint experiments could not
 reproduce; adjacent turns on the same provider separated correctly. The
 suspected mechanism is provider-side intermittent mislabeling (thinking
-deltas riding summary/thinking_delta inside text-typed blocks — the exact
-ambiguity e81b62d traded against). No classification change without
-evidence; the anthropic gateway now fingerprints every stream's block/delta
-labeling to tmp/teacher-stream-shapes.log so the next occurrence pins the
-raw shape.
+deltas riding summary/thinking_delta inside text-typed blocks). The
+fingerprint log subsequently recorded exactly those shapes. The gateway now
+treats `thinking_delta` and `summary_delta` as reasoning regardless of the
+outer block label; only `text_delta` can enter Markdown. The focused gateway
+test covers both malformed combinations, while preserving the normal thinking
+block + text block flow.
 
 ## Residual risks
 

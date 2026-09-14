@@ -11,7 +11,7 @@ Last reviewed: 2026-09-14
 | queue store | `conversation/store_test.go` | enqueue/edit/discard/promote projection; queue survives reload; supersede hides message and flips `ResponseForLearner`; steering marker recorded |
 | queue service | `service/service_test.go` (fake gateway) | auto-advance starts head on completion; steer interrupts (interrupted status preserved) and starts new turn with steering appendix; steer on idle degenerates to promote; regenerate re-runs same learner trigger |
 | websearch client | `teacher/internal/websearch/*_test.go` | httptest fake Zhipu API: result re-packing, error mapping, disabled-when-unconfigured |
-| gateway tool loop | `gateway/gateway_test.go` | openai kind: tool_calls in assistant message + role=tool result round-trip via fake SSE; anthropic kind: tool_use/tool_result blocks; thinking suppressed when tools present on anthropic kind |
+| gateway tool loop | `gateway/gateway_test.go` | openai kind: tool_calls in assistant message + role=tool result round-trip via fake SSE; anthropic kind: tool_use/tool_result blocks; thinking suppressed when tools present on anthropic kind; a malformed text block may never route `thinking_delta` or `summary_delta` into Markdown |
 | OCR | `sources/internal/ocr/*_test.go` | httptest fake vision provider: base64 image payload, prompt contract, markdown output pass-through; failure → `ocr-failed` status |
 | routes | `routes_learning_workspace_test.go` | queue/steer/regenerate/export endpoint contracts incl. 404/409 paths; existing contract-freeze suite stays green |
 | config | `platform/config` | `webSearch` section parse/validate/env-key; missing section disables search |
