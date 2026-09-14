@@ -42,6 +42,8 @@ function run(title, command, args, opts = {}) {
 }
 
 // ---- shared fast layer ----
+run('repository hygiene', 'node', ['tools/check/check-repository-hygiene.js']);
+
 (function gofmtAssert() {
   console.log('\n=== gofmt check ===');
   const result = spawnSync('gofmt', ['-l', 'backend-go', 'tools'], { encoding: 'utf8' });

@@ -18,7 +18,13 @@ frontend/playwright-report/
 
 # Local runtime data & TS incremental build cache
 /projects/
+/repro-shell/
 *.tsbuildinfo
+
+# Go test, profiling, and coverage by-products
+*.coverprofile
+*.prof
+*.test
 
 # Personal study notes — keep local only, never commit
 /learning/

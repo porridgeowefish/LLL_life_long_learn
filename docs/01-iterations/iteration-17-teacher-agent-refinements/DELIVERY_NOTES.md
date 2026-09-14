@@ -13,8 +13,10 @@ Last reviewed: 2026-09-14
 
 ## Verification
 
+- [x] npm run check:repo — tracked-path hygiene guard passes; no local runtime
+      state or generated artifact is tracked
 - [x] go test ./backend-go/... ./tools/... — all packages pass
-- [x] npm --prefix frontend run test — 45 files / 163 tests pass
+- [x] npm --prefix frontend run test — 46 files / 165 tests pass
 - [x] npm run archcheck — pass (via check:fast)
 - [x] npm run check:fast — pass (gofmt/vet/build/archcheck/short Go/lint/frontend)
 - [ ] manual smoke with real keys: GLM-4V OCR quality, Zhipu web search
@@ -80,6 +82,18 @@ smoke passed; after restarting the production binary, the Tencent Cloud task
 `task_01M2B1G0VRMHX92DZKNQ0HY9VN` converged to `succeeded` and
 `GET /generated` returned its review artifact. The direct-publication change is
 verified by the assistant task package test and the current full quality gate.
+
+## Repository and commit hygiene (2026-09-14)
+
+The repository now makes the upload boundary executable. `.gitignore` excludes
+local reproduction helpers and Go profiling/test by-products in addition to
+the existing learner data, preferences, local config, logs, reports, and build
+outputs. `npm run check:repo`, included in every quality-gate tier and CI,
+fails if a tracked path matches that boundary, including force-added files.
+`CONTRIBUTING.md` records focused Conventional Commit messages and explicit
+staging as the commit workflow. Product documentation now also reflects
+ADR-0021: assistant output is published after the assistant's own acceptance,
+without a second Go manifest/hash/content acceptance gate.
 
 ## Reasoning/body mixing repair (2026-09-14)
 

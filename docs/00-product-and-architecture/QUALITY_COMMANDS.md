@@ -2,19 +2,26 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-14
 Source of truth: repository quality-gate definitions introduced by iteration 14.
 
 ## Commands
 
 | Command | Purpose | Contents |
 |---|---|---|
-| `npm run check:fast` | pre-change feedback loop | gofmt check, `go vet`, `go build ./...`, architecture check, short-mode Go tests, frontend lint, frontend tests |
+| `npm run check:repo` | repository/staging hygiene | verifies no tracked path matches `.gitignore`, including files force-added with `git add -f` |
+| `npm run check:fast` | pre-change feedback loop | repository hygiene, gofmt check, `go vet`, `go build ./...`, architecture check, short-mode Go tests, frontend lint, frontend tests |
 | `npm run check` | pre-merge gate | everything in `check:fast` plus full Go tests with coverage, Go coverage floor vs baseline, frontend production build, backend production build |
 | `npm run check:full` | release gate | everything in `check` plus the contract-freeze suite and Windows-native smoke checks (local Windows only) |
 
 Every command returns non-zero when any included check fails. The three
 levels are strictly nested: fast ⊂ check ⊂ check:full.
+
+`.gitignore` owns the local-only boundary: learner runtime state, preferences,
+reproduction helpers, local configuration, generated reports, build outputs,
+and profiling by-products stay out of Git. The hygiene check does not inspect
+file contents for secrets; secret-bearing configuration must remain in the
+documented local paths and never be force-added.
 
 Individual commands remain runnable on their own:
 

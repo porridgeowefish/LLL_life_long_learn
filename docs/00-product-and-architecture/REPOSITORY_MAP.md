@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-12
+Last reviewed: 2026-09-14
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -76,6 +76,10 @@ A legacy workspace-root `folders.json` is migrated into `projects/` by a
 one-time copy on first open; the legacy file is left in place.
 
 Do not write long-lived product rules here.
+
+`npm run check:repo` is the executable guard for this boundary. It fails when
+a tracked path matches `.gitignore`, including an ignored file that was staged
+with `git add -f`; the command runs inside every repository quality gate.
 
 ## 3. Source-Of-Truth Documents
 

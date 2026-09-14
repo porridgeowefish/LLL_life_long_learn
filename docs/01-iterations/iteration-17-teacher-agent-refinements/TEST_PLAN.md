@@ -17,6 +17,7 @@ Last reviewed: 2026-09-14
 | config | `platform/config` | `webSearch` section parse/validate/env-key; missing section disables search |
 | direct artifact publication | `assistant/internal/tasks/dispatcher_test.go` | assistant-accepted directory without a file manifest, byte counts, or hashes is atomically published in full with task/run provenance |
 | heatmap activity | teacher service, assistant dispatcher, `routes_activity_test.go` | completed responses and successful published tasks append once; failures/no-output work do not; a new event emits `learning-activity-updated`, duplicates stay silent |
+| repository hygiene | `tools/check/check-repository-hygiene.js` | every tracked path is checked against `.gitignore`; force-added learner data, local configuration, build output, logs, or profiling files fail the quality gate |
 
 ## Frontend Vitest
 
@@ -48,5 +49,6 @@ pipeline; cells keep border/padding and headers keep the document background.
 go test ./...
 npm --prefix frontend run test
 npm run archcheck
+npm run check:repo
 npm run check:fast
 ```

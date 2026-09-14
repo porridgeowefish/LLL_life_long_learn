@@ -17,4 +17,11 @@ behavior, actual behavior, and screenshots or logs with secrets removed.
 5. Open a Pull Request explaining the learner-facing outcome and validation.
 
 Do not commit `config.local.json`, API keys, generated run data, or private
-learning projects.
+learning projects. `npm run check:repo` verifies that every tracked path is
+permitted by `.gitignore`; it is also part of every `check:*` quality gate.
+
+Use one focused Conventional Commit message per independently reviewable
+change: `type(scope): imperative summary`. Typical types are `feat`, `fix`,
+`refactor`, `test`, `docs`, and `chore`. Stage explicit paths, inspect
+`git diff --cached`, and include only source, tests, committed non-secret
+configuration, product assets, or documentation that the change needs.
