@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-09-14
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -132,7 +132,9 @@ policy. CLI execution uses a sealed envelope and generic result manifest rather
 than public HTTP payloads.
 
 Global SSE carries identifier-only invalidation for conversation, task, asset,
-and source changes. REST remains the recovery truth. There is intentionally no
+source, and activity changes. `learning-activity-updated` has payload
+`{projectSlug}` and causes all cached `GET /api/activity` summaries to refetch.
+REST remains the recovery truth. There is intentionally no
 public assistant-task create, cancel, or retry endpoint in the initial contract.
 Legacy confusion routes adapt to canonical body annotations during migration.
 

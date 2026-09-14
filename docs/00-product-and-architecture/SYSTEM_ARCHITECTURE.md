@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -98,6 +98,7 @@ learner sends a turn
 -> selected model provider streams reasoning summary (when supplied) and answer deltas
 -> events append to the conversation log before they are projected to the UI
 -> nonzero provider-reported usage appends to conversation/usage.jsonl
+-> a successful durable response appends one idempotent learning-activity event
 -> refresh reconnects to durable run state and recovers the final response
 ```
 
@@ -123,6 +124,7 @@ authorized teacher tool call
 -> Go versions/merges declared core candidates and atomically publishes every declared generated directory
 -> a publication I/O failure is terminal; the CLI is not rerun or server-side revalidated (ADR-0021)
 -> task state and global invalidation events update the conversation UI
+-> a succeeded task that actually publishes an asset appends one idempotent learning-activity event
 ```
 
 The queue is local and rebuildable from task files. Default running limits are
@@ -147,6 +149,11 @@ migrations/iteration-13/{migration.json,journal.jsonl,backup}
 REST reconstructs durable state after refresh; SSE only reduces latency. Formal
 asset/source/conversation/task writes are owned by Go and use validated,
 recoverable file operations. The CLI cannot write canonical records directly.
+
+The home and usage heatmaps both read aggregated `progress/events.jsonl` via
+REST. The single AppShell SSE connection carries `learning-activity-updated`
+after a newly persisted event, which invalidates cached activity summaries; it
+does not carry a second heatmap state or replace REST recovery.
 
 `<WORKSPACE>/preferences.md` is the only active preference document. Only the
 explicit preferences editor or direct user file editing may write it. Teacher

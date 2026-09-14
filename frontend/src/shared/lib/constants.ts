@@ -26,6 +26,7 @@ export const SSE_EVENTS = {
   assistantTaskUpdated: 'assistant-task-updated',
   generatedArtifactUpdated: 'generated-artifact-updated',
   learningAssetUpdated: 'learning-asset-updated',
+  learningActivityUpdated: 'learning-activity-updated',
   sourceUpdated: 'source-updated',
 } as const;
 

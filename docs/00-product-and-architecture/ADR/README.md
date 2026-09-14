@@ -41,6 +41,7 @@ an active owner and the historical index records the move.
 | [0019](./0019-vision-ocr-web-search-and-repository-normalization.md) | Vision OCR, Web Search Tool, And Repository Normalization | accepted | vision-model OCR for image sources, bounded search_web tool loop, learning-agents rename and script relocation |
 | [0020](./0020-idempotent-generated-artifact-promotion-recovery.md) | Idempotent Generated Artifact Promotion Recovery | superseded by 0021 | historical bounded retry of a validated artifact-only promotion |
 | [0021](./0021-assistant-self-accepted-direct-publication.md) | Assistant Self-Accepted Direct Publication | accepted | assistant accepts output; LLL directly and atomically publishes its declared directories |
+| [0022](./0022-durable-learning-activity-and-sse-refresh.md) | Durable Learning Activity And SSE Refresh | accepted | completed teacher and published assistant work write idempotent activity events and refresh heatmaps through the shared SSE connection |
 
 ## Historical Decisions
 

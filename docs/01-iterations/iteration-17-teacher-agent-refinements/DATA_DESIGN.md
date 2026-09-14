@@ -1,12 +1,25 @@
 # Iteration 17 — Data Design
 
-Status: planned
+Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 All persistence stays file-first under `projects/<slug>/`. The conversation
 event log (`conversation/events.jsonl`) remains append-only; every new
 capability below is a new event type, never a rewrite.
+
+## Heatmap activity events
+
+`progress/events.jsonl` remains the canonical, append-only activity stream.
+New source families use stable IDs and `activityDelta: 1`:
+
+| source type | ID | writer | condition |
+|---|---|---|---|
+| `teacher-response` | `teacher-response:<responseId>` | bootstrap callback from teacher service | response is durably complete and provider succeeds |
+| `assistant-publication` | `assistant-publication:<taskId>` | bootstrap callback from dispatcher | task is durably `succeeded` and published a core asset or deliverable |
+
+The progress store rejects a duplicate ID. No synthetic historical events are
+created for conversations or tasks that completed before this change.
 
 ## Conversation events (new)
 

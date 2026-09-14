@@ -47,6 +47,20 @@ var ValidateAgainstOverview = learningscope.ValidateAgainstOverview
 var NewProgressStore = progressstore.New
 var NewRunStore = runprogress.New
 
+// RecordActivity is the module's single write entry point for learning
+// activity. Event IDs are idempotency keys in the project progress store.
+func RecordActivity(projectSlug string, event ProgressEvent) (ProgressEvent, bool, error) {
+	if event.PolicyVersion == "" {
+		event.PolicyVersion = LearningPolicyVersion
+	}
+	store, err := progressstore.New(projectSlug)
+	if err != nil {
+		return ProgressEvent{}, false, err
+	}
+	awarded, added, _, err := store.Award(event)
+	return awarded, added, err
+}
+
 func Aggregate(projectSlug string, weeks int, now time.Time) (ActivitySummary, error) {
 	return progressstore.Aggregate(projectSlug, weeks, now)
 }

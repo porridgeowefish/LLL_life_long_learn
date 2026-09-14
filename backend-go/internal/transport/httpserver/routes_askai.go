@@ -163,7 +163,7 @@ func (s *Server) handleAskAiStream(w http.ResponseWriter, r *http.Request) {
 	if updatedAnnotation.Ask != nil && len(updatedAnnotation.Ask.Messages) > 0 {
 		messageID = updatedAnnotation.Ask.Messages[len(updatedAnnotation.Ask.Messages)-1].ID
 	}
-	_, _, _ = awardLearningEvent(slug, progressstore.ProgressEvent{
+	_, _, _ = s.recordLearningActivity(slug, progressstore.ProgressEvent{
 		ID:         "ask-ai:" + messageID,
 		SourceType: "ask-ai", SourceID: cid, ActivityDelta: 1,
 		Title: "使用 Ask AI", Detail: strings.TrimSpace(conf.QuoteSnapshot),

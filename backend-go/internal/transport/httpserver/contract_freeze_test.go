@@ -280,6 +280,7 @@ var frozenSSEEvents = []string{
 	"assistant-task-updated",
 	"generated-artifact-updated",
 	"learning-asset-updated",
+	"learning-activity-updated",
 	"source-updated",
 }
 

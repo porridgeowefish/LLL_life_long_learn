@@ -127,8 +127,26 @@ func (d *Dispatcher) finish(store *Store, taskID, status string, result *Result,
 	})
 	if err == nil {
 		d.emit(task)
+		if status == "succeeded" && hasPublishedOutput(result) && d.deps.OnPublished != nil {
+			d.deps.OnPublished(task)
+		}
 	}
 	d.Notify()
+}
+
+func hasPublishedOutput(result *Result) bool {
+	if result == nil {
+		return false
+	}
+	if len(result.Deliverables) > 0 {
+		return true
+	}
+	for _, status := range result.AssetUpdates {
+		if status == "updated" {
+			return true
+		}
+	}
+	return false
 }
 func (d *Dispatcher) emitCurrent(store *Store, taskID string) {
 	if task, err := store.Get(taskID); err == nil {

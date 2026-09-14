@@ -346,7 +346,7 @@ func (s *Server) handlePutDisciplineLearningPlan(w http.ResponseWriter, r *http.
 		if item.Status != "completed" {
 			continue
 		}
-		if _, _, err := awardLearningEvent(r.PathValue("id"), progressstore.ProgressEvent{
+		if _, _, err := s.recordLearningActivity(r.PathValue("id"), progressstore.ProgressEvent{
 			ID:            "learning-task-complete:" + item.ID + ":" + item.CompletedAt,
 			SourceType:    "learning-task-complete",
 			SourceID:      item.ID,

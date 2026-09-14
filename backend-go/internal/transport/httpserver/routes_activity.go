@@ -56,7 +56,7 @@ func (s *Server) handlePostActivity(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid activity event")
 		return
 	}
-	event, added, err := awardLearningEvent(slug, progressstore.ProgressEvent{
+	event, added, err := s.recordLearningActivity(slug, progressstore.ProgressEvent{
 		ID: "reading:" + in.ID, SourceType: "reading", SourceID: in.SourceID,
 		ActivityDelta: in.ActivityDelta, Title: in.Title, Detail: in.Detail,
 	})
@@ -67,14 +67,13 @@ func (s *Server) handlePostActivity(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"event": event, "added": added})
 }
 
-func awardLearningEvent(slug string, event progressstore.ProgressEvent) (progressstore.ProgressEvent, bool, error) {
-	if event.PolicyVersion == "" {
-		event.PolicyVersion = progressstore.LearningPolicyVersion
+// recordLearningActivity is the transport-side bridge from the durable
+// progress stream to the single application SSE connection. A duplicate event
+// is deliberately silent: the persisted ID is the idempotency boundary.
+func (s *Server) recordLearningActivity(slug string, event progressstore.ProgressEvent) (progressstore.ProgressEvent, bool, error) {
+	awarded, added, err := progressstore.RecordActivity(slug, event)
+	if err == nil && added && s.broadcaster != nil {
+		s.broadcaster.Emit("learning-activity-updated", map[string]any{"projectSlug": slug})
 	}
-	store, err := progressstore.NewProgressStore(slug)
-	if err != nil {
-		return progressstore.ProgressEvent{}, false, err
-	}
-	awarded, added, _, err := store.Award(event)
 	return awarded, added, err
 }

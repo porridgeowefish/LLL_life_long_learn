@@ -1,8 +1,8 @@
 # Iteration 17 — API Contract
 
-Status: planned
+Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 Base path: `/api/projects/{id}/...`. All new endpoints follow the existing
 error envelope `{"error": {"code", "message"}}`.
@@ -108,6 +108,19 @@ noted, superseded responses excluded).
 All other frames (`turn-accepted`, `message-started`, `text-delta`,
 `reasoning-summary-delta`, `usage`, `task-accepted`, `tool-rejected`,
 `message-completed`, `message-failed`) are unchanged.
+
+## Global activity invalidation
+
+The existing `GET /api/activity` response shape is unchanged. The global SSE
+endpoint additionally emits:
+
+```text
+learning-activity-updated { "projectSlug": "<slug>" }
+```
+
+It is emitted only after a new durable activity event is appended. The frontend
+invalidates every cached activity summary and refetches through `GET /api/activity`;
+the SSE payload is not an activity projection.
 
 ## Assistant-accepted artifact publication
 

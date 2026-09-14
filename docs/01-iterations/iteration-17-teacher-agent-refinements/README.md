@@ -2,7 +2,7 @@
 
 Status: delivered; manual OCR/web-search smoke remains learner-run
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 ## Goal
 
@@ -54,7 +54,11 @@ ADR-0020 (historical artifact-promotion recovery), and ADR-0021 (assistant
 self-accepted direct publication). ADR-0021 synchronizes `AGENT_ARCHITECTURE.md`,
 `LEARNING_PROJECT_STRUCTURE.md`, `DATA_MODEL.md`, `SYSTEM_ARCHITECTURE.md`,
 `BACKEND_ARCHITECTURE.md`, the ADR index, and this iteration's data, API,
-acceptance, test, and delivery records. Earlier delivery synchronized
+acceptance, test, and delivery records. ADR-0022 synchronizes
+`SYSTEM_ARCHITECTURE.md`, `BACKEND_ARCHITECTURE.md`, `DOMAIN_MODEL.md`,
+`DATA_MODEL.md`, `API_CONTRACT_STRATEGY.md`, the ADR index, and this iteration's
+data, API, acceptance, test, and delivery records for durable heatmap activity.
+Earlier delivery synchronized
 `REPOSITORY_MAP.md`, `QUALITY_COMMANDS.md`, `AGENT_PRIMITIVES.md`,
 `config/config.example.json`, and the iteration indexes (iteration 16 moved to
 foundations).

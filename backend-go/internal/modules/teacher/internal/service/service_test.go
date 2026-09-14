@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +24,12 @@ type fakeGateway struct {
 	sourceRefs        []string
 	taskType          string
 	practiceRequested bool
+}
+
+type failingGateway struct{}
+
+func (failingGateway) Stream(_ context.Context, _ teachergateway.Request, _ func(teachergateway.Event)) error {
+	return errors.New("provider unavailable")
 }
 
 func (f fakeGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
@@ -456,5 +463,43 @@ func TestRegenerateRemovesOldReplyFromProviderContext(t *testing.T) {
 	}
 	if !streamed {
 		t.Fatalf("regenerated reply was not streamed: %#v", frames)
+	}
+}
+
+func TestCompletedResponseReportsLearningActivityOnce(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("activity", "学习活动", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	service := newTestService(fakeGateway{})
+	var completed []string
+	service.OnCompleted = func(_ string, responseID string) { completed = append(completed, responseID) }
+
+	if err := service.StreamTurn(context.Background(), "activity", TurnInput{OperationID: "op_activity", Content: "解释一下闭包"}, func(StreamFrame) {}); err != nil {
+		t.Fatal(err)
+	}
+	if len(completed) != 1 || completed[0] == "" {
+		t.Fatalf("completed response was not reported exactly once: %#v", completed)
+	}
+}
+
+func TestFailedResponseDoesNotReportLearningActivity(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("failed-activity", "失败活动", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	service := newTestService(failingGateway{})
+	called := false
+	service.OnCompleted = func(string, string) { called = true }
+
+	if err := service.StreamTurn(context.Background(), "failed-activity", TurnInput{OperationID: "op_failed_activity", Content: "解释一下闭包"}, func(StreamFrame) {}); err == nil {
+		t.Fatal("expected provider failure")
+	}
+	if called {
+		t.Fatal("failed response must not record learning activity")
 	}
 }

@@ -82,9 +82,10 @@ type taskAuthorizationError interface {
 }
 
 type Service struct {
-	Gateway    teachergateway.Gateway
-	Authorizer TaskAuthorizer
-	OnTask     func(projectSlug string, task DelegatedTask)
+	Gateway     teachergateway.Gateway
+	Authorizer  TaskAuthorizer
+	OnTask      func(projectSlug string, task DelegatedTask)
+	OnCompleted func(projectSlug, responseID string)
 }
 
 // resolveSearcher is a seam for tests; production always resolves from config.
@@ -358,6 +359,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if providerErr != nil {
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": providerFailureCode(providerErr), "partialPreserved": len(blocks) > 0}})
 		return providerErr
+	}
+	if s.OnCompleted != nil {
+		s.OnCompleted(slug, responseID)
 	}
 	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": finalEvent.Seq}})
 	return nil

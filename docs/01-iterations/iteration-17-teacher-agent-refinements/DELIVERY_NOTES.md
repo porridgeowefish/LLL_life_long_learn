@@ -2,7 +2,7 @@
 
 Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 ## Implementation decisions (settled)
 
@@ -44,6 +44,20 @@ caused learner-visible data loss; both are fixed and lesson-logged
 Also added in the hotfix round: OCR binding UI on the models settings page
 (provider + model override), and a learning-investment heatmap on the usage
 page (same activity source and heat scale as the homepage).
+
+## Heatmap activity repair (2026-09-14, same iteration)
+
+The heatmap aggregation was healthy but disconnected from the active teacher
+and assistant workflow. ADR-0022 adds idempotent `teacher-response` and
+`assistant-publication` records to `progress/events.jsonl` after their durable
+success boundaries. The existing single AppShell SSE connection now carries
+`learning-activity-updated {projectSlug}` and invalidates TanStack Query's
+activity summaries for both home and usage views.
+
+Previously completed teacher conversations and assistant tasks are deliberately
+not backfilled with invented historical dates. Focused Go tests cover success,
+failure, no-output, idempotency, and broadcast behavior; a frontend hook test
+covers the shared-query invalidation.
 
 ## Hotfix (2026-09-13, same iteration)
 

@@ -14,7 +14,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
-func AssistantDependencies() assistant.Dependencies {
+func AssistantDependencies(onPublished func(assistant.Task)) assistant.Dependencies {
 	return assistant.Dependencies{
 		ConversationSnapshot: func(slug string, through uint64) ([]byte, error) {
 			store, err := teacher.NewConversation(slug)
@@ -88,6 +88,7 @@ func AssistantDependencies() assistant.Dependencies {
 			}
 			return store.SetStatus(sourceID, "ready", "", taskID)
 		},
+		OnPublished: onPublished,
 	}
 }
 

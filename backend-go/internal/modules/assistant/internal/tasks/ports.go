@@ -33,4 +33,5 @@ type Dependencies struct {
 	CommitAsset          func(projectSlug string, input AssetCommitInput) (status string, eventPayload any, err error)
 	SealSource           func(projectSlug, sourceID, destination string) (SourceSnapshot, error)
 	CommitSourceDerived  func(projectSlug, sourceID, revisionID, taskID string, files map[string][]byte, media map[string]string) (eventPayload any, err error)
+	OnPublished          func(task Task)
 }

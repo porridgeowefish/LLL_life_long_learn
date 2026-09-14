@@ -1,8 +1,8 @@
 # Iteration 17 — Acceptance Criteria
 
-Status: planned
+Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 ## AC-1 OCR
 
@@ -89,3 +89,11 @@ Last reviewed: 2026-09-13
    原子写入当前项目；不检查产物内容、SVG、文件清单或任务类型规则。
 3. Given 发布时发生文件系统错误，then 任务终态为 `publish-failed` 或
    `partial-publish`，提示未发布的输出，不自动重试或重新调用 CLI。
+
+## AC-9 学习活动热力图
+
+1. Given 教师回复已成功完成，then 追加一条幂等热力图活动。
+2. Given 助教任务已成功且实际发布资产或成果，then 追加一条活动；失败、中断和
+   无输出的成功任务不追加。
+3. Given 首页或用量页已打开，when 新活动落盘，then 通过既有 AppShell SSE 连接
+   刷新热力图，不创建第二条 EventSource，也不要求浏览器刷新。

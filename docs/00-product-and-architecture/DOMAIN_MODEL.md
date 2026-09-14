@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-14
 Source of truth: long-lived domain objects, relationships, and ownership boundaries for LLL.
 
 ## Core Objects
@@ -30,6 +30,11 @@ LearningUnit
 The active system-learning aggregate: one TeacherConversation, three
 core TeachingAssets, generated artifacts, SourceMaterials, AssistantTasks, and
 asset annotations.
+
+LearningActivity
+One idempotent, learner-visible progress event. It records an activity source
+and contribution for heatmap aggregation; it is not a second conversation or
+task lifecycle.
 
 TeacherConversation
 The one canonical learner-teacher dialogue that forms a LearningUnit.
@@ -116,6 +121,7 @@ SystemLearningProject
    ├─ owns versioned TeachingAssets and AssetAnnotations
    ├─ references SourceMaterials
    └─ owns zero or more AssistantTasks, each with RunAttempts
+   └─ owns zero or more LearningActivities in the progress stream
 
 DisciplineLearningPlan
 ├─ orders exact OverviewTopic titles according to learner choice

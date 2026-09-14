@@ -182,6 +182,40 @@ func TestDispatcherEmitsResultProjectionEvents(t *testing.T) {
 	}
 }
 
+func TestDispatcherReportsOnlyPublishedSuccessfulWorkAsLearningActivity(t *testing.T) {
+	root := t.TempDir()
+	workspace.SetProjectsRootForTest(root)
+	defer workspace.SetProjectsRootForTest("")
+	if err := workspace.CreateProjectSkeletonWithInput("activity", "学习活动", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
+		t.Fatal(err)
+	}
+	store, err := New("activity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, _, err := store.Create(CreateInput{Type: "consolidate", Objective: "整理闭包笔记", Origin: Origin{OperationID: "op_activity"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatcher := newTestDispatcher(nil, nil)
+	var published []Task
+	dispatcher.deps.OnPublished = func(task Task) { published = append(published, task) }
+
+	dispatcher.finish(store, task.ID, "succeeded", &Result{AssetUpdates: map[string]string{"body": "updated"}}, nil)
+	if len(published) != 1 || published[0].ID != task.ID {
+		t.Fatalf("published task was not reported: %#v", published)
+	}
+
+	second, _, err := store.Create(CreateInput{Type: "verify", Objective: "核查闭包笔记", Origin: Origin{OperationID: "op_no_output"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatcher.finish(store, second.ID, "succeeded", &Result{}, nil)
+	if len(published) != 1 {
+		t.Fatalf("task without published output was reported: %#v", published)
+	}
+}
+
 func TestGeneratedArtifactPublishesAssistantAcceptedDirectoryWithoutFileManifest(t *testing.T) {
 	projectRoot := t.TempDir()
 	workDir := t.TempDir()

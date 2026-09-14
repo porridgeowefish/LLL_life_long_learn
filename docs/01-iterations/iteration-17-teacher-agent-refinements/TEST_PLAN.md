@@ -1,8 +1,8 @@
 # Iteration 17 — Test Plan
 
-Status: planned
+Status: delivered
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 
 ## Backend Go tests
 
@@ -16,6 +16,7 @@ Last reviewed: 2026-09-13
 | routes | `routes_learning_workspace_test.go` | queue/steer/regenerate/export endpoint contracts incl. 404/409 paths; existing contract-freeze suite stays green |
 | config | `platform/config` | `webSearch` section parse/validate/env-key; missing section disables search |
 | direct artifact publication | `assistant/internal/tasks/dispatcher_test.go` | assistant-accepted directory without a file manifest, byte counts, or hashes is atomically published in full with task/run provenance |
+| heatmap activity | teacher service, assistant dispatcher, `routes_activity_test.go` | completed responses and successful published tasks append once; failures/no-output work do not; a new event emits `learning-activity-updated`, duplicates stay silent |
 
 ## Frontend Vitest
 
@@ -24,6 +25,7 @@ Last reviewed: 2026-09-13
 | `TeacherView` | input stays enabled while live; send while live calls queue endpoint and renders chip; queue edit/discard/steer actions wired; post-stream reattach picks up auto-advanced response; regenerate button only on last teacher message; copy button copies markdown source; export triggers download |
 | frames | `search-started/completed/failed` render status line without disturbing markdown body |
 | icons | shared icon component renders each glyph with aria-label |
+| activity refresh | `useActivityRefresh` | shared `learning-activity-updated` subscription invalidates every activity query; no per-page EventSource |
 
 ## E2E (Playwright, existing fake-agent fixtures)
 

@@ -125,6 +125,22 @@ func (s *Server) teacherResponses() *teacher.ActiveResponses {
 // future integrations). Read-only use only.
 func (s *Server) Broadcaster() *httpx.Broadcaster { return s.broadcaster }
 
+// RecordTeacherResponse and RecordAssistantPublication are composition seams:
+// domain services report completed work without importing learning or HTTP.
+func (s *Server) RecordTeacherResponse(projectSlug, responseID string) (runprogress.ProgressEvent, bool, error) {
+	return s.recordLearningActivity(projectSlug, runprogress.ProgressEvent{
+		ID: "teacher-response:" + responseID, SourceType: "teacher-response", SourceID: responseID,
+		ActivityDelta: 1, Title: "完成教师对话",
+	})
+}
+
+func (s *Server) RecordAssistantPublication(task assistant.Task) (runprogress.ProgressEvent, bool, error) {
+	return s.recordLearningActivity(task.ProjectSlug, runprogress.ProgressEvent{
+		ID: "assistant-publication:" + task.ID, SourceType: "assistant-publication", SourceID: task.ID,
+		ActivityDelta: 1, Title: "助教已发布教学成果", Detail: task.Objective,
+	})
+}
+
 // Handler returns the root HTTP handler with all routes mounted.
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()

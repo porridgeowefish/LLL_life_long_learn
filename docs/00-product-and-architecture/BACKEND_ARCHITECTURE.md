@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 Source of truth: current Go backend boundaries and write ownership; package code owns implementation details.
 
 ## Intent
@@ -78,6 +78,7 @@ POST teacher turn
 -> stream normalized reasoning-summary / answer / tool-use blocks
 -> append durable teacher events and run state
 -> append provider-reported nonzero token usage by response
+-> report durable successful completion through the bootstrap activity seam
 -> expose final conversation projection through REST
 ```
 
@@ -104,6 +105,7 @@ authorized tool call
 -> Go versions/merges declared formal assets and atomically publishes generic generated directories
 -> a publication I/O failure is terminal; there is no validator or automatic retry (ADR-0021)
 -> durable task state changes and global SSE invalidates affected resources
+-> successful publication with actual output reports through the bootstrap activity seam
 ```
 
 The local queue is reconstructed by scanning task files after restart. The
@@ -155,6 +157,8 @@ Teacher streaming and global invalidation are separate channels:
 
 - the teacher response carries response-local normalized content blocks;
 - the app-shell SSE connection carries small identifier-only invalidations;
+- `learning-activity-updated {projectSlug}` invalidates every cached activity
+  summary after a new idempotent progress event;
 - REST returns durable conversation, task, asset, and source projections after
   refresh or missed events;
 - startup scans task/run files to reconcile queued, running, interrupted, and

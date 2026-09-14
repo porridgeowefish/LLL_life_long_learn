@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-14
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -74,6 +74,7 @@ generic generated assistant deliverables
 body annotations and Ask-AI history
 versioned source originals and derived content
 append-only provider-reported teacher usage by response
+append-only idempotent learning activity events for heatmaps
 assistant tasks, captured inputs, attempts, and run records
 ```
 
@@ -193,6 +194,21 @@ canonical location; a legacy workspace-root `folders.json` is copied forward
 once on first open (ADR-0019). The optional `webSearch` config section
 (`provider`, `apiKey|apiKeyEnv`, `engine`) enables the teacher `search_web`
 tool; absent means disabled.
+
+### Learning activity
+
+`progress/events.jsonl` is the append-only source for the home and usage
+heatmaps. A `ProgressEvent` has a stable `id`, `sourceType`, `sourceId`,
+optional outcome/growth fields, `activityDelta`, presentation title/detail, and
+creation time. The stable ID prevents duplicate activity when a request or task
+recovery is replayed.
+
+Successful teacher responses write `teacher-response:<responseId>`; successful
+assistant tasks that publish at least one core asset or generated deliverable
+write `assistant-publication:<taskId>`. Both have `activityDelta: 1`. Failed,
+interrupted, and no-output task completions have no event. Existing reading,
+practice, Ask-AI, Agent session, and learning-plan events remain compatible
+members of the same stream.
 
 ## Delivery State
 

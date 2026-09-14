@@ -66,6 +66,7 @@ function ensureConnection() {
     SSE_EVENTS.assistantTaskUpdated,
     SSE_EVENTS.generatedArtifactUpdated,
     SSE_EVENTS.learningAssetUpdated,
+    SSE_EVENTS.learningActivityUpdated,
     SSE_EVENTS.sourceUpdated,
     SSE_EVENTS.annotationUpdated,
   ];

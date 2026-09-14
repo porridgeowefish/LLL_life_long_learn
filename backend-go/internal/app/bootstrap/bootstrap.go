@@ -70,8 +70,13 @@ func Build() *App {
 	})
 	execution := assistant.NewExecution(server.RuntimeSnapshot)
 	dispatcher := assistant.NewDispatcher(execution, broadcaster)
-	dispatcher.Configure(integration.AssistantDependencies())
+	dispatcher.Configure(integration.AssistantDependencies(func(task assistant.Task) {
+		_, _, _ = server.RecordAssistantPublication(task)
+	}))
 	server.AttachExecution(execution, dispatcher)
+	teacherService.OnCompleted = func(projectSlug, responseID string) {
+		_, _, _ = server.RecordTeacherResponse(projectSlug, responseID)
+	}
 	teacherService.OnTask = func(projectSlug string, task teacher.DelegatedTask) {
 		broadcaster.Emit("assistant-task-updated", map[string]any{"projectSlug": projectSlug, "task": task})
 		dispatcher.Notify()

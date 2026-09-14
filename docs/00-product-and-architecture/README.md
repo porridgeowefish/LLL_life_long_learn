@@ -67,3 +67,6 @@ defines which documents belong to the current AI context and which are historica
 implemented iteration-14 architecture: business-capability modules with private
 implementations, selective hexagonal boundaries, one composition root, one
 typed configuration system, and executable architecture checks.
+[ADR-0022](./ADR/0022-durable-learning-activity-and-sse-refresh.md) defines
+the durable activity event boundary and shared-SSE refresh path for both
+learning heatmaps.
