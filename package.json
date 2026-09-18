@@ -19,6 +19,6 @@
     "check:full": "node tools/check/run-check.js full"
   },
   "engines": {
-    "go": ">=1.22"
+    "go": ">=1.25"
   }
 }

@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-14
+Last reviewed: 2026-09-18
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -54,6 +54,8 @@ tools/archcheck/                      executable dependency policy
 tools/check/                          developer check pipeline (run-check.js, check-coverage.js)
 .artifacts/quality/                   ignored generated test and coverage evidence
 config/                               committed schema and non-secret example
+LICENSE                               repository license (MIT)
+.gitattributes                        line-ending and binary normalization contract
 ```
 
 This is the implemented source layout; `BACKEND_ARCHITECTURE.md` owns its

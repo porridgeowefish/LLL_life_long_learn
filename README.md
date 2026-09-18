@@ -54,14 +54,14 @@ LLL 是一个**本地优先的教师—助教型 AI 学习工作台**。它不�
 ### 前置要求
 
 - Node.js（用于构建前端）
-- Go ≥ 1.22（用于后端）
+- Go ≥ 1.25（用于后端）
 - 至少一个 OpenAI 兼容的 API 模型配置（用于教师与 Ask AI）
 - 可选的 Claude Code、Codex CLI 或已接入的 Agent CLI（用于异步助教任务）
 
 ### 构建与运行
 
 ```bash
-cd D:\2_Study\LLL
+cd LLL_life_long_learn
 npm install --prefix frontend   # 首次需安装前端依赖
 npm run build                   # 构建前端到 frontend/dist/，并编译后端到 dist/lll.exe
 npm run start                   # 运行 dist/lll.exe，生产模式托管 frontend/dist/（含 SPA fallback）
@@ -94,7 +94,7 @@ npm run stop
 把下面这段提示词整段复制给 AI Agent（如 Claude Code），它即可在本地完成 LLL 的安装、构建与运行：
 
 > 请在当前机器上部署并运行 LLL（荔枝读书，本地 AI 学习工作台；Go 后端 + React 前端）。
-> 仓库根目录：`D:\2_Study\LLL`（或从 https://github.com/porridgeowefish/LLL_life_long_learn clone）。
+> 仓库根目录：从 https://github.com/porridgeowefish/LLL_life_long_learn clone 后的 `LLL_life_long_learn` 目录（下文所有命令都在该目录执行）。
 > 按以下步骤执行，每完成一步向我报告结果：
 >
 > 1. 检查环境：已安装 Node.js 与 Go（≥ 1.22）；如需助教功能，再确认至少一个受支持的 Agent CLI 可用。缺失则先安装对应版本。
@@ -107,5 +107,11 @@ npm run stop
 > 8.（可选）`npm run desktop:install` 创建桌面快捷方式；`npm run stop` 停止后台服务。
 >
 > 全程只做安装、构建、运行、验证，不要修改源码；任何步骤失败请附上完整命令输出再问我。
+
+
+## 许可证
+
+本项目以 [MIT License](./LICENSE) 开源发布。
+
 
 

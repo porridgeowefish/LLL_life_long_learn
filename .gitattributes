@@ -1,0 +1,23 @@
+# Normalize text files to LF in the repository and on checkout. The index is
+# already all-LF, so this only fixes working-tree drift on Windows checkouts.
+
+* text=auto eol=lf
+
+# Windows operator scripts must keep CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets — never normalize, never diff.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.exe binary
+*.woff binary
+*.woff2 binary
+
+# Machine-written lockfiles — keep out of diffs and language stats.
+frontend/package-lock.json linguist-generated=true
