@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // withTempAgents redirects paths.AGENTS_ROOT to a temp dir for the test.
@@ -250,4 +251,53 @@ func TestRegistry_PrimitiveExists(t *testing.T) {
 	if PrimitiveExists("UPPERCASE") {
 		t.Error("PrimitiveExists(UPPERCASE) = true, want false (invalid name)")
 	}
+}
+
+// TestRegistry_FallsBackToShippedAgentsRoot pins ADR-0023: learning-agents/
+// is tracked product content, so a workspace without its own learning-agents/
+// directory must still resolve the repository's shipped set, while a
+// workspace-local copy replaces it entirely.
+func TestRegistry_FallsBackToShippedAgentsRoot(t *testing.T) {
+	oldProject := paths.PROJECT_ROOT
+	oldWorkspace := paths.WORKSPACE
+	t.Cleanup(func() {
+		paths.PROJECT_ROOT = oldProject
+		if err := paths.ConfigureWorkspace(oldWorkspace); err != nil {
+			t.Errorf("restore workspace: %v", err)
+		}
+	})
+
+	repo := t.TempDir()
+	writeAgent(t, filepath.Join(repo, "learning-agents"), "shipped-agent", []workspace.ZoneName{workspace.ZoneIntro}, "# shipped\n")
+	paths.PROJECT_ROOT = repo
+
+	t.Run("workspace without learning-agents uses shipped set", func(t *testing.T) {
+		if err := paths.ConfigureWorkspace(t.TempDir()); err != nil {
+			t.Fatal(err)
+		}
+		r := New()
+		if err := r.Load(); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Get("shipped-agent"); !ok {
+			t.Fatal("shipped agent not loaded via fallback")
+		}
+	})
+
+	t.Run("workspace-local learning-agents wins over shipped set", func(t *testing.T) {
+		if err := paths.ConfigureWorkspace(t.TempDir()); err != nil {
+			t.Fatal(err)
+		}
+		writeAgent(t, paths.AGENTS_ROOT, "custom-agent", []workspace.ZoneName{workspace.ZoneIntro}, "# custom\n")
+		r := New()
+		if err := r.Load(); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := r.Get("custom-agent"); !ok {
+			t.Fatal("workspace-local agent not loaded")
+		}
+		if _, ok := r.Get("shipped-agent"); ok {
+			t.Fatal("shipped agent leaked into custom workspace set")
+		}
+	})
 }

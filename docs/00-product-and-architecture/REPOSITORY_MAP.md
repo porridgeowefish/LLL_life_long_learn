@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-18
+Last reviewed: 2026-09-24
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -40,19 +40,21 @@ top-level operator layout:
 backend-go/internal/app/              composition and cross-module glue
 backend-go/internal/transport/        HTTP/SSE adapters
 backend-go/internal/modules/          business-capability facades and private implementations
-backend-go/internal/platform/         config, filesystem, process, event, identity mechanics
+backend-go/internal/platform/         config and filesystem mechanics (SSE broadcast lives in internal/httpx, IDs in internal/idgen)
 backend-go/internal/compatibility/    legacy reads and migration only
 
 frontend/src/app/                     router, providers, app shell, single SSE mount
 frontend/src/features/                business feature public entries and private implementation
 frontend/src/shared/                  proven cross-feature UI and pure utilities
 
-scripts/                              operator entry points only (Start/Stop/Install + assets)
+scripts/                              operator entry points and backend-invoked runtime scripts
+                                      (Start/Stop/Install, gen_infographic.py — ADR-0023)
 tests/                                cross-module contracts, fixtures, smoke, manual QA scripts
 tests/manual/                         human-run one-off QA scripts (not in npm run check)
 tools/archcheck/                      executable dependency policy
 tools/check/                          developer check pipeline (run-check.js, check-coverage.js)
 .artifacts/quality/                   ignored generated test and coverage evidence
+.artifacts/                           ignored local-only evidence (quality gates, incident forensics)
 config/                               committed schema and non-secret example
 LICENSE                               repository license (MIT)
 .gitattributes                        line-ending and binary normalization contract
@@ -66,13 +68,19 @@ dependency and responsibility rules.
 These directories are runtime state or generated local data, not product contracts:
 
 ```text
-projects/          learner projects, conversations, assets, sources, tasks, runs
-                   plus projects/folders.json (workspace folder ledger, ADR-0019)
-preferences.md     local learner-owned global preferences (gitignored)
-dist/              built desktop/backend artifacts
-learning/          local learning artifacts / workspace data
-repro-shell/       local repro helpers
+workspace/          learner workspace root (ADR-0023): projects/ (incl. the
+                    folders ledger), preferences.md, config.local.json,
+                    workspace-local learning-agents/ and scripts/ overrides,
+                    tmp/ diagnostics (teacher stream-shape log, launcher PID)
+dist/               built desktop/backend artifacts
+learning/           local learning artifacts / workspace data
+repro-shell/        local repro helpers
 ```
+
+The workspace root defaults to `<repo>/workspace/` and is overridable via
+`--workspace`, `LLL_WORKSPACE_ROOT` / `WORKSPACE`, or `workspace.root`.
+Learning agents and the infographic script resolve from the workspace first
+and fall back to the repository's shipped copies.
 
 A legacy workspace-root `folders.json` is migrated into `projects/` by a
 one-time copy on first open; the legacy file is left in place.

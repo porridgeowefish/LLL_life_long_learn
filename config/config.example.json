@@ -1,4 +1,5 @@
 {
+  "__comment": "Copy to <workspace>/config.local.json (default workspace: <repo>/workspace, ADR-0023) and fill in real values. apiKeyEnv-named environment variables win over inline keys; the file is gitignored and never rewritten during load.",
   "server": { "host": "127.0.0.1", "port": 8787 },
   "workspace": { "root": "." },
   "ai": {

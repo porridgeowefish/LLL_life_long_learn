@@ -69,6 +69,8 @@ npm run start                   # 运行 dist/lll.exe，生产模式托管 front
 
 浏览器打开 `http://localhost:8787/`；健康检查 `GET http://localhost:8787/api/health` 返回 200 即代表服务正常。
 
+学习者数据（项目、对话、偏好、本地配置、诊断日志）默认全部写入仓库内的 `workspace/` 目录（已被 Git 忽略，见 [ADR-0023](docs/00-product-and-architecture/ADR/0023-workspace-default-and-root-surface-reduction.md)）；可用 `--workspace`、`LLL_WORKSPACE_ROOT` 或配置里的 `workspace.root` 整体迁移。
+
 首次运行后，在侧边栏进入 **API 模型**，添加 Provider、Base URL、API Key 和模型名称。教师对话与 Ask AI 共用这套模型配置；搜索引擎配置仍位于统一配置页面。Agent CLI 的账号、模型和密钥由 CLI 自身管理，LLL 只负责运行时选择、上下文封装和可见终端启动。
 
 > 开发时也可用 `npm run run`（即 `go run ./backend-go/cmd/lll`）直接从源码运行后端。

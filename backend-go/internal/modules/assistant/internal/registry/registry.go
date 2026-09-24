@@ -210,10 +210,19 @@ func AgentsRootForTest() string { return agentsRootOverride }
 // SetAgentsRootForTest sets the override (test helper).
 func SetAgentsRootForTest(dir string) { agentsRootOverride = dir }
 
-// activeAgentsRoot returns the override or the real AGENTS_ROOT.
+// activeAgentsRoot returns the override, the workspace-local agent set when
+// one exists, or the repository's shipped learning-agents/ content.
+//
+// learning-agents/ is tracked product content, not learner data: a fresh
+// workspace must still expose the shipped agent set without requiring a copy
+// inside the workspace. A workspace that ships its own learning-agents/
+// directory replaces the set entirely.
 func activeAgentsRoot() string {
 	if agentsRootOverride != "" {
 		return agentsRootOverride
 	}
-	return paths.AGENTS_ROOT
+	if _, err := os.Stat(paths.AGENTS_ROOT); err == nil {
+		return paths.AGENTS_ROOT
+	}
+	return filepath.Join(paths.PROJECT_ROOT, "learning-agents")
 }

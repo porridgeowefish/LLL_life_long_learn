@@ -18,8 +18,14 @@ frontend/playwright-report/
 
 # Local runtime data & TS incremental build cache
 /projects/
+# Learner workspace: projects, preferences.md, config.local.json, tmp (ADR-0023)
+/workspace/
 /repro-shell/
 *.tsbuildinfo
+
+# Local AI-tool session state
+.workbuddy/
+.codebuddy/
 
 # Go test, profiling, and coverage by-products
 *.coverprofile
@@ -39,4 +45,3 @@ frontend/playwright-report/
 .idea/
 # Workspace-global learner preferences are local user data.
 /preferences.md
-.codebuddy/workflows/

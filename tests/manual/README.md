@@ -13,7 +13,7 @@ specific area. Each script documents its prerequisites in its header.
 | `qa_iteration13.py` | iteration-13 workspace regression sweep against a running server |
 | `qa_long_conversation.py` | long-conversation pagination and context behavior |
 | `qa_paginated_body.py` | paginated Body reader edge cases |
-| `gen_infographic.py` | infographic generation helper for manual checks |
 
-Moved here from `scripts/` in iteration 17 (see ADR-0019) so `scripts/` keeps
-only operator entry points (Start/Stop/Install).
+`gen_infographic.py` returned to `scripts/` (ADR-0023): it is a backend-invoked
+runtime dependency of the explain infographic pipeline, not a manual QA script.
+`scripts/` keeps operator entry points plus backend-invoked runtime scripts.

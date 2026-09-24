@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-14
+Last reviewed: 2026-09-18
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -98,9 +98,11 @@ An existing canonical file is mirrored at startup and after explicit saves to
 is recovery-only: reads fall back to it when the workspace file is missing, and
 opening the editor restores the canonical workspace file. If the canonical file
 is unexpectedly empty while the mirror is non-empty, startup or editor access
-restores the mirror; an explicit empty save writes both copies. Runtime workspace
-configuration is applied once to `WORKSPACE`, `PROJECTS_ROOT`, and `AGENTS_ROOT`
-after CLI, environment, and config-file precedence is resolved.
+restores the mirror; an explicit empty save writes both copies. The workspace
+root defaults to `<repo>/workspace/` (ADR-0023); `--workspace`,
+`LLL_WORKSPACE_ROOT` / `WORKSPACE`, and `workspace.root` relocate it. Runtime
+workspace configuration is applied once to `WORKSPACE`, `PROJECTS_ROOT`, and
+`AGENTS_ROOT` after CLI, environment, and config-file precedence is resolved.
 
 Legacy `projects/<slug>/memory/` files are preserved but ignored. New project
 skeletons do not create them, and the generic project file API rejects reads or
@@ -213,7 +215,9 @@ members of the same stream.
 ## Delivery State
 
 The Go state model persists `projectType` for new projects. Missing type remains
-the legacy compatibility signal and decodes as `system-learning`. Iteration 13
-is implemented; its file schemas and migration compatibility are the active
-system-learning model. Iteration 14 is an approved source-architecture target
-and does not become product-data truth until delivered.
+the legacy compatibility signal and decodes as `system-learning`. Iterations 13
+through 17 are delivered: iteration 13 established the active system-learning
+model, iteration 14 the enforced modular-monolith architecture, iteration 15 the
+retired legacy surfaces, iteration 16 source citations and consolidation, and
+iteration 17 teacher queue/steering, OCR, and web search. Code and the current
+iteration documents are product-data truth.

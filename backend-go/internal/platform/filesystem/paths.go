@@ -3,12 +3,28 @@
 package filesystem
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+// WorkspaceDirName is the directory (inside the repository) that holds all
+// learner-owned runtime data by default: projects/, preferences.md,
+// config.local.json, folders ledger, and workspace-local tmp/ diagnostics.
+const WorkspaceDirName = "workspace"
+
+// DefaultWorkspaceRoot returns the default learner workspace root for a given
+// repository root. Configuration loaders and package init must agree on this
+// value; keep a single derivation so the config-file lookup and the runtime
+// path variables can never diverge (see LESSONS_LEARNED #16 and #19).
+func DefaultWorkspaceRoot(projectRoot string) string {
+	return filepath.Join(projectRoot, WorkspaceDirName)
+}
+
 // PROJECT_ROOT is the repository root (where go.mod lives).
-// WORKSPACE is the user's learning workspace (configurable via WORKSPACE env).
+// WORKSPACE is the user's learning workspace (defaults to
+// DefaultWorkspaceRoot(PROJECT_ROOT); configurable via WORKSPACE env).
 // PROJECTS_ROOT holds all learning project folders.
 // AGENTS_ROOT holds agent registry + charter files.
 var (
@@ -43,8 +59,20 @@ func init() {
 		if err := ConfigureWorkspace(env); err != nil {
 			panic("paths: configure workspace: " + err.Error())
 		}
+	} else if isTestBinary() {
+		// Test binaries must never default to the developer's real workspace:
+		// an unisolated test writing through paths.WORKSPACE would corrupt
+		// learner data (observed 2026-09-11 as stray "topic"/"other" projects).
+		// Tests that need a specific workspace still configure one explicitly.
+		scratch, err := os.MkdirTemp("", "lll-test-workspace-")
+		if err != nil {
+			panic("paths: test workspace: " + err.Error())
+		}
+		if err := ConfigureWorkspace(scratch); err != nil {
+			panic("paths: configure workspace: " + err.Error())
+		}
 	} else {
-		if err := ConfigureWorkspace(PROJECT_ROOT); err != nil {
+		if err := ConfigureWorkspace(DefaultWorkspaceRoot(PROJECT_ROOT)); err != nil {
 			panic("paths: configure workspace: " + err.Error())
 		}
 	}
@@ -53,6 +81,13 @@ func init() {
 	// frontend runs on Vite :5173 and proxies API calls here.
 	FRONTEND_ROOT = filepath.Join(PROJECT_ROOT, "frontend", "dist")
 	FRONTEND_INDEX = filepath.Join(FRONTEND_ROOT, "index.html")
+}
+
+// isTestBinary reports whether the current process is a compiled go test
+// binary, so package init can keep unisolated tests away from real data.
+func isTestBinary() bool {
+	a := os.Args[0]
+	return strings.HasSuffix(a, ".test") || strings.HasSuffix(a, ".test.exe")
 }
 
 // ConfigureWorkspace applies one resolved workspace root to every mutable
@@ -68,6 +103,12 @@ func ConfigureWorkspace(root string) error {
 		return err
 	}
 	WORKSPACE = filepath.Clean(abs)
+	// The workspace root holds learner-owned files that several stores write
+	// directly (preferences.md, folders ledger, tmp diagnostics), so create it
+	// eagerly instead of relying on every writer to MkdirAll its parent.
+	if err := os.MkdirAll(WORKSPACE, 0o755); err != nil {
+		return fmt.Errorf("create workspace root: %w", err)
+	}
 	PROJECTS_ROOT = filepath.Join(WORKSPACE, "projects")
 	AGENTS_ROOT = filepath.Join(WORKSPACE, "learning-agents")
 	return nil

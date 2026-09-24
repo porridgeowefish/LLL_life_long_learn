@@ -14,6 +14,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 // Section shapes. These mirror DATA_DESIGN.md canonical names; the JSON
@@ -224,21 +226,10 @@ func workspaceBase() string {
 	if v := strings.TrimSpace(os.Getenv("WORKSPACE")); v != "" {
 		return v
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return "."
-	}
-	dir := wd
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return wd
-		}
-		dir = parent
-	}
+	// Single derivation shared with the filesystem package: without an
+	// override the workspace is <repo>/workspace, so the config file lookup
+	// and the runtime path variables can never disagree (LESSONS_LEARNED #16).
+	return paths.DefaultWorkspaceRoot(paths.PROJECT_ROOT)
 }
 
 // diskShape is the raw sectioned document plus tolerated legacy flat keys.

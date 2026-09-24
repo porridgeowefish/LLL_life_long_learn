@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-18
 Source of truth: active ADR numbering, status, and supersession index for LLL.
 
 ## Rules
@@ -34,7 +34,7 @@ an active owner and the historical index records the move.
 | [0012](./0012-teacher-assistant-learning-workspace.md) | Teacher-Assistant Learning Workspace | accepted | supersedes the active five-zone presentation and direct-generation workflow while retaining maps, flat storage, scope provenance, and visible native CLI execution |
 | [0013](./0013-stable-stream-rendering-and-global-preferences.md) | Stable Stream Rendering And Global Learner Preferences | accepted | extends 0012 rendering and supersedes project/learner memory growth in 0002 and 0003 |
 | [0014](./0014-current-documentation-surface-and-archive-boundary.md) | Current Documentation Surface And Archive Boundary | accepted | keeps only current decisions and delivery in the default AI reading surface |
-| [0015](./0015-business-modular-monolith-boundaries.md) | Business-Capability Modular Monolith Boundaries | accepted; implementation planned | defines enforceable capability modules, selective hexagonal responsibilities, centralized configuration, and architecture quality gates for iteration 14 |
+| [0015](./0015-business-modular-monolith-boundaries.md) | Business-Capability Modular Monolith Boundaries | accepted | defines enforceable capability modules, selective hexagonal responsibilities, centralized configuration, and architecture quality gates; implemented in iteration 14 |
 | [0016](./0016-retire-legacy-summary-extend-and-knowledge-garden.md) | Retire Legacy Summary, Extend, and Knowledge Garden | accepted | removes product code and public interfaces while preserving historical project files |
 | [0017](./0017-conversation-learning-sources-consolidation-and-usage.md) | Conversation Learning Sources, Consolidation, And Usage | accepted | extends 0012 and 0016 with canonical source citations, teaching outlines, approved consolidation, and teacher usage |
 | [0018](./0018-teacher-conversation-queue-steering-and-regeneration.md) | Teacher Conversation Queue, Steering, And Regeneration | accepted | durable event-log queue, explicit interrupt-and-redirect steering, latest-response regeneration via supersession |
@@ -42,6 +42,7 @@ an active owner and the historical index records the move.
 | [0020](./0020-idempotent-generated-artifact-promotion-recovery.md) | Idempotent Generated Artifact Promotion Recovery | superseded by 0021 | historical bounded retry of a validated artifact-only promotion |
 | [0021](./0021-assistant-self-accepted-direct-publication.md) | Assistant Self-Accepted Direct Publication | accepted | assistant accepts output; LLL directly and atomically publishes its declared directories |
 | [0022](./0022-durable-learning-activity-and-sse-refresh.md) | Durable Learning Activity And SSE Refresh | accepted | completed teacher and published assistant work write idempotent activity events and refresh heatmaps through the shared SSE connection |
+| [0023](./0023-workspace-default-and-root-surface-reduction.md) | Workspace Default And Root Surface Reduction | accepted | workspace defaults to `<repo>/workspace/`, registry falls back to shipped learning-agents, gen_infographic returns to scripts/ |
 
 ## Historical Decisions
 

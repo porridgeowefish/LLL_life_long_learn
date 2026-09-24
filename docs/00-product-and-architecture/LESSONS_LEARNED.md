@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-13
+Last reviewed: 2026-09-16
 Source of truth: 把每一轮调试得到的"如果当初…就不会…"沉淀成铁律。
 所有 agent 在动手前必须读这份文档，避免重复犯错。
 
@@ -79,6 +79,10 @@ UI 有个"实时输出抽屉"（TerminalDrawer），用 SSE 把 stdout.log 内�
 - **派生 state 必须随上游变化重算**。当某个 state 是从 props/URL/context 派生时，用 `useEffect([deps], () => setState(derived))` 同步。
 - 或者直接 `useMemo` 派生（不存 state）。
 - 不要假设 useState 默认值只算一次就够。
+- React Router 在 `/project/A` 切到 `/project/B` 时可能复用同一种组件；只写
+  `useEffect(..., [])` 的清理不会运行。会话级流、AbortController、输入草稿等整组
+  本地状态应让子树以项目 ID 作为 `key` 重新挂载，或在 ID 变化时完整重置，不能只
+  等页面刷新。
 
 ---
 
@@ -346,4 +350,17 @@ folderstore 用 `paths.WORKSPACE` 拼路径，而全仓其他存储走 workspace
 - 发布失败应明确指出未写入的输出并保持终态，不能用服务端再校验或自动重跑替代助教决策。
 - 回归测试应验证没有文件清单、字节数或哈希的成果目录会被完整发布。
 
-当前共 20 条。
+## 21. 测试二进制绝不能默认指向真实工作区（topic/other 污染真实数据）
+
+### 症状
+真实 `projects/` 里出现来历不明的 `topic`、`other` 空项目（unit.json + 空 events.jsonl，创建时间与某次测试运行吻合），UI 项目列表混入垃圾条目。
+
+### 根因
+默认 WORKSPACE 长期等于仓库根，也就是真实数据根。任何忘记 `SetProjectsRootForTest` 隔离的测试，其项目骨架创建与会话写入会直接落进学习者数据目录。逐文件补隔离是打地鼠：总有下一个漏网的测试文件。
+
+### 铁律
+- **包初始化层就要区分生产与测试二进制**（`os.Args[0]` 以 `.test`/`.test.exe` 结尾），测试二进制的默认 WORKSPACE 指向临时目录，而不是任何可能存放真实数据的位置。
+- 显式 `ConfigureWorkspace` 的测试不受影响；"每个测试自己隔离"从唯一防线降级为第二道防线。
+- 变更数据目录默认值时，必须用"迁移前后条目数对比"金丝雀跑一遍全量测试，证明套件不再写真实数据。
+
+当前共 21 条。

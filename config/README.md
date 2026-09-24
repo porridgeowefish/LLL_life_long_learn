@@ -2,13 +2,15 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-04
+Last reviewed: 2026-09-24
 Source of truth: `config.example.json` (shape) and `backend-go/internal/platform/config` (loader behavior). The iteration-14 data contract is `docs/01-iterations/iteration-14-modular-monolith-architecture/DATA_DESIGN.md`.
 
 ## File
 
-`config.local.json` in the workspace root is the local configuration file. It
-is gitignored and is never rewritten during load.
+`config.local.json` in the workspace root is the local configuration file. The
+workspace root defaults to `<repo>/workspace/` (ADR-0023); create the file by
+copying `config/config.example.json`. It is gitignored and is never rewritten
+during load.
 
 ## Precedence
 

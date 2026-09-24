@@ -166,12 +166,15 @@ function Stop-ExistingRootServer {
 try {
   $repoRoot = Get-RepoRoot
   if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-    $workspaceRoot = $repoRoot
+    # Default learner workspace: <repo>\workspace (all runtime data lives
+    # there; see ADR-0023). Created here because Resolve-Path needs it to exist.
+    $workspaceRoot = Join-Path $repoRoot 'workspace'
+    New-Item -ItemType Directory -Force -Path $workspaceRoot | Out-Null
   } else {
     $workspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
   }
   $exePath = Join-Path $repoRoot 'dist\lll.exe'
-  $tmpDir = Join-Path $repoRoot 'tmp\desktop-launcher'
+  $tmpDir = Join-Path $workspaceRoot 'tmp\desktop-launcher'
   $pidFile = Join-Path $tmpDir 'lll.pid'
   $outLog = Join-Path $tmpDir 'lll.out.log'
   $errLog = Join-Path $tmpDir 'lll.err.log'

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
 func writeConfig(t *testing.T, content string) string {
@@ -221,6 +223,27 @@ func TestWorkspacePathSafety(t *testing.T) {
 	_, _, err := Load(Options{Path: path})
 	if err == nil || !strings.Contains(err.Error(), "workspace.root") {
 		t.Fatalf("relative workspace root err = %v", err)
+	}
+}
+
+// TestWorkspaceBaseDefaultsToRepoWorkspaceDir pins the converged default:
+// without env overrides the config-file lookup base must be exactly the
+// filesystem package's <repo>/workspace derivation (LESSONS_LEARNED #16).
+func TestWorkspaceBaseDefaultsToRepoWorkspaceDir(t *testing.T) {
+	for _, key := range []string{"LLL_WORKSPACE_ROOT", "WORKSPACE"} {
+		old, had := os.LookupEnv(key)
+		os.Unsetenv(key)
+		t.Cleanup(func() {
+			if had {
+				os.Setenv(key, old)
+			} else {
+				os.Unsetenv(key)
+			}
+		})
+	}
+	want := paths.DefaultWorkspaceRoot(paths.PROJECT_ROOT)
+	if got := workspaceBase(); got != want {
+		t.Fatalf("workspaceBase() = %q, want %q", got, want)
 	}
 }
 

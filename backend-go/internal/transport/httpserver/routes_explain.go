@@ -73,14 +73,28 @@ type imageProvider struct {
 	model   string
 }
 
+// infographicScriptPath resolves the backend-invoked image script. A
+// workspace-local scripts/gen_infographic.py replaces the shipped one; the
+// default lives with the repository's operator/runtime scripts.
+func infographicScriptPath() string {
+	if paths.WORKSPACE != "" && paths.WORKSPACE != paths.PROJECT_ROOT {
+		if cand := filepath.Join(paths.WORKSPACE, "scripts", "gen_infographic.py"); fileExists(cand) {
+			return cand
+		}
+	}
+	return filepath.Join(paths.PROJECT_ROOT, "scripts", "gen_infographic.py")
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 // generateImageWithProviders runs the Python image script against each provider
 // in order until one yields a valid PNG, then returns nil. It returns the last
 // provider's error if every provider failed (or none were configured).
 func generateImageWithProviders(ctx context.Context, root, finalPrompt, pngAbs, pythonBin string, providers []imageProvider) error {
-	scriptAbs := filepath.Join(paths.WORKSPACE, "scripts", "gen_infographic.py")
-	if paths.WORKSPACE == "" {
-		scriptAbs = filepath.Join(paths.PROJECT_ROOT, "scripts", "gen_infographic.py")
-	}
+	scriptAbs := infographicScriptPath()
 
 	var lastErr error
 	for _, p := range providers {
