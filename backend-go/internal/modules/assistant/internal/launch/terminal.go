@@ -3,6 +3,7 @@ package claudelauncher
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"runtime"
@@ -43,6 +44,8 @@ func launchInteractiveTerminal(req interactiveTerminalRequest) error {
 		}
 		return launchVisibleWindow("powershell.exe", []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-File", req.WrapperPath}, req.WorkDir, req.OnExit)
 	}
+	req.Launch.terminalExitPath = req.WrapperPath + ".exit.json"
+	req.Launch.terminalExecutorPath = req.WrapperPath + ".executor.json"
 	script := buildTUIWrapperShellScript(req.WorkDir, req.PromptPath, req.ErrorLogPath, req.SettingsFile, req.Launch)
 	if err := workspace.AtomicWriteFile(req.WrapperPath, []byte(script), 0o755); err != nil {
 		return fmt.Errorf("write interactive wrapper: %w", err)
@@ -69,6 +72,8 @@ func writeAndLaunchResumeWrapper(runDirAbs, projectRoot, stderrPath string, req 
 	}
 
 	shCmd := buildResumeWrapperShellScript(projectRoot, stderrPath, req)
+	shCmd = strings.Replace(shCmd, "code=$?", "code=$?\n"+shellExitRecord(filepath.Join(runDirAbs, "wrapper.sh.exit.json")), 1)
+	shCmd = strings.Replace(shCmd, "set +e", "set +e\n"+shellExecutorRecord(filepath.Join(runDirAbs, "wrapper.sh.executor.json")), 1)
 	wrapperShPath := filepath.Join(runDirAbs, "wrapper.sh")
 	if err := os.WriteFile(wrapperShPath, []byte(shCmd), 0o755); err != nil {
 		return wrapperShPath, fmt.Errorf("write wrapper.sh: %w", err)

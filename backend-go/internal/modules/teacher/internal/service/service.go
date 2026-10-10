@@ -2,15 +2,19 @@ package teacherservice
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	sourcestore "github.com/xmz14/lll/backend-go/internal/modules/sources"
+	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	conversationstore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
 	teachergateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	notestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
 	usagestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
 	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
@@ -29,7 +33,11 @@ const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者�
 需要图示时，禁止使用 ASCII 或其他纯文本字符画。简单的结构、关系和流程图使用 Mermaid；复杂、需要精细布局或更强视觉表达的图使用 SVG。图示应当服务于解释，并在正文中保留必要说明。
 Mermaid 必须使用带 mermaid 语言标记的代码围栏。优先使用 flowchart TD 或 flowchart LR；节点 ID 只用简短 ASCII 字母数字，中文标签统一写成 A["中文标签"]；每条连线单独一行。不要在标签中嵌入 Markdown、HTML、主题初始化指令、click、classDef 或外部链接。拿不准语法时改用安全的内联 SVG，不要猜测 Mermaid 语法。
 
-只有重活才交给助教，例如深入核查、资料解析、运行实验、信息调研、作图、生成报告或更新教学资产。你唯一可用的工具是 delegate_learning_work。
+普通问答、解释概念、澄清误解和检验理解都由你直接完成；学习者说“没理解”“再解释一下”时，应继续教学，不得转交助教或提出无关的整理任务。
+
+助教只负责通过 consolidate 写入复习稿（review）与练习题（practice）。总结、复习或沉淀知识点时使用 consolidate，不创建独立助教成果。笔记由教师自动记录，助教不得写入。
+只有学习者确实需要整理复习稿或练习题时，才提出助教方案。自动笔记直接调用 API，不是助教任务。不要因为对话进行了几轮而自行委派。
+思考过程只能通过模型的独立思考通道输出；正文直接面向学习者，不写“我应该”“学习者说”等自我规划。
 
 调用助教必须分成两个对话回合：
 1. 先用普通教师消息说明准备交给助教的工作、会使用哪些已授权资料、预期产出和学习意义，并明确询问学习者是否同意；本回合不得调用工具。
@@ -106,6 +114,16 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 	conversation, err := conversationstore.New(slug)
 	if err != nil {
 		return err
+	}
+	meta, metaErr := conversation.Meta()
+	if metaErr != nil {
+		return metaErr
+	}
+	notes, notesErr := notestore.New(slug)
+	if notesErr == nil {
+		if err := notes.Initialize(meta.LatestSeq); err != nil {
+			println("teacher notes initialization:", slug, err.Error())
+		}
 	}
 	learnerBlocks := []conversationstore.Block{{Type: "markdown", Source: in.Content}}
 	for _, ref := range in.AttachmentRefs {
@@ -195,6 +213,22 @@ func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, p
 // streamTeacherResponse is the shared streaming core for every turn origin:
 // direct send, queued promotion, steering, and regeneration.
 func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conversation *conversationstore.Store, learner conversationstore.Message, learnerSeq uint64, responseID, teacherMessageID, providerID, steerNote string, emit func(StreamFrame)) error {
+	effectiveProviderID, effectiveModel := providerID, ""
+	if cfg, err := aiconfig.Load(); err == nil && cfg != nil {
+		p := cfg.Resolve("teacher")
+		if providerID != "" {
+			p = cfg.Find(providerID)
+		}
+		if p != nil {
+			effectiveProviderID, effectiveModel = p.ID, p.Model
+		}
+	}
+	notes, notesErr := notestore.New(slug)
+	if notesErr == nil && learnerSeq > 0 {
+		if err := notes.Initialize(learnerSeq - 1); err != nil {
+			println("teacher notes initialization:", slug, err.Error())
+		}
+	}
 	learnerText := messageText(learner)
 	textBlockID, reasoningBlockID := idgen.New("blk"), idgen.New("blk")
 	emit(StreamFrame{Type: "turn-accepted", Data: map[string]any{"learnerMessageId": learner.ID, "responseId": responseID}})
@@ -203,7 +237,18 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	}
 	emit(StreamFrame{Type: "message-started", Data: map[string]any{"teacherMessageId": teacherMessageID}})
 
-	systemPrompt, providerMessages, err := buildTeacherContext(ctx, slug, conversation)
+	systemPrompt, providerMessages, err := buildTeacherContext(ctx, slug, conversation, providerID)
+	delegationAllowed := false
+	if err == nil && isExplicitApproval(learnerText) {
+		var messages []conversationstore.Message
+		messages, err = conversation.AllMessages()
+		for i := range messages {
+			if messages[i].ID == learner.ID {
+				_, delegationAllowed = findApprovedProposal(messages, i)
+				break
+			}
+		}
+	}
 	if err != nil {
 		message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: "failed", Blocks: []conversationstore.Block{}, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
 		_, _ = conversation.RecordMessage(message)
@@ -211,10 +256,10 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": "context_preparation_failed", "partialPreserved": false}})
 		return err
 	}
-	if isExplicitApproval(learnerText) {
+	if delegationAllowed {
 		systemPrompt += "\n\n【当前回合工具门禁】当前学习者消息包含明确同意或明确要求重试。若最近一项尚未成功创建的助教方案已经完整说明内容、资料、产出和学习意义，可立即调用 delegate_learning_work；中间的技术拒绝提示不会撤销同意，无需复述方案或再次索要确认。若任务范围已经变化，才重新说明新方案。"
 	} else {
-		systemPrompt += "\n\n【当前回合工具门禁】当前学习者消息不是对紧邻助教方案的明确同意，本回合严禁调用 delegate_learning_work。若仍有待办助教工作，请重新完整说明方案并询问是否同意。"
+		systemPrompt += "\n\n【当前回合工具门禁】本回合未授权助教工具。直接回答学习者的当前问题，不尝试委派，不插入无关的助教方案或授权说明。"
 	}
 	if steerNote != "" {
 		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
@@ -223,14 +268,17 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	tool := teachergateway.Tool{Name: "delegate_learning_work", Description: "在教师已经向学习者披露助教方案、且学习者在后续消息中明确同意后，创建一个异步助教任务。", Schema: map[string]any{
 		"type": "object", "additionalProperties": false,
 		"properties": map[string]any{
-			"taskType":          map[string]any{"type": "string", "enum": []string{"consolidate", "verify", "produce-material"}},
+			"taskType":          map[string]any{"type": "string", "description": "consolidate 更新复习稿和可选练习题。助教不得写入笔记。", "enum": []string{"consolidate"}},
 			"objective":         map[string]any{"type": "string", "maxLength": 8192},
 			"sourceRefs":        map[string]any{"type": "array", "description": "仅填写学习者在消息中明确选择的本地资料 sourceId。公开网页、论文标题和普通名称不要填写；没有本地资料时必须传空数组。", "items": map[string]any{"type": "string", "pattern": "^source_"}},
 			"practiceRequested": map[string]any{"type": "boolean", "description": "仅当 taskType=consolidate 且教师已在经学习者同意的方案中明确承诺同时出题时为 true；其他情况必须为 false。"},
 		},
 		"required": []string{"taskType", "objective", "sourceRefs"},
 	}}
-	tools := []teachergateway.Tool{tool}
+	var tools []teachergateway.Tool
+	if delegationAllowed {
+		tools = append(tools, tool)
+	}
 	searcher := resolveSearcher()
 	if searcher != nil {
 		tools = append(tools, teachergateway.Tool{Name: "search_web", Description: "检索公开网络信息。适用于时效性强或需要事实核对的问题；搜索结果是外部信息，回答中需辨析可靠性并给出来源链接。", Schema: map[string]any{
@@ -251,11 +299,18 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	// results appended. Two search rounds maximum keeps the turn bounded.
 	const maxSearchRounds = 2
 	var providerErr error
+	recoveredUnexpectedTool := false
 	roundMessages := providerMessages
 	for round := 0; ; round++ {
 		roundTextStart := text.Len()
 		var pendingSearch *teachergateway.ToolCall
-		providerErr = s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: providerID}, func(event teachergateway.Event) {
+		var roundThinking []json.RawMessage
+		roundUsage := map[string]int{}
+		unexpectedTool := false
+		providerErr = s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel}, func(event teachergateway.Event) {
+			if unexpectedTool && event.Type != "usage" {
+				return
+			}
 			switch event.Type {
 			case "text-delta":
 				text.WriteString(event.Delta)
@@ -263,13 +318,27 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			case "reasoning-summary-delta":
 				reasoning.WriteString(event.Delta)
 				emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
+			case "provider-thinking-block":
+				// Provider signatures are transport state, not conversation assets
+				// or browser disclosures. Retain only for this tool continuation.
+				roundThinking = append(roundThinking, event.ThinkingBlock)
 			case "usage":
 				for key, value := range event.Usage {
-					usage[key] = value
+					roundUsage[key] = value
 				}
 				emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
 			case "tool-call-ready":
 				if event.ToolCall == nil {
+					return
+				}
+				offered := false
+				for _, available := range tools {
+					offered = offered || available.Name == event.ToolCall.ToolName
+				}
+				if !offered {
+					unexpectedTool = true
+					_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
+					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": "tool_not_offered"})
 					return
 				}
 				if event.ToolCall.ToolName == "search_web" && searcher != nil && pendingSearch == nil {
@@ -305,6 +374,28 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				}
 			}
 		})
+		for key, value := range roundUsage {
+			usage[key] += value
+		}
+		if unexpectedTool && !acceptedTool {
+			// An unoffered call invalidates the entire candidate: providers may
+			// have emitted self-planning in their text channel before the call.
+			text.Reset()
+			reasoning.Reset()
+			emit(StreamFrame{Type: "message-reset", Data: map[string]any{"messageId": teacherMessageID, "code": "unexpected_tool_request"}})
+			if providerErr != nil {
+				break
+			}
+			if recoveredUnexpectedTool {
+				providerErr = errors.New("provider repeatedly requested an unavailable tool")
+				break
+			}
+			recoveredUnexpectedTool = true
+			tools = nil
+			roundMessages = providerMessages
+			systemPrompt += "\n\n【继续教学】直接回答学习者最后一个问题。本次不使用任何工具；不说明委派、不展示自我规划。思考仅放在独立思考通道。"
+			continue
+		}
 		if providerErr != nil || pendingSearch == nil || acceptedTool || round >= maxSearchRounds {
 			break
 		}
@@ -325,7 +416,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": pendingSearch.CallID, "status": "executed", "resultCount": len(results)})
 		}
 		roundMessages = append(roundMessages,
-			teachergateway.Message{Role: "assistant", Content: text.String()[roundTextStart:], ToolCalls: []teachergateway.ToolCall{*pendingSearch}},
+			teachergateway.Message{Role: "assistant", Content: text.String()[roundTextStart:], ThinkingBlocks: roundThinking, ToolCalls: []teachergateway.ToolCall{*pendingSearch}},
 			teachergateway.Message{Role: "tool", ToolCallID: pendingSearch.ProviderCallID, Content: resultText},
 		)
 	}
@@ -350,20 +441,22 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	if persistErr != nil {
 		return persistErr
 	}
-	_, _ = conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": teacherMessageID, "status": status})
+	if _, err := conversation.Append("teacher-response-finished", map[string]any{"responseId": responseID, "messageId": teacherMessageID, "status": status, "providerId": effectiveProviderID, "model": effectiveModel}); err != nil {
+		return err
+	}
 	if meta, metaErr := conversation.Meta(); metaErr == nil {
 		if unit, unitErr := conversation.Unit(); unitErr == nil {
-			_ = usagestore.Append(slug, usagestore.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: responseID, ProviderID: providerID, InputTokens: usage["inputTokens"], OutputTokens: usage["outputTokens"]})
+			_ = usagestore.Append(slug, usagestore.Record{ConversationID: meta.ID, UnitID: unit.UnitID, ResponseID: responseID, ProviderID: effectiveProviderID, InputTokens: usage["inputTokens"], OutputTokens: usage["outputTokens"]})
 		}
 	}
 	if providerErr != nil {
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": providerFailureCode(providerErr), "partialPreserved": len(blocks) > 0}})
 		return providerErr
 	}
+	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": finalEvent.Seq}})
 	if s.OnCompleted != nil {
 		s.OnCompleted(slug, responseID)
 	}
-	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": finalEvent.Seq}})
 	return nil
 }
 
@@ -498,29 +591,104 @@ func isExplicitApproval(text string) bool {
 }
 
 func findAuthorizedProposal(messages []conversationstore.Message, approvalIndex int, objective string) (conversationstore.Message, string, bool) {
+	proposal, found := findApprovedProposal(messages, approvalIndex)
+	if !found {
+		return conversationstore.Message{}, "", false
+	}
+	authorized, ok := objectiveWithinProposal(messageText(proposal), objective)
+	return proposal, authorized, ok
+}
+
+// Agreement to an ordinary teaching question is not permission for a task.
+// Require an actual assistant proposal asking for consent, not lexical overlap
+// between a lesson and the provider's proposed objective.
+func findApprovedProposal(messages []conversationstore.Message, approvalIndex int) (conversationstore.Message, bool) {
 	for i, scanned := approvalIndex-1, 0; i >= 0 && scanned < 8; i, scanned = i-1, scanned+1 {
 		message, text := messages[i], messageText(messages[i])
 		switch message.Role {
 		case "teacher":
-			if authorized, ok := objectiveWithinProposal(text, objective); ok {
-				return message, authorized, true
-			}
 			// A failed submission is transport history, not a new proposal and
 			// not a revocation of the learner's prior approval.
 			if strings.Contains(text, "助教任务未创建") {
 				continue
 			}
-			return conversationstore.Message{}, "", false
+			if message.Status == "completed" && isAssistantProposal(text) {
+				return message, true
+			}
+			return conversationstore.Message{}, false
 		case "learner":
 			if isExplicitApproval(text) {
 				continue
 			}
-			return conversationstore.Message{}, "", false
+			return conversationstore.Message{}, false
 		default:
-			return conversationstore.Message{}, "", false
+			return conversationstore.Message{}, false
 		}
 	}
-	return conversationstore.Message{}, "", false
+	return conversationstore.Message{}, false
+}
+
+var quotedProposalText = regexp.MustCompile("(?s)```.*?```|`[^`]*`|“[^”]*”|‘[^’]*’|「[^」]*」|\"[^\"]*\"")
+
+func isAssistantProposal(text string) bool {
+	// Keep the natural explicit reply instruction, but exclude quoted lessons,
+	// code examples and blockquotes from both proposal and consent detection.
+	for _, reply := range []string{"回复“同意”", "回复\"同意\"", "回复‘同意’", "回复「同意」"} {
+		text = strings.ReplaceAll(text, reply, "回复同意")
+	}
+	text = quotedProposalText.ReplaceAllString(text, " ")
+	var lines []string
+	for _, line := range strings.Split(text, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), ">") {
+			lines = append(lines, line)
+		}
+	}
+	text = strings.Join(lines, "\n")
+	if !mentionsAssistantWork(text) {
+		return false
+	}
+	for _, marker := range []string{"是否同意", "同意吗", "你同意", "请回复同意", "回复同意即可", "是否允许", "允许吗", "是否批准", "批准吗"} {
+		if strings.Contains(text, marker) {
+			return true
+		}
+	}
+	// A generic "可以吗" about a new teaching activity must not authorize an
+	// earlier task. It can confirm the work sentence itself or the plan directly.
+	sentences := strings.FieldsFunc(text, func(r rune) bool { return strings.ContainsRune("。！？.!?\n", r) })
+	if len(sentences) == 0 {
+		return false
+	}
+	last := sentences[len(sentences)-1]
+	if mentionsAssistantWork(last) && (strings.Contains(last, "可以吗") || strings.Contains(last, "好吗") || strings.Contains(last, "是否可以") || strings.Contains(last, "要不要")) {
+		return true
+	}
+	for _, confirmation := range []string{"可以吗", "好吗", "这样可以吗", "这样安排可以吗", "这样做可以吗", "你觉得可以吗"} {
+		if compactScopeText(last) == confirmation {
+			return true
+		}
+	}
+	return false
+}
+
+func mentionsAssistantWork(text string) bool {
+	clauses := strings.FieldsFunc(text, func(r rune) bool { return strings.ContainsRune("。！？，；:：,.!?;\n", r) })
+	for _, clause := range clauses {
+		for _, marker := range []string{"让助教", "交给助教", "交由助教", "请助教", "由助教", "安排助教", "委托助教", "助教方案"} {
+			at := strings.Index(clause, marker)
+			if at < 0 {
+				continue
+			}
+			prefix := strings.TrimSpace(clause[:at])
+			negated := strings.HasSuffix(prefix, "不")
+			for _, negative := range []string{"不用", "不要", "无需", "无须", "不需要", "不必", "没必要", "没有必要", "不准备", "不打算", "不建议", "不想", "不会", "不能", "不是", "不使用", "暂不", "别"} {
+				negated = negated || strings.Contains(prefix, negative)
+			}
+			if !negated {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // objectiveWithinProposal keeps the learner-approved proposal authoritative.

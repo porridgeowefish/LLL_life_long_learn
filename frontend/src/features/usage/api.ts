@@ -33,3 +33,6 @@ export function useTeacherUsage(page = 1) {
     queryFn: () => http.get<TeacherUsagePage>(`/api/usage/teacher?page=${page}&pageSize=20`),
   });
 }
+
+export interface ProjectUsage { projectSlug: string; title: string; inputTokens: number; outputTokens: number; noteInputTokens: number; noteOutputTokens: number }
+export function useProjectUsage() {return useQuery({queryKey:['usage','projects'],queryFn:()=>http.get<{projects:ProjectUsage[]}>('/api/usage/projects')});}

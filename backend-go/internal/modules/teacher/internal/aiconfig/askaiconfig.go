@@ -14,6 +14,7 @@ type Provider struct {
 	Name                string `json:"name"`
 	BaseURL             string `json:"baseURL"`
 	APIKey              string `json:"apiKey"`
+	APIKeyEnv           string `json:"apiKeyEnv,omitempty"`
 	Model               string `json:"model"`
 	ContextWindowTokens int    `json:"contextWindowTokens,omitempty"`
 	Reasoning           bool   `json:"reasoning,omitempty"` // openai-compatible: disclosed summary only
@@ -47,6 +48,18 @@ func (c *Config) Enabled() bool {
 }
 
 // Find returns the provider with id, else the default, else the first, else nil.
+func (c *Config) FindExact(id string) *Provider {
+	if c == nil || id == "" {
+		return nil
+	}
+	for i := range c.Providers {
+		if c.Providers[i].ID == id {
+			return &c.Providers[i]
+		}
+	}
+	return nil
+}
+
 func (c *Config) Find(id string) *Provider {
 	if c == nil {
 		return nil
@@ -112,7 +125,7 @@ func Load() (*Config, error) {
 		cfg.Bindings[name] = Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
 	for _, provider := range settings.Providers {
-		cfg.Providers = append(cfg.Providers, Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.ResolveAPIKey(), Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
+		cfg.Providers = append(cfg.Providers, Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.ResolveAPIKey(), APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
 	cfg.Default = strings.TrimSpace(cfg.Default)
 	cfg.SearchEngine = strings.TrimSpace(cfg.SearchEngine)
@@ -131,12 +144,24 @@ func Load() (*Config, error) {
 // Save writes the askAiProviders section back to config.local.json, preserving
 // all other top-level keys via a raw-JSON round-trip. Atomic write.
 func Save(cfg Config) error {
+	old, _, err := platformconfig.LoadAI()
+	if err != nil {
+		return err
+	}
+	oldByID := map[string]platformconfig.Provider{}
+	for _, p := range old.Providers {
+		oldByID[p.ID] = p
+	}
 	settings := platformconfig.AISettings{Default: cfg.Default, SearchEngine: cfg.SearchEngine, Bindings: make(map[string]platformconfig.Binding, len(cfg.Bindings))}
 	for name, binding := range cfg.Bindings {
 		settings.Bindings[name] = platformconfig.Binding{ProviderID: binding.ProviderID, Model: binding.Model}
 	}
 	for _, provider := range cfg.Providers {
-		settings.Providers = append(settings.Providers, platformconfig.Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
+		previous, ok := oldByID[provider.ID]
+		if ok && provider.APIKey == previous.ResolveAPIKey() && previous.APIKeyEnv != "" && provider.APIKeyEnv == previous.APIKeyEnv {
+			provider.APIKey = previous.APIKey
+		}
+		settings.Providers = append(settings.Providers, platformconfig.Provider{ID: provider.ID, Kind: provider.Kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv, Model: provider.Model, ContextWindowTokens: provider.ContextWindowTokens, Reasoning: provider.Reasoning, Thinking: provider.Thinking})
 	}
 	return platformconfig.SaveAI(settings)
 }

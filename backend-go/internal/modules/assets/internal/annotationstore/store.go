@@ -1,5 +1,5 @@
 // Package annotationstore owns append-only annotations and Ask-AI threads for
-// the canonical body asset. The JSONL event log is authoritative; projections
+// the canonical review asset. The JSONL event log is authoritative; projections
 // are rebuilt on every store open and can be discarded safely.
 package annotationstore
 
@@ -64,6 +64,7 @@ type Annotation struct {
 	Note             string    `json:"note,omitempty"`
 	Status           State     `json:"status"`
 	Detached         bool      `json:"detached,omitempty"`
+	LegacySource     bool      `json:"legacySource,omitempty"`
 	LegacyExternalID string    `json:"legacyExternalId,omitempty"`
 	SourceArtifactID string    `json:"sourceArtifactId,omitempty"`
 	CreatedAt        time.Time `json:"createdAt"`
@@ -141,7 +142,7 @@ func New(slug string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	path := filepath.Join(root, "assets", "body", "annotations.jsonl")
+	path := filepath.Join(root, "assets", "review", "annotations.jsonl")
 	v, _ := locks.LoadOrStore(path, &sync.Mutex{})
 	s := &Store{slug: slug, root: root, path: path, mu: v.(*sync.Mutex)}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -207,7 +208,7 @@ func (s *Store) Create(in CreateInput) (Annotation, error) {
 	if err != nil {
 		return Annotation{}, err
 	}
-	body, err := assets.Get("body")
+	body, err := assets.Get("review")
 	if err != nil {
 		return Annotation{}, err
 	}

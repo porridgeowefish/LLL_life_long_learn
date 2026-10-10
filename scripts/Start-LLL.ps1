@@ -1,4 +1,4 @@
-param(
+﻿param(
   [int]$Port = 8787,
   [string]$WorkspaceRoot = '',
   [switch]$NoBrowser,
@@ -11,7 +11,7 @@ function Show-LauncherError {
   param([string]$Message)
   try {
     Add-Type -AssemblyName PresentationFramework -ErrorAction Stop
-    [System.Windows.MessageBox]::Show($Message, 'LifeLongLearn launcher', 'OK', 'Error') | Out-Null
+    [System.Windows.MessageBox]::Show($Message, 'Learn-With-AI launcher', 'OK', 'Error') | Out-Null
   } catch {
     Write-Error $Message
   }
@@ -46,7 +46,7 @@ function Get-ProcessPath {
 function Test-Health {
   param([int]$Port)
   try {
-    $res = Invoke-WebRequest -UseBasicParsing -Uri "http://localhost:$Port/api/health" -TimeoutSec 2
+    $res = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$Port/api/health" -TimeoutSec 2
     return $res.StatusCode -eq 200
   } catch {
     return $false
@@ -146,7 +146,7 @@ function Stop-ExistingRootServer {
   }
 
   try {
-    Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://localhost:$Port/api/system/shutdown" -TimeoutSec 2 | Out-Null
+    Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:$Port/api/system/shutdown" -TimeoutSec 2 | Out-Null
   } catch {
     # Older or wedged builds may not answer shutdown; fall through to force stop.
   }
@@ -173,7 +173,7 @@ try {
   } else {
     $workspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
   }
-  $exePath = Join-Path $repoRoot 'dist\lll.exe'
+  $exePath = Join-Path $repoRoot 'dist\learn-with-ai.exe'
   $tmpDir = Join-Path $workspaceRoot 'tmp\desktop-launcher'
   $pidFile = Join-Path $tmpDir 'lll.pid'
   $outLog = Join-Path $tmpDir 'lll.out.log'
@@ -189,7 +189,7 @@ try {
     $ownerPath = Get-ProcessPath -ProcessId $ownerPid
     $isCurrentBuild = $ownerPath -and ([string]::Compare($ownerPath, $exePath, $true) -eq 0)
     if ((-not $buildNeeded) -and $isCurrentBuild -and (Test-Health -Port $Port)) {
-      if (-not $NoBrowser) { Start-Process "http://localhost:$Port/" | Out-Null }
+      if (-not $NoBrowser) { Start-Process "http://127.0.0.1:$Port/" | Out-Null }
       exit 0
     }
     Stop-ExistingRootServer -ProcessId $ownerPid -ExePath $exePath -Port $Port
@@ -207,7 +207,7 @@ try {
   try {
     $env:WORKSPACE = $workspaceRoot
     $proc = Start-Process -FilePath $exePath `
-      -ArgumentList @('--port', "$Port", '--workspace', $workspaceRoot) `
+      -ArgumentList @('--no-browser', '--port', "$Port", '--workspace', $workspaceRoot) `
       -WorkingDirectory $repoRoot `
       -WindowStyle Hidden `
       -RedirectStandardOutput $outLog `
@@ -229,11 +229,11 @@ try {
   }
 
   if (-not $ready) {
-    throw "LLL did not become ready on http://localhost:$Port. Check $errLog and $outLog."
+    throw "learn-with-ai did not become ready on http://127.0.0.1:$Port. Check $errLog and $outLog."
   }
 
   if (-not $NoBrowser) {
-    Start-Process "http://localhost:$Port/" | Out-Null
+    Start-Process "http://127.0.0.1:$Port/" | Out-Null
   }
   exit 0
 } catch {

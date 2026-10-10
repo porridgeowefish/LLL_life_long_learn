@@ -3,10 +3,12 @@ package agentruntime
 
 import (
 	"context"
+	command "github.com/xmz14/lll/backend-go/internal/platform/command"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
@@ -17,6 +19,7 @@ type ID string
 const (
 	RuntimeClaude    ID = "claude"
 	RuntimeCodeBuddy ID = "codebuddy"
+	RuntimeWorkBuddy ID = "workbuddy"
 	RuntimeHermes    ID = "hermes"
 	RuntimeCodex     ID = "codex"
 	RuntimeTrae      ID = "trae"
@@ -44,6 +47,7 @@ type Runtime struct {
 	Definition
 	Bin       string `json:"bin"`
 	Available bool   `json:"available"`
+	Reason    string `json:"reason,omitempty"`
 	Mode      string `json:"mode,omitempty"` // native | wsl
 }
 
@@ -64,6 +68,7 @@ func Definitions() []Definition {
 			Description: "Tencent CodeBuddy 本地 Agent 入口；LLL 以可见终端和剪贴板 prompt 方式接入。",
 			ProbeArgs:   []string{"--version"}, PromptDelivery: PromptClipboard, SupportsHeadless: false,
 		},
+		{ID: RuntimeWorkBuddy, Name: "WorkBuddy CLI", DefaultBin: "wb", BinEnv: "WORKBUDDY_BIN", Description: "WorkBuddy 交互 CLI；以可见终端和剪贴板 prompt 接入。", ProbeArgs: []string{"--version"}, PromptDelivery: PromptClipboard, SupportsHeadless: false},
 		{
 			ID: RuntimeHermes, Name: "Hermes CLI", DefaultBin: "hermes", BinEnv: "HERMES_BIN",
 			Description: "Hermes Agent 终端界面；交互模式使用剪贴板预装 prompt，后台任务使用 hermes -z。",
@@ -103,9 +108,6 @@ func Load() (Config, error) {
 	if cfg.Bins == nil {
 		cfg.Bins = map[string]string{}
 	}
-	if cfg.Bins[string(RuntimeCodeBuddy)] == "" && cfg.Bins["workbuddy"] != "" {
-		cfg.Bins[string(RuntimeCodeBuddy)] = cfg.Bins["workbuddy"]
-	}
 	return cfg, nil
 }
 
@@ -125,43 +127,86 @@ func Resolve(cfg Config) Runtime {
 	if !ok {
 		def, _ = DefinitionByID(RuntimeClaude)
 	}
-	bin, mode, available := resolveCommand(def, cfg.Bins)
-	return Runtime{Definition: def, Bin: bin, Available: available, Mode: mode}
+	bin, mode, available, reason := resolveCommand(def, cfg.Bins)
+	return Runtime{Definition: def, Bin: bin, Available: available, Mode: mode, Reason: reason}
 }
 
 func List(cfg Config) []Runtime {
 	defs := Definitions()
-	out := make([]Runtime, 0, len(defs))
-	for _, def := range defs {
-		bin, mode, available := resolveCommand(def, cfg.Bins)
-		out = append(out, Runtime{Definition: def, Bin: bin, Available: available, Mode: mode})
+	out := make([]Runtime, len(defs))
+	var wg sync.WaitGroup
+	for i, def := range defs {
+		wg.Add(1)
+		go func(i int, def Definition) {
+			defer wg.Done()
+			bin, mode, available, reason := resolveCommand(def, cfg.Bins)
+			out[i] = Runtime{Definition: def, Bin: bin, Available: available, Mode: mode, Reason: reason}
+		}(i, def)
 	}
+	wg.Wait()
 	return out
 }
 
 func Probe(bin string, args []string, timeout time.Duration) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd := command.Context(ctx, bin, args...)
 	out, err := cmd.CombinedOutput()
 	return err == nil && strings.TrimSpace(string(out)) != ""
 }
 
-func resolveCommand(def Definition, bins map[string]string) (bin, mode string, available bool) {
+func resolveCommand(def Definition, bins map[string]string) (bin, mode string, available bool, reason string) {
 	bin = strings.TrimSpace(bins[string(def.ID)])
-	if env := strings.TrimSpace(os.Getenv(def.BinEnv)); env != "" {
-		bin = env
+	if value := strings.TrimSpace(os.Getenv(def.BinEnv)); value != "" {
+		bin = value
 	}
-	if bin == "" {
-		bin = def.DefaultBin
+	if bin != "" {
+		available, reason = probeIdentity(def, bin)
+		return bin, "native", available, reason
 	}
-	if Probe(bin, def.ProbeArgs, 3*time.Second) {
-		return bin, "native", true
+	reason = "not_found"
+	for _, candidate := range candidates(def) {
+		ok, why := probeIdentity(def, candidate)
+		if ok {
+			return candidate, "native", true, ""
+		}
+		if why != "not_found" {
+			reason = why
+		}
 	}
 	if runtime.GOOS == "windows" && canProbeWSL(def) && probeWSL(def.DefaultBin, def.ProbeArgs, 3*time.Second) {
-		return def.DefaultBin, "wsl", true
+		return def.DefaultBin, "wsl", true, ""
 	}
-	return bin, "native", false
+	return def.DefaultBin, "native", false, reason
+}
+func probeIdentity(def Definition, bin string) (bool, string) {
+	if _, err := exec.LookPath(bin); err != nil {
+		return false, "not_found"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	data, err := command.Context(ctx, bin, def.ProbeArgs...).CombinedOutput()
+	if err != nil || strings.TrimSpace(string(data)) == "" {
+		return false, "probe_failed"
+	}
+	if def.ID != RuntimeCodeBuddy && def.ID != RuntimeWorkBuddy {
+		return true, ""
+	}
+	matches := func(data []byte) bool {
+		text := strings.ToLower(string(data))
+		if def.ID == RuntimeCodeBuddy {
+			return strings.Contains(text, "codebuddy")
+		}
+		return strings.Contains(text, "workbuddy") || strings.Contains(text, "work buddy")
+	}
+	if matches(data) {
+		return true, ""
+	}
+	data, err = command.Context(ctx, bin, "--help").CombinedOutput()
+	if err == nil && matches(data) {
+		return true, ""
+	}
+	return false, "identity_mismatch"
 }
 
 func canProbeWSL(def Definition) bool {
@@ -180,7 +225,7 @@ func probeWSL(bin string, args []string, timeout time.Duration) bool {
 		}
 		parts = append(parts, strings.Join(quoted, " "))
 	}
-	cmd := exec.CommandContext(ctx, "wsl.exe", "-e", "sh", "-lc", strings.Join(parts, " && "))
+	cmd := command.Context(ctx, "wsl.exe", "-e", "sh", "-lc", strings.Join(parts, " && "))
 	out, err := cmd.CombinedOutput()
 	return err == nil && strings.TrimSpace(string(out)) != ""
 }
@@ -189,9 +234,4 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
-func normalizeID(id ID) ID {
-	if id == "workbuddy" {
-		return RuntimeCodeBuddy
-	}
-	return id
-}
+func normalizeID(id ID) ID { return id }

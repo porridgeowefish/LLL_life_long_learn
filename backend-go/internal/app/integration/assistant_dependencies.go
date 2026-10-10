@@ -78,16 +78,7 @@ func AssistantDependencies(onPublished func(assistant.Task)) assistant.Dependenc
 			}
 			return assistant.SourceSnapshot{RevisionID: revision.RevisionID, SHA256: revision.Original.SHA256}, nil
 		},
-		CommitSourceDerived: func(slug, sourceID, revisionID, taskID string, files map[string][]byte, media map[string]string) (any, error) {
-			store, err := sources.New(slug)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := store.CommitDerived(sourceID, revisionID, files, media); err != nil {
-				return nil, err
-			}
-			return store.SetStatus(sourceID, "ready", "", taskID)
-		},
+
 		OnPublished: onPublished,
 	}
 }

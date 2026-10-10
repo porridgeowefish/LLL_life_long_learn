@@ -2,6 +2,7 @@ package teachergateway
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -259,7 +260,7 @@ func TestOpenAIRoundTripToolMessages(t *testing.T) {
 	}
 }
 
-func TestAnthropicRoundTripToolMessagesAndThinkingSuppressed(t *testing.T) {
+func TestAnthropicToolHistoryWithoutReplayableThinkingStaysCompatible(t *testing.T) {
 	var bodies []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, _ := io.ReadAll(r.Body)
@@ -283,13 +284,87 @@ func TestAnthropicRoundTripToolMessagesAndThinkingSuppressed(t *testing.T) {
 	}
 	body := bodies[0]
 	if strings.Contains(body, `"thinking"`) {
-		t.Fatalf("thinking must be suppressed when tools are registered: %s", body)
+		t.Fatalf("unsigned historical tool messages must not enable thinking: %s", body)
 	}
 	if !strings.Contains(body, `"type":"tool_use"`) || !strings.Contains(body, `"id":"toolu_provider_1"`) || !strings.Contains(body, `"name":"search_web"`) {
 		t.Fatalf("assistant tool_use block wrong: %s", body)
 	}
 	if !strings.Contains(body, `"type":"tool_result"`) || !strings.Contains(body, `"tool_use_id":"toolu_provider_1"`) {
 		t.Fatalf("tool_result block wrong: %s", body)
+	}
+}
+
+func TestAnthropicToolAvailabilityDoesNotDisableThinking(t *testing.T) {
+	var body map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		fmt.Fprint(w, "data: {\"type\":\"message_stop\"}\n\n")
+	}))
+	defer server.Close()
+	p := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "glm-test", Thinking: true}
+	err := streamAnthropic(context.Background(), p, Request{Messages: []Message{{Role: "user", Content: "解释并发"}}, Tools: []Tool{{Name: "search_web"}}}, func(Event) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body["thinking"] == nil {
+		t.Fatal("registered tools silently disabled the configured thinking channel")
+	}
+}
+
+func TestAnthropicReplaysSignedAndRedactedThinkingAcrossToolRoundTrip(t *testing.T) {
+	var bodies []map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		bodies = append(bodies, body)
+		w.Header().Set("Content-Type", "text/event-stream")
+		for _, payload := range []string{
+			`{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":"先"}}`,
+			`{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"查证"}}`,
+			`{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"opaque-"}}`,
+			`{"type":"content_block_delta","index":0,"delta":{"type":"signature_delta","signature":"signature"}}`,
+			`{"type":"content_block_stop","index":0}`,
+			`{"type":"content_block_start","index":1,"content_block":{"type":"redacted_thinking","data":"opaque-redacted"}}`,
+			`{"type":"content_block_stop","index":1}`,
+			`{"type":"message_stop"}`,
+		} {
+			fmt.Fprintf(w, "data: %s\n\n", payload)
+		}
+	}))
+	defer server.Close()
+	p := askaiconfig.Provider{Kind: "anthropic", BaseURL: server.URL, APIKey: "key", Model: "model", Thinking: true, Reasoning: false}
+	var thinking []json.RawMessage
+	if err := streamAnthropic(context.Background(), p, Request{Tools: []Tool{{Name: "search_web"}}}, func(event Event) {
+		if event.Type == "provider-thinking-block" {
+			thinking = append(thinking, event.ThinkingBlock)
+		}
+		if event.Type == "text-delta" || event.Type == "reasoning-summary-delta" {
+			t.Fatal("hidden thinking was disclosed")
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(thinking) != 2 {
+		t.Fatalf("signed/opaque thinking lost: %v", thinking)
+	}
+	request := Request{Tools: []Tool{{Name: "search_web"}}, Messages: []Message{
+		{Role: "user", Content: "问题"},
+		{Role: "assistant", Content: "检索中", ThinkingBlocks: thinking, ToolCalls: []ToolCall{{ProviderCallID: "toolu_1", ToolName: "search_web", Arguments: map[string]any{"query": "x"}}}},
+		{Role: "tool", ToolCallID: "toolu_1", Content: "检索结果"},
+	}}
+	if err := streamAnthropic(context.Background(), p, request, func(Event) {}); err != nil {
+		t.Fatal(err)
+	}
+	body := bodies[1]
+	if body["thinking"] == nil {
+		t.Fatal("tool continuation disabled thinking")
+	}
+	content := body["messages"].([]any)[1].(map[string]any)["content"].([]any)
+	first := content[0].(map[string]any)
+	second := content[1].(map[string]any)
+	if first["type"] != "thinking" || first["thinking"] != "先查证" || first["signature"] != "opaque-signature" || second["type"] != "redacted_thinking" || second["data"] != "opaque-redacted" {
+		t.Fatalf("thinking replay corrupted: %v", content)
 	}
 }
 

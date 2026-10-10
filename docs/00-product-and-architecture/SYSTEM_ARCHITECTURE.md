@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-14
+Last reviewed: 2026-10-10
 Source of truth: current long-lived runtime boundaries; code owns implementation details.
 
 ## Current Runtime
@@ -13,7 +13,7 @@ LLL is a local-first web application:
 frontend/          React 18 + TypeScript SPA
 backend-go/        Go HTTP/SSE server and application services
 projects/          canonical learning-unit, conversation, asset, source, and task files
-agents/            native CLI charters and reusable reasoning primitives
+learning-agents/   native CLI charters and reusable reasoning primitives (renamed from agents/, ADR-0019)
 preferences.md     learner-owned global preferences, read-only to AI
 ```
 
@@ -33,8 +33,12 @@ cmd/lll
 -> app/bootstrap                         one composition root
 -> transport/httpserver                 thin HTTP and SSE adapters
 -> modules/{teacher,assistant,assets,sources,projects,learning,preferences}
--> platform/{config,filesystem,process,events,identity}
+-> platform/{config,filesystem}          technical mechanics only
 -> compatibility                        legacy reads and migration only
+
+root-level technical helpers: httpx (JSON + SSE broadcaster), idgen (IDs),
+imageconfig, uiconfig. SSE broadcasting and ID generation live here, not in
+platform.
 ```
 
 Business capabilities are the primary code boundary. Complex modules may use
@@ -81,8 +85,8 @@ order or create a learning unit without confirmation.
 ```text
 one project = one learning unit = one durable teacher conversation
 -> 教师: fast provider-neutral streaming dialogue
--> 资产: versioned intro / body / practice plus generated deliverables
--> 资料: immutable uploaded revisions and assistant-derived files
+-> 资产: versioned review / practice and independent teacher notes
+-> 资料: immutable uploaded revisions and locally parsed text
 -> 助教: disclosed, learner-authorized heavy work in a visible native CLI
 ```
 
@@ -102,10 +106,20 @@ learner sends a turn
 -> refresh reconnects to durable run state and recovers the final response
 ```
 
-The teacher owns teaching only. It has one narrow tool,
-`delegate_learning_work`. Before a task can be created, the teacher explains
-the proposed command, inputs, output, and learning value; a later learner turn
-must explicitly authorize that proposal.
+The teacher owns teaching only. It has two bounded tools:
+`delegate_learning_work` (registered only after an actual assistant proposal
+and a later explicit learner approval; agreement to an ordinary teaching
+question does not qualify) and `search_web`
+(registered only when the optional webSearch configuration resolves a key; at
+most two search rounds per response — ADR-0019).
+
+Offering tools does not disable configured thinking. Signed/opaque Anthropic
+thinking blocks remain in memory for the current tool round-trip and are never
+persisted or exposed as answer text. An unoffered tool invalidates its entire
+candidate: clear browser text/reasoning with `message-reset`, then retry the
+original question once without tools. Repeated violations fail with no answer
+blocks, no assistant task, and no successful note turn. Usage includes every
+provider request, including recovery.
 
 Rich output uses a two-rate rendering boundary: provider deltas are coalesced,
 Markdown/KaTeX/sanitization renders from a slower snapshot, collapsed reasoning
@@ -121,7 +135,7 @@ authorized teacher tool call
 -> dispatcher captures conversation/assets/sources/preferences into an attempt workspace
 -> shared execution service opens the selected native CLI in the project folder and injects one prompt
 -> CLI accepts its own outputs and writes result-manifest.json plus output directories
--> Go versions/merges declared core candidates and atomically publishes every declared generated directory
+-> Go versions/merges declared review/practice candidates; sources locally parses derived content.md independently
 -> a publication I/O failure is terminal; the CLI is not rerun or server-side revalidated (ADR-0021)
 -> task state and global invalidation events update the conversation UI
 -> a succeeded task that actually publishes an asset appends one idempotent learning-activity event
@@ -139,11 +153,14 @@ Canonical records live below the project root:
 ```text
 unit.json
 conversation/{conversation.json,events.jsonl,compact.json}
-assets/{intro,body,practice,generated}
+assets/{review,practice,notes}
 sources/<source-id>/revisions/<revision-id>/{original,derived}
 conversation/usage.jsonl
 assistant-tasks/<task-id>/{task.json,input-manifest.json,attempts}
-migrations/iteration-13/{migration.json,journal.jsonl,backup}
+progress/                                activity events and aggregated summary
+migrations/iteration-18.json
+conversation/note-usage.jsonl
+assets/notes/{state.json,jobs,entries}
 ```
 
 REST reconstructs durable state after refresh; SSE only reduces latency. Formal
@@ -168,12 +185,11 @@ saves remain valid because they update both copies together.
 
 ## Compatibility Boundary
 
-Legacy Intro / Explain / Practice routes, files, and readers remain only for
-old-project migration, rollback, and Ask-AI/asset compatibility. Extend,
-Summary, and Knowledge Garden are retired: historical directories survive on
-disk but have no routes, registered agents, readers, or navigation. These legacy
-paths are not the active system-learning navigation
-or the source for new assistant output contracts.
+Legacy teaching files are one-time cutover input. The active reader uses only
+review/practice/notes; retired intro/body/generated asset endpoints return 404.
+Generic invoke/session infrastructure remains for discipline maps and explicit
+registered Agents. Historical Summary/Extend/Knowledge Garden and project memory
+files remain ignored. Old teaching files never provide runtime fallback.
 
 ## Architectural Rules
 
@@ -185,5 +201,32 @@ visible native CLI through one reusable execution service
 raw execution separated from curated/versioned assets
 REST recovery; SSE as notification/stream transport
 learner-owned preferences; no AI-managed memory
-legacy readers are compatibility, never fallback product direction
+legacy teaching files are migration input, never runtime fallback
 ```
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+已新增独立教师笔记后台服务，按持久回合批次直接调用 API，经共享 SSE 刷新资产；不走原生 CLI。发布模式从可执行文件目录解析随包资源，使用 OS 用户数据工作区，绑定 loopback；三平台补齐实际可见终端启动。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+Before mutable bootstrap, the executable holds a workspace OS file lock and reserves
+the loopback listener. This prevents a second port or process from recovering live
+jobs. Notes startup replays successes after its persisted epoch; historical turns
+are seeded as seen. Explicit missing provider IDs fail instead of falling back.
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+sources 本地串行解析 worker 在 app/bootstrap 启动，HTTP 只持久上传/状态并通知 worker，恢复 stored/processing。文件 50MiB、派生文本 4MiB、解压/解析/模型摘录各自限量。teacher 在每次请求开头快照 ready 资料，后续工具续答共享快照，新导入下次请求生效。纯 Go 解析编入程序；Windows Setup、macOS APP/PKG 和 Linux DEB/安装脚本重用完整资源包，用户数据与安装目录分离。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

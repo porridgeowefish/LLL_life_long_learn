@@ -19,10 +19,7 @@ import (
 const SchemaVersion = 1
 
 var validTypes = map[string]bool{
-	"consolidate":       true,
-	"verify":            true,
-	"produce-material":  true,
-	"source-processing": true,
+	"consolidate": true,
 }
 
 var terminalStatuses = map[string]bool{"succeeded": true, "partial": true, "failed": true, "cancelled": true}
@@ -45,7 +42,6 @@ type Failure struct {
 
 type Result struct {
 	Summary      string            `json:"summary"`
-	Deliverables []string          `json:"deliverables,omitempty"`
 	AssetUpdates map[string]string `json:"assetUpdates,omitempty"`
 }
 

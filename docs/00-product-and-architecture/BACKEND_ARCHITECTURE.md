@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-14
+Last reviewed: 2026-10-10
 Source of truth: current Go backend boundaries and write ownership; package code owns implementation details.
 
 ## Intent
@@ -37,8 +37,9 @@ internal/
     projects
     learning
     preferences
-  platform/{config,filesystem,process,events,identity}
+  platform/{config,filesystem}
   compatibility
+  httpx, idgen, imageconfig, uiconfig   root-level technical helpers
 ```
 
 Each module root is its public facade. Private domain, application, port, and
@@ -87,10 +88,22 @@ provider SDK stream. A refresh may disconnect the browser but does not cancel
 the server-side run. REST and durable conversation/run records repair missed
 stream events.
 
-The teacher owns one tool: `delegate_learning_work`. Tool calls are accepted
+The teacher owns two bounded tools: `delegate_learning_work` and, when the
+optional webSearch configuration resolves a key, `search_web` (at most two
+rounds per response — ADR-0019). Delegation tool calls are accepted
 only when they refer to the disclosed proposal message and a later explicit
 learner authorization. A normal agreement word is not enough if the proposal
 identity or complete task definition is missing.
+
+The delegation tool itself is omitted from unapproved ordinary turns. The
+pre-request gate and task creation share the adjacent assistant-proposal
+resolver, including bounded retries after technical rejection. An unoffered
+tool discards the candidate and triggers at most one tool-free recovery; it
+cannot create a task or contaminate notes. Anthropic signed/opaque thinking is
+replayed in memory across live search rounds, so registering a tool no longer
+silently disables thinking. Externally supplied tool history without replayable
+blocks keeps its non-thinking transport shape. Provider-reported usage is
+summed per request, not overwritten by the last search/recovery round.
 
 ## Assistant Task Flow
 
@@ -102,7 +115,7 @@ authorized tool call
 -> exact conversation range, asset bases, source revisions, scope, and preferences are copied into attempt inputs
 -> agentexecution.Service opens the selected visible CLI in the learning-unit folder
 -> CLI accepts its outputs and writes result-manifest.json plus output directories
--> Go versions/merges declared formal assets and atomically publishes generic generated directories
+-> Go versions/merges declared review/practice candidates; no arbitrary deliverable publication
 -> a publication I/O failure is terminal; there is no validator or automatic retry (ADR-0021)
 -> durable task state changes and global SSE invalidates affected resources
 -> successful publication with actual output reports through the bootstrap activity seam
@@ -137,10 +150,11 @@ workspace before promotion.
 projects/<slug>/
   unit.json
   conversation/{conversation.json,events.jsonl,compact.json}
-  assets/{intro,body,practice,generated}
+  assets/{review,practice,notes}
   sources/<source-id>/revisions/<revision-id>/{original,derived}
   assistant-tasks/<task-id>/{task.json,input-manifest.json,attempts}
   runs/
+  progress/
   migrations/iteration-13/{migration.json,journal.jsonl,backup}
 
 <WORKSPACE>/preferences.md
@@ -204,13 +218,12 @@ a one-click retry contract.
 
 ## Compatibility Boundary
 
-Legacy Intro/Explain/Practice zone/session routes and stores remain for old
-projects, migration, rollback, and existing Ask-AI/practice readers. Summary,
-Extend, and Knowledge Garden have no backend routes, stores, or generic file
-access; their historical directories are deliberately ignored by runtime
-services. New teacher, assistant, asset, source, and preference behavior must
-use the application services above and must not be added to legacy route-local
-orchestration.
+Legacy teaching formats are read only during cutover to review/practice. The active
+teaching reader has no compatibility renderer, old asset aliases or arbitrary
+publication. Generic invoke/session routes remain infrastructure for registered
+Agents; they are not the teacher workspace. Summary, Extend and Knowledge Garden
+historical files remain outside runtime services. New behavior belongs to module
+facades and the single composition root.
 
 ## Non-Goals
 
@@ -222,3 +235,30 @@ database-first canonical persistence
 hidden assistant execution
 AI-managed preference or memory writes
 ```
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+仍维持现有模块化单体边界：teacher 拥有笔记任务与调用，assets 拥有 review/practice，app/integration 组装跨模块 ports。独立 generated 发布流程退役；sources 本地解析独立拥有资料输出边界。平台层负责资源根、用户数据根及终端适配，不在业务模块猜 cwd 或 go.mod。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+platform/filesystem owns release resource/user-data discovery and the workspace
+OS lock. main reserves its listener before bootstrap; teacher owns note recovery,
+strict provider selection, two-worker scheduling and per-project serialization.
+platform/config writes sensitive configuration as 0600 on Unix.
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+sources/internal/parser 拥有原生解析，sources/internal/processing 拥有恢复、串行调度和失败状态；store 在同一删除锁内校验 active revision 并发布本地派生文本。teacher/internal/service/source_context.go 拥有一次请求资料快照与相关片段预算；模型选择决定窗口，资料优先于历史重复正文。assistant 删除 sourceUpdate/CommitSourceDerived，旧 source-processing 不调度/不恢复发布。Go 构建要求 1.26，解析运行无需外部依赖。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

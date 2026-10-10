@@ -1,4 +1,4 @@
-# LLL Frontend
+# learn-with-ai Frontend
 
 Vite + React 18 + TypeScript single-page app for the LifeLongLearn workbench.
 

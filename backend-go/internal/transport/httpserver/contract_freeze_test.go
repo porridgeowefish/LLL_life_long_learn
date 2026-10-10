@@ -19,6 +19,7 @@ import (
 	"testing"
 	"time"
 
+	assets "github.com/xmz14/lll/backend-go/internal/modules/assets"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
@@ -95,9 +96,12 @@ func assertTreeUnchanged(t *testing.T, root string, before map[string]int64) {
 func canonicalFixtureServer(t *testing.T) (*Server, string) {
 	t.Helper()
 	root := copyFixture(t, filepath.Join("canonical"))
+	workspace.SetProjectsRootForTest(root)
+	if _, err := assets.MigrateReview("lingo-duihua"); err != nil {
+		t.Fatal(err)
+	}
 	before := snapshotTree(t, root)
 	t.Cleanup(func() { assertTreeUnchanged(t, root, before) })
-	workspace.SetProjectsRootForTest(root)
 	t.Cleanup(func() { workspace.SetProjectsRootForTest("") })
 	s := newTestServer(t)
 	s.teacher = teacher.New(textTeacherGateway{})
@@ -108,6 +112,11 @@ func canonicalFixtureServer(t *testing.T) (*Server, string) {
 // public contract change and must stop the affected wave (see iteration-14
 // INTERFACE_CONTRACT.md).
 var frozenRoutes = map[string]string{
+	"GET /api/usage/projects":                                                          "",
+	"GET /api/settings/teacher":                                                        "",
+	"PUT /api/settings/teacher":                                                        "",
+	"GET /api/projects/{id}/notes":                                                     "",
+	"POST /api/projects/{id}/notes/jobs/{jobId}/retry":                                 "",
 	"GET /api/health":                                                                  "",
 	"POST /api/system/shutdown":                                                        "",
 	"GET /api/settings/agent-runtime":                                                  "",
@@ -158,10 +167,6 @@ var frozenRoutes = map[string]string{
 	"POST /api/projects/{id}/sources/{sourceId}/permanent-delete":                      "",
 	"GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content":         "",
 	"GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}": "",
-	"GET /api/projects/{id}/generated":                                                 "",
-	"GET /api/projects/{id}/generated/{artifactId}":                                    "",
-	"GET /api/projects/{id}/generated/{artifactId}/open":                               "",
-	"GET /api/projects/{id}/generated/{artifactId}/files/{path...}":                    "",
 	"GET /api/preferences":                                                             "",
 	"PUT /api/preferences":                                                             "",
 	"GET /api/agents":                                                                  "",
@@ -180,12 +185,12 @@ var frozenRoutes = map[string]string{
 	"DELETE /api/projects/{id}/confusions/{confusionId}":                               "",
 	"POST /api/projects/{id}/confusions/{confusionId}/ask-stream":                      "",
 	"POST /api/projects/{id}/confusions/{confusionId}/ask/summarize":                   "",
-	"GET /api/projects/{id}/assets/body/annotations":                                   "",
-	"POST /api/projects/{id}/assets/body/annotations":                                  "",
-	"PATCH /api/projects/{id}/assets/body/annotations/{annotationId}":                  "",
-	"DELETE /api/projects/{id}/assets/body/annotations/{annotationId}":                 "",
-	"POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask-stream":        "",
-	"POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask/summarize":     "",
+	"GET /api/projects/{id}/assets/review/annotations":                                 "",
+	"POST /api/projects/{id}/assets/review/annotations":                                "",
+	"PATCH /api/projects/{id}/assets/review/annotations/{annotationId}":                "",
+	"DELETE /api/projects/{id}/assets/review/annotations/{annotationId}":               "",
+	"POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask-stream":      "",
+	"POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask/summarize":   "",
 	"GET /api/folders":                                                                 "",
 	"PUT /api/folders":                                                                 "",
 	"GET /api/projects/{id}/practice/tasks":                                            "",
@@ -206,7 +211,7 @@ var frozenRoutes = map[string]string{
 }
 
 func TestRouteTableFrozen(t *testing.T) {
-	if len(frozenRoutes) != 95 {
+	if len(frozenRoutes) != 96 {
 		t.Fatalf("route table snapshot has %d entries; update this test deliberately if the iteration-13 surface changed", len(frozenRoutes))
 	}
 	oldWorkspace := paths.WORKSPACE
@@ -234,7 +239,7 @@ func TestRouteTableFrozen(t *testing.T) {
 		}
 		// Normalize wildcard patterns for probing.
 		probePath := strings.ReplaceAll(path, "{path...}", "x")
-		for _, token := range [][2]string{{"{id}", "lingo-duihua"}, {"{zone}", "Explain"}, {"{taskId}", "task_x"}, {"{assetKey}", "body"}, {"{sourceId}", "source_x"}, {"{revisionId}", "srev_x"}, {"{fileKey}", "original"}, {"{artifactId}", "artifact_x"}, {"{responseId}", "resp_x"}, {"{queueId}", "q_x"}, {"{confusionId}", "cf_x"}, {"{annotationId}", "ann_x"}, {"{attempt}", "1"}, {"{runId}", "run_x"}} {
+		for _, token := range [][2]string{{"{id}", "lingo-duihua"}, {"{zone}", "Explain"}, {"{taskId}", "task_x"}, {"{assetKey}", "review"}, {"{sourceId}", "source_x"}, {"{revisionId}", "srev_x"}, {"{fileKey}", "original"}, {"{artifactId}", "artifact_x"}, {"{responseId}", "resp_x"}, {"{queueId}", "q_x"}, {"{confusionId}", "cf_x"}, {"{annotationId}", "ann_x"}, {"{attempt}", "1"}, {"{runId}", "run_x"}} {
 			probePath = strings.ReplaceAll(probePath, token[0], token[1])
 		}
 		if probePath == path && strings.Contains(path, "{") {
@@ -276,9 +281,9 @@ var frozenSSEEvents = []string{
 	"artifact-updated",
 	"confusion-updated",
 	"annotation-updated",
+	"teacher-note-updated",
 	"run-progress",
 	"assistant-task-updated",
-	"generated-artifact-updated",
 	"learning-asset-updated",
 	"learning-activity-updated",
 	"source-updated",
@@ -354,8 +359,8 @@ func TestAssetsListShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	assets, ok := body["assets"].([]any)
-	if !ok || len(assets) != 3 {
-		t.Fatalf("expected 3 core assets, got %v", body)
+	if !ok || len(assets) != 2 {
+		t.Fatalf("expected 2 core assets, got %v", body)
 	}
 	meta := assets[0].(map[string]any)
 	for _, field := range []string{"assetId", "key", "title", "currentVersionId", "editRevision", "conversationCursor", "updatedAt"} {
@@ -432,47 +437,14 @@ func TestErrorPathsFrozen(t *testing.T) {
 	}
 }
 
-func TestLegacyFixtureReadableWithoutMutation(t *testing.T) {
-	root := copyFixture(t, filepath.Join("legacy", "zones"))
-	before := snapshotTree(t, root)
-	workspace.SetProjectsRootForTest(root)
-	t.Cleanup(func() {
-		workspace.SetProjectsRootForTest("")
-		assertTreeUnchanged(t, root, before)
-	})
-	server := newTestServer(t)
-	server.migrationReady = false
-
-	// Legacy zone read surface.
-	rec := httptest.NewRecorder()
-	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/projects/legacy-wuqu/zones/Explain", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy zone read status = %d body = %s", rec.Code, rec.Body.String())
-	}
-	var zone map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &zone); err != nil {
-		t.Fatal(err)
-	}
-
-	// Practice tasks read.
-	rec = httptest.NewRecorder()
-	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/projects/legacy-wuqu/practice/tasks", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy practice read status = %d", rec.Code)
-	}
-
-	// Confusions (annotation-compat) read.
-	rec = httptest.NewRecorder()
-	server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/projects/legacy-wuqu/confusions", nil))
-	if rec.Code != http.StatusOK {
-		t.Fatalf("legacy confusions read status = %d body = %s", rec.Code, rec.Body.String())
-	}
-	var body map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if list, ok := body["confusions"].([]any); !ok || len(list) != 1 {
-		t.Fatalf("expected 1 imported confusion, got %v", body)
+func TestRetiredAssetRoutesReturnNotFound(t *testing.T) {
+	server, _ := canonicalFixtureServer(t)
+	for _, path := range []string{"/api/projects/lingo-duihua/assets/body", "/api/projects/lingo-duihua/assets/intro", "/api/projects/lingo-duihua/assets/body/annotations", "/api/projects/lingo-duihua/generated", "/api/projects/lingo-duihua/generated/artifact_old/open"} {
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, path, nil))
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("retired route %s returned %d", path, rec.Code)
+		}
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	command "github.com/xmz14/lll/backend-go/internal/platform/command"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,7 +67,7 @@ func LaunchHeadless(
 	if rt.ID == agentruntime.RuntimeClaude && model != "" {
 		args = append(args, "--model", model)
 	}
-	cmd := exec.CommandContext(ctx, rt.Bin, args...)
+	cmd := command.Context(ctx, rt.Bin, args...)
 	if rt.Mode == "wsl" {
 		var wslProject string
 		if out, err := exec.CommandContext(ctx, "wsl.exe", "wslpath", "-a", projectRoot).Output(); err == nil {

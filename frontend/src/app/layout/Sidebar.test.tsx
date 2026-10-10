@@ -6,6 +6,8 @@ import { Sidebar } from './Sidebar';
 
 const deleteProject = vi.hoisted(() => vi.fn());
 
+vi.mock('./ConnectionBadge',()=>({ConnectionBadge:()=> <span>连接状态</span>}));
+
 vi.mock('@/features/projects/api/projects', () => ({
   useDeleteProject: () => ({
     mutate: deleteProject,

@@ -21,24 +21,27 @@ import (
 
 const (
 	SchemaVersion        = 1
-	DefaultFileLimit     = int64(100 << 20)
+	DefaultFileLimit     = int64(50 << 20)
 	DefaultUnitByteLimit = int64(1 << 30)
 )
 
 type Source struct {
-	SchemaVersion      int        `json:"schemaVersion"`
-	SourceID           string     `json:"sourceId"`
-	DisplayName        string     `json:"displayName"`
-	Status             string     `json:"status"`
-	CurrentRevisionID  string     `json:"currentRevisionId"`
-	TombstonedAt       *time.Time `json:"tombstonedAt,omitempty"`
-	PermanentlyDeleted *time.Time `json:"permanentlyDeletedAt,omitempty"`
-	FailureCode        string     `json:"failureCode,omitempty"`
-	OriginalSHA256     string     `json:"originalSha256,omitempty"`
-	OriginalBytes      int64      `json:"originalBytes,omitempty"`
-	OriginalMediaType  string     `json:"originalMediaType,omitempty"`
-	CreatedAt          time.Time  `json:"createdAt"`
-	UpdatedAt          time.Time  `json:"updatedAt"`
+	SchemaVersion       int        `json:"schemaVersion"`
+	SourceID            string     `json:"sourceId"`
+	DisplayName         string     `json:"displayName"`
+	Status              string     `json:"status"`
+	CurrentRevisionID   string     `json:"currentRevisionId"`
+	TombstonedAt        *time.Time `json:"tombstonedAt,omitempty"`
+	PermanentlyDeleted  *time.Time `json:"permanentlyDeletedAt,omitempty"`
+	FailureCode         string     `json:"failureCode,omitempty"`
+	Parser              string     `json:"parser,omitempty"`
+	ExtractedBytes      int64      `json:"extractedBytes,omitempty"`
+	ExtractionTruncated bool       `json:"extractionTruncated,omitempty"`
+	OriginalSHA256      string     `json:"originalSha256,omitempty"`
+	OriginalBytes       int64      `json:"originalBytes,omitempty"`
+	OriginalMediaType   string     `json:"originalMediaType,omitempty"`
+	CreatedAt           time.Time  `json:"createdAt"`
+	UpdatedAt           time.Time  `json:"updatedAt"`
 }
 
 // ParseDisposition decides whether source-processing may inspect a regular
@@ -53,13 +56,18 @@ func ParseDisposition(filename, mediaType string) (disposition, reason string) {
 		return "opaque", reason
 	}
 	allowed := map[string]bool{
-		".pdf": true, ".doc": true, ".docx": true, ".odt": true, ".rtf": true, ".xls": true, ".xlsx": true, ".ods": true, ".csv": true, ".tsv": true, ".ppt": true, ".pptx": true, ".odp": true,
-		".png": true, ".jpg": true, ".jpeg": true, ".webp": true, ".gif": true, ".bmp": true, ".tif": true, ".tiff": true,
+		".pdf": true, ".docx": true, ".xlsx": true, ".csv": true, ".tsv": true, ".pptx": true,
 		".txt": true, ".md": true, ".markdown": true, ".rst": true, ".json": true, ".jsonl": true, ".yaml": true, ".yml": true, ".toml": true, ".xml": true, ".html": true, ".htm": true, ".css": true,
 		".go": true, ".py": true, ".js": true, ".jsx": true, ".ts": true, ".tsx": true, ".java": true, ".c": true, ".h": true, ".cpp": true, ".hpp": true, ".rs": true, ".rb": true, ".php": true, ".swift": true, ".kt": true, ".kts": true, ".sql": true, ".r": true, ".m": true, ".scala": true, ".lua": true,
 	}
 	if allowed[extension] {
 		return "parse", "supported"
+	}
+	if extension == ".doc" || extension == ".ppt" || extension == ".xls" {
+		return "opaque", "unsupported_legacy_format"
+	}
+	if extension == ".png" || extension == ".jpg" || extension == ".jpeg" || extension == ".webp" || extension == ".gif" || extension == ".bmp" || extension == ".tif" || extension == ".tiff" {
+		return "opaque", "no_extractable_text"
 	}
 	return "opaque", "unsupported"
 }

@@ -1,6 +1,6 @@
 # ADR-0019 — Vision OCR, Web Search Tool, And Repository Normalization
 
-Status: accepted
+Status: accepted; partially superseded by 0025
 Date: 2026-09-11
 
 ## Decision

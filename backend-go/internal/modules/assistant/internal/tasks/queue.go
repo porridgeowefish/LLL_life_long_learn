@@ -84,7 +84,7 @@ func (d *Dispatcher) dispatch() {
 	runningGlobal := 0
 	runningUnits := map[string]int{}
 	for _, project := range projects {
-		if project.ProjectType != workspace.ProjectTypeSystemLearning {
+		if project.ProjectType != workspace.ProjectTypeSystemLearning || (d.deps.ProjectBlocked != nil && d.deps.ProjectBlocked(project.Slug)) {
 			continue
 		}
 		store, err := New(project.Slug)
@@ -96,6 +96,12 @@ func (d *Dispatcher) dispatch() {
 			continue
 		}
 		for _, task := range tasks {
+			if !ValidType(task.Type) {
+				if !IsTerminal(task.Status) {
+					d.finish(store, task.ID, "cancelled", nil, &Failure{Code: "task-type-retired", Message: "资料由程序本地解析，旧助教任务已退役"})
+				}
+				continue
+			}
 			if task.Status == "running" {
 				runningGlobal++
 				runningUnits[task.UnitID]++

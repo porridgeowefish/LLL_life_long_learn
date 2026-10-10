@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-14
+Last reviewed: 2026-09-18
 Source of truth: repository quality-gate definitions introduced by iteration 14.
 
 ## Commands
@@ -74,5 +74,14 @@ R3 platform must not import modules, transport, or app
 R4 a frontend feature may not import another feature's non-index file
 ```
 
-Temporary exemptions during the migration waves live in an allowlist file
-passed via `-allow` and must be gone by the final cutover wave.
+A `-allow <file>` escape hatch exists for `importer -> imported` exemptions.
+The iteration-14 migration cutover completed without a repository allowlist;
+no exemption file is currently in use, and new violations should be fixed
+rather than allowlisted.
+
+## Windows Desktop Launcher Health
+
+`check:full` also runs `node --test tools/release/desktop-launcher.test.js` on
+Windows. It loads the actual launcher health function in Windows PowerShell5.1
+with a ready127.0.0.1 HTTP server and a stalled::1 endpoint. The launcher uses
+explicit IPv4 loopback for health, shutdown and browser URLs.

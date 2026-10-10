@@ -14,7 +14,8 @@ export interface AskProvider {
   kind: 'openai' | 'anthropic';
   name?: string;
   baseURL: string;
-  apiKey: string; // masked ("••••") from GET; plaintext only on user input
+  apiKey: string;
+  apiKeyEnv?: string;
   model: string;
   contextWindowTokens?: number;
   reasoning?: boolean;
@@ -48,7 +49,7 @@ export async function streamAskAi(
   let res: Response;
   try {
     res = await fetch(
-      `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/body/annotations/${encodeURIComponent(confusionId)}/ask-stream`,
+      `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/review/annotations/${encodeURIComponent(confusionId)}/ask-stream`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +106,7 @@ export async function streamAskAi(
 /** Trigger the close->summarize flow (backend returns 202 immediately). */
 export async function summarizeAsk(projectSlug: string, confusionId: string): Promise<void> {
   await fetch(
-    `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/body/annotations/${encodeURIComponent(confusionId)}/ask/summarize`,
+    `${API_BASE}/api/projects/${encodeURIComponent(projectSlug)}/assets/review/annotations/${encodeURIComponent(confusionId)}/ask/summarize`,
     { method: 'POST' },
   );
 }

@@ -5,7 +5,6 @@ import { useProject } from '@/features/projects/api/projects';
 import { useHealth } from '@/app/api/health';
 import { DisciplineOverview } from '@/features/projects/components/DisciplineOverview';
 import { LearningWorkspace } from '@/features/learning';
-import { LegacyProjectView } from '@/features/projects/components/LegacyProjectView';
 import { EmptyState } from '@/shared/primitive/EmptyState';
 import { useProjectStore } from '@/shared/store/slices/project';
 
@@ -26,7 +25,7 @@ export function ProjectPage() {
 
   if (data.project.projectType === 'discipline-map') return <DisciplineOverview slug={slug} title={data.project.title} />;
   if (health.data?.learningWorkspace?.failedProjects?.includes(slug)) {
-    return <LegacyProjectView project={data.project} />;
+    return <div className={s.host}><EmptyState title="学习资产迁移尚未完成" description="请结束旧助教 CLI 后重启应用。迁移失败的项目已暂停写入，请查看启动日志。" /></div>;
   }
   return <LearningWorkspace project={data.project} />;
 }

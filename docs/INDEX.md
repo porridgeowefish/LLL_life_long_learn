@@ -1,8 +1,8 @@
-# LLL Documentation Index
+# learn-with-ai Documentation Index
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-10-10
 Source of truth: this file is the entry point for people and AI agents.
 
 Read this file before implementation, then move to the linked domain documents.
@@ -44,12 +44,7 @@ for an explicit history, migration, compatibility, or regression question.
 
 ## Active Delivery
 
-The implemented product baseline is
-[Iteration 17](./01-iterations/iteration-17-teacher-agent-refinements/README.md).
-Iteration 17 refines the teacher agent: vision-model OCR for image sources, a
-durable streaming queue with steering, message copy/regenerate and transcript
-export, a bounded web-search tool, and repository normalization. Manual
-OCR/web-search smoke with real keys remains learner-run.
+[Iteration 19](./01-iterations/iteration-19-document-import-installers/README.md) is the active delivery for native document import, automatic bounded teacher context, notes scrolling and installers. Final validation status and platform-native gaps are recorded in its delivery notes. [Iteration 18](./01-iterations/foundations/iteration-18-learn-with-ai/README.md) is retained for review/practice cutover, auto-notes and portable infrastructure.
 
 ## Required Entry Points
 

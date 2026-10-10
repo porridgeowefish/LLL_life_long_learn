@@ -3,6 +3,9 @@ package teacher
 
 import (
 	"context"
+	noteservice "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/noteservice"
+	notestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
+	config "github.com/xmz14/lll/backend-go/internal/platform/config"
 
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
@@ -89,3 +92,25 @@ func Stream(ctx context.Context, provider Provider, system string, messages []AI
 func Complete(ctx context.Context, provider Provider, system string, messages []AIMessage) (string, error) {
 	return providers.Complete(ctx, provider, system, messages)
 }
+
+type AutoNotesSettings = config.AutoNotesSettings
+type NoteTurn = conversation.NoteTurn
+type NoteUsage = notestore.NoteUsage
+type NoteEntry = notestore.NoteEntry
+type NoteJob = notestore.NoteJob
+type NotesResource = notestore.NotesResource
+type NoteGenerator = notestore.NoteGenerator
+type NoteStore = notestore.Store
+type NoteService = noteservice.Service
+
+var ErrNoteJobNotFound = notestore.ErrNoteJobNotFound
+var ErrNoteJobRunning = notestore.ErrNoteJobRunning
+
+func NewNoteStore(slug string) (*NoteStore, error)        { return notestore.New(slug) }
+func NewNoteService(generator NoteGenerator) *NoteService { return noteservice.New(generator) }
+func LoadTeacherSettings() (AutoNotesSettings, error)     { return config.LoadTeacherSettings() }
+func SaveTeacherSettings(cfg AutoNotesSettings) error     { return config.SaveTeacherSettings(cfg) }
+
+type ProjectUsage = usage.ProjectUsage
+
+func ListProjectUsage() ([]ProjectUsage, error) { return usage.ListProjects() }

@@ -67,7 +67,10 @@ func learningWorkspaceServer(t *testing.T) *Server {
 	if err := workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning}); err != nil {
 		t.Fatal(err)
 	}
-	return &Server{teacher: teacher.New(textTeacherGateway{}), activeTeacher: teacher.NewActiveResponses(), broadcaster: httpx.NewBroadcaster(), migrationReady: true}
+	processor := sourcestore.NewProcessor(nil)
+	processor.Start(context.Background())
+	t.Cleanup(processor.Close)
+	return &Server{teacher: teacher.New(textTeacherGateway{}), activeTeacher: teacher.NewActiveResponses(), broadcaster: httpx.NewBroadcaster(), migrationReady: true, sourceProcessor: processor}
 }
 
 func TestTeacherTurnStreamsAndPersists(t *testing.T) {
@@ -256,7 +259,7 @@ func TestConversationTailEndpointReturnsOnlyRecentMessages(t *testing.T) {
 func TestAssetOptimisticRevisionConflict(t *testing.T) {
 	server := learningWorkspaceServer(t)
 	get := httptest.NewRecorder()
-	server.Handler().ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/projects/topic/assets/body", nil))
+	server.Handler().ServeHTTP(get, httptest.NewRequest(http.MethodGet, "/api/projects/topic/assets/review", nil))
 	var asset struct {
 		Meta struct {
 			EditRevision uint64 `json:"editRevision"`
@@ -266,12 +269,12 @@ func TestAssetOptimisticRevisionConflict(t *testing.T) {
 	// The stale second request deliberately reuses the original edit revision.
 	body := `{"baseEditRevision":` + strconv.FormatUint(asset.Meta.EditRevision, 10) + `,"content":"正文"}`
 	first := httptest.NewRecorder()
-	server.Handler().ServeHTTP(first, httptest.NewRequest(http.MethodPut, "/api/projects/topic/assets/body", strings.NewReader(body)))
+	server.Handler().ServeHTTP(first, httptest.NewRequest(http.MethodPut, "/api/projects/topic/assets/review", strings.NewReader(body)))
 	if first.Code != http.StatusOK {
 		t.Fatalf("first save failed: %d %s", first.Code, first.Body.String())
 	}
 	stale := httptest.NewRecorder()
-	server.Handler().ServeHTTP(stale, httptest.NewRequest(http.MethodPut, "/api/projects/topic/assets/body", strings.NewReader(body)))
+	server.Handler().ServeHTTP(stale, httptest.NewRequest(http.MethodPut, "/api/projects/topic/assets/review", strings.NewReader(body)))
 	if stale.Code != http.StatusConflict || !strings.Contains(stale.Body.String(), "asset_edit_conflict") {
 		t.Fatalf("stale edit was not rejected: %d %s", stale.Code, stale.Body.String())
 	}
@@ -282,8 +285,6 @@ func TestArchiveUploadStaysOpaqueAndDoesNotCreateParseTask(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	_ = writer.WriteField("operationId", "op_archive")
-	_ = writer.WriteField("parseApproved", "true")
-	_ = writer.WriteField("cloudDisclosureAccepted", "true")
 	part, err := writer.CreateFormFile("file", "materials.zip")
 	if err != nil {
 		t.Fatal(err)
@@ -321,8 +322,6 @@ func TestParseableUploadImmediatelyReportsBackgroundProcessing(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	_ = writer.WriteField("operationId", "op_parse")
-	_ = writer.WriteField("parseApproved", "true")
-	_ = writer.WriteField("cloudDisclosureAccepted", "true")
 	part, err := writer.CreateFormFile("file", "notes.txt")
 	if err != nil {
 		t.Fatal(err)
@@ -346,13 +345,16 @@ func TestParseableUploadImmediatelyReportsBackgroundProcessing(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if response.Code != http.StatusCreated || payload.Source.Status != "processing" || payload.Task == nil {
+	if response.Code != http.StatusCreated || payload.Source.Status != "processing" || payload.Task != nil {
 		t.Fatalf("parseable upload must become background processing: %d %s", response.Code, response.Body.String())
 	}
 }
 
 func TestReadReadySourceContentReturnsOnlyCanonicalMarkdown(t *testing.T) {
 	server := learningWorkspaceServer(t)
+	// Derived content is committed by hand below; stop background parsing so it
+	// cannot race and replace content.md with the original text.
+	server.sourceProcessor.Close()
 	sources, err := sourcestore.New("topic")
 	if err != nil {
 		t.Fatal(err)

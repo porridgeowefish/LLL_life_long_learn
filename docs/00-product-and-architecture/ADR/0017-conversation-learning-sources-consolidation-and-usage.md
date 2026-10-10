@@ -1,6 +1,6 @@
 # ADR-0017 — Conversation Learning Sources, Consolidation, And Usage
 
-Status: accepted
+Status: accepted; partially superseded by 0025
 Date: 2026-09-05
 
 ## Decision

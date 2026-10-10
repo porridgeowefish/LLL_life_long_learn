@@ -3,13 +3,13 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useConversation } from './learningWorkspace';
+import { learningWorkspaceKeys, useConversation, useRetrySource } from './learningWorkspace';
 
-const clientMocks = vi.hoisted(() => ({ get: vi.fn() }));
+const clientMocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }));
 
 vi.mock('@/shared/client', () => ({
   ApiError: class ApiError extends Error {},
-  http: { get: clientMocks.get },
+  http: { get: clientMocks.get, post: clientMocks.post },
 }));
 
 function wrapper(client: QueryClient) {
@@ -76,4 +76,16 @@ describe('useConversation', () => {
     expect(result.current.data?.messages[0].blocks).toEqual([]);
     expect(result.current.data?.taskLinks).toEqual([]);
   });
+});
+
+it('retries a source in its project and marks the source ledger for refresh', async () => {
+  clientMocks.post.mockReset();
+  clientMocks.post.mockResolvedValue({ sourceId: 'failed pdf', status: 'processing' });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const sourceKey = learningWorkspaceKeys.sources('linear algebra');
+  client.setQueryData(sourceKey, [{ sourceId: 'failed pdf', status: 'failed' }]);
+  const { result } = renderHook(() => useRetrySource('linear algebra'), { wrapper: wrapper(client) });
+  await act(async () => { await result.current.mutateAsync('failed pdf'); });
+  expect(clientMocks.post).toHaveBeenCalledWith('/api/projects/linear%20algebra/sources/failed%20pdf/retry', {});
+  expect(client.getQueryState(sourceKey)?.isInvalidated).toBe(true);
 });

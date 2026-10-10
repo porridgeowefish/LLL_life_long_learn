@@ -1,11 +1,13 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+test.beforeEach(({page}) => {page.on('pageerror', error => console.log('[PAGEERROR]', error.message));});
+
 async function json(route: Route, body: unknown, status = 200) {
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
 async function installStableBackend(page: Page) {
-  await page.route('**/api/**', async (route) => {
+  await page.route(url => url.pathname.startsWith('/api/'), async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === '/api/projects' && request.method() === 'POST') {
@@ -14,9 +16,11 @@ async function installStableBackend(page: Page) {
     if (path === '/api/projects') return json(route, { projects: [] });
     if (path === '/api/health') return json(route, { status: 'ok', workspace: 'E2E', agentRuntime: { runtime: { name: 'fake', available: true } } });
     if (path === '/api/sessions/recent' || path === '/api/sessions/active') return json(route, { sessions: [] });
-    if (path === '/api/activity') return json(route, { days: [], totalGrowth: 0 });
+    if (path === '/api/activity') return json(route, { summary: { days: [], totalGrowth: 0 } });
     if (path === '/api/folders') return json(route, { folders: [] });
     if (path === '/api/preferences') return json(route, { content: '' });
+    if (path === '/api/settings/ask-ai') return json(route, {default:'',searchEngine:'google',providers:[],bindings:{}});
+    if (path === '/api/settings/teacher') return json(route, {autoNotes:{enabled:true,everyTurns:3,providerId:'',model:''}});
     return json(route, {});
   });
 }
@@ -47,7 +51,7 @@ test('usage page styles stay inside the usage records', async ({ page }) => {
   expect(await item.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });
 
-test('body asset tables keep the document table treatment', async ({ page }) => {
+test('review asset tables keep the document table treatment', async ({ page }) => {
   await page.route('http://127.0.0.1:4173/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/health') return json(route, { status: 'ok', workspace: 'E2E', learningWorkspace: { failedProjects: [] } });
@@ -56,19 +60,19 @@ test('body asset tables keep the document table treatment', async ({ page }) => 
     }
     if (path === '/api/projects/body-table/assets') {
       return json(route, { assets: [
-        { assetId: 'intro', key: 'intro', title: '引入', currentVersionId: 'intro-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
-        { assetId: 'body', key: 'body', title: '正文', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
+                { assetId: 'review', key: 'review', title: '复习稿', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
         { assetId: 'practice', key: 'practice', title: '练习', currentVersionId: 'practice-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' },
       ] });
     }
-    if (path === '/api/projects/body-table/assets/body') {
-      return json(route, { meta: { assetId: 'body', key: 'body', title: '正文', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' }, contentKind: 'markdown', content: '# 容器编排\n\n## 副本与 Deployment\n\n| 组件 | 职责 |\n| --- | --- |\n| Deployment | 管理副本 |' });
+    if (path === '/api/projects/body-table/assets/review') {
+      return json(route, { meta: { assetId: 'review', key: 'review', title: '复习稿', currentVersionId: 'body-v1', editRevision: 1, conversationCursor: 0, updatedAt: '' }, contentKind: 'markdown', content: '# 容器编排\n\n## 副本与 Deployment\n\n| 组件 | 职责 |\n| --- | --- |\n| Deployment | 管理副本 |' });
     }
-    if (path === '/api/projects/body-table/generated') return json(route, { artifacts: [] });
-    if (path === '/api/projects/body-table/assets/body/annotations') return json(route, { annotations: [] });
+        if (path === '/api/projects/body-table/assets/review/annotations') return json(route, { annotations: [] });
     if (path === '/api/projects') return json(route, { projects: [] });
     if (path === '/api/folders') return json(route, { folders: [] });
     if (path === '/api/preferences') return json(route, { content: '' });
+    if (path === '/api/settings/ask-ai') return json(route, {default:'',searchEngine:'google',providers:[],bindings:{}});
+    if (path === '/api/settings/teacher') return json(route, {autoNotes:{enabled:true,everyTurns:3,providerId:'',model:''}});
     if (path === '/api/sessions/recent' || path === '/api/sessions/active') return json(route, { sessions: [] });
     if (path === '/api/settings/ask-ai') return json(route, { default: '', providers: [], bindings: {} });
     return json(route, {});
@@ -84,39 +88,79 @@ test('body asset tables keep the document table treatment', async ({ page }) => 
   expect(await heading.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
 });
 
-test('shell dividers align with the brand rail and workspace header', async ({ page }) => {
-  await page.setContent(`
-    <style>* { box-sizing: border-box; } body { margin: 0; }</style>
-    <header class="topbar">
-      <a class="logo"><img class="logoMark"><span>LifeLongLearn</span></a>
-      <span class="sep" data-testid="brand-divider"></span>
-      <nav class="nav"></nav>
-    </header>
-    <div style="display:flex;height:300px">
-      <aside class="sidebar" data-testid="sidebar"><div class="head" data-testid="navigation-head">导航</div></aside>
-      <main style="flex:1"><header class="header" data-testid="workspace-header">教师</header></main>
-    </div>
-  `);
-  await page.addStyleTag({ path: 'src/shared/styles/tokens.css' });
-  await page.addStyleTag({ path: 'src/app/layout/Topbar.module.css' });
-  await page.addStyleTag({ path: 'src/app/layout/Sidebar.module.css' });
-  await page.addStyleTag({ path: 'src/features/learning/components/LearningWorkspace.module.css' });
+test('home uses available width and keeps heatmap height under a long map list', async ({ page }) => {
+  const projects = Array.from({length:40},(_,index)=>({id:`map-${index}`,slug:`map-${index}`,title:`学科地图 ${index}`,projectType:'discipline-map',overviewAvailable:false}));
+  projects.push({id:'hidden-chat',slug:'hidden-chat',title:'隐藏对话项目',projectType:'system-learning',overviewAvailable:false});
+  const days = Array.from({length:182},(_,index)=>({date:new Date(Date.UTC(2026,3,1+index)).toISOString().slice(0,10),activity:index%5,growth:0,actions:1,events:[]}));
+  await page.route(url => url.pathname.startsWith('/api/'),async route=>{const path=new URL(route.request().url()).pathname;if(path==='/api/projects')return json(route,{projects});if(path==='/api/activity')return json(route,{summary:{days,rangeStart:days[0].date,rangeEnd:days.at(-1)!.date,currentStreak:2,longestStreak:3,activeDays:140,totalActions:182,totalGrowth:0}});if(path==='/api/folders')return json(route,{folders:[]});if(path==='/api/health')return json(route,{ok:true,workspace:'E2E',claude:{available:false},learningWorkspace:{failedProjects:[]}});return json(route,{});});
+  for(const width of [1440,1920,2560]) {
+    await page.setViewportSize({width,height:1000});await page.goto('/');await page.waitForLoadState('networkidle');
+    const main=page.getByRole('main');await expect(main.getByRole('heading',{name:'学科地图 0',exact:true})).toBeVisible();await expect(main.getByText('隐藏对话项目',{exact:true})).toHaveCount(0);
+    await expect(main.getByText('本周投入',{exact:true})).toHaveCount(0);
+    const mainBox=await main.boundingBox();const scrollBox=await main.locator(':scope > div > div').first().boundingBox();expect(Math.abs(mainBox!.x+mainBox!.width-scrollBox!.x-scrollBox!.width)).toBeLessThan(2);
+    await expect(main.getByRole('gridcell')).toHaveCount(182);
+    const grid=await main.getByRole('grid').boundingBox();expect(grid!.height).toBeGreaterThan(100);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    if(width===1920)await page.screenshot({path:'../.artifacts/iteration18/home-1920.png'});
+  }
+});
 
-  const sidebar = await page.getByTestId('sidebar').boundingBox();
-  const brandDivider = await page.getByTestId('brand-divider').boundingBox();
-  const navigationHead = await page.getByTestId('navigation-head').boundingBox();
-  const workspaceHeader = await page.getByTestId('workspace-header').boundingBox();
+test('mobile sidebar reaches model configuration and home by keyboard',async ({page})=>{
+ await installStableBackend(page);await page.setViewportSize({width:620,height:900});await page.goto('/');await page.waitForLoadState('networkidle');
+ await page.getByRole('button',{name:'打开侧栏'}).click();await page.getByRole('link',{name:'API 模型',exact:true}).click();await expect(page).toHaveURL(/models$/);
+ await page.getByRole('button',{name:'打开侧栏'}).click();const home=page.getByRole('link',{name:'主页',exact:true});await home.focus();await home.press('Enter');await expect(page.getByRole('heading',{name:'学习主页'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(620);
+ await page.screenshot({path:'../.artifacts/iteration18/home-mobile.png'});
+});
 
-  expect(sidebar).not.toBeNull();
-  expect(brandDivider).not.toBeNull();
-  expect(navigationHead).not.toBeNull();
-  expect(workspaceHeader).not.toBeNull();
-  expect(sidebar!.x + sidebar!.width).toBe(brandDivider!.x);
-  expect(navigationHead!.y + navigationHead!.height).toBe(workspaceHeader!.y + workspaceHeader!.height);
+test('teacher notes settings are styled and save a valid interval on desktop and mobile', async ({ page }) => {
+  await installStableBackend(page);
+  let settings = { enabled: true, everyTurns: 3, providerId: '', model: '' };
+  await page.route(url => url.pathname === '/api/settings/teacher', async route => {
+    if (route.request().method() === 'PUT') settings = route.request().postDataJSON().autoNotes;
+    return json(route, { autoNotes: settings });
+  });
+  for (const width of [1440, 620]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto('/settings');
+    const notes = page.getByRole('region', { name: '教师自动笔记' });
+    await expect(notes).toBeVisible();
+    const title = notes.getByRole('heading', { name: '教师自动笔记' });
+    expect(await title.evaluate(el => parseFloat(getComputedStyle(el).fontSize))).toBeLessThanOrEqual(20);
+    expect(await notes.evaluate(el => getComputedStyle(el).borderTopStyle)).toBe('solid');
+    const interval = notes.getByLabel('记录间隔');
+    await interval.fill('5');
+    await notes.getByRole('button', { name: '保存自动笔记' }).click();
+    await expect(notes.getByRole('status')).toContainText('已保存');
+    expect(settings.everyTurns).toBe(5);
+    await interval.fill('0');
+    await expect(notes.getByRole('button', { name: '保存自动笔记' })).toBeDisabled();
+    await expect(notes.getByRole('status')).not.toContainText('已保存');
+    await interval.fill('3');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await notes.screenshot({ path: `../.artifacts/iteration18/notes-settings-${width}.png` });
+  }
+});
+
+test('token bars keep selected details and open the project by keyboard',async ({page})=>{
+ await installStableBackend(page);
+ await page.route(url=>url.pathname==='/api/usage/projects',route=>json(route,{projects:[{projectSlug:'usage-topic',title:'用量验收项目',inputTokens:120,outputTokens:80,noteInputTokens:20,noteOutputTokens:10}]}));
+ await page.route(url=>url.pathname==='/api/projects/usage-topic',route=>json(route,{project:{id:'usage-topic',slug:'usage-topic',title:'用量验收项目',projectType:'system-learning'}}));
+ await page.goto('/usage');const bar=page.getByRole('button',{name:/用量验收项目.*230/});await bar.focus();await expect(page.getByRole('tooltip')).toContainText('笔记输入 20');await bar.press('Enter');
+ const link=page.getByRole('link',{name:'进入项目'});await link.focus();await expect(page.getByRole('tooltip')).toContainText('用量验收项目');await page.screenshot({path:'../.artifacts/iteration18/usage-chart.png'});await link.press('Enter');await expect(page).toHaveURL(/project\/usage-topic/);
+});
+
+test('model key stays complete through reveal save and reload',async ({page})=>{
+ await installStableBackend(page);const key='sk-test-'+ 'abcdefghij'.repeat(40);let saved=false;
+ await page.route(url=>url.pathname==='/api/settings/ask-ai',async route=>{
+  if(route.request().method()==='PUT'){expect(route.request().postDataJSON().providers[0].apiKey).toBe(key);saved=true;}
+  return json(route,{default:'p',providers:[{id:'p',kind:'openai',name:'验收模型',baseURL:'https://example.invalid/v1',model:'test-model',apiKey:key}],bindings:{}});
+ });
+ await page.goto('/models');const input=page.getByRole('textbox',{name:'API Key'});const secret=page.getByLabel('API Key',{exact:true});await expect(secret).toHaveAttribute('type','password');await expect(secret).toHaveValue(key);await page.getByRole('button',{name:'显示 API Key'}).click();await expect(input).toHaveValue(key);await page.getByRole('button',{name:'保存配置',exact:true}).click();await expect.poll(()=>saved).toBe(true);await page.reload();await expect(secret).toHaveValue(key);await expect(secret).toHaveAttribute('type','password');
 });
 
 test('lays out completed teacher rich text without content-visibility skipping', async ({ page }) => {
-  await page.route('**/api/**', async (route) => {
+  await page.route(url => url.pathname.startsWith('/api/'), async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/health') return json(route, { status: 'ok', workspace: 'E2E', learningWorkspace: { failedProjects: [] } });
     if (path === '/api/projects/streaming-layout') {

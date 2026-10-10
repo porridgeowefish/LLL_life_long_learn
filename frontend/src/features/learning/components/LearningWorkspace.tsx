@@ -6,9 +6,11 @@ import type { ProjectState } from '@/shared/types/domain';
 import { TeacherView } from './TeacherView';
 import { AssetsView } from './AssetsView';
 import { SourcesView } from './SourcesView';
+import { SourceImportControl } from './SourceImportControl';
 import { subscribeToSSE } from '@/app/hooks/useSSE';
 import { SSE_EVENTS } from '@/shared/lib/constants';
-import { learningWorkspaceKeys } from '@/features/learning/api/learningWorkspace';
+import { conversationExportURL, learningWorkspaceKeys } from '@/features/learning/api/learningWorkspace';
+import { DownloadIcon } from '@/shared/primitive/Icons';
 
 import s from './LearningWorkspace.module.css';
 
@@ -36,7 +38,7 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
     };
     const unsubscribers = [
       subscribeToSSE(SSE_EVENTS.assistantTaskUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.tasks(project.slug) }); })),
-      subscribeToSSE(SSE_EVENTS.generatedArtifactUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.generated(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.teacherNoteUpdated, forProject(() => {void queryClient.invalidateQueries({ queryKey: ['learning-workspace',project.slug,'notes'] });void queryClient.invalidateQueries({queryKey:['usage']});})),
       subscribeToSSE(SSE_EVENTS.learningAssetUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.assets(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.sourceUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.annotationUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.annotations(project.slug) }); })),
@@ -58,9 +60,13 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
             </NavLink>
           ))}
         </nav>
+        <div className={s.headerActions}>
+          <SourceImportControl key={project.slug} slug={project.slug} compact />
+          {active === 'teacher' && <a href={conversationExportURL(project.slug)} download aria-label="导出全部对话" title="导出全部对话为 Markdown"><DownloadIcon /><span>导出对话</span></a>}
+        </div>
       </header>
       <main className={s.content}>
-        {active === 'teacher' && <TeacherView slug={project.slug} title={project.title} />}
+        {active === 'teacher' && <TeacherView key={project.slug} slug={project.slug} title={project.title} />}
         {active === 'assets' && <AssetsView slug={project.slug} />}
         {active === 'sources' && <SourcesView slug={project.slug} />}
       </main>

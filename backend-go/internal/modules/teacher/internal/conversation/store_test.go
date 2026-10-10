@@ -300,6 +300,15 @@ func TestSupersedeHidesTeacherMessageAndFlipsLearnerLookup(t *testing.T) {
 	if len(sequenced) != 1 {
 		t.Fatalf("provider context must skip superseded reply: %#v", sequenced)
 	}
+	meta, _ := store.Meta()
+	snapshot, err := store.SnapshotThrough(meta.LatestSeq)
+	if err != nil || len(snapshot.Messages) != 1 || snapshot.Messages[0].Role != "learner" {
+		t.Fatalf("new assistant snapshot still includes superseded teacher reply: %#v err=%v", snapshot.Messages, err)
+	}
+	priorSnapshot, err := store.SnapshotThrough(meta.LatestSeq - 1)
+	if err != nil || len(priorSnapshot.Messages) != 2 {
+		t.Fatalf("later supersession leaked across a sealed cutoff: %#v err=%v", priorSnapshot.Messages, err)
+	}
 	if latest, ok, _ := store.LatestResponseID(); ok || latest != "" {
 		t.Fatalf("superseded response must not be latest: %s %v", latest, ok)
 	}

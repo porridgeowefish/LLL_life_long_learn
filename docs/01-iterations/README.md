@@ -2,30 +2,22 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-03
+Last reviewed: 2026-10-10
 Source of truth: current implemented baseline, active planning slice, and routing index for delivered foundations.
 
 Each iteration should be independently understandable and testable.
 
-## Current Baseline
-
-| Iteration | Goal | Directory |
-|---|---|---|
-| 17 | Teacher agent refinements: OCR, queue with steering, copy/regenerate/export, web search, repository normalization | [iteration-17-teacher-agent-refinements](./iteration-17-teacher-agent-refinements/README.md) |
-
-## Active Delivery Slice
+## Current Baseline And Active Delivery
 
 | Iteration | Goal | Directory | State |
 |---|---|---|---|
-| 17 | Teacher agent refinements: OCR image sources, streaming queue with steering, copy/regenerate/export, web search tool, repository normalization | [iteration-17-teacher-agent-refinements](./iteration-17-teacher-agent-refinements/README.md) | delivered; manual OCR/web-search smoke remains learner-run |
+| 20 | native Windows application, MSI install/upgrade and unified icon | [iteration-20-native-desktop-msi](./iteration-20-native-desktop-msi/README.md) | implementing; native validation in progress |
+| 19 | local document import, automatic source context, notes scrolling and installers | [iteration-19-document-import-installers](./iteration-19-document-import-installers/README.md) | implemented; Windows installation verified; native macOS/Linux CI pending |
 
-Iterations 13 and 16 are retained under `foundations/`; iteration 17 is the
-current implemented baseline. Iteration 14 remains the architecture baseline.
 
-Iterations 01–13 are retained as [delivered foundations](./foundations/README.md).
-They explain reusable capabilities that still support the current architecture.
-Read only the slice relevant to the task; active architecture and code decide
-how that capability participates in the current teacher workspace.
+Iterations 01–13 and 15–18 are retained under [foundations](./foundations/README.md).
+Iteration 14 remains the architecture baseline. Select a foundation only when its
+retained capability is relevant; current code and iteration 19 own present behavior.
 
 ## Required Files
 

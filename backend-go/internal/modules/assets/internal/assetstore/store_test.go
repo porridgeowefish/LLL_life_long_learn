@@ -20,19 +20,22 @@ func TestMigratesLegacyAndProtectsLearnerEdit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(project, "explain", "output.md"), []byte("# 原正文\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := MigrateReview("topic"); err != nil {
+		t.Fatal(err)
+	}
 	s, err := New("topic")
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := s.Get("body")
+	body, err := s.Get("review")
 	if err != nil || body.Content != "# 原正文\n" {
 		t.Fatalf("migration failed: %#v %v", body, err)
 	}
-	edited, err := s.UpdateLearner("body", body.Meta.EditRevision, "# 用户正文\n")
+	edited, err := s.UpdateLearner("review", body.Meta.EditRevision, "# 用户正文\n")
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = s.UpdateLearner("body", body.Meta.EditRevision, "stale")
+	_, err = s.UpdateLearner("review", body.Meta.EditRevision, "stale")
 	if _, ok := err.(*ConflictError); !ok {
 		t.Fatalf("expected conflict, got %v", err)
 	}
@@ -41,7 +44,7 @@ func TestMigratesLegacyAndProtectsLearnerEdit(t *testing.T) {
 	}
 }
 
-func TestMigratedStructuredAssetsKeepTheirPresentationContracts(t *testing.T) {
+func TestMigratedStructuredAssetsBecomeCanonicalMarkdown(t *testing.T) {
 	root := t.TempDir()
 	workspace.SetProjectsRootForTest(root)
 	defer workspace.SetProjectsRootForTest("")
@@ -67,20 +70,23 @@ func TestMigratedStructuredAssetsKeepTheirPresentationContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if _, err := MigrateReview("structured"); err != nil {
+		t.Fatal(err)
+	}
 	store, err := New("structured")
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := store.Get("body")
-	if err != nil || body.ContentKind != "explain-pages" {
+	body, err := store.Get("review")
+	if err != nil || body.ContentKind != "markdown" {
 		t.Fatalf("body should retain explain page presentation, got %#v %v", body, err)
 	}
 	practice, err := store.Get("practice")
-	if err != nil || practice.ContentKind != "practice-set" {
+	if err != nil || practice.ContentKind != "markdown" {
 		t.Fatalf("practice should retain interactive practice presentation, got %#v %v", practice, err)
 	}
 
-	edited, err := store.UpdateLearner("body", body.Meta.EditRevision, "# 学习者重写的正文")
+	edited, err := store.UpdateLearner("review", body.Meta.EditRevision, "# 学习者重写的正文")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,16 +101,16 @@ func TestCandidateOverlapPreservesLearner(t *testing.T) {
 	defer workspace.SetProjectsRootForTest("")
 	_ = workspace.CreateProjectSkeletonWithInput("topic", "主题", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning})
 	s, _ := New("topic")
-	base, _ := s.Get("body")
-	_, _ = s.UpdateLearner("body", base.Meta.EditRevision, "learner rewrite")
-	result, err := s.CommitCandidate(CandidateInput{Key: "body", BaseVersionID: base.Meta.CurrentVersionID, BaseContent: base.Content, CandidateContent: "assistant rewrite", TaskID: "task", ThroughSeq: 3})
+	base, _ := s.Get("review")
+	_, _ = s.UpdateLearner("review", base.Meta.EditRevision, "learner rewrite")
+	result, err := s.CommitCandidate(CandidateInput{Key: "review", BaseVersionID: base.Meta.CurrentVersionID, BaseContent: base.Content, CandidateContent: "assistant rewrite", TaskID: "task", ThroughSeq: 3})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Code != "edit-conflict" {
 		t.Fatalf("expected edit conflict, got %#v", result)
 	}
-	current, _ := s.Get("body")
+	current, _ := s.Get("review")
 	if current.Content != "learner rewrite" {
 		t.Fatalf("learner content overwritten: %q", current.Content)
 	}
@@ -116,14 +122,14 @@ func TestCandidateRecoveryRepairsCurrentAndMetaFromExistingVersion(t *testing.T)
 	defer workspace.SetProjectsRootForTest("")
 	_ = workspace.CreateProjectSkeletonWithInput("recovery", "恢复", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning})
 	store, _ := New("recovery")
-	base, _ := store.Get("body")
-	input := CandidateInput{Key: "body", BaseVersionID: base.Meta.CurrentVersionID, BaseContent: base.Content, CandidateContent: "assistant candidate", TaskID: "task_recovery", RunID: "run_recovery", ThroughSeq: 17}
+	base, _ := store.Get("review")
+	input := CandidateInput{Key: "review", BaseVersionID: base.Meta.CurrentVersionID, BaseContent: base.Content, CandidateContent: "assistant candidate", TaskID: "task_recovery", RunID: "run_recovery", ThroughSeq: 17}
 	first, err := store.CommitCandidate(input)
 	if err != nil || first.Asset == nil {
 		t.Fatalf("first commit failed: %#v %v", first, err)
 	}
 	versionID := first.Asset.Meta.CurrentVersionID
-	assetDir := filepath.Join(root, "recovery", "assets", "body")
+	assetDir := filepath.Join(root, "recovery", "assets", "review")
 	if err := os.WriteFile(filepath.Join(assetDir, "current.md"), []byte(base.Content), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -137,7 +143,7 @@ func TestCandidateRecoveryRepairsCurrentAndMetaFromExistingVersion(t *testing.T)
 	if recovered.Asset.Content != "assistant candidate" || recovered.Asset.Meta.CurrentVersionID != versionID || recovered.Asset.Meta.ConversationCursor != 17 {
 		t.Fatalf("recovery returned inconsistent asset: %#v", recovered.Asset)
 	}
-	current, _ := store.Get("body")
+	current, _ := store.Get("review")
 	if current.Content != "assistant candidate" || current.Meta.CurrentVersionID != versionID {
 		t.Fatalf("canonical asset was not repaired: %#v", current)
 	}

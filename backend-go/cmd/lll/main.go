@@ -4,9 +4,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	browser "github.com/xmz14/lll/backend-go/internal/platform/browser"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,13 +18,21 @@ import (
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
 
+var Version = "0.3.0-dev"
+
 func main() {
 	var (
-		port       = flag.Int("port", 0, "server port (overrides config and LLL_SERVER_PORT)")
-		workspace  = flag.String("workspace", "", "workspace root (overrides config and LLL_WORKSPACE_ROOT)")
-		configPath = flag.String("config", "", "config file path (default: <workspace>/config.local.json)")
+		versionOnly = flag.Bool("version", false, "print version")
+		noBrowser   = flag.Bool("no-browser", false, "do not open the browser")
+		port        = flag.Int("port", 0, "server port (overrides config and LLL_SERVER_PORT)")
+		workspace   = flag.String("workspace", "", "workspace root (overrides config and LLL_WORKSPACE_ROOT)")
+		configPath  = flag.String("config", "", "config file path (default: <workspace>/config.local.json)")
 	)
 	flag.Parse()
+	if *versionOnly {
+		fmt.Println("Learn-With-AI " + Version)
+		return
+	}
 
 	cfg, _, err := config.Load(config.Options{Path: *configPath, WorkspaceRoot: *workspace, Port: *port})
 	if err != nil {
@@ -41,19 +52,26 @@ func main() {
 	}
 	os.Setenv("WORKSPACE", paths.WORKSPACE)
 
+	instance, err := paths.AcquireWorkspaceInstance(paths.WORKSPACE)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "instance:", err)
+		os.Exit(1)
+	}
+	defer instance.Close()
+	portEnv := strconv.Itoa(cfg.Server.Port)
+	addr := net.JoinHostPort(cfg.Server.Host, portEnv)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "listen:", err)
+		instance.Close()
+		os.Exit(1)
+	}
+	defer listener.Close()
+	os.Setenv("LEARN_WITH_AI_SERVER_PORT", strconv.Itoa(cfg.Server.Port))
 	srv := bootstrap.Build()
 	defer srv.Server.Close()
 
-	portEnv := fmt.Sprintf("%d", cfg.Server.Port)
-	if *port != 0 {
-		portEnv = fmt.Sprintf("%d", *port)
-	}
-	if portEnv == "" {
-		portEnv = "8787"
-	}
-	addr := ":" + portEnv
-
-	fmt.Printf("LifeLongLearn server\n")
+	fmt.Printf("Learn-With-AI %s\n", Version)
 	fmt.Printf("  Workspace: %s\n", paths.WORKSPACE)
 	fmt.Printf("  Projects:  %s\n", paths.PROJECTS_ROOT)
 	fmt.Printf("  Agents:    %s\n", paths.AGENTS_ROOT)
@@ -78,7 +96,21 @@ func main() {
 		httpServer.Close()
 	}()
 
-	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	os.Setenv("LEARN_WITH_AI_SERVER_PORT", portEnv)
+	browserHost := cfg.Server.Host
+	if browserHost == "0.0.0.0" {
+		browserHost = "127.0.0.1"
+	}
+	if browserHost == "::" {
+		browserHost = "::1"
+	}
+	url := "http://" + net.JoinHostPort(browserHost, portEnv)
+	if !*noBrowser {
+		if err := browser.Open(url); err != nil {
+			fmt.Println("Open browser manually:", url)
+		}
+	}
+	if err := httpServer.Serve(listener); err != nil && err != http.ErrServerClosed {
 		fmt.Fprintln(os.Stderr, "server error:", err)
 		os.Exit(1)
 	}

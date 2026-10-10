@@ -37,19 +37,19 @@ func TestMigrationBacksUpAndCreatesCanonicalWorkspace(t *testing.T) {
 	if err := Migrate("topic"); err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"unit.json", "conversation/conversation.json", "assets/body/current.md", "migrations/iteration-13/backup/explain/output.md"} {
+	for _, path := range []string{"unit.json", "conversation/conversation.json", "assets/review/current.md", "migrations/iteration-13/backup/explain/output.md"} {
 		if _, err := os.Stat(filepath.Join(project, filepath.FromSlash(path))); err != nil {
 			t.Fatalf("missing %s: %v", path, err)
 		}
 	}
-	content, _ := os.ReadFile(filepath.Join(project, "assets", "body", "current.md"))
+	content, _ := os.ReadFile(filepath.Join(project, "assets", "review", "current.md"))
 	if string(content) != "# 正文" {
 		t.Fatalf("body not migrated: %q", content)
 	}
 	if err := Migrate("topic"); err != nil {
 		t.Fatalf("migration should be idempotent: %v", err)
 	}
-	annotationBytes, err := os.ReadFile(filepath.Join(project, "assets", "body", "annotations.jsonl"))
+	annotationBytes, err := os.ReadFile(filepath.Join(project, "assets", "review", "annotations.jsonl"))
 	if err != nil || !strings.Contains(string(annotationBytes), "legacy-note") || !strings.Contains(string(annotationBytes), "旧问题") {
 		t.Fatalf("legacy annotations not migrated: %v %s", err, annotationBytes)
 	}
@@ -94,7 +94,7 @@ func TestMigrationResumesIncompleteJournalEvenWhenUnitExists(t *testing.T) {
 	if err := readJSON(filepath.Join(migrationDir, "migration.json"), &completed); err != nil || completed.Status != "completed" {
 		t.Fatalf("incomplete migration did not resume: %#v %v", completed, err)
 	}
-	body, err := os.ReadFile(filepath.Join(project, "assets", "body", "current.md"))
+	body, err := os.ReadFile(filepath.Join(project, "assets", "review", "current.md"))
 	if err != nil || string(body) != "# 恢复正文" {
 		t.Fatalf("resumed body mismatch: %q %v", body, err)
 	}

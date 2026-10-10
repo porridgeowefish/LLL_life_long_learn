@@ -48,11 +48,11 @@ export interface QueuedTurn {
 
 export interface AssistantTask {
   id: string;
-  type: 'consolidate' | 'verify' | 'produce-material' | 'source-processing';
+  type: 'consolidate';
   objective: string;
   status: 'queued' | 'running' | 'succeeded' | 'partial' | 'failed' | 'cancelled';
   phase?: 'preparing' | 'executing' | 'validating' | 'committing';
-  result?: { summary: string; deliverables?: string[]; assetUpdates?: Record<string, string> };
+  result?: { summary: string; assetUpdates?: Record<string, string> };
   failure?: { code: string; message: string; suggestion?: string };
   createdAt: string;
   updatedAt: string;
@@ -60,7 +60,7 @@ export interface AssistantTask {
 
 export interface AssetMeta {
   assetId: string;
-  key: 'intro' | 'body' | 'practice';
+  key: 'review' | 'practice';
   title: string;
   currentVersionId: string;
   editRevision: number;
@@ -71,18 +71,7 @@ export interface AssetMeta {
 export interface LearningAsset {
   meta: AssetMeta;
   content: string;
-  contentKind: 'markdown' | 'explain-pages' | 'practice-set';
-}
-
-export interface GeneratedArtifactSummary {
-  artifactId: string;
-  kind: string;
-  title: string;
-  description: string;
-  entryPoint?: string;
-  entryMediaType?: string;
-  fileCount: number;
-  createdAt: string;
+  contentKind: 'markdown';
 }
 
 export interface BodyAnnotationMessage {
@@ -114,6 +103,9 @@ export interface LearningSource {
   status: 'stored' | 'processing' | 'ready' | 'opaque' | 'failed' | 'tombstoned' | 'deleted';
   currentRevisionId: string;
   failureCode?: string;
+  parser?: string;
+  extractedBytes?: number;
+  extractionTruncated?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -139,6 +131,7 @@ export interface SourceRevision {
 export type TeacherStreamFrame =
   | { type: 'turn-accepted'; data: { learnerMessageId: string; responseId: string } }
   | { type: 'message-started'; data: { teacherMessageId: string } }
+  | { type: 'message-reset'; data: { messageId: string; code: string } }
   | { type: 'text-delta' | 'reasoning-summary-delta'; data: { blockId: string; delta: string } }
   | { type: 'task-accepted'; data: { toolCallId: string; taskId: string; status: string } }
   | { type: 'tool-rejected'; data: { toolCallId: string; code: string; existingTaskId?: string } }
@@ -154,8 +147,6 @@ export const learningWorkspaceKeys = {
   tasks: (slug: string) => ['learning-workspace', slug, 'tasks'] as const,
   assets: (slug: string) => ['learning-workspace', slug, 'assets'] as const,
   asset: (slug: string, key: string) => ['learning-workspace', slug, 'assets', key] as const,
-  generated: (slug: string) => ['learning-workspace', slug, 'generated'] as const,
-  generatedEntry: (slug: string, artifactId: string) => ['learning-workspace', slug, 'generated', artifactId, 'entry'] as const,
   annotations: (slug: string) => ['learning-workspace', slug, 'annotations'] as const,
   sources: (slug: string) => ['learning-workspace', slug, 'sources'] as const,
   source: (slug: string, sourceId: string) => ['learning-workspace', slug, 'sources', sourceId] as const,
@@ -200,7 +191,7 @@ export function useConversation(slug: string) {
 }
 
 export function useAssistantTasks(slug: string) {
-  return useQuery({ queryKey: keys.tasks(slug), queryFn: async () => (await http.get<{ tasks: AssistantTask[] }>(`/api/projects/${encodeURIComponent(slug)}/assistant-tasks`)).tasks, enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((task) => task.status === 'queued' || task.status === 'running') ? 2500 : false });
+  return useQuery({ queryKey: keys.tasks(slug), queryFn: async () => (await http.get<{ tasks: AssistantTask[] }>(`/api/projects/${encodeURIComponent(slug)}/assistant-tasks`)).tasks.filter(task => task.type === 'consolidate'), enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((task) => task.status === 'queued' || task.status === 'running') ? 2500 : false });
 }
 
 export function useAssets(slug: string) {
@@ -209,33 +200,6 @@ export function useAssets(slug: string) {
 
 export function useAsset(slug: string, key: string) {
   return useQuery({ queryKey: keys.asset(slug, key), queryFn: () => http.get<LearningAsset>(`/api/projects/${encodeURIComponent(slug)}/assets/${key}`), enabled: Boolean(slug && key) });
-}
-
-export function useGeneratedArtifacts(slug: string) {
-  return useQuery({
-    queryKey: keys.generated(slug),
-    queryFn: async () => (await http.get<{ artifacts: GeneratedArtifactSummary[] }>(`/api/projects/${encodeURIComponent(slug)}/generated`)).artifacts,
-    enabled: Boolean(slug),
-  });
-}
-
-function generatedFileURL(slug: string, artifact: GeneratedArtifactSummary) {
-  if (!artifact.entryPoint) return '';
-  const path = artifact.entryPoint.split('/').map(encodeURIComponent).join('/');
-  return `/api/projects/${encodeURIComponent(slug)}/generated/${encodeURIComponent(artifact.artifactId)}/files/${path}`;
-}
-
-export function generatedArtifactOpenURL(slug: string, artifactId: string) {
-  return `/api/projects/${encodeURIComponent(slug)}/generated/${encodeURIComponent(artifactId)}/open`;
-}
-
-export function useGeneratedArtifactEntry(slug: string, artifact?: GeneratedArtifactSummary) {
-  const previewable = artifact?.entryMediaType === 'text/markdown' || artifact?.entryMediaType === 'text/plain';
-  return useQuery({
-    queryKey: keys.generatedEntry(slug, artifact?.artifactId ?? ''),
-    queryFn: () => http.get<string>(generatedFileURL(slug, artifact!), { rawText: true }),
-    enabled: Boolean(slug && artifact?.entryPoint && previewable),
-  });
 }
 
 export function useSaveAsset(slug: string, key: string) {
@@ -252,7 +216,7 @@ export function useSaveAsset(slug: string, key: string) {
 export function useBodyAnnotations(slug: string) {
   return useQuery({
     queryKey: keys.annotations(slug),
-    queryFn: async () => (await http.get<{ annotations: BodyAnnotation[] }>(`/api/projects/${encodeURIComponent(slug)}/assets/body/annotations`)).annotations,
+    queryFn: async () => (await http.get<{ annotations: BodyAnnotation[] }>(`/api/projects/${encodeURIComponent(slug)}/assets/review/annotations`)).annotations,
     enabled: Boolean(slug),
   });
 }
@@ -261,7 +225,7 @@ export function useCreateBodyAnnotation(slug: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: { assetVersionId: string; quoteSnapshot: string; anchors: BodyAnnotation['anchors']; note?: string }) =>
-      http.post<{ annotation: BodyAnnotation }>(`/api/projects/${encodeURIComponent(slug)}/assets/body/annotations`, input),
+      http.post<{ annotation: BodyAnnotation }>(`/api/projects/${encodeURIComponent(slug)}/assets/review/annotations`, input),
     onSuccess: () => void client.invalidateQueries({ queryKey: keys.annotations(slug) }),
   });
 }
@@ -269,7 +233,7 @@ export function useCreateBodyAnnotation(slug: string) {
 export function useDeleteBodyAnnotation(slug: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (annotationId: string) => http.delete(`/api/projects/${encodeURIComponent(slug)}/assets/body/annotations/${encodeURIComponent(annotationId)}`),
+    mutationFn: (annotationId: string) => http.delete(`/api/projects/${encodeURIComponent(slug)}/assets/review/annotations/${encodeURIComponent(annotationId)}`),
     onSuccess: () => void client.invalidateQueries({ queryKey: keys.annotations(slug) }),
   });
 }
@@ -290,24 +254,24 @@ export function sourceFileURL(slug: string, sourceId: string, revisionId: string
   return `/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}/revisions/${encodeURIComponent(revisionId)}/files/${encodeURIComponent(fileKey)}`;
 }
 
+export const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024;
+
 export function useUploadSource(slug: string) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ file, parseApproved, cloudDisclosureAccepted }: { file: File; parseApproved: boolean; cloudDisclosureAccepted: boolean }) => {
+    mutationFn: async ({ file }: { file: File }) => {
+      if (file.size > MAX_SOURCE_FILE_BYTES) throw new Error('单文件不能超过 50MB');
       const form = new FormData();
       form.set('operationId', crypto.randomUUID());
       form.set('displayName', file.name);
-      form.set('parseApproved', String(parseApproved));
-      form.set('cloudDisclosureAccepted', String(cloudDisclosureAccepted));
       form.set('file', file);
       const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/sources`, { method: 'POST', body: form });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new ApiError(response.status, '资料上传失败', payload);
-      return payload as { source: LearningSource; task?: AssistantTask };
+      if (!response.ok) throw new ApiError(response.status, response.status === 413 ? '单文件不能超过 50MB' : '资料上传失败', payload);
+      return payload as { source: LearningSource; revision: SourceRevision; parseDisposition: string; parseReason: string };
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: keys.sources(slug) });
-      void client.invalidateQueries({ queryKey: keys.tasks(slug) });
     },
   });
 }
@@ -316,6 +280,14 @@ export function useTombstoneSource(slug: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (sourceId: string) => http.delete(`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}`),
+    onSuccess: () => void client.invalidateQueries({ queryKey: keys.sources(slug) }),
+  });
+}
+
+export function useRetrySource(slug: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sourceId: string) => http.post<LearningSource>(`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}/retry`, {}),
     onSuccess: () => void client.invalidateQueries({ queryKey: keys.sources(slug) }),
   });
 }

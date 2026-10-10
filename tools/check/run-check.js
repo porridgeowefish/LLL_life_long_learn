@@ -29,7 +29,9 @@ function run(title, command, args, opts = {}) {
   console.log(`\n=== ${title} ===`);
   const result = spawnSync(command, args, {
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    // Only npm's Windows shim needs cmd.exe. Native executables (including
+    // Node under Program Files) must preserve argv and their full path.
+    shell: process.platform === 'win32' && command === 'npm',
     env: { ...process.env, FORCE_COLOR: '0' },
     ...opts.spawn,
   });
@@ -74,7 +76,7 @@ if (mode !== 'fast') {
   );
   if (!failed) run('Go coverage gate', 'node', ['tools/check/check-coverage.js', 'go', `${artifacts}/coverage/go.out`]);
   run('frontend production build', 'npm', ['--prefix', 'frontend', 'run', 'build']);
-  run('backend production build', 'go', ['build', '-o', 'dist/lll.exe', './backend-go/cmd/lll']);
+  run('backend production build', process.execPath, ['tools/release/manage.js', 'build']);
 }
 
 // ---- full adds ----
@@ -86,6 +88,11 @@ if (mode === 'full') {
     ['test', '-count=1', '-timeout', '300s', './backend-go/internal/transport/httpserver/'],
   );
   if (process.platform === 'win32') {
+    run(
+      'Windows desktop launcher health regression',
+      'node',
+      ['--test', 'tools/release/desktop-launcher.test.js'],
+    );
     run(
       'Windows-native fake CLI smoke',
       'go',

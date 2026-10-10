@@ -125,7 +125,7 @@ export interface HealthStats {
   activeSessions: number;
 }
 
-export type AgentRuntimeID = 'claude' | 'codebuddy' | 'hermes' | 'codex' | 'trae';
+export type AgentRuntimeID = 'claude' | 'codebuddy' | 'workbuddy' | 'hermes' | 'codex' | 'trae';
 
 export interface AgentRuntimeProvider {
   id: AgentRuntimeID;
@@ -138,6 +138,7 @@ export interface AgentRuntimeProvider {
   bin: string;
   available: boolean;
   mode?: 'native' | 'wsl';
+  reason?: string;
 }
 
 export interface AgentRuntimeHealth {

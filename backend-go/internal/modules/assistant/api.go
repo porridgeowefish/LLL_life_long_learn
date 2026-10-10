@@ -21,6 +21,7 @@ const (
 
 	RuntimeClaude    = runtime.RuntimeClaude
 	RuntimeCodeBuddy = runtime.RuntimeCodeBuddy
+	RuntimeWorkBuddy = runtime.RuntimeWorkBuddy
 	RuntimeHermes    = runtime.RuntimeHermes
 	RuntimeCodex     = runtime.RuntimeCodex
 	RuntimeTrae      = runtime.RuntimeTrae
@@ -123,3 +124,5 @@ func ExpandPrimitives(required, optional []string) (string, error) {
 	return prompt.ExpandPrimitives(required, optional)
 }
 func LoadPrimitive(name string) (string, error) { return prompt.LoadPrimitive(name) }
+
+func RetireLegacyTasks(slug string) error { return tasks.RetireLegacyTasks(slug) }

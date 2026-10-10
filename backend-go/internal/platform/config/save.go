@@ -10,10 +10,12 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 // pathOverride lets tests redirect the file location.
 var pathOverride string
+var saveMu sync.Mutex
 
 // UsePathForTest redirects the config file path and returns a restore func.
 func UsePathForTest(path string) (restore func()) {
@@ -31,6 +33,8 @@ func activePath(explicit string) string {
 
 // SaveUI writes the ui section, preserving every other top-level key.
 func SaveUI(theme string) error {
+	saveMu.Lock()
+	defer saveMu.Unlock()
 	raw, err := readRaw(activePath(""))
 	if err != nil {
 		return err
@@ -43,6 +47,8 @@ func SaveUI(theme string) error {
 // assistant section exists, otherwise the legacy flat agentRuntime key so
 // older builds stay readable during the compatibility period).
 func SaveAssistantRuntime(runtime string) error {
+	saveMu.Lock()
+	defer saveMu.Unlock()
 	raw, err := readRaw(activePath(""))
 	if err != nil {
 		return err
@@ -72,11 +78,23 @@ type AISettings struct {
 // existing local Settings flow and older builds keep reading it. The
 // canonical 'ai' section is read-preferred during the compatibility period.
 func SaveAI(settings AISettings) error {
+	saveMu.Lock()
+	defer saveMu.Unlock()
 	raw, err := readRaw(activePath(""))
 	if err != nil {
 		return err
 	}
-	raw["askAiProviders"] = settings
+	if existing, ok := raw["ai"]; ok {
+		section, _ := existing.(map[string]any)
+		if section == nil {
+			section = map[string]any{}
+		}
+		section["defaultProvider"], section["searchEngine"], section["providers"], section["bindings"] = settings.Default, settings.SearchEngine, settings.Providers, settings.Bindings
+		raw["ai"] = section
+		delete(raw, "askAiProviders")
+	} else {
+		raw["askAiProviders"] = settings
+	}
 	return writeRaw(activePath(""), raw)
 }
 
@@ -151,6 +169,8 @@ func LoadWebSearch() (WebSearchSettings, bool, error) {
 
 // SaveWebSearch writes the webSearch section, preserving other keys.
 func SaveWebSearch(settings WebSearchSettings) error {
+	saveMu.Lock()
+	defer saveMu.Unlock()
 	raw, err := readRaw(activePath(""))
 	if err != nil {
 		return err
@@ -207,7 +227,7 @@ func atomicWrite(path string, content []byte) error {
 		os.Remove(name)
 		return err
 	}
-	if err := os.Chmod(name, 0o644); err != nil {
+	if err := os.Chmod(name, 0o600); err != nil {
 		os.Remove(name)
 		return err
 	}

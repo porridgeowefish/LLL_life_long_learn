@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-10-10
 Source of truth: current project types, flat storage, learning-unit shape, and navigation semantics.
 
 ## Core Principle
@@ -68,10 +68,9 @@ projects/<learning-slug>/
     events.jsonl
     compact.json
   assets/
-    intro/
-    body/
+    review/
     practice/
-    generated/
+    notes/{state.json,entries/,jobs/}
   sources/<source-id>/revisions/<revision-id>/
     original/
     derived/
@@ -80,8 +79,15 @@ projects/<learning-slug>/
     input-manifest.json
     attempts/
   runs/
-  migrations/iteration-13/
+  progress/
+  migrations/iteration-18.json
 ```
+
+The skeleton also creates the legacy `intro/`, `explain/`, and `practice/`
+zone directories: practice persistence, the learner-writable notes/survey
+files, and the infographic pipeline still live there through the compatibility
+layer. `progress/` holds the activity event stream and summary that feed the
+home and usage heatmaps.
 
 `project.md` stores the focused-learning brief. `learning-scope.json` stores the
 objective topic boundary: a map-origin project receives a ready creation-time
@@ -124,10 +130,9 @@ ordinary movable folder members.
 
 ## Assets, Sources, Runs, And Preferences
 
-- `assets/intro`, `assets/body`, and `assets/practice` are editable,
-  learner-facing teaching assets.
-- `assets/generated` holds declared research, code, images, experiments, and
-  other assistant deliverables that do not fit the three teaching sections.
+- `assets/review` and `assets/practice` are editable, versioned Markdown assets.
+- `assets/notes` holds teacher API notes, durable batch jobs and counting state.
+- Retired intro/body/generated assets and their public reading endpoints are removed.
 - `sources/` holds learner-provided immutable revisions and, after supported
   background parsing, exactly one `derived/content.md` citation per ready revision.
 - `runs/` and task attempts hold execution evidence until the assistant declares
@@ -136,20 +141,18 @@ ordinary movable folder members.
   read-only to AI and never tool authorization or factual evidence.
 
 Formal assets are written by Go after assistant acceptance and version/merge
-handling. The visible CLI writes only its attempt workspace and declared result
-manifest; Go atomically publishes declared deliverable directories without
-content or hash validation.
-Confirmed consolidation always rewrites Intro and Body from captured conversation
-evidence; Practice changes only when the approved task explicitly requests it.
+handling. The visible CLI writes only its attempt workspace and result manifest.
+Confirmed consolidation updates review; practice changes only if explicitly requested.
 
-## Compatibility Boundary
+## One-Time Cutover Boundary
 
-Old projects may contain `intro/`, `explain/`, `practice/`, `extend/`,
-`summary/`, `progress/`, and `memory/`. Migration may read Intro, Explain,
-Practice, and Explain annotations into the current intro/body/practice model.
-`extend/` and `summary/` are preserved historical files: they do not enter
-teacher context, migration inventory, file APIs, watchers, navigation, or agent
-registration. Project memory is likewise preserved but ignored.
+Legacy Intro/Explain/Practice files are read only during verified cutover. Canonical
+intro/current.md precedes body/current.md in the new review; canonical empty files
+stay empty. Old annotations retain quote snapshots and source version IDs. A failed
+read, conflicting existing review or linked directory blocks that project's learning
+APIs and keeps sources. After journal completion there is no runtime fallback.
+Source originals/derived, conversations, maps, plans and preferences are retained.
+Retired Summary/Extend and project memory remain ignored historical files.
 
 ## Required State
 
@@ -171,3 +174,25 @@ not active navigation state for the teacher workspace.
 Earlier partially effective workbench and artifact decisions remain in the
 [active ADR graph](./ADR/README.md). Only fully superseded decisions move to the
 [historical ADR index](../99-archive/adr/README.md).
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+资产导航只展示复习稿、练习题、笔记；review 替代 intro/body，并保留迁移前批注的引用快照与旧来源标记。generated 成果目录及运行期读取不保留，source originals/derived、教师会话与学科地图不在清理范围。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+资料原件与派生文字继续位于 sources/<sourceId>/revisions/<revisionId>/，本地解析后台完成；教师/资产/资料顶部均提供导入入口。资料无需手动引用即可进入下次教师请求的有界摘录，显式引用仅提升优先级。笔记在资产页剩余空间独立滚动。公开安装目录不包含私有工作区，维护者仓库运行和安装运行分离。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

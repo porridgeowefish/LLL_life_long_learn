@@ -165,7 +165,7 @@ func (s *Store) ensure() error {
 		}
 	}
 	now := time.Now().UTC()
-	unit := Unit{SchemaVersion: SchemaVersion, UnitID: idgen.New("unit"), ConversationID: idgen.New("conv"), ProjectSlug: s.slug, ActiveAssetKeys: []string{"intro", "body", "practice"}, CreatedAt: now, UpdatedAt: now}
+	unit := Unit{SchemaVersion: SchemaVersion, UnitID: idgen.New("unit"), ConversationID: idgen.New("conv"), ProjectSlug: s.slug, ActiveAssetKeys: []string{"review", "practice", "notes"}, CreatedAt: now, UpdatedAt: now}
 	if data, err := os.ReadFile(unitPath); err == nil {
 		_ = json.Unmarshal(data, &unit)
 	}
@@ -437,6 +437,8 @@ func (s *Store) SnapshotThrough(throughSeq uint64) (Projection, error) {
 	if throughSeq > meta.LatestSeq {
 		return Projection{}, errors.New("conversation cutoff exceeds latest sequence")
 	}
+	cutoff := sort.Search(len(events), func(i int) bool { return events[i].Seq > throughSeq })
+	hidden := hiddenTeacherMessages(events[:cutoff])
 	projection := Projection{ConversationID: meta.ID, UnitID: meta.UnitID, LatestSeq: throughSeq, PageThroughSeq: throughSeq, Messages: []Message{}, TaskLinks: []TaskLink{}}
 	for _, event := range events {
 		if event.Seq > throughSeq {
@@ -445,7 +447,7 @@ func (s *Store) SnapshotThrough(throughSeq uint64) (Projection, error) {
 		switch event.Type {
 		case "message-recorded":
 			var message Message
-			if json.Unmarshal(event.Data, &message) == nil {
+			if json.Unmarshal(event.Data, &message) == nil && !(message.Role == "teacher" && hidden[message.ID]) {
 				projection.Messages = append(projection.Messages, message)
 			}
 		case "task-linked":

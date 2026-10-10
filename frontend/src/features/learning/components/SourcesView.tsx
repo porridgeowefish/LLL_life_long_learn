@@ -1,51 +1,30 @@
-import { ChangeEvent, useRef, useState } from 'react';
-
-import { useSources, useUploadSource } from '@/features/learning/api/learningWorkspace';
+import { useRetrySource, useSources, type LearningSource } from '@/features/learning/api/learningWorkspace';
+import { SourceImportControl } from './SourceImportControl';
 
 import s from './SourcesView.module.css';
 
 // This page is deliberately a file ledger, not a second content reader. The
 // parsed Markdown is available only from the teacher's citation picker.
 export function SourcesView({ slug }: { slug: string }) {
-  const input = useRef<HTMLInputElement>(null);
   const sources = useSources(slug);
-  const upload = useUploadSource(slug);
-  const [pending, setPending] = useState<File | null>(null);
-  const [cloudAccepted, setCloudAccepted] = useState(false);
-
-  const choose = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    event.target.value = '';
-    setPending(file);
-    setCloudAccepted(false);
-  };
-
-  const submit = () => {
-    if (!pending || !cloudAccepted) return;
-    upload.mutate({ file: pending, parseApproved: true, cloudDisclosureAccepted: true }, { onSuccess: () => setPending(null) });
-  };
+  const retry = useRetrySource(slug);
   const visible = (sources.data ?? []).filter((source) => source.status !== 'tombstoned' && source.status !== 'deleted');
 
   return (
     <section className={s.sources}>
       <header>
-        <div><span>资料库</span><h2>当前文件</h2><p>文件上传后由助教在后台提取为可引用文本；此处不展示解析内容或助教资产。</p></div>
-        <button type="button" onClick={() => input.current?.click()} disabled={upload.isPending}>{upload.isPending ? '正在保存…' : '上传资料'}</button>
-        <input ref={input} type="file" hidden onChange={choose} />
+        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 50 MB。</p><p>扫描版 PDF 暂不识别图片文字；旧版 DOC 请另存为 DOCX 后导入。</p></div>
+        <SourceImportControl slug={slug} />
       </header>
-      {upload.isError && <div className={s.error}>上传失败：{upload.error.message}</div>}
-      {pending && <div className={s.confirm} role="dialog" aria-label="确认资料处理">
-        <div><strong>{pending.name}</strong><p>资料会保存到当前学习单元，并由助教异步提取为 Markdown。解析不阻塞教师对话。</p></div>
-        <label><input type="checkbox" checked={cloudAccepted} onChange={(event) => setCloudAccepted(event.target.checked)} /> 我了解并同意本次解析可能使用云端模型</label>
-        <div className={s.confirmActions}><button type="button" onClick={() => setPending(null)}>取消</button><button type="button" className={s.primary} disabled={!cloudAccepted || upload.isPending} onClick={submit}>保存并解析</button></div>
-      </div>}
+      {sources.isError && <div className={s.error} role="alert">资料列表读取失败。<button type="button" onClick={() => void sources.refetch()}>重试</button></div>}
+      {retry.isError && <div className={s.error} role="alert">重试解析失败：{retry.error.message}</div>}
       <section className={s.librarySection}>
         <div className={s.sectionHeading}><div><span>上传资料</span><h3>文件项</h3></div><small>{visible.length} 份</small></div>
         <div className={s.list}>
           {visible.map((source) => <article key={source.sourceId}>
             <div className={s.fileIcon}>{extension(source.displayName)}</div>
-            <div><strong>{source.displayName}</strong><span>{statusLabel(source.status)}</span></div>
-            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time></div>
+            <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}</div>
+            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}</div>
           </article>)}
           {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传资料</div>}
         </div>
@@ -59,7 +38,23 @@ function extension(name: string) {
   return value.slice(0, 5);
 }
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = { stored: '已保存，未解析', processing: '助教正在解析', ready: '解析完成，可在教师对话中引用', opaque: '已保存，暂不支持解析', failed: '解析失败' };
-  return labels[status] ?? status;
+function statusLabel(source: LearningSource) {
+  const failures: Record<string, string> = {
+    unsupported_legacy_format: '旧版 DOC 暂不支持，请另存为 DOCX 后重新导入。',
+    unsupported_format: '暂不支持此格式，请转换为支持的格式后重新导入。',
+    invalid_document: '文件格式无效或已损坏，请检查后重新导入。',
+    encrypted_document: '文件已加密，请解密后重新导入。',
+    resource_limit: '文件内容超出解析资源限制，请拆分后重新导入。',
+    no_extractable_text: '无可提取文字，扫描件暂不支持识别。',
+    parse_cancelled: '解析被中断，可以重试。',
+    parse_failed: '解析未完成，可以重试。',
+  };
+  if (source.status === 'failed') return `解析失败：${failures[source.failureCode ?? ''] ?? '请检查文件是否损坏、加密或没有可提取文字，再重新导入。'}`;
+  if (source.status === 'opaque' && canRetry(source)) return '原文件已保存，可重试本地解析';
+  const labels: Record<string, string> = { stored: '已保存，等待解析', processing: '正在本地解析', ready: '解析完成，教师可读取', opaque: '已保存，暂不支持解析' };
+  return labels[source.status] ?? source.status;
+}
+
+function canRetry(source: LearningSource) {
+  return (source.status === 'failed' || source.status === 'opaque') && /\.(pdf|md|markdown|txt|pptx|docx|xlsx|csv)$/i.test(source.displayName);
 }

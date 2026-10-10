@@ -41,6 +41,40 @@ beforeEach(() => {
 });
 
 describe('TeacherView source references', () => {
+  it('explains a failed empty reply instead of leaving a blank teacher bubble', async () => {
+    workspaceMocks.conversation = {
+      messages: [{ id: 'failed-teacher', role: 'teacher', status: 'failed', blocks: [], createdAt: '' }],
+      taskLinks: [],
+    };
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="closures" title="闭包" /></QueryClientProvider>);
+    expect(await screen.findByRole('alert')).toHaveTextContent('回复未完成');
+  });
+
+  it('retracts an invalid streamed candidate before rendering the recovered answer', async () => {
+    let emit!: Parameters<typeof streamTeacherTurn>[3];
+    let finish!: () => void;
+    vi.mocked(streamTeacherTurn).mockImplementationOnce(async (_slug, _input, _signal, onFrame) => {
+      emit = onFrame;
+      await new Promise<void>(resolve => { finish = resolve; });
+    });
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><TeacherView slug="closures" title="闭包" /></QueryClientProvider>);
+    fireEvent.change(screen.getByPlaceholderText('和 闭包 的教师继续讨论…'), { target: { value: '我没有理解这个问题' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(streamTeacherTurn).toHaveBeenCalled());
+    act(() => {
+      emit({ type: 'text-delta', data: { blockId: 'body', delta: '我应该调用助教整理内容。' } });
+      // The reset must discard buffered deltas, not let a pending timer put
+      // the invalid candidate back into the replacement reply.
+      emit({ type: 'message-reset', data: { messageId: 'teacher', code: 'unexpected_tool_request' } });
+      emit({ type: 'text-delta', data: { blockId: 'body', delta: '我们用一个简单的例子解释。' } });
+    });
+    expect(await screen.findByText('我们用一个简单的例子解释。')).toBeVisible();
+    expect(screen.queryByText(/我应该调用助教/)).toBeNull();
+    await act(async () => { finish(); });
+  });
+
   it('keeps a newly opened conversation pinned to the bottom while late content finishes layout', async () => {
     let notifyResize: (() => void) | undefined;
     class ResizeObserverStub {
@@ -75,7 +109,7 @@ describe('TeacherView source references', () => {
 
     expect(await screen.findByRole('option', { name: '主教师 · gpt-new' })).toBeTruthy();
 
-    fireEvent.click(screen.getByText('资料', { selector: 'summary' }));
+    fireEvent.click(screen.getByText('引用资料', { selector: 'summary' }));
     fireEvent.click(screen.getByRole('checkbox', { name: /闭包讲义/ }));
     fireEvent.change(screen.getByPlaceholderText('和 闭包 的教师继续讨论…'), { target: { value: '请结合资料解释' } });
     const transcript = screen.getByRole('log', { name: '教师对话' });
@@ -236,19 +270,19 @@ describe('TeacherView source references', () => {
   });
 
   it('announces an assistant task when it transitions to completed', async () => {
-    workspaceMocks.tasks = [{ id: 'task-1', type: 'produce-material', objective: '生成分布式计算总结', status: 'running', createdAt: '', updatedAt: '1' }];
+    workspaceMocks.tasks = [{ id: 'task-1', type: 'consolidate', objective: '生成分布式计算总结', status: 'running', createdAt: '', updatedAt: '1' }];
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><TeacherView slug="distributed" title="分布式计算" /></QueryClientProvider>);
 
-    workspaceMocks.tasks = [{ id: 'task-1', type: 'produce-material', objective: '生成分布式计算总结', status: 'succeeded', result: { summary: '已生成', deliverables: ['artifact-1'] }, createdAt: '', updatedAt: '2' }];
+    workspaceMocks.tasks = [{ id: 'task-1', type: 'consolidate', objective: '生成分布式计算总结', status: 'succeeded', result: { summary: '已生成', assetUpdates: { review: 'updated' } }, createdAt: '', updatedAt: '2' }];
     view.rerender(<QueryClientProvider client={client}><TeacherView slug="distributed" title="分布式计算" /></QueryClientProvider>);
 
-    expect(await screen.findByRole('status')).toHaveTextContent('助教已完成，成果已同步到资产与资料');
-    expect(screen.getByRole('link', { name: '到资料页查看' })).toHaveAttribute('href', '/project/distributed/sources');
+    expect(await screen.findByRole('status')).toHaveTextContent('助教已完成，教学资产已经更新');
+    expect(screen.queryByRole('link', { name: '到资料页查看' })).toBeNull();
   });
 
   it('recovers an unseen completion after reopening and remembers dismissal', async () => {
-    workspaceMocks.tasks = [{ id: 'task-offline', type: 'produce-material', objective: '离开页面期间生成总结', status: 'succeeded', result: { summary: '已生成', deliverables: ['artifact-2'] }, createdAt: '', updatedAt: '2026-09-02T01:00:00Z' }];
+    workspaceMocks.tasks = [{ id: 'task-offline', type: 'consolidate', objective: '离开页面期间生成总结', status: 'succeeded', result: { summary: '已生成', assetUpdates: { review: 'updated' } }, createdAt: '', updatedAt: '2026-09-02T01:00:00Z' }];
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const view = render(<QueryClientProvider client={client}><TeacherView slug="offline" title="离线恢复" /></QueryClientProvider>);
 
@@ -303,6 +337,9 @@ describe('TeacherView iteration-17 conversation actions', () => {
     render(<QueryClientProvider client={client}><TeacherView slug="queue-view" title="队列" /></QueryClientProvider>);
 
     expect(await screen.findByText('排队中的问题')).toBeTruthy();
+    const queue = screen.getByLabelText('等待队列');
+    const composer = screen.getByPlaceholderText('和 队列 的教师继续讨论…').closest('form');
+    expect(composer).not.toContainElement(queue);
     fireEvent.click(screen.getByRole('button', { name: '立即引导 排队中的问题' }));
     await waitFor(() => expect(steerQueuedTurn).toHaveBeenCalledWith('queue-view', 'q_1', expect.anything(), expect.anything()));
     fireEvent.click(screen.getByRole('button', { name: '移除排队消息 排队中的问题' }));
@@ -328,12 +365,24 @@ describe('TeacherView iteration-17 conversation actions', () => {
     await screen.findByText('最新回答');
     // Copy exists on every message (3 here), regenerate only once.
     const copyButtons = screen.getAllByRole('button', { name: '复制原文' });
+    const downloadButtons = screen.getAllByRole('button', { name: '下载本条文本' });
     expect(copyButtons.length).toBe(3);
+    expect(downloadButtons.length).toBe(3);
     const regenerateButton = screen.getByRole('button', { name: '重新生成这条回复' });
     expect(regenerateButton).toBeTruthy();
 
     fireEvent.click(copyButtons[2]);
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('最新回答'));
+
+    const createObjectURL = vi.fn(() => 'blob:teacher-message');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectURL });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    fireEvent.click(downloadButtons[2]);
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:teacher-message');
 
     fireEvent.click(regenerateButton);
     await waitFor(() => expect(regenerateTeacherResponse).toHaveBeenCalledWith('regen', 'resp_last', expect.anything(), expect.anything()));

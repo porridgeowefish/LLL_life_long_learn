@@ -24,7 +24,9 @@ describe('LearningRhythm', () => {
     expect(screen.getByText('有效学习行动')).toBeTruthy();
     expect(screen.getByText('18')).toBeTruthy();
     fireEvent.click(screen.getByLabelText(/7月10日/));
-    expect(screen.getByText('有效阅读')).toBeTruthy();
+    expect(screen.queryByText('有效阅读')).toBeNull();
+    expect(screen.queryByText('本周投入')).toBeNull();
+    expect(screen.getByLabelText(/7月10日/)).toHaveAttribute('aria-selected', 'true');
   });
 
   it('supports project and range filters', () => {

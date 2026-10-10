@@ -151,7 +151,7 @@ func (c *Config) Validate() error {
 		seen[p.ID] = true
 	}
 	switch c.Assistant.Runtime {
-	case "claude", "codebuddy", "hermes", "codex", "trae", "":
+	case "claude", "codebuddy", "workbuddy", "hermes", "codex", "trae", "":
 	default:
 		return fmt.Errorf("assistant.runtime %q is not a supported runtime", c.Assistant.Runtime)
 	}

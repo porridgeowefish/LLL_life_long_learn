@@ -359,3 +359,10 @@
   color: var(--muted);
   font-size: 0.7rem;
 }
+
+.brand { display: flex; align-items: center; gap: 8px; padding: 16px 12px; font-size: .95rem; font-weight: 700; color: var(--fg); text-decoration: none; }
+.brand img { width: 26px; height: 26px; }
+.foot { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.utilities { display: flex; align-items: center; justify-content: space-between; }
+.utilities a, .utilities button { color: var(--muted); font: inherit; }
+.utilities button { background: transparent; border: 0; cursor: pointer; }

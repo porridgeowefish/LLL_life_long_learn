@@ -30,6 +30,9 @@ type Message struct {
 	Content    string
 	ToolCalls  []ToolCall
 	ToolCallID string
+	// Retained only in memory for a provider tool round-trip, never persisted
+	// or sent to the browser. Signed/opaque blocks must be replayed intact.
+	ThinkingBlocks []json.RawMessage
 }
 
 type Tool struct {
@@ -46,17 +49,20 @@ type ToolCall struct {
 }
 
 type Event struct {
-	Type     string
-	Delta    string
-	ToolCall *ToolCall
-	Usage    map[string]int
+	Type          string
+	Delta         string
+	ToolCall      *ToolCall
+	Usage         map[string]int
+	ThinkingBlock json.RawMessage
 }
 
 type Request struct {
-	System     string
-	Messages   []Message
-	Tools      []Tool
-	ProviderID string
+	System      string
+	Messages    []Message
+	Tools       []Tool
+	ProviderID  string
+	BindingName string
+	Model       string
 }
 
 type Gateway interface {
@@ -70,9 +76,16 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 	if err != nil {
 		return err
 	}
-	p := cfg.Resolve("teacher")
+	binding := in.BindingName
+	if binding == "" {
+		binding = "teacher"
+	}
+	p := cfg.Resolve(binding)
 	if strings.TrimSpace(in.ProviderID) != "" {
-		p = cfg.Find(strings.TrimSpace(in.ProviderID))
+		p = cfg.FindExact(strings.TrimSpace(in.ProviderID))
+	}
+	if p != nil && in.Model != "" {
+		p.Model = in.Model
 	}
 	if p == nil || p.APIKey == "" || p.BaseURL == "" || p.Model == "" {
 		return errors.New("teacher provider is not configured")
@@ -226,7 +239,10 @@ func anthropicMessage(message Message) map[string]any {
 		}}}
 	}
 	if len(message.ToolCalls) > 0 {
-		blocks := make([]map[string]any, 0, len(message.ToolCalls)+1)
+		blocks := make([]any, 0, len(message.ThinkingBlocks)+len(message.ToolCalls)+1)
+		for _, block := range message.ThinkingBlocks {
+			blocks = append(blocks, block)
+		}
 		if message.Content != "" {
 			blocks = append(blocks, map[string]any{"type": "text", "text": message.Content})
 		}
@@ -244,9 +260,16 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		messages = append(messages, anthropicMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": 8192}
-	// Re-synthesized assistant messages cannot replay signed thinking blocks,
-	// so tool-capable turns disable thinking rather than risk protocol errors.
-	if p.Thinking && len(in.Tools) == 0 {
+	// Merely offering tools must not change the configured thinking channel.
+	// Older externally supplied tool history lacking signed blocks still uses
+	// the non-thinking request shape; live tool rounds retain them in memory.
+	replayableThinking := true
+	for _, message := range in.Messages {
+		if len(message.ToolCalls) > 0 && len(message.ThinkingBlocks) == 0 {
+			replayableThinking = false
+		}
+	}
+	if p.Thinking && replayableThinking {
 		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": 2048}
 		body["max_tokens"] = 10240
 	}
@@ -259,6 +282,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 	}
 	var toolName, providerID, arguments string
 	blockTypes := map[int]string{}
+	thinkingBlocks := map[int]map[string]any{}
 	// shape records the block/delta type fingerprint of this provider stream.
 	// GLM's anthropic-compat endpoint intermittently mislabels thinking or
 	// body deltas (the 2026-09-12 mixed reasoning incidents); this log pins
@@ -281,6 +305,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				Thinking    string `json:"thinking"`
 				Summary     string `json:"summary"`
 				PartialJSON string `json:"partial_json"`
+				Signature   string `json:"signature"`
 			} `json:"delta"`
 			Message struct {
 				Usage struct {
@@ -305,6 +330,14 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			}
 		case "content_block_start":
 			blockTypes[event.Index] = event.ContentBlock.Type
+			if event.ContentBlock.Type == "thinking" || event.ContentBlock.Type == "redacted_thinking" {
+				var envelope struct {
+					Block map[string]any `json:"content_block"`
+				}
+				if json.Unmarshal(payload, &envelope) == nil {
+					thinkingBlocks[event.Index] = envelope.Block
+				}
+			}
 			shape.blockStart(event.Index, event.ContentBlock.Type)
 			if event.ContentBlock.Type == "tool_use" {
 				toolName, providerID, arguments = event.ContentBlock.Name, event.ContentBlock.ID, ""
@@ -316,6 +349,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			switch event.Delta.Type {
 			case "text_delta":
 				if blockTypes[event.Index] == "thinking" {
+					appendThinkingField(thinkingBlocks[event.Index], "thinking", event.Delta.Text)
 					if p.Reasoning && event.Delta.Text != "" {
 						emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Text})
 					}
@@ -329,6 +363,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Summary})
 				}
 			case "thinking_delta":
+				appendThinkingField(thinkingBlocks[event.Index], "thinking", event.Delta.Thinking)
 				// GLM's anthropic-compatible stream has emitted thinking deltas in
 				// text blocks. Never let that label error mix reasoning into body.
 				if p.Reasoning && event.Delta.Thinking != "" {
@@ -336,8 +371,18 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				}
 			case "input_json_delta":
 				arguments += event.Delta.PartialJSON
+			case "signature_delta":
+				appendThinkingField(thinkingBlocks[event.Index], "signature", event.Delta.Signature)
 			}
 		case "content_block_stop":
+			if block, ok := thinkingBlocks[event.Index]; ok {
+				raw, err := json.Marshal(block)
+				if err != nil {
+					return err
+				}
+				emit(Event{Type: "provider-thinking-block", ThinkingBlock: raw})
+				delete(thinkingBlocks, event.Index)
+			}
 			delete(blockTypes, event.Index)
 			if toolName != "" {
 				var args map[string]any
@@ -356,6 +401,14 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 		return nil
 	}, nil)
+}
+
+func appendThinkingField(block map[string]any, field, delta string) {
+	if block == nil || delta == "" {
+		return
+	}
+	current, _ := block[field].(string)
+	block[field] = current + delta
 }
 
 func firstNonEmpty(values ...string) string {

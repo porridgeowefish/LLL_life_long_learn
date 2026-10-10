@@ -1,8 +1,8 @@
-# LLL PRD
+# learn-with-ai PRD
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-10-10
 Source of truth: long-lived product intent and product-object boundaries for LLL.
 
 ## Problem
@@ -20,7 +20,7 @@ needs a committed learning workflow.
 
 ## Product Goal
 
-LLL is a local-first learning workbench that:
+learn-with-ai is a local-first learning workbench that:
 
 ```text
 keeps learning context and artifacts in durable local project folders
@@ -52,10 +52,10 @@ not enter the sidebar or filesystem until the learner creates a project.
 
 ### System-learning project
 
-A committed deep-dive learning unit. Current delivered code uses the five
-legacy learning zones. The accepted iteration-13 target replaces that active
-presentation with one teacher conversation plus editable assets and source
-material.
+A committed deep-dive learning unit. Since iteration 13 the delivered active
+presentation is one teacher conversation plus editable assets and source
+material. Legacy Intro/Explain/Practice is one-time migration input only;
+there is no active compatibility reader for retired teaching assets.
 
 It is a physically flat project regardless of whether creation started from a
 map. When started from a map, existing folder membership places it beneath that
@@ -63,7 +63,7 @@ map-backed folder in navigation.
 
 Every system-learning project owns one explicit content boundary. A map-origin
 project snapshots its selected topic's planned boundary; a standalone project
-starts with a draft boundary. In the iteration-13 target, this boundary guides
+starts with a draft boundary. This boundary guides
 the teacher and assistant without mechanically rejecting natural cross-topic
 questions.
 
@@ -78,23 +78,48 @@ The encyclopedia Agent plans the whole architecture before writing; the overview
 Each H4 topic also declares what it owns, reuses, requires, and excludes. The backend snapshots that canonical boundary when the learner confirms a deep dive.
 Each new-contract H4 topic has its learning action beside that body heading; legacy H3-only overviews remain actionable until regenerated.
 System-learning projects use the conversation-first teacher workspace.
-Intro, Explain, and Practice remain compatibility data and migration input only;
+Legacy Intro/Explain/Practice may be read during one-time cutover only;
 retired Summary and Extend files stay recoverable but have no product interface.
-Existing projects remain system-learning projects and migrate compatibly.
-Intro presents generated prerequisite-gap summaries directly, without a second action; project creation represents a deliberate longer-lived commitment.
-Intro calibrates readiness, depth, examples, scaffolding, and practice difficulty. It may finalize a standalone draft scope but cannot broaden a ready map-origin scope.
+Existing projects retain their type; verified intro/body content moves into review.
+The teacher discusses prerequisite gaps directly; creating a project records a deliberate commitment.
+The teacher calibrates depth, examples, scaffolding, and practice difficulty within the scope snapshot.
 All project directories are flat. Existing frontend folders are the only navigation/classification structure: an explicit `××学科总览` row opens the bound map, while system-learning projects remain movable child rows. Folder placement never changes learning behavior or prompt context.
 ```
 
 ## Current Delivery Boundary
 
-The two project types, flat map navigation, scope snapshots, and the Iteration
-13 teacher workspace are implemented. `教师` is one low-latency API
+The two project types, flat map navigation, scope snapshots, and the teacher
+workspace are implemented. `教师` is one low-latency API
 conversation, `资产` is versioned editable accumulated learning, and `资料` is
 explicit private source material. A visible native-CLI assistant performs
 learner-authorized substantial work asynchronously. The five teaching roles are
 soft methods in one teacher prompt, not product modules. Current runnable code,
 the current iteration, and active architecture documents are the delivery truth.
-Iteration 16 makes ready source citations selectable in the teacher composer,
-uses map-topic teaching outlines as soft guidance, consolidates confirmed
-conversation learning into Intro/Body, and exposes teacher-only token usage.
+Iteration 16 delivered ready source citations in the teacher composer, map-topic
+teaching outlines as soft guidance, confirmed conversation consolidation into
+Intro/Body, and teacher-only token usage (now superseded by review and project usage). Iteration 17
+delivered the durable conversation queue with steering, response regeneration
+and transcript export, vision-model OCR for image sources, and the bounded
+web-search tool.
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+产品名称为 learn-with-ai，主页与侧栏承担简化后的导航。系统学习资产为复习稿、练习题、教师自动笔记；助教不再提供任意生成成果。便携发布保持本地 Go 服务与浏览器界面，提供 Windows/macOS/Linux 下载包。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+学习单元任意标签页均可导入 PDF、Markdown、PPTX、DOCX、XLSX、CSV，教师回复期间也可导入。单文件 50MiB，本地自动提取文字，不再调用助教解析。教师每次请求自动使用有界相关摘录，扫描件明确提示无可提取文字。公开分发提供 Windows 每用户安装程序、macOS APP/PKG、Linux DEB/用户安装包；原源码部署与仓库桌面快捷方式是维护者快速验证入口。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

@@ -32,7 +32,15 @@ func (failingGateway) Stream(_ context.Context, _ teachergateway.Request, _ func
 	return errors.New("provider unavailable")
 }
 
-func (f fakeGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
+func (f fakeGateway) Stream(_ context.Context, in teachergateway.Request, emit func(teachergateway.Event)) error {
+	offered := false
+	for _, tool := range in.Tools {
+		offered = offered || tool.Name == "delegate_learning_work"
+	}
+	if !offered {
+		emit(teachergateway.Event{Type: "text-delta", Delta: "继续解释当前问题。"})
+		return nil
+	}
 	objective := f.objective
 	if objective == "" {
 		objective = "核查当前结论"
@@ -40,7 +48,7 @@ func (f fakeGateway) Stream(_ context.Context, _ teachergateway.Request, emit fu
 	emit(teachergateway.Event{Type: "text-delta", Delta: "助教已开始。"})
 	taskType := f.taskType
 	if taskType == "" {
-		taskType = "verify"
+		taskType = "consolidate"
 	}
 	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_test", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": taskType, "objective": objective, "sourceRefs": f.sourceRefs, "practiceRequested": f.practiceRequested, "proposalMessageId": f.proposalID}}})
 	emit(teachergateway.Event{Type: "response-completed"})
@@ -68,7 +76,7 @@ func newTestService(gateway teachergateway.Gateway) *Service {
 }
 
 func (f sourceGateway) Stream(_ context.Context, _ teachergateway.Request, emit func(teachergateway.Event)) error {
-	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_source", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": "verify", "objective": "读取讲义并核查当前结论", "sourceRefs": []string{f.sourceID}, "proposalMessageId": f.proposalID}}})
+	emit(teachergateway.Event{Type: "tool-call-ready", ToolCall: &teachergateway.ToolCall{CallID: "call_source", ToolName: "delegate_learning_work", Arguments: map[string]any{"taskType": "consolidate", "objective": "读取讲义并核查当前结论", "sourceRefs": []string{f.sourceID}, "proposalMessageId": f.proposalID}}})
 	return nil
 }
 
@@ -116,6 +124,18 @@ func TestApprovedConsolidationCarriesExplicitPracticeRequest(t *testing.T) {
 	inputs := service.Authorizer.(*fakeTaskAuthorizer).inputs
 	if len(inputs) != 1 || !inputs[0].PracticeRequested {
 		t.Fatalf("practice request was lost: %#v", inputs)
+	}
+}
+
+func TestTeacherPromptDefinesReviewAndPracticeDestinations(t *testing.T) {
+	for _, want := range []string{
+		"总结、复习或沉淀知识点时使用 consolidate",
+		"助教只负责通过 consolidate 写入复习稿",
+		"笔记由教师自动记录",
+	} {
+		if !strings.Contains(SystemPrompt, want) {
+			t.Fatalf("teacher prompt missing delegation boundary %q", want)
+		}
 	}
 }
 
@@ -168,8 +188,8 @@ func TestDelegationRejectsAmbiguousLearnerReply(t *testing.T) {
 		t.Fatal("ambiguous learner reply authorized delegation")
 	}
 	messages, err := conversation.AllMessages()
-	if err != nil || len(messages) == 0 || !strings.Contains(messageText(messages[len(messages)-1]), "助教任务未创建") {
-		t.Fatalf("rejection notice was not persisted: err=%v messages=%v", err, messages)
+	if err != nil || len(messages) == 0 || messages[len(messages)-1].Status != "completed" || strings.Contains(messageText(messages[len(messages)-1]), "助教任务未创建") {
+		t.Fatalf("ordinary teaching was replaced by an unrelated rejection: err=%v messages=%v", err, messages)
 	}
 }
 

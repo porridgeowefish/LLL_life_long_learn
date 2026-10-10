@@ -33,7 +33,7 @@ func TestSoftScopeAppendixIsGuidance(t *testing.T) {
 	}
 }
 
-func TestSelectedReadySourceContributesCanonicalTextToTeacherContext(t *testing.T) {
+func TestSelectedSourceHistoryRetainsIdentityWithoutRepeatingBody(t *testing.T) {
 	root := t.TempDir()
 	workspace.SetProjectsRootForTest(root)
 	defer workspace.SetProjectsRootForTest("")
@@ -55,8 +55,8 @@ func TestSelectedReadySourceContributesCanonicalTextToTeacherContext(t *testing.
 		t.Fatal(err)
 	}
 	messages := toProviderMessages("topic", []conversationstore.SequencedMessage{{Message: conversationstore.Message{Role: "learner", Blocks: []conversationstore.Block{{Type: "attachment", ArtifactRef: source.SourceID}}}}})
-	if len(messages) != 1 || !strings.Contains(messages[0].Content, "闭包捕获定义时的词法环境") {
-		t.Fatalf("selected source text was not cited: %#v", messages)
+	if len(messages) != 1 || !strings.Contains(messages[0].Content, source.SourceID) || strings.Contains(messages[0].Content, "闭包捕获定义时的词法环境") {
+		t.Fatalf("selected source identity was missing or body duplicated: %#v", messages)
 	}
 }
 

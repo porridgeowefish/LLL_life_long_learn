@@ -1,4 +1,4 @@
-param(
+﻿param(
   [int]$Port = 8787
 )
 
@@ -30,7 +30,7 @@ function Get-ProcessPath {
 }
 
 $repoRoot = Get-RepoRoot
-$exePath = Join-Path $repoRoot 'dist\lll.exe'
+$exePath = Join-Path $repoRoot 'dist\learn-with-ai.exe'
 $ownerPid = Get-PortOwner -Port $Port
 
 if (-not $ownerPid) {
@@ -45,7 +45,7 @@ if (-not $ownerPath -or ([string]::Compare($ownerPath, $exePath, $true) -ne 0)) 
 }
 
 try {
-  Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://localhost:$Port/api/system/shutdown" -TimeoutSec 2 | Out-Null
+  Invoke-WebRequest -UseBasicParsing -Method Post -Uri "http://127.0.0.1:$Port/api/system/shutdown" -TimeoutSec 2 | Out-Null
 } catch {
   Write-Host "Shutdown API did not answer; forcing PID $ownerPid."
 }

@@ -2,7 +2,7 @@
 
 Status: active  
 Owner: project maintainer  
-Last reviewed: 2026-09-24
+Last reviewed: 2026-10-10
 Source of truth: this file classifies repository content by ownership and trust level.
 
 ## Purpose
@@ -163,13 +163,13 @@ Implemented in code today:
 Go backend + React frontend
 conversation-first API teacher with durable response recovery
 visible asynchronous CLI assistant tasks and sealed inputs
-versioned intro/body/practice assets plus generated deliverables
-source upload, immutable revisions, and assistant parsing
-one ready `derived/content.md` source citation and teacher token usage ledger
+versioned review/practice assets and independent teacher notes
+source upload, immutable revisions, and built-in local parsing
+one ready `derived/content.md` source citation; separate teacher/note usage ledgers
 single learner-owned global preferences file
-legacy Intro/Explain/Practice and agent invoke/session compatibility
-Explain confusion CRUD
-Practice task reading + batch submit + evaluation reading
+one-time Intro/Explain/Practice migration; generic invoke/session infrastructure
+review annotation CRUD and Ask AI
+Markdown practice reader/editor; no structured practice compatibility in the active workspace
 Markdown editor for learner-owned files
 file-first project/runs persistence
 ```
@@ -184,7 +184,7 @@ the `/memory` frontend route redirects to `/preferences`
 the standalone Agent-management frontend route is retired; legacy invoke/session APIs remain compatibility-only
 ```
 
-### Iteration 04 Additions
+### Historical Iteration 04 Contribution (migration inputs only)
 
 Implemented in code:
 
@@ -195,3 +195,25 @@ six Practice question types with private answer-key checking
 project-local idempotent growth events
 legacy Explain and Practice readers
 ```
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+发布压缩包含二进制、frontend/dist、learning-agents 与非敏感说明/配置样例；用户 workspace 不随包发布，默认落入 OS 用户目录。generated 与 intro/body 不再是目标正式资产；一次性迁移读取不得变成新的运行期 fallback。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+本地解析：sources/internal/parser、processing 与 store/parse.go；教师有界资料上下文：teacher/internal/service/source_context.go。安装工具：tools/installer 与 tools/release/build-installers.js，平台安装/卸载/烟测脚本；公开包含 THIRD_PARTY_NOTICES.txt。维护者 Start-LLL/desktop:install 保留但不进入发行包。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

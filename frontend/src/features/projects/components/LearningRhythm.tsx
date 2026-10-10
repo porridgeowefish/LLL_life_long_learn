@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { useActivity, type ActivityDay, type LearningEvent } from '@/features/projects/api/activity';
+import { useActivity, type ActivityDay } from '@/features/projects/api/activity';
 import type { ProjectMeta } from '@/shared/types/domain';
 
 import s from './LearningRhythm.module.css';
@@ -20,11 +20,7 @@ export function LearningRhythm({ projects }: Props) {
     setSelectedDate((current) => summary.days.some((day) => day.date === current) ? current : (latestActive?.date ?? summary.rangeEnd));
   }, [summary]);
 
-  const selected = summary?.days.find((day) => day.date === selectedDate);
   const weekLabels = useMemo(() => buildWeekLabels(summary?.days ?? []), [summary?.days]);
-  const currentWeekLength = summary?.days.length ? ((summary.days.length - 1) % 7) + 1 : 0;
-  const thisWeek = currentWeekLength ? summary!.days.slice(-currentWeekLength) : [];
-
   return (
     <section className={s.section} aria-labelledby="learning-rhythm-title">
       <header className={s.head}>
@@ -61,6 +57,7 @@ export function LearningRhythm({ projects }: Props) {
                   type="button"
                   role="gridcell"
                   className={`${s.day} ${selectedDate === day.date ? s.selected : ''}`}
+                  aria-selected={selectedDate === day.date}
                   data-level={activityLevel(day.activity)}
                   title={`${formatDate(day.date)} · 热度 ${day.activity} · ${day.actions} 次学习行动`}
                   aria-label={`${formatDate(day.date)}，投入热度 ${day.activity}，${day.actions} 次学习行动`}
@@ -69,7 +66,7 @@ export function LearningRhythm({ projects }: Props) {
               ))}
             </div>
           </div>
-          <div className={s.legend}><span>点击一天查看具体记录</span><span>少 <i data-level="0" /><i data-level="1" /><i data-level="2" /><i data-level="3" /><i data-level="4" /> 多</span></div>
+          <div className={s.legend}><span>悬浮查看每日投入</span><span>少 <i data-level="0" /><i data-level="1" /><i data-level="2" /><i data-level="3" /><i data-level="4" /> 多</span></div>
         </div>
       </div>
 
@@ -80,54 +77,12 @@ export function LearningRhythm({ projects }: Props) {
         <Metric label="累计成长值" value={summary?.totalGrowth ?? 0} suffix="分" />
       </div>
 
-      <div className={s.detailGrid}>
-        <DayDetail day={selected} />
-        <WeeklyInvestment days={thisWeek} />
-      </div>
     </section>
   );
 }
 
 function Metric({ label, value, suffix }: { label: string; value: number; suffix: string }) {
   return <div className={s.metric}><span>{label}</span><strong>{value}</strong><small>{suffix}</small></div>;
-}
-
-function DayDetail({ day }: { day?: ActivityDay }) {
-  return (
-    <article className={s.detail}>
-      <header><h3>{day ? formatDate(day.date) : '学习记录'}</h3><span>{day?.activity ? `投入热度 ${day.activity}` : '休息日'}</span></header>
-      {!day?.events.length ? (
-        <p className={s.emptyDay}>这一天没有学习记录。适当休息也是长期学习的一部分。</p>
-      ) : (
-        <ul>{day.events.map((event) => <EventRow key={`${event.projectSlug}-${event.id}`} event={event} />)}</ul>
-      )}
-    </article>
-  );
-}
-
-function EventRow({ event }: { event: LearningEvent }) {
-  return (
-    <li>
-      <span className={s.eventMark}>{eventMark(event.sourceType)}</span>
-      <span className={s.eventCopy}><strong>{event.title || fallbackTitle(event.sourceType)}</strong><small>{event.projectTitle}{event.detail ? ` · ${event.detail}` : ''}</small></span>
-      <span className={s.eventGain}>{event.delta > 0 ? `成长 +${event.delta}` : `热度 +${event.activityDelta ?? 1}`}</span>
-    </li>
-  );
-}
-
-function WeeklyInvestment({ days }: { days: ActivityDay[] }) {
-  const labels = ['一', '二', '三', '四', '五', '六', '日'];
-  const max = Math.max(1, ...days.map((day) => day.activity));
-  const active = days.filter((day) => day.activity > 0).length;
-  return (
-    <aside className={s.weekPanel}>
-      <header><h3>本周投入</h3><span>{active} / 7 天</span></header>
-      <div className={s.bars}>
-        {labels.map((label, index) => <i key={label} style={{ height: `${Math.max(2, ((days[index]?.activity ?? 0) / max) * 64)}px` }}><span>{label}</span></i>)}
-      </div>
-      <p>{active > 0 ? '已经留下本周的学习节律，继续按当前频率推进即可。' : '本周还没有学习记录，从一次短小而明确的学习行动开始。'}</p>
-    </aside>
-  );
 }
 
 function buildWeekLabels(days: ActivityDay[]) {
@@ -143,13 +98,3 @@ function buildWeekLabels(days: ActivityDay[]) {
 
 function activityLevel(value: number) { return value === 0 ? 0 : value <= 2 ? 1 : value <= 5 ? 2 : value <= 9 ? 3 : 4; }
 function formatDate(value: string) { const [, month, day] = value.split('-'); return `${Number(month)}月${Number(day)}日`; }
-function eventMark(type: string) { return type.startsWith('practice') ? '练' : type.startsWith('flashcard') ? '复' : type.startsWith('ask') ? '问' : type === 'reading' ? '阅' : '学'; }
-function fallbackTitle(type: string) {
-  if (type === 'reading') return '有效阅读';
-  if (type === 'practice-correct') return '答题正确';
-  if (type === 'practice-evaluation') return '练习评估';
-  if (type.startsWith('practice')) return '完成练习';
-  if (type.startsWith('flashcard')) return '复习闪卡';
-  if (type === 'extend-flower') return '编辑知识花朵';
-  return '学习行动';
-}

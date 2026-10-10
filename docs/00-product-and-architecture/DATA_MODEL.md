@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-18
+Last reviewed: 2026-10-10
 Source of truth: long-lived conceptual file-first model; Go structs and persisted schemas own current runtime truth.
 
 ## Project
@@ -69,9 +69,9 @@ The active system-learning model contains:
 
 ```text
 one durable conversation and recoverable teacher runs
-versioned intro, body, and practice assets
-generic generated assistant deliverables
-body annotations and Ask-AI history
+versioned review and practice assets
+independent teacher note entries and jobs
+review annotations and Ask-AI history
 versioned source originals and derived content
 append-only provider-reported teacher usage by response
 append-only idempotent learning activity events for heatmaps
@@ -79,8 +79,8 @@ assistant tasks, captured inputs, attempts, and run records
 ```
 
 Legacy zone protocols (`intro/assessment.json`, Explain manifests/pages,
-Practice tasks/answers/evaluations, and progress events) remain readable for
-migration and compatibility. Historical Extend/Summary files are intentionally
+Practice tasks/answers/evaluations) are one-time migration inputs only.
+Progress events remain active; retired teaching formats have no runtime fallback. Historical Extend/Summary files are intentionally
 excluded from runtime readers and migration inventory. None is the data contract
 for new assistant outputs.
 
@@ -149,8 +149,8 @@ for one learning unit:
 ```text
 unit metadata
 append-only conversation events plus rebuildable compact context
-versioned intro, body, and practice assets plus generated artifacts
-body-owned annotation and Ask-AI history
+versioned review/practice assets and durable note batches
+review-owned annotation and Ask-AI history
 versioned source originals and derived content
 durable assistant tasks, captured inputs, and per-attempt workspaces
 migration backup and recovery journals
@@ -158,13 +158,14 @@ migration backup and recovery journals
 
 ### Assistant-accepted publication
 
-`result-manifest.json` is an assistant-authored publication declaration, not a
-server-verified acceptance checklist. Its artifact metadata may omit file lists,
-byte counts, and hashes. LLL copies each declared deliverable directory into
-`assets/generated/`, then writes task/run provenance and a presentation-only
-file index to `artifact.json`.
-`publish-failed` and `partial-publish` record operational write failures; no
-automatic validation or promotion retry follows (ADR-0021).
+`result-manifest.json` declares only review/practice Markdown candidates for
+consolidation. Source-derived content.md is owned by the local sources parser, not an assistant output.
+There is no deliverables/artifact.json publication or arbitrary generated reader.
+Go retains version/merge and filesystem authorization; content acceptance remains
+with the assistant. Retired caches and generated directories are removed during
+cutover before dispatch. notes/state.json records the epoch, seen learner IDs,
+pending turns and counts; durable jobs and entries are under assets/notes.
+conversation/note-usage.jsonl records each API attempt separately from teacher usage.
 
 Product Task and executor Run are separate identities. Conversation, task,
 asset, source, and version IDs are opaque stable ULIDs. In-memory queue and SSE
@@ -206,7 +207,7 @@ creation time. The stable ID prevents duplicate activity when a request or task
 recovery is replayed.
 
 Successful teacher responses write `teacher-response:<responseId>`; successful
-assistant tasks that publish at least one core asset or generated deliverable
+assistant tasks that publish at least one review/practice asset
 write `assistant-publication:<taskId>`. Both have `activityDelta: 1`. Failed,
 interrupted, and no-output task completions have no event. Existing reading,
 practice, Ask-AI, Agent session, and learning-plan events remain compatible
@@ -216,8 +217,32 @@ members of the same stream.
 
 The Go state model persists `projectType` for new projects. Missing type remains
 the legacy compatibility signal and decodes as `system-learning`. Iterations 13
-through 17 are delivered: iteration 13 established the active system-learning
+through 18 are implemented: iteration 13 established the active system-learning
 model, iteration 14 the enforced modular-monolith architecture, iteration 15 the
-retired legacy surfaces, iteration 16 source citations and consolidation, and
-iteration 17 teacher queue/steering, OCR, and web search. Code and the current
+retired legacy surfaces, iteration 16 source citations and consolidation, iteration 17 teacher queue/steering, OCR, and web search, and iteration 18
+review cutover, independent notes and portable release infrastructure. Code and the current
 iteration documents are product-data truth.
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+存储为 assets/review、assets/practice，以及 assets/notes 的条目与持久任务；原 intro/body 一次性拼接 cutover，generated 文件与引用删除。成功回合按 learner message 去重计数，笔记独立记录 provider usage；不追溯升级前历史自动生成。
+
+未开放工具使教师候选无效，不作为 completed 回合持久化；失败候选不计笔记。Anthropic 签名/不透明思考块是仅在当前工具续答内存中的传输状态，不进入 conversation blocks。既有 response-superseded 支持已确认异常回复撤回；所有新会话/助教输入投影排除已撤回消息，封存快照只应用截止 seq 之内的撤回。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+source.json 新增 parser/extractedBytes/extractionTruncated。原件不可变，最大 50MiB；派生文字最大 4MiB，ZIP 展开另有限额。processing/stored 在启动恢复，结果写入必须仍为同一 active revision，删除不能被晚到结果复活。旧原件/可读派生结果保留，source-processing 写入端口退役。安装清单拥有应用文件，用户数据独立于安装目录并在卸载后保留。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

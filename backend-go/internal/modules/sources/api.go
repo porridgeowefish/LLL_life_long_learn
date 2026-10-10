@@ -2,7 +2,9 @@
 package sources
 
 import (
+	"context"
 	ocr "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/ocr"
+	processing "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/processing"
 	impl "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
 )
 
@@ -14,6 +16,12 @@ type FileRef = impl.FileRef
 type Privacy = impl.Privacy
 type Revision = impl.Revision
 type Store = impl.Store
+type Processor = processing.Processor
+
+func NewProcessor(onUpdated func(string, Source)) *Processor { return processing.New(onUpdated) }
+func ProcessLocal(ctx context.Context, store *Store, sourceID string) (Source, error) {
+	return processing.Process(ctx, store, sourceID)
+}
 
 func ParseDisposition(filename, mediaType string) (string, string) {
 	return impl.ParseDisposition(filename, mediaType)

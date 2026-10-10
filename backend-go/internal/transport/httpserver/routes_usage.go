@@ -32,3 +32,12 @@ func (s *Server) handleListTeacherUsage(w http.ResponseWriter, r *http.Request) 
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"page": page, "pageSize": pageSize, "total": len(rows), "conversations": rows[start:end]})
 }
+
+func (s *Server) handleListProjectUsage(w http.ResponseWriter, r *http.Request) {
+	rows, err := teacher.ListProjectUsage()
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"projects": rows})
+}

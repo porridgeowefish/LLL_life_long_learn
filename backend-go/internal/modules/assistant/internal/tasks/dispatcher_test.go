@@ -2,6 +2,8 @@ package assistanttask
 
 import (
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,16 +77,6 @@ func newTestDispatcher(execution ExecutionService, events EventEmitter) *Dispatc
 			}
 			return SourceSnapshot{RevisionID: revision.RevisionID, SHA256: revision.Original.SHA256}, nil
 		},
-		CommitSourceDerived: func(slug, sourceID, revisionID, taskID string, files map[string][]byte, media map[string]string) (any, error) {
-			store, err := sourcestore.New(slug)
-			if err != nil {
-				return nil, err
-			}
-			if _, err := store.CommitDerived(sourceID, revisionID, files, media); err != nil {
-				return nil, err
-			}
-			return store.SetStatus(sourceID, "ready", "", taskID)
-		},
 	})
 	return d
 }
@@ -109,10 +101,7 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	projectRoot, _ := workspace.ProjectRootForSlug("live-terminal")
 	attemptDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID)
 	workDir := filepath.Join(attemptDir, "workspace")
-	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "body"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "intro"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(workDir, "asset-updates", "review"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	d := newTestDispatcher(nil, nil)
@@ -124,17 +113,14 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "input-manifest.json"), manifest); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "body", "current.md"), []byte("终端仍打开时已经完成的正文"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "intro", "current.md"), []byte("为什么值得学习"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "review", "current.md"), []byte("终端仍打开时已经完成的正文"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	result := resultManifest{SchemaVersion: 1, TaskID: task.ID, RunID: runID, Summary: "成果已经写完", AssetUpdates: map[string]struct {
 		Status    string `json:"status"`
 		Candidate string `json:"candidate"`
 		Code      string `json:"code"`
-	}{"intro": {Status: "updated", Candidate: "asset-updates/intro/current.md"}, "body": {Status: "updated", Candidate: "asset-updates/body/current.md"}, "practice": {Status: "unchanged"}}}
+	}{"review": {Status: "updated", Candidate: "asset-updates/review/current.md"}, "practice": {Status: "unchanged"}}}
 	resultPath := filepath.Join(workDir, "result-manifest.json")
 	if err := writeJSON(resultPath, result); err != nil {
 		t.Fatal(err)
@@ -156,7 +142,7 @@ func TestRunningVisibleTerminalCommitsStableManifestBeforeTerminalExit(t *testin
 		got, _ := store.Get(task.ID)
 		if got.Status == "succeeded" {
 			asset, _ := assetstore.New("live-terminal")
-			body, _ := asset.Get("body")
+			body, _ := asset.Get("review")
 			if body.Content != "终端仍打开时已经完成的正文" {
 				t.Fatalf("committed body mismatch: %q", body.Content)
 			}
@@ -175,9 +161,8 @@ func (e *recordingTaskEmitter) Emit(name string, _ any) { e.names = append(e.nam
 func TestDispatcherEmitsResultProjectionEvents(t *testing.T) {
 	emitter := &recordingTaskEmitter{}
 	dispatcher := newTestDispatcher(nil, emitter)
-	dispatcher.emitGenerated("topic", "task-1", "artifact-1")
-	dispatcher.emitSource("topic", sourcestore.Source{SourceID: "source-1"})
-	if len(emitter.names) != 2 || emitter.names[0] != "generated-artifact-updated" || emitter.names[1] != "source-updated" {
+	dispatcher.emitAsset("topic", map[string]any{"key": "review"})
+	if len(emitter.names) != 1 || emitter.names[0] != "learning-asset-updated" {
 		t.Fatalf("unexpected projection events: %#v", emitter.names)
 	}
 }
@@ -201,64 +186,18 @@ func TestDispatcherReportsOnlyPublishedSuccessfulWorkAsLearningActivity(t *testi
 	var published []Task
 	dispatcher.deps.OnPublished = func(task Task) { published = append(published, task) }
 
-	dispatcher.finish(store, task.ID, "succeeded", &Result{AssetUpdates: map[string]string{"body": "updated"}}, nil)
+	dispatcher.finish(store, task.ID, "succeeded", &Result{AssetUpdates: map[string]string{"review": "updated"}}, nil)
 	if len(published) != 1 || published[0].ID != task.ID {
 		t.Fatalf("published task was not reported: %#v", published)
 	}
 
-	second, _, err := store.Create(CreateInput{Type: "verify", Objective: "核查闭包笔记", Origin: Origin{OperationID: "op_no_output"}})
+	second, _, err := store.Create(CreateInput{Type: "consolidate", Objective: "核查闭包笔记", Origin: Origin{OperationID: "op_no_output"}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	dispatcher.finish(store, second.ID, "succeeded", &Result{}, nil)
 	if len(published) != 1 {
 		t.Fatalf("task without published output was reported: %#v", published)
-	}
-}
-
-func TestGeneratedArtifactPublishesAssistantAcceptedDirectoryWithoutFileManifest(t *testing.T) {
-	projectRoot := t.TempDir()
-	workDir := t.TempDir()
-	artifactDir := filepath.Join(workDir, "deliverables", "review")
-	if err := os.MkdirAll(filepath.Join(artifactDir, "files"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(artifactDir, "files", "review.md"), []byte("# 复习资料\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(artifactDir, "files", "diagram.svg"), []byte("<svg/>"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := writeJSON(filepath.Join(artifactDir, "artifact.json"), map[string]any{
-		"title":       "考前总复习",
-		"entryPoints": []string{"files/review.md"},
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	task := Task{ID: "task_publish", ProjectSlug: "publish", ConversationCutoffSeq: 12}
-	d := newTestDispatcher(nil, nil)
-	artifactID, err := d.commitGeneratedArtifact(projectRoot, task, "run_publish", workDir, inputManifest{}, struct {
-		Key        string `json:"key"`
-		Descriptor string `json:"descriptor"`
-	}{Key: "review", Descriptor: "deliverables/review/artifact.json"})
-	if err != nil {
-		t.Fatalf("assistant-accepted directory was not published: %v", err)
-	}
-	published := filepath.Join(projectRoot, "assets", "generated", artifactID)
-	if got, err := os.ReadFile(filepath.Join(published, "files", "diagram.svg")); err != nil || string(got) != "<svg/>" {
-		t.Fatalf("unlisted assistant file was not published: %q %v", got, err)
-	}
-	if !artifactOwnedBy(published, task.ID, "run_publish") {
-		t.Fatal("published artifact is missing system provenance")
-	}
-	var descriptor map[string]any
-	if err := readJSON(filepath.Join(published, "artifact.json"), &descriptor); err != nil {
-		t.Fatal(err)
-	}
-	files, _ := descriptor["files"].([]any)
-	if len(files) != 2 {
-		t.Fatalf("published artifact did not receive a presentation file index: %#v", descriptor["files"])
 	}
 }
 
@@ -281,7 +220,7 @@ func TestLateAssistantResultPublishesWithoutTaskSpecificOutputChecks(t *testing.
 	})
 	projectRoot, _ := workspace.ProjectRootForSlug("late")
 	workDir := filepath.Join(projectRoot, "assistant-tasks", task.ID, "attempts", runID, "workspace")
-	for _, dir := range []string{"inputs", "asset-updates/body", "deliverables"} {
+	for _, dir := range []string{"inputs", "asset-updates/review"} {
 		if err := os.MkdirAll(filepath.Join(workDir, filepath.FromSlash(dir)), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -294,14 +233,14 @@ func TestLateAssistantResultPublishesWithoutTaskSpecificOutputChecks(t *testing.
 	if err := writeJSON(filepath.Join(projectRoot, "assistant-tasks", task.ID, "input-manifest.json"), manifest); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "body", "current.md"), []byte("助教迟到的正文"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(workDir, "asset-updates", "review", "current.md"), []byte("助教迟到的正文"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	result := resultManifest{SchemaVersion: 1, TaskID: task.ID, RunID: runID, Summary: "迟到但完整的成果", AssetUpdates: map[string]struct {
 		Status    string `json:"status"`
 		Candidate string `json:"candidate"`
 		Code      string `json:"code"`
-	}{"body": {Status: "updated", Candidate: "asset-updates/body/current.md"}}}
+	}{"review": {Status: "updated", Candidate: "asset-updates/review/current.md"}}}
 	resultPath := filepath.Join(workDir, "result-manifest.json")
 	if err := writeJSON(resultPath, result); err != nil {
 		t.Fatal(err)
@@ -317,11 +256,11 @@ func TestLateAssistantResultPublishesWithoutTaskSpecificOutputChecks(t *testing.
 	})
 	d.reconcileLateResults()
 	got, _ := store.Get(task.ID)
-	if got.Status != "succeeded" || got.Result == nil || got.Result.AssetUpdates["body"] != "updated" {
+	if got.Status != "succeeded" || got.Result == nil || got.Result.AssetUpdates["review"] != "updated" {
 		t.Fatalf("late result was not recovered: %#v", got)
 	}
 	asset, _ := assetstore.New("late")
-	body, _ := asset.Get("body")
+	body, _ := asset.Get("review")
 	if body.Content != "助教迟到的正文" {
 		t.Fatalf("late asset was not committed: %q", body.Content)
 	}
@@ -373,7 +312,7 @@ func TestFreshLaunchRecordPreventsImmediateRestartFailure(t *testing.T) {
 	defer workspace.SetProjectsRootForTest("")
 	_ = workspace.CreateProjectSkeletonWithInput("launch", "启动", "", workspace.ProjectInput{ProjectType: workspace.ProjectTypeSystemLearning})
 	store, _ := New("launch")
-	task, _, _ := store.Create(CreateInput{Type: "verify", Objective: "验证", Origin: Origin{OperationID: "op_launch"}})
+	task, _, _ := store.Create(CreateInput{Type: "consolidate", Objective: "验证", Origin: Origin{OperationID: "op_launch"}})
 	runID := "run_launching"
 	if err := prepareLaunchRecord(task, runID); err != nil {
 		t.Fatal(err)
@@ -402,7 +341,7 @@ func TestRecoverAttemptFinishesCompletedCommitJournal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	task, _, err := store.Create(CreateInput{Type: "verify", Objective: "验证", Origin: Origin{OperationID: "op"}})
+	task, _, err := store.Create(CreateInput{Type: "consolidate", Objective: "验证", Origin: Origin{OperationID: "op"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -429,4 +368,48 @@ func TestRecoverAttemptFinishesCompletedCommitJournal(t *testing.T) {
 	if got.Status != "succeeded" || got.Result == nil || got.Result.Summary != "已恢复" {
 		t.Fatalf("completed journal not recovered: %#v", got)
 	}
+}
+
+func copyTree(source, destination string) error {
+	return filepath.Walk(source, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(source, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(destination, rel)
+		if info.IsDir() {
+			return os.MkdirAll(target, 0o755)
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		in, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_EXCL|os.O_WRONLY, info.Mode().Perm())
+		if errors.Is(err, os.ErrExist) {
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		_, copyErr := io.Copy(out, in)
+		syncErr := out.Sync()
+		closeErr := out.Close()
+		if copyErr != nil {
+			return copyErr
+		}
+		if syncErr != nil {
+			return syncErr
+		}
+		return closeErr
+	})
 }

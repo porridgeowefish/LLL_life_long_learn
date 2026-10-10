@@ -50,13 +50,12 @@
 .taskNotice a, .taskNotice button { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--fg); background: var(--card); font-size: 10px; text-decoration: none; }
 .attachment { display: inline-flex; margin: 7px 6px 0 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface-raised); font-size: 11px; }
 .error { max-width: 760px; margin: 0 auto 20px; font-size: 12px; }
-.composer { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 36px)); margin: -78px auto 0; padding: 9px 10px 28px; display: flex; align-items: flex-end; gap: 8px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border)); border-radius: 15px; background: var(--surface-translucent); box-shadow: 0 12px 32px rgb(var(--shadow-color) / .15); backdrop-filter: blur(16px); }
+.composerDock { position: relative; z-index: 3; flex: 0 0 auto; width: min(820px, calc(100% - 36px)); margin: -78px auto 0; }
+.composer { position: relative; width: 100%; padding: 9px 10px 28px; display: flex; align-items: flex-end; gap: 8px; border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border)); border-radius: 15px; background: var(--surface-translucent); box-shadow: 0 12px 32px rgb(var(--shadow-color) / .15); backdrop-filter: blur(16px); }
 .composer textarea { flex: 1; max-height: 150px; min-height: 34px; resize: none; padding: 7px 4px; border: 0; outline: 0; background: transparent; line-height: 1.45; }
 .composer button { flex: 0 0 auto; min-width: 52px; height: 32px; border: 0; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 650; }
 .composer button:disabled { opacity: .45; cursor: default; }
 .composer .stop { background: var(--fg); }
-.uploadButton { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: var(--muted); background: var(--surface-sunken); cursor: pointer; font-size: 18px; }
-.uploadButton input, .srOnly { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .sourcePicker { position: relative; flex: 0 0 auto; }
 .sourcePicker summary { min-width: 44px; height: 32px; display: grid; place-items: center; padding: 0 8px; border-radius: 9px; color: var(--muted); background: var(--surface-sunken); cursor: pointer; list-style: none; font-size: 12px; font-weight: 650; }
 .sourcePicker summary::-webkit-details-marker { display: none; }
@@ -76,13 +75,6 @@
 .composerMeta { position: absolute; left: 13px; right: 13px; bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
 .modelSelect { display: inline-flex; align-items: center; gap: 5px; }
 .modelSelect select { max-width: 190px; border: 0; color: var(--muted); background: transparent; font: inherit; outline: none; }
-.uploadPanel { position: absolute; left: 0; bottom: calc(100% + 9px); width: min(430px, calc(100vw - 48px)); padding: 14px; border: 1px solid var(--border); border-radius: 13px; background: var(--card); box-shadow: var(--shadow-lg); }
-.uploadPanel strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
-.uploadPanel p { margin: 5px 0 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
-.uploadPanel > label { display: flex; align-items: flex-start; gap: 7px; color: var(--muted); font-size: 11px; line-height: 1.45; }
-.uploadPanel > div { display: flex; justify-content: flex-end; gap: 7px; margin-top: 12px; }
-.uploadPanel button { min-width: auto; padding: 0 10px; }
-.uploadPanel .secondary { color: var(--fg); background: var(--surface-sunken); }
 .dataRail { min-height: 0; overflow-y: auto; padding: 18px 16px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--card) 82%, var(--surface-tint)); }
 .dataRail header { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .dataRail header span, .dataRail section > span { color: var(--accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
@@ -92,7 +84,6 @@
 .dataRail dt { color: var(--muted); font-size: 11px; }
 .dataRail dd { font: 650 15px/1.2 Georgia, serif; }
 .dataRail dd small { color: var(--muted); font: 400 9px/1.2 'DM Sans', sans-serif; }
-.parsingSource { margin: 2px 0 8px; padding: 7px 8px; border-radius: 7px; color: var(--accent-ink); background: var(--accent-soft); font-size: 10px; }
 .dataRail section { padding: 13px 0; border-bottom: 1px solid var(--border); }
 .dataRail section strong, .dataRail section > small { display: block; overflow-wrap: anywhere; }
 .dataRail section strong { margin-top: 6px; font-size: 11px; line-height: 1.45; }
@@ -104,7 +95,7 @@
 .dataRail > p { margin-top: 14px; color: var(--muted); font-size: 9px; line-height: 1.6; }
 @keyframes pulse { 50% { opacity: .45; } }
 @media (max-width: 1050px) { .teacher { grid-template-columns: minmax(0, 1fr); } .dataRail { display: none; } }
-@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 92px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composer { width: calc(100% - 20px); } .composerMeta > span { display: none; } }
+@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 92px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { width: calc(100% - 20px); } .composerMeta > span { display: none; } }
 
 /* ---- hover-revealed icon actions (iteration 17) ---- */
 
@@ -150,8 +141,11 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 0;
-  border-top: 1px dashed rgba(0, 0, 0, 0.12);
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-sunken);
 }
 .queueChip {
   display: flex;

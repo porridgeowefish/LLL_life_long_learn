@@ -10,9 +10,9 @@ import {
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
 
+import { SecretInput } from '@/shared/primitive/SecretInput';
 import s from './ModelsPage.module.css';
 
-const MASKED_KEY = '••••';
 
 function freshProvider(): AskProvider {
   return {
@@ -182,7 +182,7 @@ export function ModelsPage() {
                 <label className={s.wide}>Base URL<input value={provider.baseURL} placeholder="https://api.openai.com/v1" onChange={(event) => patchProvider(provider.id, { baseURL: event.target.value })} /></label>
                 <label>模型名称<input value={provider.model} placeholder="gpt-5 / claude-sonnet" onChange={(event) => patchProvider(provider.id, { model: event.target.value })} /></label>
                 <label>上下文 Token<input type="number" min={16384} step={1024} value={provider.contextWindowTokens ?? ''} placeholder="默认安全阈值 256K" onChange={(event) => patchProvider(provider.id, { contextWindowTokens: event.target.value ? Number(event.target.value) : undefined })} /></label>
-                <label className={s.wide}>API Key<input type="password" value={provider.apiKey} placeholder={MASKED_KEY} onChange={(event) => patchProvider(provider.id, { apiKey: event.target.value })} /></label>
+                <label className={s.wide}>API Key<SecretInput value={provider.apiKey} onChange={value => patchProvider(provider.id, { apiKey: value, apiKeyEnv: '' })} /></label>
               </div>
               <div className={s.cardFoot}>
                 <div className={s.flags}>

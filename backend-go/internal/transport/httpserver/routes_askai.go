@@ -18,20 +18,11 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
 
-const maskedKey = "••••"
-
-func maskProviders(ps []teacher.ProviderConfig) []teacher.ProviderConfig {
-	out := make([]teacher.ProviderConfig, len(ps))
-	for i, p := range ps {
-		if p.APIKey != "" {
-			p.APIKey = maskedKey
-		}
-		out[i] = p
-	}
-	return out
-}
-
 func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) {
+	if !allowSecretSettings(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	cfg, err := teacher.LoadConfig()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, err.Error())
@@ -43,33 +34,30 @@ func (s *Server) handleGetAskAiSettings(w http.ResponseWriter, r *http.Request) 
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"default":      cfg.Default,
 		"searchEngine": cfg.SearchEngine,
-		"providers":    maskProviders(cfg.Providers),
+		"providers":    cfg.Providers,
 		"bindings":     cfg.Bindings,
 	})
 }
 
 func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) {
+	if !allowSecretSettings(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	var in teacher.Config
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid body: "+err.Error())
 		return
 	}
-	// Preserve real keys for providers the client echoed back masked.
-	old, _ := teacher.LoadConfig()
-	oldByKey := map[string]teacher.ProviderConfig{}
+	// Preserve service bindings when an older configuration editor omits them.
+	old, loadErr := teacher.LoadConfig()
+	if loadErr != nil {
+		httpx.Error(w, http.StatusInternalServerError, "unable to load existing AI settings")
+		return
+	}
 	if old != nil {
 		if in.Bindings == nil {
 			in.Bindings = old.Bindings
-		}
-		for _, p := range old.Providers {
-			oldByKey[p.ID] = p
-		}
-	}
-	for i, p := range in.Providers {
-		if p.APIKey == maskedKey {
-			if prev, ok := oldByKey[p.ID]; ok {
-				in.Providers[i].APIKey = prev.APIKey
-			}
 		}
 	}
 	if err := teacher.SaveConfig(in); err != nil {

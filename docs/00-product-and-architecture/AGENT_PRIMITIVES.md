@@ -2,7 +2,7 @@
 
 Status: active compatibility contract
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-18
 Source of truth: file-shape rules for the reusable reasoning-primitives library and retained compatibility-agent coverage.
 
 > Current-context boundary: the teacher uses a unified system prompt. This
@@ -16,7 +16,8 @@ LLL agents share a common library of **reasoning primitives**: reusable thinking
 ```text
 one primitive = one mechanism = one .md file under learning-agents/primitives/
 each agent charter declares which primitives it requires / optionally uses
-promptassembly expands primitives into the prompt before Claude is launched
+the prompt assembler (backend-go/internal/modules/assistant/internal/prompt)
+expands primitives into the prompt before the native CLI is launched
 ```
 
 This is the systematic replacement for the legacy `deepthink` skill. The goal is to:
@@ -68,7 +69,7 @@ mechanism text lives in one place
 
 ## Mechanism Ownership Table
 
-This table is the authoritative mapping from the legacy `deepthink` mechanism list to its new owner. The `primitives_coverage_test.go` test in the promptassembly package asserts every row has a home.
+This table is the authoritative mapping from the legacy `deepthink` mechanism list to its new owner. The `TestPrimitivesCoverage_*` tests in the assistant registry package assert every row has a home.
 
 ```text
 ┌────┬──────────────────────────┬─────────────────────────┬──────────────┐
@@ -120,7 +121,9 @@ One complete example for reference (not for copying).
 2. Decide ownership: which agent's user story needs this mechanism.
 3. Add the primitive id to that agent's registry JSON under primitives.required or primitives.optional.
 4. Add or update the corresponding row in the Mechanism Ownership Table above.
-5. Run go test ./backend-go/... — charter_self_contained_test will refuse to compile if the file is missing or the agent declares more than six required primitives.
+5. Run go test ./backend-go/... — registry tests (TestRegistry_PrimitiveExists,
+   TestRegistry_RejectsTooManyRequiredPrimitives, TestRegistry_RejectsInvalidPrimitiveName)
+   fail if the file is missing or the declaration is invalid.
 ```
 
 ## How To Declare A Primitive In A Charter
@@ -165,18 +168,15 @@ DO NOT inline a primitive's text into a charter by hand.
 ## Verification
 
 ```text
-go test ./backend-go/internal/agentregistry/...
-  → charter_self_contained_test asserts every declared primitive file exists
-    and every agent has a non-empty userStory
-
-go test ./backend-go/internal/promptassembly/...
-  → primitives_loader_test asserts load + cache behavior
-  → assembly_primitives_test asserts the expanded prompt contains
-    the # Reasoning Primitives block and the required primitive bodies
-
-go test ./backend-go/... -run TestPrimitivesCoverage
-  → primitives_coverage_test asserts every legacy mechanism in the
+go test ./backend-go/internal/modules/assistant/internal/registry/...
+  → TestRegistry_* validates registry entries, charters, and primitive presence
+  → TestPrimitivesCoverage_* asserts every legacy mechanism in the
     table above resolves to an existing primitive file
+
+go test ./backend-go/internal/modules/assistant/internal/prompt/...
+  → primitives_loader_test asserts load + cache behavior
+  → assembly_test asserts the expanded prompt contains
+    the # Reasoning Primitives block and the required primitive bodies
 ```
 
 ## Related Documents

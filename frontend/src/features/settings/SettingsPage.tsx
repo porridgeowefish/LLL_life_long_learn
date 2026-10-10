@@ -16,13 +16,16 @@ import { Tag } from '@/shared/primitive/Tag';
 import type { AgentRuntimeID, AgentRuntimeProvider } from '@/shared/types/domain';
 import type { ThemePreference } from '@/shared/lib/theme';
 
+import { SecretInput } from '@/shared/primitive/SecretInput';
 import s from './SettingsPage.module.css';
+import { TeacherNotesSettings } from './TeacherNotesSettings';
 
-const ORDER: AgentRuntimeID[] = ['codebuddy', 'hermes', 'codex', 'trae', 'claude'];
+const ORDER: AgentRuntimeID[] = ['codebuddy', 'workbuddy', 'hermes', 'codex', 'trae', 'claude'];
 
 const RUNTIME_LOGOS: Record<AgentRuntimeID, string> = {
   claude: '/img/agent-runtimes/claude.png',
   codebuddy: '/img/agent-runtimes/codebuddy.png',
+ workbuddy: '/img/agent-runtimes/codebuddy.png',
   hermes: '/img/agent-runtimes/hermes.png',
   codex: '/img/agent-runtimes/codex.png',
   trae: '/img/agent-runtimes/trae.png',
@@ -57,6 +60,7 @@ export function SettingsPage() {
         </header>
 
         <AppearanceSection />
+        <TeacherNotesSettings />
 
         {isLoading && <div className={s.loading}>加载配置中…</div>}
         {isError && (
@@ -90,7 +94,7 @@ export function SettingsPage() {
             <span className={s.noteIcon}><Icon name="check" size={14} /></span>
             <div>
               <h3>助教运行时</h3>
-              <p>验证、沉淀、复盘和材料制作等重活仍交给 CLI；这里选择它们默认使用的运行时。</p>
+              <p>助教负责整理复习稿和练习题；这里选择它默认使用的 CLI 运行时。</p>
             </div>
           </div>
           <div className={s.note}>
@@ -217,6 +221,7 @@ function RuntimeCard({ provider, selected, saving, onSelect }: RuntimeCardProps)
         <span>命令：<code>{provider.bin}</code></span>
         <span>来源：<code>{provider.mode === 'wsl' ? 'WSL' : 'Native'}</code></span>
         <span>覆盖：<code>{provider.binEnv}</code></span>
+        {!provider.available && provider.reason && <span>原因：{({not_found:'找不到可执行文件',probe_failed:'版本探测失败',identity_mismatch:'命令身份不匹配'} as Record<string,string>)[provider.reason] ?? provider.reason}</span>}
         <span>{provider.supportsHeadless ? '支持后台任务' : '仅交互终端'}</span>
       </div>
       <Button
@@ -230,7 +235,6 @@ function RuntimeCard({ provider, selected, saving, onSelect }: RuntimeCardProps)
   );
 }
 
-const MASKED_KEY = '••••';
 
 function newProvider(): AskProvider {
   return {
@@ -307,7 +311,7 @@ export function AskAiSection() {
         <div>
           <h2 className={s.title}>Ask-AI 模型源</h2>
           <p className={s.subtitle}>
-            选中教程文字后「问 AI」使用的模型源。API Key 在服务端加密；未修改时回显占位符 {MASKED_KEY}。
+            选中教程文字后「问 AI」使用的模型源。API Key 默认遮蔽，可切换查看完整内容。
           </p>
         </div>
         <div className={s.askActions}>
@@ -434,12 +438,7 @@ function ProviderRow({
       </label>
       <label className={s.askField}>
         API Key
-        <input
-          value={provider.apiKey}
-          onChange={(e) => onPatch({ apiKey: e.target.value })}
-          placeholder={MASKED_KEY}
-          type="password"
-        />
+        <SecretInput value={provider.apiKey} onChange={value=>onPatch({apiKey:value,apiKeyEnv:''})}/>
       </label>
       <div className={s.askFlags}>
         <label>

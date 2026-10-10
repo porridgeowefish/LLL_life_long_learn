@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -19,6 +20,17 @@ const WorkspaceDirName = "workspace"
 // value; keep a single derivation so the config-file lookup and the runtime
 // path variables can never diverge (see LESSONS_LEARNED #16 and #19).
 func DefaultWorkspaceRoot(projectRoot string) string {
+	if BuildMode == "release" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic("cannot resolve user home")
+		}
+		root, err := DefaultUserWorkspace(runtime.GOOS, os.Getenv, home)
+		if err != nil {
+			panic(err.Error())
+		}
+		return root
+	}
 	return filepath.Join(projectRoot, WorkspaceDirName)
 }
 
@@ -42,17 +54,13 @@ func init() {
 	if err != nil {
 		panic("paths: cannot get working directory: " + err.Error())
 	}
-	dir := wd
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			PROJECT_ROOT = dir
-			break
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			panic("paths: go.mod not found walking up from " + wd)
-		}
-		dir = parent
+	executable, err := os.Executable()
+	if err != nil {
+		panic("paths: cannot resolve executable")
+	}
+	PROJECT_ROOT, err = DiscoverResourceRoot(wd, executable, BuildMode)
+	if err != nil {
+		panic("paths: " + err.Error())
 	}
 
 	if env := os.Getenv("WORKSPACE"); env != "" {

@@ -20,15 +20,15 @@ export default defineConfig({
         proxy: {
             '/api': {
                 target: 'http://localhost:8787',
-                changeOrigin: true,
+                changeOrigin: false,
             },
             '/files': {
                 target: 'http://localhost:8787',
-                changeOrigin: true,
+                changeOrigin: false,
             },
             '/events': {
                 target: 'http://localhost:8787',
-                changeOrigin: true,
+                changeOrigin: false,
                 // SSE needs ws:false + long-lived; Vite proxy supports streaming.
                 ws: false,
             },

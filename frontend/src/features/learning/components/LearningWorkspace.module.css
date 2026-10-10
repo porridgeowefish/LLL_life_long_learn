@@ -8,4 +8,15 @@
 .tab:hover, .tabActive:hover { text-decoration: none; color: var(--fg); }
 .tabActive { color: var(--fg); font-weight: 600; }
 .tabActive::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px 2px 0 0; }
+.headerActions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.headerActions a { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 7px; color: var(--muted); font-size: 11px; text-decoration: none; }
+.headerActions a:hover { color: var(--fg); background: var(--surface-sunken); text-decoration: none; }
 .content { flex: 1; min-height: 0; overflow: hidden; }
+@media (max-width: 900px) {
+  .header { height: auto; min-height: var(--workspace-header-h); flex-basis: auto; flex-wrap: wrap; gap: 8px 16px; padding: 10px 16px 0; }
+  .identity { flex: 1; }
+  .identity span { display: none; }
+  .tabs { order: 3; width: 100%; height: 34px; justify-content: center; }
+  .headerActions { gap: 4px; }
+  .headerActions a span { display: none; }
+}

@@ -51,12 +51,12 @@ func TestAddAndDeleteSource(t *testing.T) {
 }
 
 func TestParseDispositionKeepsArchivesAndExecutablesOpaque(t *testing.T) {
-	for _, name := range []string{"book.zip", "installer.exe", "script.ps1", "unknown.blob"} {
+	for _, name := range []string{"book.zip", "installer.exe", "script.ps1", "unknown.blob", "figure.png", "old.doc"} {
 		if disposition, _ := ParseDisposition(name, "application/octet-stream"); disposition != "opaque" {
 			t.Fatalf("unsafe or unknown file became parseable: %s", name)
 		}
 	}
-	for _, name := range []string{"book.pdf", "notes.md", "table.xlsx", "source.py", "figure.png"} {
+	for _, name := range []string{"book.pdf", "notes.md", "table.xlsx", "source.py"} {
 		if disposition, _ := ParseDisposition(name, ""); disposition != "parse" {
 			t.Fatalf("supported file stayed opaque: %s", name)
 		}

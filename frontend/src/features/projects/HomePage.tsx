@@ -3,17 +3,13 @@ import { useNavigate } from 'react-router-dom';
 
 import { useHealth } from '@/app/api/health';
 import { useProjects } from '@/features/projects/api/projects';
-import { useRecentSessions, useActiveSessions } from '@/features/agents';
 import { useUiStore } from '@/shared/store/slices/ui';
 import { Button } from '@/shared/primitive/Button';
-import { Card } from '@/shared/primitive/Card';
-import { Tag } from '@/shared/primitive/Tag';
 import { Icon } from '@/shared/primitive/Icon';
 import { EmptyState } from '@/shared/primitive/EmptyState';
 import { ProjectCard } from '@/features/projects/components/ProjectCard';
 import { LearningRhythm } from '@/features/projects/components/LearningRhythm';
 import { CreateProjectModal } from '@/features/projects/components/CreateProjectModal';
-import { formatRelativeTime } from '@/shared/lib/format';
 
 import s from './HomePage.module.css';
 
@@ -25,10 +21,8 @@ export function HomePage() {
 
   const { data: health } = useHealth();
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
-  const { data: recent } = useRecentSessions(5);
-  const { data: active } = useActiveSessions();
 
-  const projects = projectsData?.projects ?? [];
+  const projects = (projectsData?.projects ?? []).filter(project => project.projectType === 'discipline-map');
   const runtime = health?.agentRuntime?.runtime;
 
   return (
@@ -50,26 +44,6 @@ export function HomePage() {
 
         <LearningRhythm projects={projects} />
 
-        {/* Active sessions hero */}
-        {active?.sessions && active.sessions.length > 0 && (
-          <section className={s.active}>
-            {active.sessions.map((sess) => (
-              <div key={sess.id} className={s.activeTile}>
-                <span className={s.activeIcon}>
-                  <Icon name="bot" size={16} />
-                </span>
-                <div className={s.activeBody}>
-                  <h4>{sess.projectSlug} · {sess.agentId}</h4>
-                  <p>
-                    <Tag tone="orange">{sess.state}</Tag>{' '}
-                    <span className={s.activeMeta}>{sess.zoneName} zone</span>
-                  </p>
-                </div>
-              </div>
-            ))}
-          </section>
-        )}
-
         {/* Projects grid */}
         <section>
           <h2 className={s.sectionTitle}>学习项目</h2>
@@ -77,8 +51,8 @@ export function HomePage() {
             <div className={s.loading}>加载中…</div>
           ) : projects.length === 0 ? (
             <EmptyState
-              title="还没有任何学习项目"
-              description="创建学科地图来了解一个领域，或创建系统学习项目进入完整学习流程。"
+              title="还没有学科地图"
+              description="创建学科地图来梳理一个领域。对话项目可从左侧栏进入。"
               action={
                 <Button variant="primary" onClick={openModal}>
                   创建第一个项目
@@ -95,33 +69,6 @@ export function HomePage() {
           )}
         </section>
 
-        {/* Recent runs */}
-        {recent?.sessions && recent.sessions.length > 0 && (
-          <section>
-            <h2 className={s.sectionTitle}>最近运行</h2>
-            <div className={s.recent}>
-              {recent.sessions.map((sess) => (
-                <Card
-                  key={sess.id}
-                  variant="outlined"
-                  className={s.recentCard}
-                  onClick={() => navigate(`/project/${sess.projectSlug}/${sess.zoneName}`)}
-                >
-                  <span className={s.recentIcon}>
-                    <Icon name="clock" size={16} />
-                  </span>
-                  <div className={s.recentBody}>
-                    <h4>{sess.projectSlug} · {sess.agentId}</h4>
-                    <p>{formatRelativeTime(sess.createdAt)} · {sess.zoneName}</p>
-                  </div>
-                  <Tag tone={sess.state === 'completed' ? 'accent' : 'muted'}>
-                    {sess.state}
-                  </Tag>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
       </div>
 
       <CreateProjectModal

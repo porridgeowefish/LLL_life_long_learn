@@ -1,39 +1,22 @@
-param(
-  [string]$ShortcutName = 'LifeLongLearn',
+﻿param(
+  [string]$ShortcutName = 'learn-with-ai-dev',
   [string]$WorkspaceRoot = ''
 )
-
 $ErrorActionPreference = 'Stop'
-
-function Get-RepoRoot {
-  return (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-}
-
-$repoRoot = Get-RepoRoot
-$startScript = Join-Path $repoRoot 'scripts\Start-LLL.ps1'
-$iconPath = Join-Path $repoRoot 'scripts\assets\lll.ico'
-$desktop = [Environment]::GetFolderPath('Desktop')
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$appPath = Join-Path $repoRoot 'dist\learn-with-ai-desktop.exe'
+$iconPath = Join-Path $repoRoot 'scripts\assets\learn-with-ai.ico'
+if (-not (Test-Path -LiteralPath $appPath -PathType Leaf)) { throw 'Run npm run build:desktop before creating the native developer shortcut.' }
+if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) { $WorkspaceRoot = Join-Path $repoRoot 'workspace' }
+$resolvedWorkspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
+$desktop = [Environment]::GetFolderPath('DesktopDirectory')
 $shortcutPath = Join-Path $desktop "$ShortcutName.lnk"
-
-if (-not (Test-Path -LiteralPath $startScript)) {
-  throw "Missing launcher script: $startScript"
-}
-if (-not (Test-Path -LiteralPath $iconPath)) {
-  throw "Missing icon: $iconPath"
-}
-
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
-$arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$startScript`""
-if (-not [string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-  $resolvedWorkspace = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
-  $arguments += " -WorkspaceRoot `"$resolvedWorkspace`""
-}
-$shortcut.Arguments = $arguments
+$shortcut.TargetPath = $appPath
+$shortcut.Arguments = "--workspace `"$resolvedWorkspace`""
 $shortcut.WorkingDirectory = $repoRoot
 $shortcut.IconLocation = $iconPath
-$shortcut.Description = 'Start LifeLongLearn'
+$shortcut.Description = 'learn-with-ai native development verification'
 $shortcut.Save()
-
-Write-Host "Created desktop shortcut: $shortcutPath"
+Write-Output "Created native desktop shortcut: $shortcutPath"

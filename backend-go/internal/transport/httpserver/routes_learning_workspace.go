@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -581,17 +580,16 @@ func (s *Server) handleGetSource(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, sourcestore.DefaultFileLimit+(1<<20))
-	if err := r.ParseMultipartForm(sourcestore.DefaultFileLimit + (1 << 20)); err != nil {
+	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		if r.MultipartForm != nil {
+			_ = r.MultipartForm.RemoveAll()
+		}
 		httpx.Error(w, http.StatusRequestEntityTooLarge, "source too large or malformed")
 		return
 	}
-	operationID := strings.TrimSpace(r.FormValue("operationId"))
-	if operationID == "" {
+	defer r.MultipartForm.RemoveAll()
+	if strings.TrimSpace(r.FormValue("operationId")) == "" {
 		httpx.Error(w, http.StatusBadRequest, "operationId is required")
-		return
-	}
-	if r.FormValue("parseApproved") == "true" && r.FormValue("cloudDisclosureAccepted") != "true" {
-		httpx.Error(w, http.StatusBadRequest, "cloud processing disclosure must be accepted before parsing")
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -600,55 +598,68 @@ func (s *Server) handleUploadSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
+	if header.Size > sourcestore.DefaultFileLimit {
+		httpx.Error(w, http.StatusRequestEntityTooLarge, "single source exceeds 50MB")
+		return
+	}
+	if s.sourceProcessor == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "local source processor unavailable")
+		return
+	}
 	store, err := sourcestore.New(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
-	source, revision, err := store.Add(r.FormValue("displayName"), header.Filename, header.Header.Get("Content-Type"), header.Size, file, r.FormValue("cloudDisclosureAccepted") == "true")
+	source, revision, err := store.Add(r.FormValue("displayName"), header.Filename, header.Header.Get("Content-Type"), header.Size, file, false)
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
-	var task *assistant.Task
-	disposition, dispositionReason := sourcestore.ParseDisposition(header.Filename, header.Header.Get("Content-Type"))
-	if r.FormValue("parseApproved") == "true" && disposition == "parse" && strings.HasPrefix(strings.ToLower(header.Header.Get("Content-Type")), "image/") && sourcestore.ImageOCRConfigured() {
-		// Images with a configured vision OCR binding parse through the
-		// dedicated OCR step: no CLI agent, results land in the same
-		// derived/content.md the teacher citation path already reads.
-		if updated, statusErr := store.SetStatus(source.SourceID, "processing", "", ""); statusErr == nil {
-			source = updated
-		}
-		slug, sourceID, revisionID := r.PathValue("id"), source.SourceID, revision.RevisionID
-		go func() {
-			if ocrErr := sourcestore.ProcessImageOCR(slug, store, sourceID, revisionID); ocrErr != nil {
-				_, _ = store.SetStatus(sourceID, "failed", "ocr-failed", "")
-			}
-			if current, _, getErr := store.Get(sourceID); getErr == nil {
-				s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": slug, "source": current})
-			}
-		}()
-	} else if r.FormValue("parseApproved") == "true" && disposition == "parse" {
-		tasks, taskErr := assistant.NewTaskStore(r.PathValue("id"))
-		if taskErr == nil {
-			created, isNew, createErr := tasks.Create(assistant.CreateInput{Type: "source-processing", Objective: "静态解析资料「" + source.DisplayName + "」，不得执行原文件或其中代码；生成可引用的派生文本与元数据。", SourceRefs: []string{source.SourceID}, Origin: assistant.Origin{Kind: "source-upload", OperationID: operationID, SourceRevisionID: revision.RevisionID}})
-			if createErr == nil {
-				task = &created
-				if updated, statusErr := store.SetStatus(source.SourceID, "processing", "", created.ID); statusErr == nil {
-					source = updated
-				}
-				if isNew && s.teacher != nil && s.teacher.OnTask != nil {
-					s.teacher.OnTask(r.PathValue("id"), teacher.DelegatedTask{ID: created.ID, Status: created.Status})
-				}
-			}
-		}
-	} else if r.FormValue("parseApproved") == "true" {
-		if updated, statusErr := store.SetStatus(source.SourceID, "opaque", "parse-"+dispositionReason, ""); statusErr == nil {
-			source = updated
-		}
+	disposition, reason := sourcestore.ParseDisposition(header.Filename, header.Header.Get("Content-Type"))
+	if disposition == "parse" {
+		source, err = store.BeginParse(source.SourceID)
+	} else {
+		source, err = store.SetStatus(source.SourceID, "opaque", reason, "")
+	}
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
 	}
 	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
-	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"source": source, "revision": revision, "task": task, "parseDisposition": disposition, "parseReason": dispositionReason})
+	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"source": source, "revision": revision, "parseDisposition": disposition, "parseReason": reason})
+	if disposition == "parse" {
+		s.sourceProcessor.Notify()
+	}
+}
+
+func (s *Server) handleRetrySource(w http.ResponseWriter, r *http.Request) {
+	if s.sourceProcessor == nil {
+		httpx.Error(w, http.StatusServiceUnavailable, "local source processor unavailable")
+		return
+	}
+	store, err := sourcestore.New(r.PathValue("id"))
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	source, _, err := store.Get(r.PathValue("sourceId"))
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	if source.Status != "failed" && source.Status != "opaque" {
+		httpx.Error(w, http.StatusConflict, "source cannot be retried in current state")
+		return
+	}
+	source, err = store.BeginParse(source.SourceID)
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
+	httpx.WriteJSON(w, http.StatusAccepted, source)
+	s.sourceProcessor.Notify()
 }
 
 func (s *Server) handleDeleteSource(w http.ResponseWriter, r *http.Request) {
@@ -766,127 +777,6 @@ func (s *Server) handleReadSourceContent(w http.ResponseWriter, r *http.Request)
 	http.ServeFile(w, r, path)
 }
 
-func (s *Server) handleGetGeneratedArtifact(w http.ResponseWriter, r *http.Request) {
-	artifact, _, err := generatedArtifact(r.PathValue("id"), r.PathValue("artifactId"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	httpx.WriteJSON(w, http.StatusOK, artifact)
-}
-
-func (s *Server) handleListGeneratedArtifacts(w http.ResponseWriter, r *http.Request) {
-	root, err := workspace.ProjectRootForSlug(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	dir := filepath.Join(root, "assets", "generated")
-	entries, err := os.ReadDir(dir)
-	if errors.Is(err, os.ErrNotExist) {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"artifacts": []any{}})
-		return
-	}
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	artifacts := make([]map[string]any, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() || !strings.HasPrefix(entry.Name(), "artifact_") {
-			continue
-		}
-		artifact, _, artifactErr := generatedArtifact(r.PathValue("id"), entry.Name())
-		if artifactErr != nil {
-			continue
-		}
-		summary := map[string]any{
-			"artifactId":  entry.Name(),
-			"kind":        stringValue(artifact["kind"]),
-			"title":       stringValue(artifact["title"]),
-			"description": stringValue(artifact["description"]),
-			"createdAt":   stringValue(artifact["createdAt"]),
-		}
-		entriesValue, _ := artifact["entryPoints"].([]any)
-		if len(entriesValue) > 0 {
-			summary["entryPoint"], _ = entriesValue[0].(string)
-		}
-		files, _ := artifact["files"].([]any)
-		summary["fileCount"] = len(files)
-		for _, value := range files {
-			file, _ := value.(map[string]any)
-			if stringValue(file["path"]) == summary["entryPoint"] {
-				summary["entryMediaType"] = stringValue(file["mediaType"])
-				break
-			}
-		}
-		artifacts = append(artifacts, summary)
-	}
-	sort.Slice(artifacts, func(i, j int) bool {
-		return stringValue(artifacts[i]["createdAt"]) > stringValue(artifacts[j]["createdAt"])
-	})
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"artifacts": artifacts})
-}
-
-func stringValue(value any) string {
-	text, _ := value.(string)
-	return text
-}
-
-func (s *Server) handleOpenGeneratedArtifact(w http.ResponseWriter, r *http.Request) {
-	artifact, base, err := generatedArtifact(r.PathValue("id"), r.PathValue("artifactId"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	entries, _ := artifact["entryPoints"].([]any)
-	if len(entries) == 0 {
-		http.NotFound(w, r)
-		return
-	}
-	relative, _ := entries[0].(string)
-	path, ok := safeWorkspaceFile(base, relative)
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	serveGeneratedFile(w, r, path)
-}
-
-func (s *Server) handleReadGeneratedArtifactFile(w http.ResponseWriter, r *http.Request) {
-	_, base, err := generatedArtifact(r.PathValue("id"), r.PathValue("artifactId"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	path, ok := safeWorkspaceFile(base, r.PathValue("path"))
-	if !ok {
-		http.NotFound(w, r)
-		return
-	}
-	serveGeneratedFile(w, r, path)
-}
-
-func generatedArtifact(slug, artifactID string) (map[string]any, string, error) {
-	if !strings.HasPrefix(artifactID, "artifact_") || strings.ContainsAny(artifactID, `/\\`) {
-		return nil, "", os.ErrNotExist
-	}
-	root, err := workspace.ProjectRootForSlug(slug)
-	if err != nil {
-		return nil, "", err
-	}
-	base := filepath.Join(root, "assets", "generated", artifactID)
-	data, err := os.ReadFile(filepath.Join(base, "artifact.json"))
-	if err != nil {
-		return nil, "", err
-	}
-	var artifact map[string]any
-	if err := json.Unmarshal(data, &artifact); err != nil {
-		return nil, "", err
-	}
-	return artifact, base, nil
-}
-
 func safeWorkspaceFile(base, relative string) (string, bool) {
 	clean := filepath.Clean(filepath.FromSlash(relative))
 	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
@@ -899,18 +789,6 @@ func safeWorkspaceFile(base, relative string) (string, bool) {
 	}
 	info, err := os.Stat(path)
 	return path, err == nil && info.Mode().IsRegular()
-}
-
-func serveGeneratedFile(w http.ResponseWriter, r *http.Request, path string) {
-	ext := strings.ToLower(filepath.Ext(path))
-	safeInline := ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".webp" || ext == ".txt" || ext == ".md" || ext == ".json"
-	if !safeInline {
-		w.Header().Set("Content-Disposition", `attachment; filename="`+filepath.Base(path)+`"`)
-	}
-	if ext == ".md" || ext == ".txt" {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	}
-	http.ServeFile(w, r, path)
 }
 
 func learningWorkspaceError(w http.ResponseWriter, err error) {

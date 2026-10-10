@@ -2,7 +2,7 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-14
+Last reviewed: 2026-10-10
 Source of truth: long-lived backend/frontend contract strategy; Go handlers and TypeScript types own current shapes.
 
 ## Current Surface
@@ -116,7 +116,7 @@ the project route, workspace operation, and their tests.
 ## Conversation And Task Boundary
 
 The active API includes one provider-neutral teacher-turn stream, durable conversation
-reads, task and asset reads, editable core assets, body annotations, and source
+reads, task and asset reads, editable core assets, review annotations, and source
 operations. The frontend consumes normalized block events and never consumes a
 provider SDK stream directly.
 
@@ -125,21 +125,31 @@ does not preview it. `GET /api/usage/teacher` returns paginated, durable
 conversation-level teacher usage with per-response rows. These values are
 provider-reported only and do not include assistant usage.
 
-The teacher sees one `delegate_learning_work` tool with logical type, objective,
-source references, and proposal message identity. Application services inject
+Only a turn explicitly approving an actual adjacent assistant proposal sees
+`delegate_learning_work`, with logical type, objective, source references and
+optional practice intent. Proposal identity is resolved by the service, not the
+model. The teacher also sees the bounded `search_web`
+tool when the optional webSearch configuration resolves a key (ADR-0019).
+Application services inject
 physical paths, approval identity, task/run IDs, input ranges, and executor
 policy. CLI execution uses a sealed envelope and generic result manifest rather
 than public HTTP payloads.
 
+Teacher response SSE can emit `message-reset` to retract an invalid candidate
+before one tool-free recovery. Clients must clear pending and rendered answer,
+reasoning and tool notices; only the final valid candidate is persisted. Signed
+provider thinking used for tool continuation is private in-memory transport
+state and never part of this SSE or conversation schema.
+
 Global SSE carries identifier-only invalidation for conversation, task, asset,
-source, and activity changes. `learning-activity-updated` has payload
+source, activity and teacher-note changes. `learning-activity-updated` has payload
 `{projectSlug}` and causes all cached `GET /api/activity` summaries to refetch.
 REST remains the recovery truth. There is intentionally no
 public assistant-task create, cancel, or retry endpoint in the initial contract.
-Legacy confusion routes adapt to canonical body annotations during migration.
+Retired intro/body/generated asset routes return 404. Review annotations retain their canonical resource; legacy confusion APIs are not the teaching workspace flow.
 
 Exact stable shapes and errors are documented by the current iteration
-`INTERFACE_CONTRACT.md`; implemented Go routes and TypeScript types remain
+`API_CONTRACT.md`; implemented Go routes and TypeScript types remain
 executable truth.
 
 ## Compatibility
@@ -147,3 +157,25 @@ executable truth.
 Breaking public-shape changes require an ADR, an iteration contract, migration
 behavior, synchronized client/server types, and tests covering older persisted
 projects or requests.
+
+## Iteration 18 Current Contract
+
+Status: implemented; platform-native and remote workflow validation limits are recorded in delivery notes.
+
+前后端同步升级为 review/practice 与 notes 资源；intro/body/generated 接口退役为 404，不保留旧端点别名。配置敏感资源返回完整密钥并限制本地同源/no-store，诊断保持脱敏；笔记配置、重试与项目用量聚合合同由迭代 18 拥有。
+
+参见 [Iteration 18](../01-iterations/foundations/iteration-18-learn-with-ai/README.md) 与 [ADR-0024](./ADR/0024-review-notes-and-portable-release.md)。迭代 18 交付的历史基础仍保留；资料与安装的当前合同由迭代 19 更新。
+
+
+## Iteration 19 — 资料解析与安装（已实现）
+
+POST sources 自动本地解析，不需要 parseApproved/cloudDisclosureAccepted；返回 source/revision/disposition/reason，不返回助教 task。50MiB 超限 413。POST sources/{sourceId}/retry 重试原修订，失败/opaque 状态可提交，202 返回 source。source 新增解析器/字节数/截断标记；source-updated 继续走唯一 AppShell SSE。
+
+参见 [Iteration 19](../01-iterations/iteration-19-document-import-installers/README.md) 与 [ADR-0025](./ADR/0025-native-source-context-and-installers.md)。验收状态见交付记录。
+
+
+## Iteration 20 — Native Windows application and MSI (implementing)
+
+Windows targets a dedicated WebView2 application window with the Go services in the same process, private loopback, owned shutdown and a standard per-user MSI. Installation detects installed versions and asks before overwrite/upgrade, supports repair/uninstall and protects learner data. Native window/executable/installer/shortcut/UI share the project-owned icon. Verified duplicate script desktop entries are removed; source deployment commands remain maintainer tools. macOS/Linux currently retain their existing browser-based distributions; this Windows MSI change does not claim native shells on those platforms.
+
+See [Iteration 20](../01-iterations/iteration-20-native-desktop-msi/README.md) and [ADR-0026](./ADR/0026-native-windows-desktop-and-msi.md); actual native/legacy-transition verification belongs to the delivery notes.

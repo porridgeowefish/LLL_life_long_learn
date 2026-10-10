@@ -12,7 +12,7 @@ import (
 func (d *Dispatcher) reconcileLostRuns() {
 	projects, _ := workspace.IndexAll()
 	for _, project := range projects {
-		if project.ProjectType != workspace.ProjectTypeSystemLearning {
+		if project.ProjectType != workspace.ProjectTypeSystemLearning || (d.deps.ProjectBlocked != nil && d.deps.ProjectBlocked(project.Slug)) {
 			continue
 		}
 		store, err := New(project.Slug)
@@ -21,6 +21,10 @@ func (d *Dispatcher) reconcileLostRuns() {
 		}
 		tasks, _ := store.List("running")
 		for _, task := range tasks {
+			if !ValidType(task.Type) {
+				d.finish(store, task.ID, "cancelled", nil, &Failure{Code: "task-type-retired", Message: "旧任务类型已退役"})
+				continue
+			}
 			d.reconcileRunningTask(store, task)
 		}
 	}
@@ -35,7 +39,7 @@ func (d *Dispatcher) reconcileLostRuns() {
 func (d *Dispatcher) reconcileLateResults() {
 	projects, _ := workspace.IndexAll()
 	for _, project := range projects {
-		if project.ProjectType != workspace.ProjectTypeSystemLearning {
+		if project.ProjectType != workspace.ProjectTypeSystemLearning || (d.deps.ProjectBlocked != nil && d.deps.ProjectBlocked(project.Slug)) {
 			continue
 		}
 		store, err := New(project.Slug)
@@ -44,6 +48,9 @@ func (d *Dispatcher) reconcileLateResults() {
 		}
 		tasks, _ := store.List("failed")
 		for _, task := range tasks {
+			if !ValidType(task.Type) {
+				continue
+			}
 			if task.Failure == nil || (task.Failure.Code != "executor-state-lost" && task.Failure.Code != "invalid-result-manifest") || len(task.AttemptIDs) == 0 {
 				continue
 			}

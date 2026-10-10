@@ -1,7 +1,12 @@
 {
   "__comment": "Copy to <workspace>/config.local.json (default workspace: <repo>/workspace, ADR-0023) and fill in real values. apiKeyEnv-named environment variables win over inline keys; the file is gitignored and never rewritten during load.",
-  "server": { "host": "127.0.0.1", "port": 8787 },
-  "workspace": { "root": "." },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8787
+  },
+  "workspace": {
+    "root": ""
+  },
   "ai": {
     "defaultProvider": "primary",
     "searchEngine": "google",
@@ -19,10 +24,22 @@
       }
     ],
     "bindings": {
-      "teacher": { "providerId": "primary", "model": "" },
-      "conversationCompaction": { "providerId": "primary", "model": "" },
-      "annotationAskAI": { "providerId": "primary", "model": "" },
-      "ocr": { "providerId": "primary", "model": "" }
+      "teacher": {
+        "providerId": "primary",
+        "model": ""
+      },
+      "conversationCompaction": {
+        "providerId": "primary",
+        "model": ""
+      },
+      "annotationAskAI": {
+        "providerId": "primary",
+        "model": ""
+      },
+      "ocr": {
+        "providerId": "primary",
+        "model": ""
+      }
     }
   },
   "webSearch": {
@@ -49,5 +66,15 @@
       "model": ""
     }
   },
-  "ui": { "theme": "lychee-paper" }
+  "ui": {
+    "theme": "lychee-paper"
+  },
+  "teacher": {
+    "autoNotes": {
+      "enabled": true,
+      "everyTurns": 3,
+      "providerId": "",
+      "model": ""
+    }
+  }
 }

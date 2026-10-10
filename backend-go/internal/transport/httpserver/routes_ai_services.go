@@ -15,11 +15,12 @@ type aiServiceBinding struct {
 }
 
 type aiServiceProvider struct {
-	ID      string `json:"id"`
-	Kind    string `json:"kind"`
-	Name    string `json:"name,omitempty"`
-	BaseURL string `json:"baseUrl"`
-	APIKey  string `json:"apiKey"`
+	ID        string `json:"id"`
+	Kind      string `json:"kind"`
+	Name      string `json:"name,omitempty"`
+	BaseURL   string `json:"baseUrl"`
+	APIKey    string `json:"apiKey"`
+	APIKeyEnv string `json:"apiKeyEnv,omitempty"`
 }
 
 type aiServicesResource struct {
@@ -28,6 +29,10 @@ type aiServicesResource struct {
 }
 
 func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
+	if !allowSecretSettings(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	cfg, err := teacher.LoadConfig()
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "unable to load AI services")
@@ -40,11 +45,7 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 			if kind == "openai" {
 				kind = "openai-compatible"
 			}
-			key := ""
-			if provider.APIKey != "" {
-				key = maskedKey
-			}
-			resource.Providers = append(resource.Providers, aiServiceProvider{ID: provider.ID, Kind: kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: key})
+			resource.Providers = append(resource.Providers, aiServiceProvider{ID: provider.ID, Kind: kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv})
 		}
 		for _, name := range []string{"teacher", "annotationAskAI", "conversationCompaction"} {
 			if binding, ok := cfg.Bindings[name]; ok {
@@ -60,12 +61,20 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
+	if !allowSecretSettings(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	var in aiServicesResource
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid AI services body")
 		return
 	}
-	old, _ := teacher.LoadConfig()
+	old, loadErr := teacher.LoadConfig()
+	if loadErr != nil {
+		httpx.Error(w, http.StatusInternalServerError, "unable to load existing AI settings")
+		return
+	}
 	oldByID := map[string]teacher.ProviderConfig{}
 	if old != nil {
 		for _, provider := range old.Providers {
@@ -89,10 +98,7 @@ func (s *Server) handlePutAIServices(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		apiKey := provider.APIKey
-		if apiKey == maskedKey {
-			apiKey = oldByID[provider.ID].APIKey
-		}
-		providers = append(providers, teacher.ProviderConfig{ID: strings.TrimSpace(provider.ID), Kind: kind, Name: provider.Name, BaseURL: strings.TrimSpace(provider.BaseURL), APIKey: strings.TrimSpace(apiKey), Model: strings.TrimSpace(model)})
+		providers = append(providers, teacher.ProviderConfig{ID: strings.TrimSpace(provider.ID), Kind: kind, Name: provider.Name, BaseURL: strings.TrimSpace(provider.BaseURL), APIKey: strings.TrimSpace(apiKey), APIKeyEnv: provider.APIKeyEnv, Model: strings.TrimSpace(model)})
 	}
 	bindings := map[string]teacher.Binding{}
 	for name, binding := range in.Bindings {

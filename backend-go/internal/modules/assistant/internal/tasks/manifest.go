@@ -31,24 +31,11 @@ type resultManifest struct {
 	TaskID        string `json:"taskId"`
 	RunID         string `json:"runId"`
 	Summary       string `json:"summary"`
-	Deliverables  []struct {
-		Key        string `json:"key"`
-		Descriptor string `json:"descriptor"`
-	} `json:"deliverables"`
-	AssetUpdates map[string]struct {
+	AssetUpdates  map[string]struct {
 		Status    string `json:"status"`
 		Candidate string `json:"candidate"`
 		Code      string `json:"code"`
 	} `json:"assetUpdates"`
-	SourceUpdate *struct {
-		SourceID   string `json:"sourceId"`
-		RevisionID string `json:"revisionId"`
-		Files      []struct {
-			Key       string `json:"key"`
-			Path      string `json:"path"`
-			MediaType string `json:"mediaType"`
-		} `json:"files"`
-	} `json:"sourceUpdate,omitempty"`
 }
 
 type executorRecord struct {

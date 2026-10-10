@@ -21,6 +21,7 @@ import (
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 	paths "github.com/xmz14/lll/backend-go/internal/platform/filesystem"
 )
@@ -42,6 +43,8 @@ type Server struct {
 	agentExecution  AgentExecutionService
 	dispatcher      *assistant.Dispatcher
 	activeTeacher   *teacher.ActiveResponses
+	notes           *teacher.NoteService
+	sourceProcessor *sources.Processor
 	migrationReady  bool
 	migrationFailed []string
 
@@ -78,6 +81,7 @@ type Dependencies struct {
 	Cache           *projectindex.Index
 	MigrationReady  bool
 	MigrationFailed []string
+	SourceProcessor *sources.Processor
 }
 
 // New constructs only the HTTP adapter. Concrete dependency creation and
@@ -96,6 +100,7 @@ func New(deps Dependencies) *Server {
 		activeTeacher:   teacher.NewActiveResponses(),
 		migrationReady:  deps.MigrationReady,
 		migrationFailed: deps.MigrationFailed,
+		sourceProcessor: deps.SourceProcessor,
 		broadcaster:     deps.Broadcaster,
 		agents:          deps.Agents,
 		sessions:        deps.Sessions,
@@ -146,6 +151,10 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	// Health
+	mux.HandleFunc("GET /api/settings/teacher", s.handleGetTeacherSettings)
+	mux.HandleFunc("PUT /api/settings/teacher", s.handlePutTeacherSettings)
+	mux.HandleFunc("GET /api/projects/{id}/notes", s.handleGetNotes)
+	mux.HandleFunc("POST /api/projects/{id}/notes/jobs/{jobId}/retry", s.handleRetryNote)
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("POST /api/system/shutdown", s.handleShutdown)
 	mux.HandleFunc("GET /api/settings/agent-runtime", s.handleGetAgentRuntimeSettings)
@@ -159,6 +168,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings/appearance", s.handleGetAppearance)
 	mux.HandleFunc("PUT /api/settings/appearance", s.handlePutAppearance)
 	mux.HandleFunc("GET /api/activity", s.handleGetActivity)
+	mux.HandleFunc("GET /api/usage/projects", s.handleListProjectUsage)
 	mux.HandleFunc("GET /api/usage/teacher", s.handleListTeacherUsage)
 
 	// Projects
@@ -193,15 +203,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}/versions", s.handleListLearningAssetVersions)
 	mux.HandleFunc("GET /api/projects/{id}/sources", s.handleListSources)
 	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
+	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/retry", s.handleRetrySource)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
 	mux.HandleFunc("DELETE /api/projects/{id}/sources/{sourceId}", s.handleDeleteSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/permanent-delete", s.handlePermanentDeleteSource)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content", s.handleReadSourceContent)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/files/{fileKey}", s.handleReadSourceFile)
-	mux.HandleFunc("GET /api/projects/{id}/generated", s.handleListGeneratedArtifacts)
-	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}", s.handleGetGeneratedArtifact)
-	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/open", s.handleOpenGeneratedArtifact)
-	mux.HandleFunc("GET /api/projects/{id}/generated/{artifactId}/files/{path...}", s.handleReadGeneratedArtifactFile)
 	mux.HandleFunc("GET /api/preferences", s.handleGetPreferences)
 	mux.HandleFunc("PUT /api/preferences", s.handlePutPreferences)
 
@@ -219,6 +226,9 @@ func (s *Server) Handler() http.Handler {
 
 	// Legacy project file reads and learner-owned zone edits. Project memory is
 	// deliberately not part of this surface; global preferences use /api/preferences.
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		httpx.WriteJSON(w, http.StatusNotFound, map[string]any{"error": "API route not found"})
+	})
 	mux.HandleFunc("GET /files/projects/{id}/", s.handleReadFile)
 	mux.HandleFunc("POST /files/projects/{id}/", s.handleWriteFile)
 
@@ -229,12 +239,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/projects/{id}/confusions/{confusionId}", s.handleDeleteConfusion)
 	mux.HandleFunc("POST /api/projects/{id}/confusions/{confusionId}/ask-stream", s.handleAskAiStream)
 	mux.HandleFunc("POST /api/projects/{id}/confusions/{confusionId}/ask/summarize", s.handleAskAiSummarize)
-	mux.HandleFunc("GET /api/projects/{id}/assets/body/annotations", s.handleListAnnotations)
-	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations", s.handleCreateAnnotation)
-	mux.HandleFunc("PATCH /api/projects/{id}/assets/body/annotations/{annotationId}", s.handleUpdateAnnotation)
-	mux.HandleFunc("DELETE /api/projects/{id}/assets/body/annotations/{annotationId}", s.handleDeleteAnnotation)
-	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask-stream", s.handleAnnotationAskAiStream)
-	mux.HandleFunc("POST /api/projects/{id}/assets/body/annotations/{annotationId}/ask/summarize", s.handleAnnotationAskAiSummarize)
+	mux.HandleFunc("GET /api/projects/{id}/assets/review/annotations", s.handleListAnnotations)
+	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations", s.handleCreateAnnotation)
+	mux.HandleFunc("PATCH /api/projects/{id}/assets/review/annotations/{annotationId}", s.handleUpdateAnnotation)
+	mux.HandleFunc("DELETE /api/projects/{id}/assets/review/annotations/{annotationId}", s.handleDeleteAnnotation)
+	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask-stream", s.handleAnnotationAskAiStream)
+	mux.HandleFunc("POST /api/projects/{id}/assets/review/annotations/{annotationId}/ask/summarize", s.handleAnnotationAskAiSummarize)
 
 	// Project folders (workspace-global virtual grouping of projects)
 	mux.HandleFunc("GET /api/folders", s.handleGetFolders)
@@ -272,7 +282,18 @@ func (s *Server) Handler() http.Handler {
 	// over client-side. Asset paths (containing ".") that miss get a 404.
 	mux.Handle("/", spaHandler(paths.FRONTEND_ROOT, paths.FRONTEND_INDEX))
 
-	return logging(mux)
+	return logging(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/api/projects/"), "/")
+		if strings.HasPrefix(r.URL.Path, "/api/projects/") && len(parts) > 0 {
+			for _, slug := range s.migrationFailed {
+				if parts[0] == slug {
+					httpx.WriteJSON(w, http.StatusServiceUnavailable, map[string]any{"error": map[string]any{"code": "review_migration_blocked", "message": "资产迁移未完成，请结束旧助教 CLI 后重启并查看启动日志"}})
+					return
+				}
+			}
+		}
+		mux.ServeHTTP(w, r)
+	}))
 }
 
 // SetShutdownFunc installs the process-level shutdown callback used by the
@@ -285,6 +306,12 @@ func (s *Server) SetShutdownFunc(fn func()) {
 
 // Close releases background resources (the artifact file watcher).
 func (s *Server) Close() {
+	if s.sourceProcessor != nil {
+		s.sourceProcessor.Close()
+	}
+	if s.notes != nil {
+		_ = s.notes.Close()
+	}
 	if s.dispatcher != nil {
 		s.dispatcher.Close()
 	}
@@ -407,3 +434,5 @@ func logging(h http.Handler) http.Handler {
 		}
 	})
 }
+
+func (s *Server) AttachNotes(notes *teacher.NoteService) { s.notes = notes }

@@ -42,9 +42,11 @@ type LaunchRequest struct {
 	// assistant-task dispatcher. They are deliberately part of the same
 	// interactive launcher used by project agents, rather than a second CLI
 	// execution implementation.
-	taskExecutorPath string
-	taskExitPath     string
-	taskEnv          map[string]string
+	taskExecutorPath     string
+	terminalExitPath     string
+	terminalExecutorPath string
+	taskExitPath         string
+	taskEnv              map[string]string
 }
 
 // ResumeRequest carries the minimal context needed to reopen Claude Code's

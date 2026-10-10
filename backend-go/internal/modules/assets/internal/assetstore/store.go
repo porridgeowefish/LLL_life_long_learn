@@ -19,7 +19,7 @@ import (
 
 const SchemaVersion = 1
 
-var coreKeys = []string{"intro", "body", "practice"}
+var coreKeys = []string{"review", "practice"}
 
 type Meta struct {
 	SchemaVersion      int       `json:"schemaVersion"`
@@ -81,6 +81,13 @@ func New(slug string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	for _, key := range []string{"intro", "body"} {
+		if _, err := os.Stat(filepath.Join(root, "assets", key)); err == nil {
+			return nil, errors.New("review migration required before opening assets")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
 	v, _ := locks.LoadOrStore(root, &sync.Mutex{})
 	s := &Store{root: root, mu: v.(*sync.Mutex)}
 	if err := s.ensure(); err != nil {
@@ -111,67 +118,12 @@ func (s *Store) ensure() error {
 		if _, err := os.Stat(filepath.Join(dir, "asset.json")); err == nil {
 			continue
 		}
-		content := s.legacyContent(key)
+		content := ""
 		if err := s.createInitialLocked(key, content, "migration"); err != nil {
 			return err
 		}
 	}
-	return os.MkdirAll(filepath.Join(s.root, "assets", "generated"), 0o755)
-}
-
-func (s *Store) legacyContent(key string) string {
-	switch key {
-	case "intro":
-		return readText(filepath.Join(s.root, "intro", "output.md"))
-	case "body":
-		if text := readText(filepath.Join(s.root, "explain", "output.md")); strings.TrimSpace(text) != "" {
-			return text
-		}
-		return s.legacyExplainPages()
-	case "practice":
-		if text := readText(filepath.Join(s.root, "practice", "output.md")); strings.TrimSpace(text) != "" {
-			return text
-		}
-		if raw := readText(filepath.Join(s.root, "practice", "tasks.json")); strings.TrimSpace(raw) != "" {
-			return "# 练习\n\n```json\n" + strings.TrimSpace(raw) + "\n```\n"
-		}
-	}
-	return ""
-}
-
-func (s *Store) legacyExplainPages() string {
-	var manifest struct {
-		Title string `json:"title"`
-		Pages []struct {
-			Title string `json:"title"`
-			File  string `json:"file"`
-			Order int    `json:"order"`
-		} `json:"pages"`
-	}
-	raw, err := os.ReadFile(filepath.Join(s.root, "explain", "manifest.json"))
-	if err != nil || json.Unmarshal(raw, &manifest) != nil {
-		return ""
-	}
-	sort.SliceStable(manifest.Pages, func(i, j int) bool { return manifest.Pages[i].Order < manifest.Pages[j].Order })
-	var out strings.Builder
-	if strings.TrimSpace(manifest.Title) != "" {
-		out.WriteString("# " + strings.TrimSpace(manifest.Title) + "\n\n")
-	}
-	for _, page := range manifest.Pages {
-		clean := filepath.Clean(filepath.FromSlash(page.File))
-		if filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
-			continue
-		}
-		content := readText(filepath.Join(s.root, "explain", clean))
-		if strings.TrimSpace(content) == "" {
-			continue
-		}
-		if strings.TrimSpace(page.Title) != "" && !strings.HasPrefix(strings.TrimSpace(content), "#") {
-			out.WriteString("## " + strings.TrimSpace(page.Title) + "\n\n")
-		}
-		out.WriteString(strings.TrimSpace(content) + "\n\n")
-	}
-	return out.String()
+	return nil
 }
 
 func (s *Store) createInitialLocked(key, content, author string) error {
@@ -327,56 +279,9 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 	return CandidateResult{Status: "updated", Asset: asset}, nil
 }
 
-// assetLocked projects the canonical editable asset into the appropriate
-// learner-facing renderer. Migration versions may still be backed by the
-// legacy structured protocols; later learner or assistant versions are plain
-// canonical Markdown and must not be shadowed by stale legacy files.
+// assetLocked returns canonical Markdown only; old protocols are cut over once.
 func (s *Store) assetLocked(key string, meta Meta, content string) Asset {
-	kind := "markdown"
-	var current Version
-	versionPath := filepath.Join(s.root, "assets", key, "versions", meta.CurrentVersionID, "version.json")
-	if readJSON(versionPath, &current) == nil && current.Author == "migration" {
-		switch key {
-		case "body":
-			if s.hasExplainPageContract() {
-				kind = "explain-pages"
-			}
-		case "practice":
-			if s.hasPracticeContract() {
-				kind = "practice-set"
-			}
-		}
-	}
-	return Asset{Meta: meta, Content: content, ContentKind: kind}
-}
-
-func (s *Store) hasExplainPageContract() bool {
-	var manifest struct {
-		Pages []struct {
-			File string `json:"file"`
-		} `json:"pages"`
-	}
-	if readJSON(filepath.Join(s.root, "explain", "manifest.json"), &manifest) != nil || len(manifest.Pages) == 0 {
-		return false
-	}
-	for _, page := range manifest.Pages {
-		clean := filepath.Clean(filepath.FromSlash(page.File))
-		if page.File == "" || filepath.IsAbs(clean) || clean == "." || strings.HasPrefix(clean, "..") {
-			return false
-		}
-		info, err := os.Stat(filepath.Join(s.root, "explain", clean))
-		if err != nil || !info.Mode().IsRegular() {
-			return false
-		}
-	}
-	return true
-}
-
-func (s *Store) hasPracticeContract() bool {
-	var tasks struct {
-		Tasks []json.RawMessage `json:"tasks"`
-	}
-	return readJSON(filepath.Join(s.root, "practice", "tasks.json"), &tasks) == nil && len(tasks.Tasks) > 0
+	return Asset{Meta: meta, Content: content, ContentKind: "markdown"}
 }
 
 func (s *Store) AdvanceCursor(key string, throughSeq uint64) (Meta, error) {
@@ -474,12 +379,10 @@ func mergeThreeWay(base, current, candidate string) (string, bool) {
 
 func titleFor(key string) string {
 	switch key {
-	case "intro":
-		return "引入"
-	case "body":
-		return "正文"
+	case "review":
+		return "复习稿"
 	case "practice":
-		return "练习"
+		return "练习题"
 	default:
 		return key
 	}

@@ -35,14 +35,14 @@ func buildTUIWrapperShellScript(projectRoot, promptMdPath, stderrPath, settingsF
 		fmt.Sprintf(`prompt_file=%s`, shQuote(promptMdPath)),
 		`prompt_text=''`,
 		`if [ -f "$prompt_file" ]; then prompt_text=$(cat "$prompt_file"); else log_err "prompt.md missing: $prompt_file"; fi`,
-		`command -v clip.exe >/dev/null 2>&1 && clip.exe < "$prompt_file" 2>/dev/null`,
+		`if command -v pbcopy >/dev/null 2>&1; then pbcopy < "$prompt_file"; elif command -v wl-copy >/dev/null 2>&1; then wl-copy < "$prompt_file"; elif command -v xclip >/dev/null 2>&1; then xclip -selection clipboard < "$prompt_file"; elif command -v clip.exe >/dev/null 2>&1; then clip.exe < "$prompt_file"; else printf "Clipboard unavailable. Read and paste the complete prompt from %s\n" "$prompt_file"; fi`,
 		fmt.Sprintf(`agent_bin=%s`, shQuote(rt.Bin)),
 		`agent_exe=$(command -v "$agent_bin" 2>/dev/null)`,
 		`log_err "resolved runtime agentExe=$agent_exe"`,
 		`if [ -z "$agent_exe" ]; then printf 'Cannot find %s. Install it inside this Linux/WSL environment, then rerun.\n' "$agent_bin"; read -r _; exit 1; fi`,
 		fmt.Sprintf(`permission_mode=%s`, shQuote(NormalizePermissionMode(req.PermissionMode))),
 		`export FORCE_COLOR=1`,
-		`printf 'Starting %s. The initial prompt is loaded from prompt.md.\n\n' "$agent_bin"`,
+		`printf 'Starting %s. If the CLI opens without a message, paste the prompt from the clipboard and submit it.\n\n' "$agent_bin"`,
 		execLine,
 		`code=$?`,
 		taskShellFinished(req),
@@ -178,6 +178,9 @@ func taskPowerShellFinished(req LaunchRequest) string {
 
 func taskShellPrelude(req LaunchRequest) []string {
 	var lines []string
+	if req.terminalExecutorPath != "" {
+		lines = append(lines, shellExecutorRecord(req.terminalExecutorPath))
+	}
 	keys := make([]string, 0, len(req.taskEnv))
 	for key := range req.taskEnv {
 		if strings.HasPrefix(key, "LLL_") {
@@ -195,10 +198,25 @@ func taskShellPrelude(req LaunchRequest) []string {
 }
 
 func taskShellFinished(req LaunchRequest) string {
-	if req.taskExitPath == "" {
+	lines := []string{}
+	if req.taskExitPath != "" {
+		lines = append(lines, shellExitRecord(req.taskExitPath))
+	}
+	if req.terminalExitPath != "" {
+		lines = append(lines, shellExitRecord(req.terminalExitPath))
+	}
+	if len(lines) == 0 {
 		return ":"
 	}
-	return `printf '{"schemaVersion":1,"pid":%s,"exitCode":%s,"finishedAt":"%s"}\n' "$$" "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ` + shQuote(req.taskExitPath)
+	return strings.Join(lines, "\n")
+}
+func shellExitRecord(path string) string {
+	return `printf '{"schemaVersion":1,"pid":%s,"exitCode":%s,"finishedAt":"%s"}
+' "$$" "$code" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ` + shQuote(path)
+}
+func shellExecutorRecord(path string) string {
+	return `printf '{"schemaVersion":1,"pid":%s,"startedAt":"%s"}
+' "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > ` + shQuote(path)
 }
 
 func buildResumeWrapperScript(projectRoot, stderrPath string, req ResumeRequest) string {
@@ -250,7 +268,11 @@ func runStatusPowerShellLine(runID, token string) string {
 	if runID == "" || token == "" {
 		return ""
 	}
-	url := "http://127.0.0.1:8787/api/runs/" + runID + "/status"
+	port := os.Getenv("LEARN_WITH_AI_SERVER_PORT")
+	if port == "" {
+		port = "8787"
+	}
+	url := "http://127.0.0.1:" + port + "/api/runs/" + runID + "/status"
 	return fmt.Sprintf(`$statusBody = if ($code -eq 0) { '{"done":true}' } else { '{"failed":true}' }; try { Invoke-RestMethod -Method Post -Uri '%s' -Headers @{'X-Run-Token'='%s'} -ContentType 'application/json' -Body $statusBody | Out-Null } catch { Log-Err "report runtime exit failed: $_" }`, url, token)
 }
 
@@ -258,7 +280,11 @@ func runStatusShellLine(runID, token string) string {
 	if runID == "" || token == "" {
 		return ":"
 	}
-	url := "http://127.0.0.1:8787/api/runs/" + runID + "/status"
+	port := os.Getenv("LEARN_WITH_AI_SERVER_PORT")
+	if port == "" {
+		port = "8787"
+	}
+	url := "http://127.0.0.1:" + port + "/api/runs/" + runID + "/status"
 	return fmt.Sprintf(`if [ "$code" -eq 0 ]; then status_body='{"done":true}'; else status_body='{"failed":true}'; fi; curl -s -o /dev/null -X POST %s -H %s -H 'Content-Type: application/json' -d "$status_body" || log_err "report runtime exit failed"`, shQuote(url), shQuote("X-Run-Token: "+token))
 }
 

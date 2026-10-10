@@ -37,13 +37,14 @@ describe('ProjectPage migration cutover', () => {
     useProject.mockReturnValue({ data: { project }, isLoading: false, error: null });
   });
 
-  it('uses the legacy reader only for a project whose migration failed', () => {
+  it('blocks a project whose asset migration failed', () => {
     useHealth.mockReturnValue({
       data: { learningWorkspace: { mode: 'legacy', failedProjects: ['topic'] } },
       isLoading: false,
     });
     renderPage();
-    expect(screen.getByText('legacy-reader')).toBeInTheDocument();
+    expect(screen.getByText('学习资产迁移尚未完成')).toBeInTheDocument();
+    expect(screen.queryByText('legacy-reader')).toBeNull();
   });
 
   it('uses the teacher workspace for a migrated learning unit', () => {

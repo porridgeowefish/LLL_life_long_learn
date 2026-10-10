@@ -38,7 +38,11 @@ type Conversation struct {
 
 var lock sync.Mutex
 
-func Append(slug string, record Record) error {
+func Append(slug string, record Record) error { return appendLedger(slug, record, "usage.jsonl") }
+func AppendNote(slug string, record Record) error {
+	return appendLedger(slug, record, "note-usage.jsonl")
+}
+func appendLedger(slug string, record Record, filename string) error {
 	if record.ResponseID == "" || record.ConversationID == "" || record.UnitID == "" || (record.InputTokens == 0 && record.OutputTokens == 0) {
 		return nil
 	}
@@ -58,7 +62,7 @@ func Append(slug string, record Record) error {
 	}
 	lock.Lock()
 	defer lock.Unlock()
-	file, err := os.OpenFile(filepath.Join(root, "conversation", "usage.jsonl"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(filepath.Join(root, "conversation", filename), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {
 		return err
 	}
@@ -126,7 +130,10 @@ func read(path string) ([]Record, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		var item Record
-		if json.Unmarshal(scanner.Bytes(), &item) == nil && item.ResponseID != "" {
+		if err := json.Unmarshal(scanner.Bytes(), &item); err != nil {
+			return nil, err
+		}
+		if item.ResponseID != "" {
 			items = append(items, item)
 		}
 	}

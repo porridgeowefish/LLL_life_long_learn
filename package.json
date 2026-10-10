@@ -1,24 +1,29 @@
 {
-  "name": "lll",
-  "version": "0.2.0",
+  "name": "learn-with-ai",
+  "version": "0.5.0",
   "private": true,
-  "description": "LifeLongLearn — local learning workbench (Go backend + static frontend).",
+  "description": "learn-with-ai — local learning workbench",
   "scripts": {
-    "build": "npm --prefix frontend run build && go build -o dist/lll.exe ./backend-go/cmd/lll",
-    "build:backend": "go build -o dist/lll.exe ./backend-go/cmd/lll",
+    "build": "npm --prefix frontend run build && node tools/release/manage.js build",
+    "build:backend": "node tools/release/manage.js build",
     "desktop:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Install-Desktop-Shortcut.ps1",
-    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Stop-LLL.ps1",
+    "stop": "node tools/release/manage.js stop",
     "run": "go run ./backend-go/cmd/lll",
-    "start": "dist/lll.exe",
+    "start": "node tools/release/manage.js start",
     "test": "go test ./...",
     "test:verbose": "go test -v ./...",
     "archcheck": "go run ./tools/archcheck -repo . -report .artifacts/quality/architecture/dependency-report.json",
     "check:repo": "node tools/check/check-repository-hygiene.js",
     "check:fast": "node tools/check/run-check.js fast",
     "check": "node tools/check/run-check.js complete",
-    "check:full": "node tools/check/run-check.js full"
+    "check:full": "node tools/check/run-check.js full",
+    "release:build": "node tools/release/build-release.js",
+    "release:installers": "node tools/release/build-installers.js",
+    "release:test": "node --test tools/release/build-release.test.js tools/release/build-installers.test.js tools/release/linux-installer-smoke.test.js tools/release/windows-msi.test.js tools/release/windows-resources.test.js",
+    "build:desktop": "node tools/release/manage.js build-desktop",
+    "desktop:icon": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/release/build-icon.ps1"
   },
   "engines": {
-    "go": ">=1.25"
+    "go": ">=1.26"
   }
 }

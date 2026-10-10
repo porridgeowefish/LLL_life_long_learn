@@ -39,7 +39,16 @@ func (s *Server) handlePutAppearance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetAgentRuntimeSettings(w http.ResponseWriter, r *http.Request) {
-	rt, options := s.runtimeSnapshot()
+	cfg, err := assistant.LoadRuntime()
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "unable to load CLI configuration")
+		return
+	}
+	options := assistant.ListRuntimes(cfg)
+	rt := assistant.ResolveRuntime(cfg)
+	s.mu.Lock()
+	s.Runtime, s.RuntimeOptions = rt, options
+	s.mu.Unlock()
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"selected":  rt.ID,
 		"runtime":   rt,

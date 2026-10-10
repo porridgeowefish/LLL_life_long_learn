@@ -53,44 +53,7 @@ func (d *Dispatcher) commitResult(projectRoot string, task Task, runID, workDir 
 			d.emitAsset(task.ProjectSlug, payload)
 		}
 	}
-	for _, deliverable := range result.Deliverables {
-		artifactID, err := d.commitGeneratedArtifact(projectRoot, task, runID, workDir, manifest, deliverable)
-		if err != nil {
-			failed++
-			failedOutputs = append(failedOutputs, "教学成果“"+deliverable.Key+"”未能写入资产库")
-			continue
-		}
-		taskResult.Deliverables = append(taskResult.Deliverables, artifactID)
-		updated++
-		d.emitGenerated(task.ProjectSlug, task.ID, artifactID)
-	}
-	if result.SourceUpdate != nil && task.Type == "source-processing" {
-		files, media := map[string][]byte{}, map[string]string{}
-		for _, file := range result.SourceUpdate.Files {
-			path, ok := safeJoin(workDir, file.Path)
-			if !ok || !strings.Contains(filepath.ToSlash(file.Path), "source-updates/") {
-				failed++
-				failedOutputs = append(failedOutputs, "资料解析成果路径无效")
-				continue
-			}
-			data, err := os.ReadFile(path)
-			if err != nil {
-				failed++
-				failedOutputs = append(failedOutputs, "资料解析成果无法读取")
-				continue
-			}
-			files[file.Path[strings.LastIndex(filepath.ToSlash(file.Path), "/")+1:]] = data
-			media[file.Path[strings.LastIndex(filepath.ToSlash(file.Path), "/")+1:]] = file.MediaType
-		}
-		payload, err := d.deps.CommitSourceDerived(task.ProjectSlug, result.SourceUpdate.SourceID, result.SourceUpdate.RevisionID, task.ID, files, media)
-		if err != nil {
-			failed++
-			failedOutputs = append(failedOutputs, "资料解析成果未能写入来源库")
-		} else {
-			d.emitSource(task.ProjectSlug, payload)
-			updated++
-		}
-	}
+
 	if failed > 0 && updated > 0 {
 		failure := &Failure{Code: "partial-publish", Message: "部分助教成果已发布，另有输出未能写入项目", Retryable: false, Suggestion: commitFailureSuggestion(failedOutputs)}
 		writeCompletedCommit(journalPath, journal, "partial", taskResult, failure)
@@ -138,9 +101,6 @@ func hasPublishedOutput(result *Result) bool {
 	if result == nil {
 		return false
 	}
-	if len(result.Deliverables) > 0 {
-		return true
-	}
 	for _, status := range result.AssetUpdates {
 		if status == "updated" {
 			return true
@@ -161,17 +121,5 @@ func (d *Dispatcher) emit(task Task) {
 func (d *Dispatcher) emitAsset(slug string, asset any) {
 	if d.events != nil && asset != nil {
 		d.events.Emit("learning-asset-updated", map[string]any{"projectSlug": slug, "asset": asset})
-	}
-}
-
-func (d *Dispatcher) emitGenerated(slug, taskID, artifactID string) {
-	if d.events != nil {
-		d.events.Emit("generated-artifact-updated", map[string]any{"projectSlug": slug, "taskId": taskID, "artifactId": artifactID})
-	}
-}
-
-func (d *Dispatcher) emitSource(slug string, source any) {
-	if d.events != nil && source != nil {
-		d.events.Emit("source-updated", map[string]any{"projectSlug": slug, "source": source})
 	}
 }

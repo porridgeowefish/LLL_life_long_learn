@@ -1,10 +1,9 @@
-import { ChangeEvent, FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { CopyIcon, DownloadIcon, EditIcon, RegenerateIcon, SearchIcon, SteerIcon, TrashIcon } from '@/shared/primitive/Icons';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import {
-  conversationExportURL,
   discardQueuedTurn,
   editQueuedTurn,
   queueTeacherTurn,
@@ -18,7 +17,6 @@ import {
   useAssets,
   useConversation,
   useSources,
-  useUploadSource,
   type AssistantTask,
   type ConversationMessage,
   type QueuedTurn,
@@ -56,16 +54,12 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const sourcesQuery = useSources(slug);
   const assetsQuery = useAssets(slug);
   const modelSettings = useAskAiSettings();
-  const upload = useUploadSource(slug);
   const [input, setInput] = useState('');
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
 	const [previewSourceId, setPreviewSourceId] = useState('');
 	const [previewContent, setPreviewContent] = useState('');
 	const [previewPage, setPreviewPage] = useState(0);
   const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
-  const [pendingUpload, setPendingUpload] = useState<File | null>(null);
-  const [cloudAccepted, setCloudAccepted] = useState(false);
-	const [parsingSourceName, setParsingSourceName] = useState('');
   const [live, setLive] = useState<LiveResponse | null>(null);
   const [error, setError] = useState('');
   const [editingQueue, setEditingQueue] = useState<{ queueId: string; content: string } | null>(null);
@@ -93,9 +87,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === 'queued' || task.status === 'running'), [tasksQuery.data]);
   const selectedModel = availableModels.find((provider) => provider.id === providerId);
   const conversationReady = Boolean(conversation.data);
-	useEffect(() => {
-		if (parsingSourceName && (sourcesQuery.data ?? []).some((source) => source.displayName === parsingSourceName && source.status !== 'processing')) setParsingSourceName('');
-	}, [parsingSourceName, sourcesQuery.data]);
 
   useEffect(() => {
     const current = new Map((tasksQuery.data ?? []).map((task) => [task.id, task.status]));
@@ -335,6 +326,16 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     }
   }, []);
 
+  const downloadMessage = useCallback((message: ConversationMessage) => {
+    const markdown = messageMarkdown(message);
+    const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `teacher-message-${message.id}.md`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const refreshQueue = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
   }, [queryClient, slug]);
@@ -391,21 +392,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     latestResponseRef.current = conversation.data?.latestResponseId ?? '';
   }, [conversation.data?.latestResponseId]);
 
-  const chooseUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    event.target.value = '';
-    setCloudAccepted(false);
-    setPendingUpload(file);
-  };
-
-  const finishUpload = async (parseApproved: boolean) => {
-    if (!pendingUpload) return;
-    const result = await upload.mutateAsync({ file: pendingUpload, parseApproved, cloudDisclosureAccepted: parseApproved && cloudAccepted });
-    if (result.source?.status === 'processing') setParsingSourceName(result.source.displayName);
-    setPendingUpload(null);
-    setCloudAccepted(false);
-  };
-
   const loadPrevious = async () => {
     const transcript = transcriptRef.current;
     if (!transcript || !conversation.hasPrevious || conversation.isLoadingPrevious) return;
@@ -458,6 +444,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
           <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} actions={{
             copied: copiedMessageId === message.id,
             onCopy: copyMessage,
+            onDownload: downloadMessage,
             canRegenerate: !live && message.id === lastTeacherMessage?.id && Boolean(latestResponseRef.current),
             onRegenerate: regenerate,
           }} />
@@ -482,12 +469,12 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             ], createdAt: new Date().toISOString() }} tasks={live.taskIds.map((id) => tasksById.get(id) ?? { id, type: 'consolidate', objective: '助教任务', status: 'queued', createdAt: '', updatedAt: '' })} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} notice={live.notice} streaming />
           </>
         )}
-        {taskNotice && <div className={s.taskNotice} role="status"><div><strong>{taskNotice.text}</strong><span>{taskNotice.task.objective}</span></div><div>{(taskNotice.task.type === 'source-processing' || !!taskNotice.task.result?.deliverables?.length) && <a href={`/project/${encodeURIComponent(slug)}/sources`}>到资料页查看</a>}<button type="button" onClick={dismissTaskNotice}>知道了</button></div></div>}
+        {taskNotice && <div className={s.taskNotice} role="status"><div><strong>{taskNotice.text}</strong><span>{taskNotice.task.objective}</span></div><div><button type="button" onClick={dismissTaskNotice}>知道了</button></div></div>}
         {error && <div className={s.error}>{error}</div>}
         <div className={s.streamAnchor} aria-hidden="true" />
         </div>
       </div>
-      <form className={s.composer} onSubmit={submit}>
+      <div className={s.composerDock}>
         {queueItems.length > 0 && (
           <div className={s.queueBar} aria-label="等待队列">
             {queueItems.map((item) => editingQueue?.queueId === item.queueId ? (
@@ -511,13 +498,11 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             ))}
           </div>
         )}
+
+      <form className={s.composer} onSubmit={submit}>
 		{selectedSources.length > 0 && <div className={s.citationChips} aria-label="已引用资料">{selectedSources.map((source) => <button key={source.sourceId} type="button" onClick={() => setSelectedSourceIds((current) => current.filter((id) => id !== source.sourceId))}>{source.displayName} ×</button>)}</div>}
-        <label className={s.uploadButton} title="上传资料">
-          <span aria-hidden="true">＋</span><span className={s.srOnly}>上传资料</span>
-          <input type="file" onChange={chooseUpload} />
-        </label>
         {!!availableSources.length && <details className={s.sourcePicker}>
-          <summary>资料{selectedSourceIds.length ? ` ${selectedSourceIds.length}` : ''}</summary>
+          <summary>引用资料{selectedSourceIds.length ? ` ${selectedSourceIds.length}` : ''}</summary>
           <div className={s.sourceMenu}>
             <strong>本条消息引用</strong>
             {availableSources.map((source) => <label key={source.sourceId}>
@@ -539,16 +524,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             </select>
           </label>}
           <span>Enter 发送 · Shift + Enter 换行</span>
-          <a className={s.iconButton} href={conversationExportURL(slug)} download title="导出整段对话为 Markdown" aria-label="导出对话"><DownloadIcon /></a>
         </div>
-        {pendingUpload && <div className={s.uploadPanel} role="dialog" aria-label="上传资料">
-          <strong>{pendingUpload.name}</strong>
-          <p>可以只保存原件，或交给助教异步解析；解析不会阻塞当前对话。</p>
-          <label><input type="checkbox" checked={cloudAccepted} onChange={(event) => setCloudAccepted(event.target.checked)} /> 我知道解析时内容可能发送到当前 CLI Agent 的模型服务</label>
-          {upload.isError && <span className={s.taskFailure}>上传失败，请稍后重试。</span>}
-          <div><button type="button" className={s.secondary} onClick={() => { setPendingUpload(null); setCloudAccepted(false); }}>取消</button><button type="button" className={s.secondary} disabled={upload.isPending} onClick={() => void finishUpload(false)}>仅保存</button><button type="button" disabled={!cloudAccepted || upload.isPending} onClick={() => void finishUpload(true)}>保存并解析</button></div>
-        </div>}
       </form>
+      </div>
       </div>
       <aside className={s.dataRail} aria-label="学习单元数据">
         <header><span>UNIT SIGNALS</span><h2>学习数据</h2></header>
@@ -557,7 +535,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
           <div><dt>资料</dt><dd>{availableSources.length}<small> 份可引用</small></dd></div>
           <div><dt>助教</dt><dd>{activeTasks.length ? activeTasks.length : (tasksQuery.data?.length ?? 0)}<small>{activeTasks.length ? ' 项进行中' : ' 项记录'}</small></dd></div>
         </dl>
-		{parsingSourceName && <p className={s.parsingSource} role="status">正在解析资料 · {parsingSourceName}</p>}
         <section>
           <span>当前模型</span>
           <strong>{selectedModel?.name || selectedModel?.model || '使用默认配置'}</strong>
@@ -586,8 +563,6 @@ function taskCompletionText(task: AssistantTask) {
   if (task.status === 'cancelled') return '助教任务已在终端取消。';
   if (task.status === 'failed') return '助教任务执行失败，请查看任务说明。';
   if (task.status === 'partial') return '助教已部分完成，可查看已提交的成果。';
-  if (task.type === 'source-processing') return '助教已完成资料解析，可在资料页查看。';
-  if (task.result?.deliverables?.length) return '助教已完成，成果已同步到资产与资料。';
   if (Object.values(task.result?.assetUpdates ?? {}).includes('updated')) return '助教已完成，教学资产已经更新。';
   return '助教任务已完成。';
 }
@@ -597,6 +572,7 @@ function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.Se
     if (!current) return current;
     if (frame.type === 'turn-accepted') return { ...current, responseId: String(frame.data.responseId), learner: { ...current.learner, id: String(frame.data.learnerMessageId) } };
     if (frame.type === 'message-started') return { ...current, teacherId: String(frame.data.teacherMessageId) };
+    if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [] };
     if (frame.type === 'text-delta') return { ...current, text: current.text + String(frame.data.delta ?? '') };
     if (frame.type === 'reasoning-summary-delta') return { ...current, reasoning: current.reasoning + String(frame.data.delta ?? '') };
     if (frame.type === 'task-accepted') return { ...current, taskIds: [...current.taskIds, String(frame.data.taskId)] };
@@ -622,6 +598,7 @@ function rejectionText(code: string) {
 interface MessageActions {
   copied: boolean;
   onCopy: (message: ConversationMessage) => void;
+  onDownload: (message: ConversationMessage) => void;
   canRegenerate: boolean;
   onRegenerate: () => void;
 }
@@ -638,10 +615,12 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, getRe
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={block.source ?? ''} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {notice && <div className={s.notice}>{notice}</div>}
+        {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}
         {tasks.map((task) => <TaskCard key={task.id} slug={slug} task={task} />)}
         {actions && !streaming && (
           <div className={s.messageActions}>
             <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
+            <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>
             {actions.canRegenerate && <button type="button" className={s.iconButton} title="重新生成这条回复" aria-label="重新生成这条回复" onClick={actions.onRegenerate}><RegenerateIcon /></button>}
           </div>
         )}
@@ -656,7 +635,16 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, getRe
   && previous.actions?.copied === next.actions?.copied
   && previous.actions?.canRegenerate === next.actions?.canRegenerate
   && previous.actions?.onCopy === next.actions?.onCopy
+  && previous.actions?.onDownload === next.actions?.onDownload
   && previous.actions?.onRegenerate === next.actions?.onRegenerate);
+
+function messageMarkdown(message: ConversationMessage) {
+  return (message.blocks ?? [])
+    .filter((block) => block.type === 'markdown')
+    .map((block) => block.source ?? '')
+    .join('\n\n')
+    .trim();
+}
 
 function ReasoningBlock({ messageID, source, streaming, initialOpen, onOpenChange }: { messageID: string; source: string; streaming: boolean; initialOpen: boolean; onOpenChange: (messageID: string, open: boolean) => void }) {
   const [open, setOpen] = useState(() => initialOpen);
@@ -687,14 +675,13 @@ function sameTasks(left: AssistantTask[], right: AssistantTask[]) {
   });
 }
 
-function TaskCard({ slug, task }: { slug: string; task: AssistantTask }) {
+function TaskCard({ task }: { slug: string; task: AssistantTask }) {
   const label: Record<AssistantTask['status'], string> = { queued: '等待助教', running: '助教执行中', succeeded: '助教已完成', partial: '部分完成', failed: '执行失败', cancelled: '已在终端取消' };
   return (
     <div className={s.taskCard} data-status={task.status}>
       <div><span className={s.taskDot} /><strong>{label[task.status] ?? '助教任务'}</strong><small>{task.phase ? ` · ${task.phase}` : ''}</small></div>
       <p>{task.objective || '助教正在处理已确认的工作。'}</p>
       {task.result?.summary && <p className={s.taskResult}>{task.result.summary}</p>}
-      {!!task.result?.deliverables?.length && <div className={s.deliverables}>{task.result.deliverables.map((artifactId) => <a key={artifactId} href={`/api/projects/${encodeURIComponent(slug)}/generated/${encodeURIComponent(artifactId)}/open`} target="_blank" rel="noreferrer">打开成果</a>)}<a href={`/project/${encodeURIComponent(slug)}/sources`}>在资料页查看</a></div>}
       {task.failure && <p className={s.taskFailure}>{task.failure.message}{task.failure.suggestion ? ` ${task.failure.suggestion}` : ''}</p>}
     </div>
   );

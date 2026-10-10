@@ -52,8 +52,8 @@ func TestOperationConflict(t *testing.T) {
 	workspace.SetProjectsRootForTest(root)
 	defer workspace.SetProjectsRootForTest("")
 	s := testStore(t, "topic")
-	_, _, _ = s.Create(CreateInput{Type: "verify", Objective: "核查 A", Origin: Origin{OperationID: "op_same"}})
-	_, _, err := s.Create(CreateInput{Type: "verify", Objective: "核查 B", Origin: Origin{OperationID: "op_same"}})
+	_, _, _ = s.Create(CreateInput{Type: "consolidate", Objective: "核查 A", Origin: Origin{OperationID: "op_same"}})
+	_, _, err := s.Create(CreateInput{Type: "consolidate", Objective: "核查 B", Origin: Origin{OperationID: "op_same"}})
 	var conflict *OperationConflictError
 	if !errors.As(err, &conflict) {
 		t.Fatalf("expected operation conflict, got %v", err)

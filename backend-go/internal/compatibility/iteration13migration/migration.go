@@ -41,14 +41,16 @@ type Preflight struct {
 	FailedProjects []string
 }
 
-func RunAll() Preflight {
+func RunAll() Preflight { return RunExcept(nil) }
+
+func RunExcept(blocked map[string]bool) Preflight {
 	result := Preflight{Ready: true}
 	projects, err := workspace.IndexAll()
 	if err != nil {
 		return Preflight{Ready: false, FailedProjects: []string{"workspace-index"}}
 	}
 	for _, project := range projects {
-		if project.ProjectType != workspace.ProjectTypeSystemLearning {
+		if project.ProjectType != workspace.ProjectTypeSystemLearning || blocked[project.Slug] {
 			continue
 		}
 		if err := Migrate(project.Slug); err != nil {
@@ -126,7 +128,7 @@ func Migrate(slug string) error {
 	if _, err := teacher.NewConversation(slug); err != nil {
 		return fail(migrationDir, record, "conversation-conversion-failed", err)
 	}
-	if _, err := assets.New(slug); err != nil {
+	if _, err := assets.MigrateReview(slug); err != nil {
 		return fail(migrationDir, record, "asset-conversion-failed", err)
 	}
 	if _, err := sourcestore.New(slug); err != nil {

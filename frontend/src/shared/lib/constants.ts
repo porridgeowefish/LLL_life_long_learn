@@ -24,7 +24,7 @@ export const SSE_EVENTS = {
   sessionCompleted: 'session-completed',
   sessionFailed: 'session-failed',
   assistantTaskUpdated: 'assistant-task-updated',
-  generatedArtifactUpdated: 'generated-artifact-updated',
+  teacherNoteUpdated: 'teacher-note-updated',
   learningAssetUpdated: 'learning-asset-updated',
   learningActivityUpdated: 'learning-activity-updated',
   sourceUpdated: 'source-updated',

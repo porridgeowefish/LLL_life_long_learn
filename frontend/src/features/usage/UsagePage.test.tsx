@@ -1,11 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 import { UsagePage } from './UsagePage';
 
 vi.mock('./api', () => ({
-  useTeacherUsage: () => ({ data: { total: 1, conversations: [{ projectSlug: 'parallel', title: '并发、并行与计算模型', conversationId: 'conv_1', inputTokens: 120, outputTokens: 80, turns: [{ responseId: 'resp_1', inputTokens: 120, outputTokens: 80, occurredAt: '2026-09-04T00:00:00Z' }] }] }, isLoading: false }),
+  useProjectUsage: () => ({ data: { projects: [{ projectSlug: 'parallel', title: '并发、并行与计算模型', conversationId: 'conv_1', inputTokens: 120, outputTokens: 80, noteInputTokens: 20, noteOutputTokens: 10, turns: [{ responseId: 'resp_1', inputTokens: 120, outputTokens: 80, occurredAt: '2026-09-04T00:00:00Z' }] }] }, isLoading: false }),
 }));
 
 const days = Array.from({ length: 7 }, (_, index) => ({
@@ -23,16 +24,21 @@ vi.mock('@/features/projects', () => ({
 
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><UsagePage /></QueryClientProvider>);
+  return render(<MemoryRouter><QueryClientProvider client={client}><UsagePage /></QueryClientProvider></MemoryRouter>);
 }
 
 describe('UsagePage', () => {
-  it('shows teacher usage grouped by durable conversation and its turns', () => {
+  it('shows project details when a token bar is focused or selected', () => {
     renderPage();
-    expect(screen.getByRole('heading', { name: '教师 Token 用量' })).toBeInTheDocument();
-    expect(screen.getByText('并发、并行与计算模型')).toBeInTheDocument();
-    expect(screen.getAllByText(/输入 120/)).toHaveLength(2);
-    expect(screen.getAllByText(/输出 80/)).toHaveLength(2);
+    expect(screen.getByRole('heading', { name: 'Token 用量' })).toBeInTheDocument();
+    const bar = screen.getByRole('button', {name: /并发、并行与计算模型.*230/});
+    fireEvent.focus(bar);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('并发、并行与计算模型');
+    expect(screen.getByRole('tooltip')).toHaveTextContent('笔记输入 20');
+    fireEvent.click(bar);
+    expect(bar).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.blur(bar);
+    expect(screen.getByRole('link',{name:'进入项目'})).toHaveAttribute('href','/project/parallel');
   });
 
   it('renders the learning-investment heatmap with clickable days', () => {
