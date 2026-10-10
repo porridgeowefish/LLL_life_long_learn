@@ -29,29 +29,42 @@ function tarGzip(root, prefix, output, executablePaths) {
     if (encoded.length >= width) throw new Error('Tar value exceeds header limit');
     header.write(`${encoded}\0`, offset, width, 'ascii');
   }
-  for (const file of entries(root, prefix, executablePaths)) {
-    const header = Buffer.alloc(512);
-    let name = file.name;
+  function header(entryName, mode, size, type) {
+    const block = Buffer.alloc(512);
+    let name = entryName;
     if (Buffer.byteLength(name) > 100) {
-      const split = name.lastIndexOf('/');
+      const split = name.lastIndexOf('/', name.length - 2);
       const parent = name.slice(0, split);
       name = name.slice(split + 1);
       if (Buffer.byteLength(parent) > 155 || Buffer.byteLength(name) > 100) throw new Error('Tar path exceeds ustar limit');
-      header.write(parent, 345, 155, 'utf8');
+      block.write(parent, 345, 155, 'utf8');
     }
-    header.write(name, 0, 100, 'utf8');
-    octal(header, 100, 8, file.mode);
-    octal(header, 108, 8, 0);
-    octal(header, 116, 8, 0);
-    octal(header, 124, 12, file.data.length);
-    octal(header, 136, 12, 0);
-    header.fill(32, 148, 156);
-    header.write('0', 156);
-    header.write('ustar\0', 257, 6, 'ascii');
-    header.write('00', 263, 2, 'ascii');
-    const sum = [...header].reduce((a, b) => a + b, 0);
-    header.write(`${sum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii');
-    chunks.push(header, file.data, Buffer.alloc((512 - file.data.length % 512) % 512));
+    block.write(name, 0, 100, 'utf8');
+    octal(block, 100, 8, mode);
+    octal(block, 108, 8, 0);
+    octal(block, 116, 8, 0);
+    octal(block, 124, 12, size);
+    octal(block, 136, 12, 0);
+    block.fill(32, 148, 156);
+    block.write(type, 156);
+    block.write('ustar\0', 257, 6, 'ascii');
+    block.write('00', 263, 2, 'ascii');
+    const sum = [...block].reduce((a, b) => a + b, 0);
+    block.write(`${sum.toString(8).padStart(6, '0')}\0 `, 148, 8, 'ascii');
+    return block;
+  }
+  // Explicit directory entries: dpkg and some extractors refuse to create
+  // parents that the archive never declares.
+  const directories = new Set();
+  for (const file of entries(root, prefix, executablePaths)) {
+    const parts = file.name.split('/');
+    for (let depth = 1; depth < parts.length; depth++) {
+      const directory = `${parts.slice(0, depth).join('/')}/`;
+      if (directory === '/' || directories.has(directory)) continue;
+      directories.add(directory);
+      chunks.push(header(directory, 0o755, 0, '5'));
+    }
+    chunks.push(header(file.name, file.mode, file.data.length, '0'), file.data, Buffer.alloc((512 - file.data.length % 512) % 512));
   }
   chunks.push(Buffer.alloc(1024));
   fs.writeFileSync(output, zlib.gzipSync(Buffer.concat(chunks), { level: 9 }));

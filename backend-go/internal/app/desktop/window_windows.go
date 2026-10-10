@@ -112,6 +112,9 @@ func RunWindow(engine *Engine, smokeResult string) error {
 					view.Dispatch(func() {
 						var evidence map[string]any
 						smokeErr = json.Unmarshal([]byte(payload), &evidence)
+						if smokeErr == nil && evidence["ok"] != true {
+							smokeErr = fmt.Errorf("native desktop React rendering not ready: %s", payload)
+						}
 						if smokeErr == nil {
 							evidence["hasWindowIcon"] = hasWindowIcon(uintptr(view.Window()))
 							evidence["appUserModelID"] = AppID
@@ -133,7 +136,8 @@ func RunWindow(engine *Engine, smokeResult string) error {
 		}); err != nil {
 			return err
 		}
-		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const check=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');if(nav&&nav.getBoundingClientRect().height>0&&root&&root.innerText.includes('Learn-With-AI')&&root.querySelector('main h1')&&root.querySelector('main').getBoundingClientRect().height>0){requestAnimationFrame(()=>requestAnimationFrame(()=>window.lllSmokeReady(JSON.stringify({ok:true,title:document.title,url:location.href,navHeight:nav.getBoundingClientRect().height,textLength:root.innerText.length}))));}else if(Date.now()<deadline)setTimeout(check,100);};check();});`)
+		// Timers only: requestAnimationFrame is suspended while a window is occluded (CI desktops).
+		view.Init(`window.addEventListener('DOMContentLoaded',()=>{const deadline=Date.now()+40000;const state=()=>{const nav=document.querySelector('aside[aria-label="应用导航"]');const root=document.getElementById('root');const main=root&&root.querySelector('main');return {nav:!!nav,navHeight:nav?nav.getBoundingClientRect().height:0,brand:!!root&&root.textContent.includes('Learn-With-AI'),heading:!!(main&&main.querySelector('h1')),mainHeight:main?main.getBoundingClientRect().height:0,visibility:document.visibilityState,textLength:root?root.textContent.length:0,title:document.title,url:location.href};};const check=()=>{const s=state();if(s.nav&&s.navHeight>0&&s.brand&&s.heading&&s.mainHeight>0){setTimeout(()=>window.lllSmokeReady(JSON.stringify({ok:true,...s})),300);}else if(Date.now()<deadline){setTimeout(check,100);}else{window.lllSmokeReady(JSON.stringify({ok:false,...s}));}};check();});`)
 		go func() {
 			select {
 			case <-timer.C:
