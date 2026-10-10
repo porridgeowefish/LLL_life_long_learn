@@ -72,7 +72,7 @@ function generateWxs(payload, version, arch, icon, options = {}) {
  <!-- Install beside the learner data under %LOCALAPPDATA% (normally the system drive). Windows' shell
       "Local AppData" folder can be redirected to another drive whose Config.Msi is blocked by security
       software; following the environment keeps upgrades on the drive Windows Installer manages. -->
- <SetDirectory Id="INSTALLFOLDER" Value="[%LOCALAPPDATA]\\Programs\\${esc(identity)}\\" Sequence="first" Condition="NOT INSTALLFOLDER"/>
+ <SetDirectory Action="SetDefaultInstallFolder" Id="INSTALLFOLDER" Value="[%LOCALAPPDATA]\\Programs\\${esc(identity)}\\" Sequence="first" Condition="NOT INSTALLFOLDER"/>
  <Property Id="MSI_ARCH"><RegistrySearch Id="InstallArchitectureSearch" Root="HKCU" Key="Software\\${esc(identity)}\\Installer" Name="Architecture" Type="raw"/></Property>
  <Launch Condition="Installed OR NOT MSI_ARCH OR MSI_ARCH = &quot;${arch}&quot;" Message="已安装其他处理器架构的版本，请先卸载该应用再切换架构。学习数据会保留。"/>
  <Property Id="MSI_VERSION" ><RegistrySearch Id="MsiVersionSearch" Root="HKCU" Key="Software\\${esc(identity)}\\Installer" Name="Version" Type="raw"/></Property>
