@@ -68,6 +68,10 @@ func (s *Server) handlePutAskAiSettings(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleProbeAskAi(w http.ResponseWriter, r *http.Request) {
+	if !allowSecretSettings(w, r) {
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
 	var in struct {
 		ProviderID string                  `json:"providerId"`
 		Inline     *teacher.ProviderConfig `json:"inline"`
@@ -92,10 +96,24 @@ func (s *Server) handleProbeAskAi(w http.ResponseWriter, r *http.Request) {
 		}
 		pc = *p
 	}
+	if pc.APIKeyEnv != "" {
+		if value := strings.TrimSpace(os.Getenv(pc.APIKeyEnv)); value != "" {
+			pc.APIKey = value
+		}
+	}
+	probeCtx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
 	prov := teacher.Provider{Kind: pc.Kind, BaseURL: pc.BaseURL, APIKey: pc.APIKey, Model: pc.Model, Reasoning: pc.Reasoning, Thinking: pc.Thinking}
-	_, err := teacher.Complete(r.Context(), prov, "Reply with the single word: ok", []teacher.AIMessage{{Role: "user", Content: "ping"}})
+	_, err := teacher.Complete(probeCtx, prov, "Reply with the single word: ok", []teacher.AIMessage{{Role: "user", Content: "ping"}})
 	if err != nil {
-		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": false, "error": err.Error()})
+		message := err.Error()
+		if pc.APIKey != "" {
+			message = strings.ReplaceAll(message, pc.APIKey, "[redacted]")
+		}
+		if len(message) > 512 {
+			message = string([]rune(message)[:min(256, len([]rune(message)))])
+		}
+		httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": false, "error": message})
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"ok": true})

@@ -66,6 +66,12 @@ func Build() *App {
 	}
 	teacherService := teacher.New(nil)
 	teacherService.Authorizer = integration.TeacherTaskAuthorizer{}
+	teacherService.OnSourceReading = func(event map[string]any) {
+		broadcaster.Emit("source-reading", event)
+	}
+	teacherService.OnSourceUpdated = func(slug string, source sources.Source) {
+		broadcaster.Emit("source-updated", map[string]any{"projectSlug": slug, "source": source})
+	}
 	sourceProcessor := sources.NewProcessor(func(slug string, source sources.Source) {
 		broadcaster.Emit("source-updated", map[string]any{"projectSlug": slug, "source": source})
 	})

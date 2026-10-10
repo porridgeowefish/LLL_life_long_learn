@@ -1,5 +1,7 @@
 .host {
   flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -8,13 +10,30 @@
 .scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 24px 32px;
+  padding: 22px 24px 72px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 1240px;
+  gap: 24px;
+  min-height: 0;
+  min-width: 0;
+  max-width: 960px;
   width: 100%;
+  margin: 0 auto;
 }
+
+.scroll > * { flex-shrink: 0; min-width: 0; }
+.runtimeSection { min-width: 0; }
+.sectionHeader { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.sectionHeader h2 { font-size: 1rem; }
+.runtimeChoice { display: flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--muted); min-width: 0; font: inherit; font-size: .8rem; cursor: pointer; }
+.runtimeChoice img { width: 26px; height: 26px; object-fit: contain; }
+.runtimeChoice span { overflow-wrap: anywhere; }
+.detected { color: var(--accent-ink); background: var(--accent-soft); }
+.undetected img { filter: grayscale(1); opacity: .45; }
+.undetected { color: var(--muted); }
+.runtimeSelected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.runtimeChoice:disabled { cursor: default; }
+.runtimeChoice:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .header {
   display: flex;
@@ -40,7 +59,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -310,6 +329,7 @@
 .openSource p {
   color: var(--muted);
   font-size: 0.78rem;
+  overflow-wrap: anywhere;
 }
 
 .themeChoices {
@@ -381,3 +401,6 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 1180px) { .runtimeSection .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .scroll { padding: 18px 14px 72px; gap: 22px; } .runtimeSection .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

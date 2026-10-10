@@ -56,25 +56,10 @@
 .composer button { flex: 0 0 auto; min-width: 52px; height: 32px; border: 0; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 12px; font-weight: 650; }
 .composer button:disabled { opacity: .45; cursor: default; }
 .composer .stop { background: var(--fg); }
-.sourcePicker { position: relative; flex: 0 0 auto; }
-.sourcePicker summary { min-width: 44px; height: 32px; display: grid; place-items: center; padding: 0 8px; border-radius: 9px; color: var(--muted); background: var(--surface-sunken); cursor: pointer; list-style: none; font-size: 12px; font-weight: 650; }
-.sourcePicker summary::-webkit-details-marker { display: none; }
-.sourceMenu { position: absolute; left: 0; bottom: 42px; z-index: 5; width: min(330px, calc(100vw - 48px)); max-height: 260px; overflow: auto; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-lg); }
-.sourceMenu > strong { display: block; padding: 3px 5px 8px; font-size: 11px; }
-.sourceMenu label { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; padding: 8px 5px; cursor: pointer; font-size: 12px; }
-.sourceMenu small { color: var(--muted); font-size: 10px; }
-.sourceMenu label button { min-width: auto; height: auto; padding: 3px 5px; color: var(--accent-ink); background: transparent; font-size: 10px; }
-.citationChips { position: absolute; left: 11px; bottom: calc(100% + 8px); display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 22px); }
-.citationChips button { min-width: auto; height: 25px; padding: 0 9px; border: 1px solid var(--border); border-radius: 999px; color: var(--fg); background: var(--card); box-shadow: var(--shadow-sm); font-size: 10px; }
-.citationPreview { margin-top: 8px; padding: 9px; border-top: 1px solid var(--border); background: var(--surface-raised); }
-.citationPreview > div, .citationPreview footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.citationPreview strong { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.citationPreview pre { max-height: 104px; margin: 7px 0; overflow: auto; white-space: pre-wrap; color: var(--muted); font: 10px/1.45 var(--font-mono, monospace); }
-.citationPreview button { min-width: auto; height: 24px; padding: 0 7px; color: var(--fg); background: var(--surface-sunken); font-size: 10px; }
-.citationPreview footer span { color: var(--muted); font-size: 10px; }
 .composerMeta { position: absolute; left: 13px; right: 13px; bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; }
-.modelSelect { display: inline-flex; align-items: center; gap: 5px; }
-.modelSelect select { max-width: 190px; border: 0; color: var(--muted); background: transparent; font: inherit; outline: none; }
+.modelSelect { min-width: 0; display: inline-flex; align-items: center; gap: 5px; }
+.modelSelect select { min-width: 0; max-width: 190px; border: 0; color: var(--muted); background: transparent; font: inherit; outline: none; }
+.materialStatus { flex-shrink: 0; white-space: nowrap; }
 .dataRail { min-height: 0; overflow-y: auto; padding: 18px 16px; border: 1px solid var(--border); border-radius: 14px; background: color-mix(in srgb, var(--card) 82%, var(--surface-tint)); }
 .dataRail header { padding-bottom: 14px; border-bottom: 1px solid var(--border); }
 .dataRail header span, .dataRail section > span { color: var(--accent-ink); font-size: 9px; font-weight: 800; letter-spacing: .12em; }
@@ -95,7 +80,7 @@
 .dataRail > p { margin-top: 14px; color: var(--muted); font-size: 9px; line-height: 1.6; }
 @keyframes pulse { 50% { opacity: .45; } }
 @media (max-width: 1050px) { .teacher { grid-template-columns: minmax(0, 1fr); } .dataRail { display: none; } }
-@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 92px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { width: calc(100% - 20px); } .composerMeta > span { display: none; } }
+@media (max-width: 760px) { .teacher { padding: 6px; } .transcript { padding: 20px 14px 92px; border-radius: 12px; } .learnerMessage .messageBody { max-width: 92%; } .composerDock { width: calc(100% - 20px); } .composerMeta .keyboardHint { display: none; } }
 
 /* ---- hover-revealed icon actions (iteration 17) ---- */
 

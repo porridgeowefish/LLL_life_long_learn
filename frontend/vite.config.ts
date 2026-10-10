@@ -42,6 +42,8 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // Windows parallel workers can collide on temporary fixture cleanup.
+    ...(process.platform === 'win32' ? { fileParallelism: false, maxWorkers: 2 } : {}),
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],

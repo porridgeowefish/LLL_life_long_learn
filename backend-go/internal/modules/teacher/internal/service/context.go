@@ -2,11 +2,8 @@ package teacherservice
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,80 +51,15 @@ type compactProjection struct {
 }
 
 func buildTeacherContext(ctx context.Context, slug string, store *conversationstore.Store, providerID ...string) (string, []teachergateway.Message, error) {
-	systemPrompt := SystemPrompt + preferenceAppendix() + softScopeAppendix(slug)
+	system := SystemPrompt + preferenceAppendix() + softScopeAppendix(slug)
 	sequenced, err := store.SequencedMessages()
 	if err != nil {
 		return "", nil, err
 	}
-	allTokens := 0
-	for _, item := range sequenced {
-		allTokens += estimateMessageTokens(item.Message)
-	}
-	threshold, recentBudget := contextBudgets(providerID...)
-	sourceBudget := threshold / 4
-	if sourceBudget > maxSourceContextBytes {
-		sourceBudget = maxSourceContextBytes
-	}
-	appendix := sourceContextAppendix(slug, sequenced, sourceBudget)
-	systemPrompt += appendix
-	// Count source JSON conservatively at one token per UTF-8 byte.
-	threshold -= len(appendix)
-	if recentBudget > threshold/2 {
-		recentBudget = threshold / 2
-	}
-	if allTokens <= threshold {
-		return systemPrompt, toProviderMessages(slug, sequenced), nil
-	}
-	projectionPath, err := compactPath(slug)
-	if err != nil {
-		return "", nil, err
-	}
-	var existing compactProjection
-	if data, readErr := os.ReadFile(projectionPath); readErr == nil && json.Unmarshal(data, &existing) == nil && existing.SchemaVersion == 1 && existing.PromptVersion == "teacher-1" {
-		coveredEnd := 0
-		for coveredEnd < len(sequenced) && sequenced[coveredEnd].Seq <= existing.Covered.ThroughSeq {
-			coveredEnd++
-		}
-		if coveredEnd > 0 {
-			raw, _ := json.Marshal(sequenced[:coveredEnd])
-			sum := sha256.Sum256(raw)
-			if "sha256:"+hex.EncodeToString(sum[:]) == existing.Covered.EventHash && sequencedTokens(sequenced[coveredEnd:]) <= threshold {
-				return systemPrompt + compactAppendix(existing), toProviderMessages(slug, sequenced[coveredEnd:]), nil
-			}
-		}
-	}
-	recentStart := len(sequenced)
-	recentTokens := 0
-	for recentStart > 0 {
-		next := estimateMessageTokens(sequenced[recentStart-1].Message)
-		if recentTokens+next > recentBudget && recentStart < len(sequenced) {
-			break
-		}
-		recentStart--
-		recentTokens += next
-	}
-	if recentStart == 0 {
-		return systemPrompt, toProviderMessages(slug, sequenced), nil
-	}
-	older := sequenced[:recentStart]
-	recent := sequenced[recentStart:]
-	raw, _ := json.Marshal(older)
-	sum := sha256.Sum256(raw)
-	eventHash := "sha256:" + hex.EncodeToString(sum[:])
-	projection, compactErr := generateCompact(ctx, older, eventHash, recent[0].Seq)
-	if compactErr != nil {
-		return "", nil, fmt.Errorf("learning context compaction required: %w", compactErr)
-	}
-	data, marshalErr := json.MarshalIndent(projection, "", "  ")
-	if marshalErr != nil {
-		return "", nil, marshalErr
-	}
-	if err := workspace.AtomicWriteFile(projectionPath, append(data, '\n'), 0o644); err != nil {
-		return "", nil, err
-	}
-	return systemPrompt + compactAppendix(projection), toProviderMessages(slug, recent), nil
+	// The teacher turn uses no hidden compaction-provider requests. Retain recent
+	// complete history before the tool loop; the unified guard decides capacity.
+	return system, toProviderMessages(slug, sequenced), nil
 }
-
 func preferenceAppendix() string {
 	snapshot, err := preferencestore.Read()
 	if err != nil || strings.TrimSpace(snapshot.Content) == "" {

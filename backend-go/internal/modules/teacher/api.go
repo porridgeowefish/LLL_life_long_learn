@@ -40,6 +40,7 @@ type (
 	SequencedMessage  = conversation.SequencedMessage
 	ResponseRecord    = conversation.ResponseRecord
 	ResponseInfo      = conversation.ResponseInfo
+	ReadingCoverage   = conversation.ReadingCoverage
 	QueueItem         = conversation.QueueItem
 	PromotedTurn      = conversation.PromotedTurn
 	ConversationStore = conversation.Store

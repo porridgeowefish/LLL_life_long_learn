@@ -11,7 +11,7 @@ const ProjectPage = lazy(() => import('@/features/projects/ProjectPage').then((m
 const UsagePage = lazy(() => import('@/features/usage/UsagePage').then((m) => ({ default: m.UsagePage })));
 const PreferencesPage = lazy(() => import('@/features/preferences/PreferencesPage').then((m) => ({ default: m.PreferencesPage })));
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
-const ModelsPage = lazy(() => import('@/features/settings/ModelsPage').then((m) => ({ default: m.ModelsPage })));
+
 
 function PageFallback() {
   return <div style={{ padding: 24, color: 'var(--muted)' }}>加载中…</div>;
@@ -51,7 +51,7 @@ export const routes: RouteObject[] = [
       },
       {
         path: 'models',
-        element: withShell(<ModelsPage />),
+        element: <Navigate to="/settings" replace />,
       },
       {
         path: '*',

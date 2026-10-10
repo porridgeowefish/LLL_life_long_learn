@@ -1,146 +1,44 @@
-import { useEffect, useMemo, useState } from 'react';
-
-import { useAppearance, useUpdateAppearance } from '@/features/settings/appearance';
-import { useAgentRuntimeSettings, useUpdateAgentRuntime } from '@/features/settings/settings';
-import {
-  useAskAiSettings,
-  useSaveAskAiSettings,
-  useProbeAskAi,
-  type AskConfig,
-  type AskProvider,
-} from '@/features/settings/askAi';
+import { useMemo } from 'react';
+import { useAppearance, useUpdateAppearance } from './appearance';
+import { useAgentRuntimeSettings, useUpdateAgentRuntime } from './settings';
+import { ModelsPage } from './ModelsPage';
+import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { Button } from '@/shared/primitive/Button';
-import { Card } from '@/shared/primitive/Card';
 import { Icon } from '@/shared/primitive/Icon';
-import { Tag } from '@/shared/primitive/Tag';
 import type { AgentRuntimeID, AgentRuntimeProvider } from '@/shared/types/domain';
 import type { ThemePreference } from '@/shared/lib/theme';
-
-import { SecretInput } from '@/shared/primitive/SecretInput';
-import s from './SettingsPage.module.css';
-import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { useHealth } from '@/app/api/health';
 import { failedAttempt, useCheckUpdate, useInstallUpdate, useUpdateInfo } from './update';
+import s from './SettingsPage.module.css';
 
 const ORDER: AgentRuntimeID[] = ['codebuddy', 'workbuddy', 'hermes', 'codex', 'trae', 'claude'];
-
 const RUNTIME_LOGOS: Record<AgentRuntimeID, string> = {
-  claude: '/img/agent-runtimes/claude.png',
-  codebuddy: '/img/agent-runtimes/codebuddy.png',
- workbuddy: '/img/agent-runtimes/codebuddy.png',
-  hermes: '/img/agent-runtimes/hermes.png',
-  codex: '/img/agent-runtimes/codex.png',
-  trae: '/img/agent-runtimes/trae.png',
+  claude: '/img/agent-runtimes/claude.png', codebuddy: '/img/agent-runtimes/codebuddy.png',
+  workbuddy: '/img/agent-runtimes/codebuddy.png', hermes: '/img/agent-runtimes/hermes.png',
+  codex: '/img/agent-runtimes/codex.png', trae: '/img/agent-runtimes/trae.png',
 };
 
 export function SettingsPage() {
-  const { data, isLoading, isError, error } = useAgentRuntimeSettings();
+  const runtime = useAgentRuntimeSettings();
   const update = useUpdateAgentRuntime();
-
-  const providers = useMemo(() => {
-    const list = data?.providers ?? [];
-    return [...list].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id));
-  }, [data?.providers]);
-
-  const selected = update.data?.selected ?? data?.selected;
-
-  return (
-    <div className={s.host}>
-      <div className={s.scroll}>
-        <header className={s.header}>
-          <div>
-            <h1 className={s.title}>统一配置</h1>
-            <p className={s.subtitle}>管理底层 Agent CLI、外观与搜索引擎。API 教师模型在独立页面配置。</p>
-          </div>
-          <Button
-            variant="outline"
-            iconLeft={<Icon name="terminal" size={14} />}
-            onClick={() => window.location.reload()}
-          >
-            刷新探测
-          </Button>
-        </header>
-
-        <VersionAndDataSection />
-        <AppearanceSection />
-        <TeacherNotesSettings />
-
-        {isLoading && <div className={s.loading}>加载配置中…</div>}
-        {isError && (
-          <div className={s.error} role="alert">
-            配置读取失败：{(error as Error).message}
-          </div>
-        )}
-
-        <section className={s.grid}>
-          {providers.map((provider) => (
-            <RuntimeCard
-              key={provider.id}
-              provider={provider}
-              selected={provider.id === selected}
-              saving={update.isPending}
-              onSelect={() => update.mutate(provider.id)}
-            />
-          ))}
-        </section>
-
-        {update.isError && (
-          <div className={s.error} role="alert">
-            保存失败：{(update.error as Error).message}
-          </div>
-        )}
-
-        <SearchEngineSection />
-
-        <section className={s.notes}>
-          <div className={s.note}>
-            <span className={s.noteIcon}><Icon name="check" size={14} /></span>
-            <div>
-              <h3>助教运行时</h3>
-              <p>助教负责整理复习稿和练习题；这里选择它默认使用的 CLI 运行时。</p>
-            </div>
-          </div>
-          <div className={s.note}>
-            <span className={s.noteIcon}><Icon name="terminal" size={14} /></span>
-            <div>
-              <h3>命令名可覆盖</h3>
-              <p>需要自定义 CLI 路径时，在系统环境变量里设置对应的 *_BIN；API 模型参数在「API 模型」中填写。</p>
-            </div>
-          </div>
-        </section>
-
-        <OpenSourceSection />
-      </div>
-    </div>
-  );
-}
-
-function SearchEngineSection() {
-  const settings = useAskAiSettings();
-  const save = useSaveAskAiSettings();
-  const current = settings.data;
-  if (!current) return null;
-  const updateSearch = (searchEngine: 'google' | 'bing') => {
-    save.mutate({ ...current, searchEngine });
-  };
-  return (
-    <section className={s.appearance} aria-labelledby="search-engine-title">
-      <div>
-        <h2 id="search-engine-title">搜索引擎</h2>
-        <p>需要网页检索时使用。教师与 Ask AI 的模型绑定统一在「API 模型」页面管理。</p>
-      </div>
-      <label className={s.askEngine}>
-        默认搜索引擎
-        <select value={current.searchEngine} onChange={(event) => updateSearch(event.target.value as 'google' | 'bing')}>
-          <option value="google">Google</option>
-          <option value="bing">Bing</option>
-        </select>
-      </label>
-      {save.isError && <div className={s.error}>保存失败：{(save.error as Error).message}</div>}
+  const providers = useMemo(() => [...(runtime.data?.providers ?? [])].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id)), [runtime.data?.providers]);
+  const selected = update.data?.selected ?? runtime.data?.selected;
+  return <div className={s.host}><div className={s.scroll} data-testid="settings-scroll">
+    <header className={s.header}><h1 className={s.title}>设置</h1></header>
+    <ModelsPage />
+    <section className={s.runtimeSection} aria-labelledby="runtime-title">
+      <div className={s.sectionHeader}><h2 id="runtime-title">助教 CLI</h2><Button size="sm" variant="ghost" loading={runtime.isFetching} onClick={() => { void runtime.refetch(); }}>重新检测</Button></div>
+      {runtime.isLoading && <p className={s.loading}>检测中…</p>}
+      {runtime.isError && <p className={s.error} role="alert">配置读取失败：{(runtime.error as Error).message}</p>}
+      <div className={s.grid} role="radiogroup" aria-label="默认助教 CLI">{providers.map(provider => <RuntimeChoice key={provider.id} provider={provider} selected={selected === provider.id} saving={update.isPending} onSelect={() => update.mutate(provider.id)} />)}</div>
+      {update.isError && <p className={s.error} role="alert">保存失败：{(update.error as Error).message}</p>}
     </section>
-  );
+    <TeacherNotesSettings />
+    <AppearanceSection />
+    <VersionAndDataSection />
+    <OpenSourceSection />
+  </div></div>;
 }
-
 const THEME_OPTIONS: Array<{ id: ThemePreference; name: string; description: string; swatches: string[] }> = [
   { id: 'lychee-paper', name: '荔枝暖纸', description: '温暖、安静的默认阅读主题', swatches: ['#faf8f4', '#fffdf9', '#60775a'] },
   { id: 'mountain-mist', name: '远山雾蓝', description: '清凉克制，适合长时间专注', swatches: ['#f4f7f7', '#fbfdfd', '#557987'] },
@@ -239,282 +137,14 @@ function OpenSourceSection() {
   );
 }
 
-interface RuntimeCardProps {
-  provider: AgentRuntimeProvider;
-  selected: boolean;
-  saving: boolean;
-  onSelect: () => void;
-}
-
-function RuntimeCard({ provider, selected, saving, onSelect }: RuntimeCardProps) {
-  return (
-    <Card variant="outlined" className={`${s.card} ${selected ? s.cardSelected : ''}`}>
-      <div className={s.cardTop}>
-        <div className={s.cardTitle}>
-          <span className={s.cardIcon}>
-            <img src={RUNTIME_LOGOS[provider.id]} alt="" aria-hidden="true" />
-          </span>
-          <h2>{provider.name}</h2>
-        </div>
-        <Tag tone={provider.available ? 'accent' : 'orange'}>
-          {provider.available ? '已就绪' : '未探测到'}
-        </Tag>
-      </div>
-      <p className={s.desc}>{provider.description}</p>
-      <div className={s.meta}>
-        <span>命令：<code>{provider.bin}</code></span>
-        <span>来源：<code>{provider.mode === 'wsl' ? 'WSL' : 'Native'}</code></span>
-        <span>覆盖：<code>{provider.binEnv}</code></span>
-        {!provider.available && provider.reason && <span>原因：{({not_found:'找不到可执行文件',probe_failed:'版本探测失败',identity_mismatch:'命令身份不匹配'} as Record<string,string>)[provider.reason] ?? provider.reason}</span>}
-        <span>{provider.supportsHeadless ? '支持后台任务' : '仅交互终端'}</span>
-      </div>
-      <Button
-        variant={selected ? 'outline' : 'primary'}
-        disabled={selected || saving}
-        onClick={onSelect}
-      >
-        {selected ? '当前选择' : '选择'}
-      </Button>
-    </Card>
-  );
-}
-
-
-function newProvider(): AskProvider {
-  return {
-    id: `prov-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    kind: 'openai',
-    name: '',
-    baseURL: '',
-    apiKey: '',
-    model: '',
-  };
-}
-
-export function AskAiSection() {
-  const { data, isLoading, isError, error } = useAskAiSettings();
-  const save = useSaveAskAiSettings();
-  const probe = useProbeAskAi();
-
-  // Local draft, re-seeded whenever the server snapshot (`data`) changes —
-  // initial load and after a save (the save mutation invalidates the query,
-  // refetch returns a new `data` identity, this effect re-seeds). In-flight
-  // edits are preserved between fetches.
-  const [draft, setDraft] = useState<AskConfig | null>(null);
-  useEffect(() => {
-    if (!data) return;
-    setDraft({
-      default: data.default,
-      searchEngine: data.searchEngine,
-      providers: data.providers.map((p) => ({ ...p })),
-      bindings: { ...(data.bindings ?? {}) },
-    });
-  }, [data]);
-
-  if (isLoading) return <div className={s.loading}>加载 Ask-AI 配置…</div>;
-  if (isError) {
-    return (
-      <div className={s.error} role="alert">
-        Ask-AI 配置读取失败：{(error as Error).message}
-      </div>
-    );
-  }
-  if (!draft) return null;
-
-  const patchProvider = (id: string, patch: Partial<AskProvider>) => {
-    setDraft((d) =>
-      d ? { ...d, providers: d.providers.map((p) => (p.id === id ? { ...p, ...patch } : p)) } : d,
-    );
-  };
-
-  const removeProvider = (id: string) => {
-    setDraft((d) => {
-      if (!d) return d;
-      const providers = d.providers.filter((p) => p.id !== id);
-      return { ...d, providers, default: d.default === id ? (providers[0]?.id ?? '') : d.default };
-    });
-  };
-
-  const addProvider = () => {
-    setDraft((d) => {
-      if (!d) return d;
-      const p = newProvider();
-      return { ...d, providers: [...d.providers, p], default: d.default || p.id };
-    });
-  };
-
-  const setDefault = (id: string) => setDraft((d) => (d ? { ...d, default: id } : d));
-  const setSearchEngine = (engine: 'google' | 'bing') =>
-    setDraft((d) => (d ? { ...d, searchEngine: engine } : d));
-
-  const onSave = () => save.mutate(draft);
-
-  return (
-    <section className={s.askSection} aria-label="Ask-AI 模型源">
-      <header className={s.header}>
-        <div>
-          <h2 className={s.title}>Ask-AI 模型源</h2>
-          <p className={s.subtitle}>
-            选中教程文字后「问 AI」使用的模型源。API Key 默认遮蔽，可切换查看完整内容。
-          </p>
-        </div>
-        <div className={s.askActions}>
-          <label className={s.askEngine}>
-            搜索引擎
-            <select
-              value={draft.searchEngine}
-              onChange={(e) => setSearchEngine(e.target.value as 'google' | 'bing')}
-            >
-              <option value="google">Google</option>
-              <option value="bing">Bing</option>
-            </select>
-          </label>
-          <Button variant="outline" onClick={addProvider}>添加模型源</Button>
-          <Button variant="primary" loading={save.isPending} onClick={onSave}>保存</Button>
-        </div>
-      </header>
-
-      {save.isError && (
-        <div className={s.error} role="alert">
-          保存失败：{(save.error as Error).message}
-        </div>
-      )}
-
-      <div className={s.askList}>
-        {draft.providers.length === 0 && (
-          <div className={s.loading}>还没有模型源。点击「添加模型源」新建一个。</div>
-        )}
-        {draft.providers.map((p) => (
-          <ProviderRow
-            key={p.id}
-            provider={p}
-            isDefault={draft.default === p.id}
-            onSetDefault={() => setDefault(p.id)}
-            onPatch={(patch) => patchProvider(p.id, patch)}
-            onRemove={() => removeProvider(p.id)}
-            onProbe={() => probe.mutate({ providerId: p.id })}
-            probeResult={probe.variables?.providerId === p.id ? probe.data : undefined}
-            probePending={probe.isPending && probe.variables?.providerId === p.id}
-            probeError={probe.variables?.providerId === p.id && probe.isError
-              ? (probe.error as Error).message
-              : undefined}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ProviderRow({
-  provider,
-  isDefault,
-  onSetDefault,
-  onPatch,
-  onRemove,
-  onProbe,
-  probeResult,
-  probePending,
-  probeError,
-}: {
-  provider: AskProvider;
-  isDefault: boolean;
-  onSetDefault: () => void;
-  onPatch: (patch: Partial<AskProvider>) => void;
-  onRemove: () => void;
-  onProbe: () => void;
-  probeResult?: { ok: boolean; error?: string };
-  probePending: boolean;
-  probeError?: string;
+function RuntimeChoice({ provider, selected, saving, onSelect }: {
+  provider: AgentRuntimeProvider; selected: boolean; saving: boolean; onSelect: () => void;
 }) {
-  const showThinking = provider.kind === 'anthropic';
-  return (
-    <Card variant="outlined" className={s.card}>
-      <div className={s.cardTop}>
-        <label className={s.askField}>
-          名称
-          <input
-            value={provider.name ?? ''}
-            onChange={(e) => onPatch({ name: e.target.value })}
-            placeholder="如：GPT-4o / Claude"
-          />
-        </label>
-        <label className={s.askField}>
-          类型
-          <select
-            value={provider.kind}
-            onChange={(e) => onPatch({ kind: e.target.value as 'openai' | 'anthropic' })}
-          >
-            <option value="openai">openai</option>
-            <option value="anthropic">anthropic</option>
-          </select>
-        </label>
-        <label className={s.askDefault}>
-          <input type="radio" checked={isDefault} onChange={onSetDefault} />
-          默认
-        </label>
-      </div>
-      <label className={s.askField}>
-        Base URL
-        <input
-          value={provider.baseURL}
-          onChange={(e) => onPatch({ baseURL: e.target.value })}
-          placeholder="https://api.openai.com/v1"
-        />
-      </label>
-      <label className={s.askField}>
-        Model
-        <input
-          value={provider.model}
-          onChange={(e) => onPatch({ model: e.target.value })}
-          placeholder="gpt-4o / claude-sonnet-4"
-        />
-      </label>
-      <label className={s.askField}>
-        上下文窗口（tokens，可选）
-        <input
-          value={provider.contextWindowTokens || ''}
-          onChange={(e) => onPatch({ contextWindowTokens: e.target.value ? Number(e.target.value) : undefined })}
-          placeholder="留空按 256K 安全阈值"
-          type="number"
-          min={16384}
-          step={1024}
-        />
-      </label>
-      <label className={s.askField}>
-        API Key
-        <SecretInput value={provider.apiKey} onChange={value=>onPatch({apiKey:value,apiKeyEnv:''})}/>
-      </label>
-      <div className={s.askFlags}>
-        <label>
-          <input
-            type="checkbox"
-            checked={!!provider.reasoning}
-            onChange={(e) => onPatch({ reasoning: e.target.checked })}
-          />
-          reasoning
-        </label>
-        {showThinking && (
-          <label>
-            <input
-              type="checkbox"
-              checked={!!provider.thinking}
-              onChange={(e) => onPatch({ thinking: e.target.checked })}
-            />
-            thinking
-          </label>
-        )}
-      </div>
-      <div className={s.askRowActions}>
-        <Button variant="outline" size="sm" loading={probePending} onClick={onProbe}>
-          探测
-        </Button>
-        {probeError && <span className={s.askProbeErr}>失败：{probeError}</span>}
-        {probeResult?.ok === false && !probeError && (
-          <span className={s.askProbeErr}>失败：{probeResult.error ?? '未知'}</span>
-        )}
-        {probeResult?.ok && <span className={s.askProbeOk}>已连通</span>}
-        <Button variant="ghost" size="sm" onClick={onRemove}>删除</Button>
-      </div>
-    </Card>
-  );
+  const status = `${provider.name}，${provider.available ? '已检测到' : '未检测到'}${selected ? '，当前选择' : ''}`;
+  return <button type="button" role="radio" aria-checked={selected} aria-label={status} title={status}
+    className={`${s.runtimeChoice} ${provider.available ? s.detected : s.undetected} ${selected ? s.runtimeSelected : ''}`}
+    disabled={saving || selected} onClick={onSelect}>
+    <img src={RUNTIME_LOGOS[provider.id]} alt="" aria-hidden="true" /><span>{provider.name}</span>
+    {selected && <Icon name="check" size={13} />}
+  </button>;
 }

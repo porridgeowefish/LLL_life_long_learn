@@ -3,8 +3,7 @@ import { SourceImportControl } from './SourceImportControl';
 
 import s from './SourcesView.module.css';
 
-// This page is deliberately a file ledger, not a second content reader. The
-// parsed Markdown is available only from the teacher's citation picker.
+// Imported materials automatically participate in the next teacher request.
 export function SourcesView({ slug }: { slug: string }) {
   const sources = useSources(slug);
   const retry = useRetrySource(slug);

@@ -205,6 +205,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/retry", s.handleRetrySource)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/evidence/{evidenceId}", s.handleSourceEvidence)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/retrieval", s.handleSourceRetrievalStatus)
 	mux.HandleFunc("DELETE /api/projects/{id}/sources/{sourceId}", s.handleDeleteSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/permanent-delete", s.handlePermanentDeleteSource)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/revisions/{revisionId}/content", s.handleReadSourceContent)

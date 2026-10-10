@@ -26,22 +26,23 @@ const (
 )
 
 type Source struct {
-	SchemaVersion       int        `json:"schemaVersion"`
-	SourceID            string     `json:"sourceId"`
-	DisplayName         string     `json:"displayName"`
-	Status              string     `json:"status"`
-	CurrentRevisionID   string     `json:"currentRevisionId"`
-	TombstonedAt        *time.Time `json:"tombstonedAt,omitempty"`
-	PermanentlyDeleted  *time.Time `json:"permanentlyDeletedAt,omitempty"`
-	FailureCode         string     `json:"failureCode,omitempty"`
-	Parser              string     `json:"parser,omitempty"`
-	ExtractedBytes      int64      `json:"extractedBytes,omitempty"`
-	ExtractionTruncated bool       `json:"extractionTruncated,omitempty"`
-	OriginalSHA256      string     `json:"originalSha256,omitempty"`
-	OriginalBytes       int64      `json:"originalBytes,omitempty"`
-	OriginalMediaType   string     `json:"originalMediaType,omitempty"`
-	CreatedAt           time.Time  `json:"createdAt"`
-	UpdatedAt           time.Time  `json:"updatedAt"`
+	SchemaVersion       int              `json:"schemaVersion"`
+	SourceID            string           `json:"sourceId"`
+	DisplayName         string           `json:"displayName"`
+	Status              string           `json:"status"`
+	CurrentRevisionID   string           `json:"currentRevisionId"`
+	TombstonedAt        *time.Time       `json:"tombstonedAt,omitempty"`
+	PermanentlyDeleted  *time.Time       `json:"permanentlyDeletedAt,omitempty"`
+	FailureCode         string           `json:"failureCode,omitempty"`
+	Parser              string           `json:"parser,omitempty"`
+	ExtractedBytes      int64            `json:"extractedBytes,omitempty"`
+	ExtractionTruncated bool             `json:"extractionTruncated,omitempty"`
+	OriginalSHA256      string           `json:"originalSha256,omitempty"`
+	OriginalBytes       int64            `json:"originalBytes,omitempty"`
+	OriginalMediaType   string           `json:"originalMediaType,omitempty"`
+	Retrieval           *RetrievalStatus `json:"retrieval,omitempty"`
+	CreatedAt           time.Time        `json:"createdAt"`
+	UpdatedAt           time.Time        `json:"updatedAt"`
 }
 
 // ParseDisposition decides whether source-processing may inspect a regular
@@ -286,6 +287,16 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	var source Source
+	if err := readJSON(filepath.Join(s.root, sourceID, "source.json"), &source); err != nil {
+		return Revision{}, err
+	}
+	if source.Status == "deleted" || source.Status == "tombstoned" {
+		return Revision{}, ErrSourceDeleted
+	}
+	if source.CurrentRevisionID != revisionID {
+		return Revision{}, ErrRevisionChanged
+	}
 	revisionPath := filepath.Join(s.root, sourceID, "revisions", revisionID, "revision.json")
 	var revision Revision
 	if err := readJSON(revisionPath, &revision); err != nil {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	sources "github.com/xmz14/lll/backend-go/internal/modules/sources"
 )
 
 const SchemaVersion = 1
@@ -27,13 +28,15 @@ type Block struct {
 }
 
 type Message struct {
-	ID          string    `json:"id"`
-	Role        string    `json:"role"`
-	Status      string    `json:"status"`
-	Blocks      []Block   `json:"blocks"`
-	OperationID string    `json:"operationId,omitempty"`
-	CreatedAt   time.Time `json:"createdAt"`
-	CompletedAt time.Time `json:"completedAt,omitempty"`
+	ID              string                   `json:"id"`
+	Role            string                   `json:"role"`
+	Status          string                   `json:"status"`
+	Blocks          []Block                  `json:"blocks"`
+	OperationID     string                   `json:"operationId,omitempty"`
+	CreatedAt       time.Time                `json:"createdAt"`
+	CompletedAt     time.Time                `json:"completedAt,omitempty"`
+	SourceCitations []sources.SourceCitation `json:"sourceCitations,omitempty"`
+	ReadingCoverage []ReadingCoverage        `json:"readingCoverage,omitempty"`
 }
 
 type Event struct {
@@ -914,6 +917,9 @@ func (s *Store) ReconcileInterruptedResponses() (int, error) {
 			}
 		} else if response.Message.Status != "" {
 			status = response.Message.Status
+			if err := s.ensureSourceEvidenceLocked(response.ResponseID, *response.Message, events); err != nil {
+				return 0, err
+			}
 		}
 		if _, err := s.appendLocked("teacher-response-finished", map[string]any{"responseId": response.ResponseID, "messageId": response.TeacherMessageID, "status": status, "recoveredAtStartup": true}); err != nil {
 			return 0, err

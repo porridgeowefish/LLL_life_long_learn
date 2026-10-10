@@ -71,14 +71,32 @@ public static class LearnInstallerResource {
 '@
 $manifest = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0"><assemblyIdentity version="1.0.0.0" processorArchitecture="*" name="learn-with-ai.desktop" type="win32"/><trustInfo xmlns="urn:schemas-microsoft-com:asm.v3"><security><requestedPrivileges><requestedExecutionLevel level="asInvoker" uiAccess="false"/></requestedPrivileges></security></trustInfo><compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1"><application><supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}"/></application></compatibility><application xmlns="urn:schemas-microsoft-com:asm.v3"><windowsSettings><dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness><longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware></windowsSettings></application></assembly>'
 $bytes = [Text.Encoding]::UTF8.GetBytes($manifest)
-$handle = [LearnInstallerResource]::BeginUpdateResource($Executable, $false)
-if ($handle -eq [IntPtr]::Zero) { throw "BeginUpdateResource failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
-try {
-  if (-not [LearnInstallerResource]::UpdateResource($handle, [IntPtr]24, [IntPtr]1, 1033, $bytes, $bytes.Length)) { throw "UpdateResource failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
-  [LearnInstallerResource]::Icons($handle, [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($IconPath)))
-  [LearnInstallerResource]::Version($handle, $Version, $Description)
-  if (-not [LearnInstallerResource]::EndUpdateResource($handle, $false)) { throw "EndUpdateResource failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+# A freshly linked PE can briefly be held by a scanner. Retry only native
+# sharing/open failures; malformed resources and all other failures stay fatal.
+for ($taskAttempt = 0; $taskAttempt -lt 6; $taskAttempt++) {
   $handle = [IntPtr]::Zero
-} finally {
-  if ($handle -ne [IntPtr]::Zero) { [LearnInstallerResource]::EndUpdateResource($handle, $true) | Out-Null }
+  $taskNativeError = 0
+  try {
+    $handle = [LearnInstallerResource]::BeginUpdateResource($Executable, $false)
+    if ($handle -eq [IntPtr]::Zero) {
+      $taskNativeError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+      throw "BeginUpdateResource failed: $taskNativeError"
+    }
+    if (-not [LearnInstallerResource]::UpdateResource($handle, [IntPtr]24, [IntPtr]1, 1033, $bytes, $bytes.Length)) {
+      $taskNativeError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+      throw "UpdateResource failed: $taskNativeError"
+    }
+    [LearnInstallerResource]::Icons($handle, [IO.File]::ReadAllBytes([IO.Path]::GetFullPath($IconPath)))
+    [LearnInstallerResource]::Version($handle, $Version, $Description)
+    $taskCommitted = [LearnInstallerResource]::EndUpdateResource($handle, $false)
+    $taskNativeError = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    $handle = [IntPtr]::Zero
+    if (-not $taskCommitted) { throw "EndUpdateResource failed: $taskNativeError" }
+    break
+  } catch {
+    if ($taskNativeError -notin @(32, 110) -or $taskAttempt -eq 5) { throw }
+    Start-Sleep -Milliseconds ([Math]::Min(3000, 250 * [Math]::Pow(2, $taskAttempt)))
+  } finally {
+    if ($handle -ne [IntPtr]::Zero) { [LearnInstallerResource]::EndUpdateResource($handle, $true) | Out-Null }
+  }
 }

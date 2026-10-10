@@ -24,6 +24,7 @@ import {
 } from '@/features/learning/api/learningWorkspace';
 import { useAskAiSettings } from '@/features/settings';
 
+import { SourceCitations } from './SourceCitations';
 import s from './TeacherView.module.css';
 
 interface SearchStatus {
@@ -41,6 +42,7 @@ interface LiveResponse {
   taskIds: string[];
   searches: SearchStatus[];
   notice?: string;
+  reading?: { operationId: string; operation: string; sourceId?: string; displayRange?: string };
 }
 
 const STREAM_FLUSH_MS = 64;
@@ -55,10 +57,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const assetsQuery = useAssets(slug);
   const modelSettings = useAskAiSettings();
   const [input, setInput] = useState('');
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
-	const [previewSourceId, setPreviewSourceId] = useState('');
-	const [previewContent, setPreviewContent] = useState('');
-	const [previewPage, setPreviewPage] = useState(0);
   const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
   const [live, setLive] = useState<LiveResponse | null>(null);
   const [error, setError] = useState('');
@@ -82,7 +80,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const tasksById = useMemo(() => new Map((tasksQuery.data ?? []).map((task) => [task.id, task])), [tasksQuery.data]);
   const sourceNames = useMemo(() => new Map((sourcesQuery.data ?? []).map((source) => [source.sourceId, source.displayName])), [sourcesQuery.data]);
   const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status === 'ready'), [sourcesQuery.data]);
-  const selectedSources = useMemo(() => availableSources.filter((source) => selectedSourceIds.includes(source.sourceId)), [availableSources, selectedSourceIds]);
   const availableModels = useMemo(() => (modelSettings.data?.providers ?? []).filter((provider) => provider.id && provider.model && provider.baseURL), [modelSettings.data?.providers]);
   const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === 'queued' || task.status === 'running'), [tasksQuery.data]);
   const selectedModel = availableModels.find((provider) => provider.id === providerId);
@@ -246,24 +243,21 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     const content = input.trim();
     if (!content) return;
     setError('');
-    const attachmentRefs = [...selectedSourceIds];
+    const attachmentRefs: string[] = [];
     if (live) {
       // Sending while streaming queues durably server-side; the queue chips
       // above the composer reflect and edit that state.
       setInput('');
-      setSelectedSourceIds([]);
       try {
         await queueTeacherTurn(slug, { operationId: crypto.randomUUID(), content, attachmentRefs, providerId: providerId || undefined });
         await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
       } catch (cause) {
         setError((cause as Error).message || '排队失败，请稍后重试');
         setInput(content);
-        setSelectedSourceIds(attachmentRefs);
       }
       return;
     }
     setInput('');
-    setSelectedSourceIds([]);
     followStream.current = true;
     pendingDeltas.current = { text: '', reasoning: '' };
     const operationId = crypto.randomUUID();
@@ -275,10 +269,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       text: '', reasoning: '', taskIds: [], searches: [],
     };
     setLive(temporary);
-    const ok = await runStream(async (signal) => {
+    await runStream(async (signal) => {
       await streamTeacherTurn(slug, { operationId, content, attachmentRefs, providerId: providerId || undefined }, signal, handleTeacherFrame);
     });
-    if (!ok) setSelectedSourceIds(attachmentRefs);
   };
 
   // Steer interrupts the active response server-side; we detach from the old
@@ -414,21 +407,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     setTaskNotice(null);
   };
 
-	const previewCitation = async (sourceId: string) => {
-		const source = availableSources.find((item) => item.sourceId === sourceId);
-		if (!source) return;
-		setPreviewSourceId(sourceId);
-		setPreviewContent('正在载入引用文本…');
-		setPreviewPage(0);
-		try {
-			const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(source.sourceId)}/revisions/${encodeURIComponent(source.currentRevisionId)}/content`);
-			if (!response.ok) throw new Error('引用文本暂不可用');
-			setPreviewContent(await response.text());
-		} catch (cause) {
-			setPreviewContent((cause as Error).message || '引用文本暂不可用');
-		}
-	};
-	const previewPages = useMemo(() => previewContent ? previewContent.match(/[\s\S]{1,900}/g) ?? [''] : [], [previewContent]);
 
   return (
     <section className={s.teacher}>
@@ -452,6 +430,11 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {live && (
           <>
             <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
+            {live.reading && <div className={s.searches} role="status">
+              {live.reading.operation === 'search' ? '正在查找资料' : '正在查阅'}
+              {live.reading.sourceId && <> · {sourceNames.get(live.reading.sourceId) ?? '资料'}</>}
+              {live.reading.displayRange && <> · {live.reading.displayRange}</>}
+            </div>}
             {live.searches.length > 0 && (
               <div className={s.searches} role="status">
                 {live.searches.map((search, index) => (
@@ -500,18 +483,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         )}
 
       <form className={s.composer} onSubmit={submit}>
-		{selectedSources.length > 0 && <div className={s.citationChips} aria-label="已引用资料">{selectedSources.map((source) => <button key={source.sourceId} type="button" onClick={() => setSelectedSourceIds((current) => current.filter((id) => id !== source.sourceId))}>{source.displayName} ×</button>)}</div>}
-        {!!availableSources.length && <details className={s.sourcePicker}>
-          <summary>引用资料{selectedSourceIds.length ? ` ${selectedSourceIds.length}` : ''}</summary>
-          <div className={s.sourceMenu}>
-            <strong>本条消息引用</strong>
-            {availableSources.map((source) => <label key={source.sourceId}>
-              <input type="checkbox" checked={selectedSourceIds.includes(source.sourceId)} onChange={(event) => setSelectedSourceIds((current) => event.target.checked ? [...current, source.sourceId] : current.filter((id) => id !== source.sourceId))} />
-              <span>{source.displayName}</span><button type="button" onClick={(event) => { event.preventDefault(); void previewCitation(source.sourceId); }}>查看文本</button>
-            </label>)}
-			{previewSourceId && <div className={s.citationPreview} role="dialog" aria-label="引用文本预览"><div><strong>{availableSources.find((source) => source.sourceId === previewSourceId)?.displayName}</strong><button type="button" onClick={() => setPreviewSourceId('')}>关闭</button></div><pre>{previewPages[previewPage] ?? ''}</pre>{previewPages.length > 1 && <footer><button type="button" disabled={previewPage === 0} onClick={() => setPreviewPage((page) => page - 1)}>上一页</button><span>{previewPage + 1} / {previewPages.length}</span><button type="button" disabled={previewPage >= previewPages.length - 1} onClick={() => setPreviewPage((page) => page + 1)}>下一页</button></footer>}</div>}
-          </div>
-        </details>}
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} placeholder={live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
@@ -523,7 +494,8 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
               {availableModels.map((provider) => <option key={provider.id} value={provider.id}>{provider.name ? `${provider.name} · ${provider.model}` : provider.model}</option>)}
             </select>
           </label>}
-          <span>Enter 发送 · Shift + Enter 换行</span>
+          {availableSources.length > 0 && <span className={s.materialStatus}>有 {availableSources.length} 份资料可查阅</span>}
+          <span className={s.keyboardHint}>Enter 发送 · Shift + Enter 换行</span>
         </div>
       </form>
       </div>
@@ -572,7 +544,13 @@ function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.Se
     if (!current) return current;
     if (frame.type === 'turn-accepted') return { ...current, responseId: String(frame.data.responseId), learner: { ...current.learner, id: String(frame.data.learnerMessageId) } };
     if (frame.type === 'message-started') return { ...current, teacherId: String(frame.data.teacherMessageId) };
-    if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [] };
+    if (frame.type === 'message-reset') return { ...current, text: '', reasoning: '', notice: '', searches: [], reading: undefined };
+    if (frame.type === 'message-completed' || frame.type === 'message-failed') return { ...current, reading: undefined };
+    if (frame.type === 'source-reading') {
+      const operationId = String(frame.data.operationId ?? '');
+      if (frame.data.phase === 'started') return { ...current, reading: { operationId, operation: String(frame.data.operation ?? ''), sourceId: typeof frame.data.sourceId === 'string' ? frame.data.sourceId : undefined, displayRange: typeof frame.data.displayRange === 'string' ? frame.data.displayRange : undefined } };
+      return current.reading?.operationId === operationId ? { ...current, reading: undefined } : current;
+    }
     if (frame.type === 'text-delta') return { ...current, text: current.text + String(frame.data.delta ?? '') };
     if (frame.type === 'reasoning-summary-delta') return { ...current, reasoning: current.reasoning + String(frame.data.delta ?? '') };
     if (frame.type === 'task-accepted') return { ...current, taskIds: [...current.taskIds, String(frame.data.taskId)] };
@@ -605,15 +583,31 @@ interface MessageActions {
 
 const Message = memo(function Message({ slug, message, tasks, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
+  const [selectedEvidence, setSelectedEvidence] = useState('');
+  const citations = message.sourceCitations ?? [];
+  const citationSource = (source: string) => source.replace(/\[\[source:([^\]]+)\]\]/g, (_marker, id: string) => {
+    const index = citations.findIndex(item => item.evidenceId === id);
+    return index < 0 ? '' : `[资料${index + 1}](#source-${id})`;
+  });
   return (
     <article className={teacher ? s.teacherMessage : s.learnerMessage}>
       {teacher && <div className={s.speaker}>教师</div>}
-      <div className={s.messageBody}>
+      <div className={s.messageBody} onClick={event => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const href = target.closest('a')?.getAttribute('href');
+        if (!href?.startsWith('#source-')) return;
+        const evidenceId = href.slice('#source-'.length);
+        if (!citations.some(item => item.evidenceId === evidenceId)) return;
+        event.preventDefault();
+        setSelectedEvidence(evidenceId);
+      }}>
         {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
-          : block.type === 'markdown' ? <MarkdownView key={block.id} source={block.source ?? ''} className={s.markdown} streaming={streaming} />
+          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(block.source ?? '')} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
+        {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}
         {tasks.map((task) => <TaskCard key={task.id} slug={slug} task={task} />)}

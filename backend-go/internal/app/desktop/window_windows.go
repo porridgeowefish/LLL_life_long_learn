@@ -119,6 +119,11 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	user32.NewProc("SetPropW").Call(uintptr(view.Window()), uintptr(unsafe.Pointer(property)), 1)
 	defer user32.NewProc("RemovePropW").Call(uintptr(view.Window()), uintptr(unsafe.Pointer(property)))
 	applyWindowIcon(uintptr(view.Window()))
+	tray, err := attachWindowTray(uintptr(view.Window()), engine.Close)
+	if err != nil {
+		return err
+	}
+	defer tray.close()
 	// Let a second launch find this window; removed when the window closes.
 	record := filepath.Join(engine.Workspace, windowRecordName)
 	if err := os.WriteFile(record, []byte(fmt.Sprintf("%d %d", uintptr(view.Window()), os.Getpid())), 0600); err == nil {
@@ -152,19 +157,38 @@ func RunWindow(engine *Engine, smokeResult string) error {
 							smokeErr = fmt.Errorf("native desktop React rendering not ready: %s", payload)
 						}
 						if smokeErr == nil {
+							hwnd := uintptr(view.Window())
+							evidence["trayAdded"] = tray.added
+							user32.NewProc("SendMessageW").Call(hwnd, 0x10, 0, 0)
+							visible, _, _ := user32.NewProc("IsWindowVisible").Call(hwnd)
+							evidence["closeHidesWindow"] = visible == 0
+							select {
+							case <-engine.Done:
+								evidence["engineAliveAfterClose"] = false
+							default:
+								evidence["engineAliveAfterClose"] = true
+							}
+							user32.NewProc("SendMessageW").Call(hwnd, trayMessage, 1, 0x203)
+							visible, _, _ = user32.NewProc("IsWindowVisible").Call(hwnd)
+							evidence["trayRestoresWindow"] = visible != 0
 							evidence["hasWindowIcon"] = hasWindowIcon(uintptr(view.Window()))
 							evidence["appUserModelID"] = AppID
 							evidence["screenshot"] = smokeResult + ".png"
 							smokeErr = captureWindow(uintptr(view.Window()), smokeResult+".png")
 						}
 						if smokeErr == nil {
+							user32.NewProc("SendMessageW").Call(uintptr(view.Window()), 0x111, trayExit, 0)
+							evidence["trayExitRequested"] = tray.exiting
 							var data []byte
 							data, smokeErr = json.Marshal(evidence)
 							if smokeErr == nil {
 								smokeErr = os.WriteFile(smokeResult, data, 0600)
 							}
 						}
-						view.Destroy()
+						if smokeErr != nil {
+							tray.exiting = true
+							view.Destroy()
+						}
 					})
 				}()
 			})
@@ -179,13 +203,14 @@ func RunWindow(engine *Engine, smokeResult string) error {
 			case <-timer.C:
 				view.Dispatch(func() {
 					smokeOnce.Do(func() { smokeErr = errors.New("native desktop React rendering timed out") })
+					tray.exiting = true
 					view.Destroy()
 				})
 			case <-engine.Done:
 			}
 		}()
 	}
-	go func() { <-engine.Done; view.Dispatch(func() { view.Destroy() }) }()
+	go func() { <-engine.Done; view.Dispatch(func() { tray.exiting = true; view.Destroy() }) }()
 	view.Navigate(engine.URL)
 	view.Run()
 	if smokeResult != "" {

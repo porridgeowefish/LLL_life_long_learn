@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import { useTeacherSettings, useSaveTeacherSettings, type AutoNotesSettings } from '@/features/learning';
 import { Button } from '@/shared/primitive/Button';
@@ -11,10 +11,12 @@ export function TeacherNotesSettings() {
   const ai = useAskAiSettings();
   const id = useId();
   const [draft, setDraft] = useState<AutoNotesSettings>();
+  const dirty = useRef(false);
 
-  useEffect(() => { if (query.data) setDraft(query.data.autoNotes); }, [query.data]);
+  useEffect(() => { if (query.data && !dirty.current) setDraft({ ...query.data.autoNotes }); }, [query.data]);
 
   const update = (patch: Partial<AutoNotesSettings>) => {
+    dirty.current = true;
     save.reset();
     setDraft(current => current ? { ...current, ...patch } : current);
   };
@@ -74,7 +76,7 @@ export function TeacherNotesSettings() {
           {save.isError ? `保存失败：${(save.error as Error).message}` : save.isSuccess ? '自动笔记配置已保存。' : '笔记保存在各项目的「资产 → 笔记」中。'}
         </p>
         <Button variant="primary" size="sm" loading={save.isPending} disabled={!validInterval}
-          onClick={() => save.mutate(draft)}>保存自动笔记</Button>
+          onClick={() => save.mutate(draft, { onSuccess: () => { dirty.current = false; } })}>保存自动笔记</Button>
       </footer>
     </section>
   );

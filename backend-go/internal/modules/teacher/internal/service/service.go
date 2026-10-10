@@ -90,10 +90,12 @@ type taskAuthorizationError interface {
 }
 
 type Service struct {
-	Gateway     teachergateway.Gateway
-	Authorizer  TaskAuthorizer
-	OnTask      func(projectSlug string, task DelegatedTask)
-	OnCompleted func(projectSlug, responseID string)
+	Gateway         teachergateway.Gateway
+	Authorizer      TaskAuthorizer
+	OnTask          func(projectSlug string, task DelegatedTask)
+	OnCompleted     func(projectSlug, responseID string)
+	OnSourceReading func(map[string]any)
+	OnSourceUpdated func(string, sourcestore.Source)
 }
 
 // resolveSearcher is a seam for tests; production always resolves from config.
@@ -291,26 +293,48 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		systemPrompt += "\n\n你可以使用 search_web 工具检索公开网络信息（一次回答最多调用 2 次）。仅在需要时效性信息或事实核对时使用；搜索结果来自外部站点，需要辨析可靠性与时效，并在回答中给出来源链接。"
 	}
 
+	budget := budgetForProvider(effectiveProviderID)
+	tools = append(tools, sourceTools()...)
+	systemPrompt += sourceToolInstructions
+	initial := teachergateway.Request{System: systemPrompt, Messages: providerMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.output}
+	budgetErr := budget.trimInitial(&initial)
+	providerMessages = initial.Messages
+	sourceLimit := min(12000, budget.window/4, max(0, budget.available(initial)-512))
+	reading := newResponseSources(ctx, slug, sourceLimit)
+	if reading.reader != nil && s.OnSourceUpdated != nil {
+		reading.reader.OnUpdated = func(source sourcestore.Source) { s.OnSourceUpdated(slug, source) }
+	}
+	if budgetErr == nil {
+		bootstrap := reading.bootstrap(ctx, learnerText, min(2500, sourceLimit))
+		systemPrompt += bootstrap
+		if strings.Contains(learnerText, "继续") || strings.EqualFold(strings.TrimSpace(learnerText), "continue") {
+			if messages, e := conversation.AllMessages(); e == nil {
+				systemPrompt += reading.continuation(ctx, messages)
+			}
+		}
+	}
 	var text, reasoning strings.Builder
 	usage := map[string]int{}
 	acceptedTool := false
-	// The search loop: stream once; if the model calls search_web and the
-	// round budget allows it, answer the call and stream again with the
-	// results appended. Two search rounds maximum keeps the turn bounded.
-	const maxSearchRounds = 2
 	var providerErr error
 	recoveredUnexpectedTool := false
 	roundMessages := providerMessages
-	for round := 0; ; round++ {
+	sourceCalls, webCalls, toolRounds := 0, 0, 0
+	for requestNumber := 0; requestNumber < 8; requestNumber++ {
+		if budgetErr != nil {
+			providerErr = budgetErr
+			break
+		}
+		request := teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel, MaxOutputTokens: budget.output}
+		if providerErr = budget.check(request); providerErr != nil {
+			break
+		}
 		roundTextStart := text.Len()
-		var pendingSearch *teachergateway.ToolCall
+		var pending []teachergateway.ToolCall
 		var roundThinking []json.RawMessage
+		var roundProviderContent, roundProviderReasoning strings.Builder
 		roundUsage := map[string]int{}
-		unexpectedTool := false
-		providerErr = s.Gateway.Stream(ctx, teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools, ProviderID: effectiveProviderID, Model: effectiveModel}, func(event teachergateway.Event) {
-			if unexpectedTool && event.Type != "usage" {
-				return
-			}
+		providerErr = s.Gateway.Stream(ctx, request, func(event teachergateway.Event) {
 			switch event.Type {
 			case "text-delta":
 				text.WriteString(event.Delta)
@@ -319,108 +343,196 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 				reasoning.WriteString(event.Delta)
 				emit(StreamFrame{Type: "reasoning-summary-delta", Data: map[string]any{"blockId": reasoningBlockID, "delta": event.Delta}})
 			case "provider-thinking-block":
-				// Provider signatures are transport state, not conversation assets
-				// or browser disclosures. Retain only for this tool continuation.
-				roundThinking = append(roundThinking, event.ThinkingBlock)
+				roundThinking = append(roundThinking, append(json.RawMessage(nil), event.ThinkingBlock...))
+			case "provider-content-delta":
+				roundProviderContent.WriteString(event.Delta)
+			case "provider-reasoning-delta":
+				roundProviderReasoning.WriteString(event.Delta)
 			case "usage":
-				for key, value := range event.Usage {
-					roundUsage[key] = value
+				for k, v := range event.Usage {
+					roundUsage[k] = v
 				}
 				emit(StreamFrame{Type: "usage", Data: map[string]any{"usage": event.Usage}})
 			case "tool-call-ready":
-				if event.ToolCall == nil {
-					return
-				}
-				offered := false
-				for _, available := range tools {
-					offered = offered || available.Name == event.ToolCall.ToolName
-				}
-				if !offered {
-					unexpectedTool = true
-					_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
-					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": "tool_not_offered"})
-					return
-				}
-				if event.ToolCall.ToolName == "search_web" && searcher != nil && pendingSearch == nil {
-					pendingSearch = event.ToolCall
-					_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
-					return
-				}
-				_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": event.ToolCall.CallID, "responseId": responseID, "toolName": event.ToolCall.ToolName, "arguments": event.ToolCall.Arguments})
-				if acceptedTool {
-					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": "one_task_per_response"})
-					emit(StreamFrame{Type: "tool-rejected", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "code": "one_task_per_response"}})
-					appendToolNotice(&text, textBlockID, "one_task_per_response", emit)
-					return
-				}
-				task, ok, toolErr := s.acceptDelegation(slug, conversation, learner, learnerSeq, learner.OperationID, *event.ToolCall)
-				if toolErr != nil {
-					data := map[string]any{"toolCallId": event.ToolCall.CallID, "code": delegationCode(toolErr)}
-					var classified taskAuthorizationError
-					if errors.As(toolErr, &classified) && classified.ExistingTaskIDValue() != "" {
-						data["existingTaskId"] = classified.ExistingTaskIDValue()
+				if event.ToolCall != nil {
+					call := *event.ToolCall
+					if call.ProviderCallID == "" {
+						call.ProviderCallID = call.CallID
 					}
-					emit(StreamFrame{Type: "tool-rejected", Data: data})
-					appendToolNotice(&text, textBlockID, data["code"].(string), emit)
-					_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "rejected", "code": data["code"]})
-					return
-				}
-				acceptedTool = true
-				_, _ = conversation.Append("task-linked", conversationstore.TaskLink{MessageID: teacherMessageID, TaskID: task.ID, ToolCallID: event.ToolCall.CallID})
-				_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": event.ToolCall.CallID, "status": "accepted", "taskId": task.ID, "taskStatus": task.Status})
-				emit(StreamFrame{Type: "task-accepted", Data: map[string]any{"toolCallId": event.ToolCall.CallID, "taskId": task.ID, "status": task.Status}})
-				if ok && s.OnTask != nil {
-					s.OnTask(slug, task)
+					pending = append(pending, call)
 				}
 			}
 		})
-		for key, value := range roundUsage {
-			usage[key] += value
+		for k, v := range roundUsage {
+			usage[k] += v
 		}
-		if unexpectedTool && !acceptedTool {
-			// An unoffered call invalidates the entire candidate: providers may
-			// have emitted self-planning in their text channel before the call.
+		if len(pending) == 0 {
+			break
+		}
+		streamErr := providerErr
+		unexpected := false
+		for _, call := range pending {
+			offered := false
+			for _, available := range tools {
+				if available.Name == call.ToolName {
+					offered = true
+					break
+				}
+			}
+			if !offered {
+				unexpected = true
+			}
+		}
+		if unexpected {
 			text.Reset()
 			reasoning.Reset()
 			emit(StreamFrame{Type: "message-reset", Data: map[string]any{"messageId": teacherMessageID, "code": "unexpected_tool_request"}})
-			if providerErr != nil {
-				break
+			for _, call := range pending {
+				_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": call.CallID, "responseId": responseID, "toolName": call.ToolName})
+				_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": call.CallID, "status": "rejected", "code": "tool_not_offered"})
 			}
-			if recoveredUnexpectedTool {
+			if recoveredUnexpectedTool || requestNumber == 7 {
 				providerErr = errors.New("provider repeatedly requested an unavailable tool")
 				break
 			}
 			recoveredUnexpectedTool = true
 			tools = nil
-			roundMessages = providerMessages
-			systemPrompt += "\n\n【继续教学】直接回答学习者最后一个问题。本次不使用任何工具；不说明委派、不展示自我规划。思考仅放在独立思考通道。"
+			// Discard the complete invalid provider candidate, including its tool history.
+			// Prior valid exchanges are kept; this candidate never becomes teaching text.
+			systemPrompt += "\n【继续教学】直接回答最后问题。本次不使用工具，不展示自我规划。"
 			continue
 		}
-		if providerErr != nil || pendingSearch == nil || acceptedTool || round >= maxSearchRounds {
+		assistant := teachergateway.Message{Role: "assistant", Content: text.String()[roundTextStart:], ThinkingBlocks: roundThinking, ToolCalls: pending, ProviderContent: roundProviderContent.String(), ReasoningContent: roundProviderReasoning.String()}
+		roundMessages = append(roundMessages, assistant)
+		limited := toolRounds >= 6 || requestNumber >= 6
+		// Reserve a bounded result for every pending ID before any body is loaded.
+		resultRoom := budget.available(teachergateway.Request{System: systemPrompt, Messages: roundMessages, Tools: tools}) - 256*len(pending) - 512
+		forceFinal := limited || acceptedTool
+		for _, call := range pending {
+			_, _ = conversation.Append("tool-call-requested", map[string]any{"callId": call.CallID, "responseId": responseID, "toolName": call.ToolName, "arguments": call.Arguments})
+			resultText := ""
+			resultStatus := "executed"
+			code := ""
+			if limited {
+				code = "tool_limit_reached"
+				forceFinal = true
+			} else if ctx.Err() != nil {
+				code = "cancelled"
+			} else if isSourceTool(call.ToolName) {
+				sourceCalls++
+				allocation := min(4000, max(0, resultRoom), reading.limit-reading.used)
+				if sourceCalls > 12 {
+					code = "tool_limit_reached"
+					forceFinal = true
+				} else if allocation < 128 {
+					code = "budget_exhausted"
+					forceFinal = true
+				} else {
+					operation := strings.TrimSuffix(strings.TrimPrefix(call.ToolName, "get_source_"), "_source")
+					if call.ToolName == "search_source" {
+						operation = "search"
+					}
+					if call.ToolName == "read_source" {
+						operation = "read"
+					}
+					sourceID, _ := call.Arguments["sourceId"].(string)
+					revisionID, _ := call.Arguments["revisionId"].(string)
+					progress := map[string]any{"projectSlug": slug, "responseId": responseID, "operationId": call.CallID, "phase": "started", "operation": operation, "sourceId": sourceID, "revisionId": revisionID}
+					s.sourceReading(progress, emit)
+					result := reading.execute(ctx, call.ToolName, call.Arguments, allocation)
+					encoded, _ := json.Marshal(result)
+					resultText = string(encoded)
+					done := map[string]any{"projectSlug": slug, "responseId": responseID, "operationId": call.CallID, "phase": "completed", "operation": operation, "sourceId": sourceID, "revisionId": revisionID}
+					if data, ok := result.Data.(sourcestore.SourceReadData); ok {
+						done["displayRange"] = data.Citation.DisplayRange
+					}
+					if result.Error != nil {
+						done["phase"] = "failed"
+						done["reason"] = result.Error.Code
+						code = result.Error.Code
+						resultStatus = "failed"
+						if code == "budget_exhausted" {
+							forceFinal = true
+						}
+					}
+					s.sourceReading(done, emit)
+				}
+			} else if call.ToolName == "search_web" {
+				webCalls++
+				if webCalls > 2 {
+					code = "tool_limit_reached"
+					forceFinal = true
+				} else if resultRoom < 256 {
+					code = "budget_exhausted"
+					forceFinal = true
+				} else {
+					query, _ := call.Arguments["query"].(string)
+					if len(call.Arguments) != 1 || query == "" || len([]rune(query)) > 256 {
+						code = "invalid_arguments"
+					} else {
+						emit(StreamFrame{Type: "search-started", Data: map[string]any{"query": query}})
+						results, e := searcher.Search(ctx, query)
+						if e != nil {
+							code = "websearch_unavailable"
+							emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "code": code}})
+						} else {
+							resultText = truncateTokens(websearch.FormatResults(results), min(2000, resultRoom))
+							emit(StreamFrame{Type: "search-completed", Data: map[string]any{"query": query, "count": len(results)}})
+						}
+					}
+				}
+			} else if call.ToolName == "delegate_learning_work" {
+				if acceptedTool {
+					code = "one_task_per_response"
+					appendToolNotice(&text, textBlockID, code, emit)
+				} else {
+					task, created, e := s.acceptDelegation(slug, conversation, learner, learnerSeq, learner.OperationID, call)
+					if e != nil {
+						code = delegationCode(e)
+						emit(StreamFrame{Type: "tool-rejected", Data: map[string]any{"toolCallId": call.CallID, "code": code}})
+						appendToolNotice(&text, textBlockID, code, emit)
+					} else {
+						acceptedTool = true
+						forceFinal = true
+						_, _ = conversation.Append("task-linked", conversationstore.TaskLink{MessageID: teacherMessageID, TaskID: task.ID, ToolCallID: call.CallID})
+						emit(StreamFrame{Type: "task-accepted", Data: map[string]any{"toolCallId": call.CallID, "taskId": task.ID, "status": task.Status}})
+						if created && s.OnTask != nil {
+							s.OnTask(slug, task)
+						}
+						raw, _ := json.Marshal(map[string]any{"status": "accepted", "taskId": task.ID, "taskStatus": task.Status})
+						resultText = string(raw)
+					}
+				}
+			} else {
+				code = "invalid_arguments"
+			}
+			if resultText == "" {
+				encoded, _ := json.Marshal(sourceError(code))
+				resultText = string(encoded)
+			}
+			if code != "" {
+				resultStatus = "failed"
+			}
+			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": call.CallID, "status": resultStatus, "code": code})
+			roundMessages = append(roundMessages, teachergateway.Message{Role: "tool", ToolCallID: call.ProviderCallID, Content: resultText})
+			resultRoom -= estimateTextTokens(resultText) + 32
+		}
+		toolRounds++
+		if streamErr != nil {
+			providerErr = streamErr
 			break
 		}
-		query, _ := pendingSearch.Arguments["query"].(string)
-		if strings.TrimSpace(query) == "" {
-			query = learnerText
+		if acceptedTool {
+			break
 		}
-		emit(StreamFrame{Type: "search-started", Data: map[string]any{"query": query}})
-		resultText := ""
-		results, searchErr := searcher.Search(ctx, query)
-		if searchErr != nil {
-			emit(StreamFrame{Type: "search-failed", Data: map[string]any{"query": query, "code": "websearch_unavailable"}})
-			resultText = "搜索服务暂时不可用，请基于已有知识回答并说明未能检索。"
-			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": pendingSearch.CallID, "status": "failed", "code": "websearch_unavailable"})
-		} else {
-			emit(StreamFrame{Type: "search-completed", Data: map[string]any{"query": query, "count": len(results)}})
-			resultText = websearch.FormatResults(results)
-			_, _ = conversation.Append("tool-result-recorded", map[string]any{"callId": pendingSearch.CallID, "status": "executed", "resultCount": len(results)})
+		if webCalls >= 2 {
+			forceFinal = true
 		}
-		roundMessages = append(roundMessages,
-			teachergateway.Message{Role: "assistant", Content: text.String()[roundTextStart:], ThinkingBlocks: roundThinking, ToolCalls: []teachergateway.ToolCall{*pendingSearch}},
-			teachergateway.Message{Role: "tool", ToolCallID: pendingSearch.ProviderCallID, Content: resultText},
-		)
+		if forceFinal || requestNumber >= 6 {
+			tools = nil
+			systemPrompt += "\n【本轮阅读结束】只依据已返回证据回答，说明尚未读完的范围；不声称完整阅读。"
+		}
 	}
-
 	status := "completed"
 	if providerErr != nil {
 		if errors.Is(providerErr, context.Canceled) {
@@ -437,7 +549,20 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		blocks = append(blocks, conversationstore.Block{ID: textBlockID, Type: "markdown", Source: text.String()})
 	}
 	message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: status, Blocks: blocks, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
-	finalEvent, persistErr := conversation.RecordMessage(message)
+	if status == "completed" {
+		answer, citations, coverage := reading.verifiedAnswer(ctx, text.String())
+		message.SourceCitations, message.ReadingCoverage = citations, coverage
+		if answer != text.String() {
+			for i := range message.Blocks {
+				if message.Blocks[i].Type == "markdown" {
+					message.Blocks[i].Source = answer
+				}
+			}
+			emit(StreamFrame{Type: "message-reset", Data: map[string]any{"messageId": teacherMessageID, "code": "source_citation_verification"}})
+			emit(StreamFrame{Type: "text-delta", Data: map[string]any{"blockId": textBlockID, "delta": answer}})
+		}
+	}
+	finalEvent, persistErr := conversation.RecordMessageWithEvidence(responseID, message)
 	if persistErr != nil {
 		return persistErr
 	}
@@ -453,11 +578,22 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": providerFailureCode(providerErr), "partialPreserved": len(blocks) > 0}})
 		return providerErr
 	}
-	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": finalEvent.Seq}})
+	latestSeq := finalEvent.Seq
+	if meta, e := conversation.Meta(); e == nil {
+		latestSeq = meta.LatestSeq
+	}
+	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": latestSeq, "sourceCitations": message.SourceCitations, "readingCoverage": message.ReadingCoverage}})
 	if s.OnCompleted != nil {
 		s.OnCompleted(slug, responseID)
 	}
 	return nil
+}
+
+func (s *Service) sourceReading(data map[string]any, emit func(StreamFrame)) {
+	if s.OnSourceReading != nil {
+		s.OnSourceReading(data)
+	}
+	emit(StreamFrame{Type: "source-reading", Data: data})
 }
 
 func appendToolNotice(text *strings.Builder, blockID, code string, emit func(StreamFrame)) {
@@ -787,6 +923,9 @@ func delegationCode(err error) string {
 }
 
 func providerFailureCode(err error) string {
+	if errors.Is(err, errContextBudgetExhausted) {
+		return "context_budget_exhausted"
+	}
 	if errors.Is(err, context.Canceled) {
 		return "interrupted"
 	}

@@ -111,11 +111,11 @@ func (s *Server) advanceTeacherQueue(slug string) bool {
 
 func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
-	if _, err := teacher.NewConversation(slug); err != nil {
+	conversation, err := teacher.NewConversation(slug)
+	if err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
-	conversation, _ := teacher.NewConversation(slug)
 	if err := ensureTeacherGreeting(conversation, slug); err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -426,6 +426,9 @@ func streamTeacherRun(w http.ResponseWriter, r *http.Request, run *teacher.Activ
 }
 
 func ensureTeacherGreeting(store *teacher.ConversationStore, slug string) error {
+	if store == nil {
+		return errors.New("teacher conversation is unavailable")
+	}
 	meta, err := store.Meta()
 	if err != nil {
 		return err

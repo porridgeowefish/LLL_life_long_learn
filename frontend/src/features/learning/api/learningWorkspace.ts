@@ -16,6 +16,21 @@ export interface ConversationMessage {
   status: 'completed' | 'failed' | 'interrupted';
   blocks: MessageBlock[];
   createdAt: string;
+  sourceCitations?: SourceCitation[];
+  readingCoverage?: Array<{ sourceId: string; revisionId: string; contentHash: string; scope: string; completeWithinScope: boolean }>;
+}
+
+export interface SourceCitation {
+  evidenceId: string;
+  sourceId: string;
+  revisionId: string;
+  contentHash: string;
+  startByte: number;
+  endByte: number;
+  startLine: number;
+  endLine: number;
+  displayRange: string;
+  quoteHash: string;
 }
 
 export interface TaskLink {

@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -33,6 +35,11 @@ type Message struct {
 	// Retained only in memory for a provider tool round-trip, never persisted
 	// or sent to the browser. Signed/opaque blocks must be replayed intact.
 	ThinkingBlocks []json.RawMessage
+	// OpenAI-compatible providers can require their full assistant transport
+	// content and separate reasoning channel on tool continuations. Neither is
+	// persisted nor exposed as learner Markdown.
+	ProviderContent  string
+	ReasoningContent string
 }
 
 type Tool struct {
@@ -57,12 +64,13 @@ type Event struct {
 }
 
 type Request struct {
-	System      string
-	Messages    []Message
-	Tools       []Tool
-	ProviderID  string
-	BindingName string
-	Model       string
+	System          string
+	Messages        []Message
+	Tools           []Tool
+	ProviderID      string
+	BindingName     string
+	Model           string
+	MaxOutputTokens int
 }
 
 type Gateway interface {
@@ -98,6 +106,7 @@ func (Configured) Stream(ctx context.Context, in Request, emit func(Event)) erro
 
 func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	var buffers toolBufferSet
+	var inline inlineThinkingFilter
 	messages := make([]map[string]any, 0, len(in.Messages)+1)
 	if in.System != "" {
 		messages = append(messages, map[string]any{"role": "system", "content": in.System})
@@ -106,6 +115,9 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 		messages = append(messages, openAIMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
+	if in.MaxOutputTokens > 0 {
+		body[openAIOutputLimitKey(p)] = in.MaxOutputTokens
+	}
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
 		for _, tool := range in.Tools {
@@ -145,6 +157,9 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 			return nil
 		}
 		for _, choice := range chunk.Choices {
+			if choice.Delta.ReasoningContent != "" {
+				emit(Event{Type: "provider-reasoning-delta", Delta: choice.Delta.ReasoningContent})
+			}
 			if choice.Delta.ReasoningSummary != "" {
 				emit(Event{Type: "reasoning-summary-delta", Delta: choice.Delta.ReasoningSummary})
 			} else if p.Reasoning {
@@ -154,7 +169,10 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 				}
 			}
 			if choice.Delta.Content != "" {
-				emit(Event{Type: "text-delta", Delta: choice.Delta.Content})
+				emit(Event{Type: "provider-content-delta", Delta: choice.Delta.Content})
+				if visible := inline.add(choice.Delta.Content); visible != "" {
+					emit(Event{Type: "text-delta", Delta: visible})
+				}
 			}
 			for _, call := range choice.Delta.ToolCalls {
 				buffers.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
@@ -167,12 +185,26 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 	}, func() {
 		for _, buffered := range buffers.drain() {
 			var args map[string]any
-			if json.Unmarshal([]byte(buffered.arguments), &args) == nil {
-				emit(Event{Type: "tool-call-ready", ToolCall: &ToolCall{CallID: idgen.New("call"), ProviderCallID: buffered.id, ToolName: buffered.name, Arguments: args}})
+			if json.Unmarshal([]byte(buffered.arguments), &args) != nil || args == nil {
+				args = map[string]any{"__invalid_arguments": true}
 			}
+			emit(Event{Type: "tool-call-ready", ToolCall: &ToolCall{CallID: idgen.New("call"), ProviderCallID: buffered.id, ToolName: buffered.name, Arguments: args}})
 		}
 		emit(Event{Type: "response-completed"})
 	})
+}
+
+func openAIOutputLimitKey(p askaiconfig.Provider) string {
+	endpoint, _ := url.Parse(p.BaseURL)
+	if endpoint != nil && (endpoint.Hostname() == "api.openai.com" || endpoint.Hostname() == "api.groq.com") {
+		return "max_completion_tokens"
+	}
+	model := strings.ToLower(p.Model)
+	if model == "chat-latest" || strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6") ||
+		strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
+		return "max_completion_tokens"
+	}
+	return "max_tokens"
 }
 
 // The provider stream is processed synchronously, so a request-local buffer is
@@ -200,10 +232,13 @@ func (s *toolBufferSet) add(index int, id, name, args string) {
 }
 func (s *toolBufferSet) drain() []openAIBuffer {
 	var out []openAIBuffer
-	for i := 0; i < len(s.values); i++ {
-		if v, ok := s.values[i]; ok {
-			out = append(out, v)
-		}
+	indices := make([]int, 0, len(s.values))
+	for index := range s.values {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
+	for _, index := range indices {
+		out = append(out, s.values[index])
 	}
 	s.values = nil
 	return out
@@ -213,6 +248,12 @@ func (s *toolBufferSet) drain() []openAIBuffer {
 // including tool_calls and role=tool continuations for the search loop.
 func openAIMessage(message Message) map[string]any {
 	out := map[string]any{"role": message.Role, "content": message.Content}
+	if len(message.ToolCalls) > 0 && message.ProviderContent != "" {
+		out["content"] = message.ProviderContent
+	}
+	if len(message.ToolCalls) > 0 && message.ReasoningContent != "" {
+		out["reasoning_content"] = message.ReasoningContent
+	}
 	if message.ToolCallID != "" {
 		out["role"] = "tool"
 		out["tool_call_id"] = message.ToolCallID
@@ -226,6 +267,44 @@ func openAIMessage(message Message) map[string]any {
 		out["tool_calls"] = calls
 	}
 	return out
+}
+
+type inlineThinkingFilter struct {
+	pending  string
+	thinking bool
+}
+
+func (f *inlineThinkingFilter) add(delta string) string {
+	f.pending += delta
+	var visible strings.Builder
+	for f.pending != "" {
+		if f.thinking {
+			at := strings.Index(f.pending, "</think>")
+			if at < 0 {
+				return visible.String()
+			}
+			f.pending = f.pending[at+len("</think>"):]
+			f.thinking = false
+			continue
+		}
+		at := strings.Index(f.pending, "<think>")
+		if at >= 0 {
+			visible.WriteString(f.pending[:at])
+			f.pending = f.pending[at+len("<think>"):]
+			f.thinking = true
+			continue
+		}
+		keep := 0
+		for n := 1; n < len("<think>") && n <= len(f.pending); n++ {
+			if strings.HasSuffix(f.pending, "<think>"[:n]) {
+				keep = n
+			}
+		}
+		visible.WriteString(f.pending[:len(f.pending)-keep])
+		f.pending = f.pending[len(f.pending)-keep:]
+		break
+	}
+	return visible.String()
 }
 
 // anthropicMessage maps one gateway message to the anthropic messages shape,
@@ -256,8 +335,16 @@ func anthropicMessage(message Message) map[string]any {
 
 func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, emit func(Event)) error {
 	var messages []map[string]any
+	previousTool := false
 	for _, message := range in.Messages {
-		messages = append(messages, anthropicMessage(message))
+		mapped := anthropicMessage(message)
+		if message.ToolCallID != "" && previousTool && len(messages) > 0 {
+			last := messages[len(messages)-1]
+			last["content"] = append(last["content"].([]map[string]any), mapped["content"].([]map[string]any)...)
+		} else {
+			messages = append(messages, mapped)
+		}
+		previousTool = message.ToolCallID != ""
 	}
 	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": 8192}
 	// Merely offering tools must not change the configured thinking channel.
@@ -273,6 +360,12 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": 2048}
 		body["max_tokens"] = 10240
 	}
+	if in.MaxOutputTokens > 0 {
+		body["max_tokens"] = in.MaxOutputTokens
+		if p.Thinking && replayableThinking {
+			body["max_tokens"] = in.MaxOutputTokens + 2048
+		}
+	}
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
 		for _, tool := range in.Tools {
@@ -280,7 +373,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 		body["tools"] = tools
 	}
-	var toolName, providerID, arguments string
+	var toolBuffers toolBufferSet
 	blockTypes := map[int]string{}
 	thinkingBlocks := map[int]map[string]any{}
 	// shape records the block/delta type fingerprint of this provider stream.
@@ -294,10 +387,11 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			Type         string `json:"type"`
 			Index        int    `json:"index"`
 			ContentBlock struct {
-				Type     string `json:"type"`
-				ID       string `json:"id"`
-				Name     string `json:"name"`
-				Thinking string `json:"thinking"`
+				Type     string          `json:"type"`
+				ID       string          `json:"id"`
+				Name     string          `json:"name"`
+				Thinking string          `json:"thinking"`
+				Input    json.RawMessage `json:"input"`
 			} `json:"content_block"`
 			Delta struct {
 				Type        string `json:"type"`
@@ -340,7 +434,10 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			}
 			shape.blockStart(event.Index, event.ContentBlock.Type)
 			if event.ContentBlock.Type == "tool_use" {
-				toolName, providerID, arguments = event.ContentBlock.Name, event.ContentBlock.ID, ""
+				toolBuffers.add(event.Index, event.ContentBlock.ID, event.ContentBlock.Name, "")
+				if len(event.ContentBlock.Input) > 0 && string(event.ContentBlock.Input) != "{}" {
+					toolBuffers.add(event.Index, "", "", string(event.ContentBlock.Input))
+				}
 			} else if p.Reasoning && event.ContentBlock.Type == "thinking" && event.ContentBlock.Thinking != "" {
 				emit(Event{Type: "reasoning-summary-delta", Delta: event.ContentBlock.Thinking})
 			}
@@ -370,7 +467,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 					emit(Event{Type: "reasoning-summary-delta", Delta: event.Delta.Thinking})
 				}
 			case "input_json_delta":
-				arguments += event.Delta.PartialJSON
+				toolBuffers.add(event.Index, "", "", event.Delta.PartialJSON)
 			case "signature_delta":
 				appendThinkingField(thinkingBlocks[event.Index], "signature", event.Delta.Signature)
 			}
@@ -384,12 +481,16 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				delete(thinkingBlocks, event.Index)
 			}
 			delete(blockTypes, event.Index)
-			if toolName != "" {
+			if buffered, ok := toolBuffers.values[event.Index]; ok && buffered.name != "" {
 				var args map[string]any
-				if json.Unmarshal([]byte(arguments), &args) == nil {
-					emit(Event{Type: "tool-call-ready", ToolCall: &ToolCall{CallID: idgen.New("call"), ProviderCallID: providerID, ToolName: toolName, Arguments: args}})
+				if buffered.arguments == "" {
+					buffered.arguments = "{}"
 				}
-				toolName, providerID, arguments = "", "", ""
+				if json.Unmarshal([]byte(buffered.arguments), &args) != nil || args == nil {
+					args = map[string]any{"__invalid_arguments": true}
+				}
+				emit(Event{Type: "tool-call-ready", ToolCall: &ToolCall{CallID: idgen.New("call"), ProviderCallID: buffered.id, ToolName: buffered.name, Arguments: args}})
+				delete(toolBuffers.values, event.Index)
 			}
 		case "message_delta":
 			if event.Usage.OutputTokens > 0 {

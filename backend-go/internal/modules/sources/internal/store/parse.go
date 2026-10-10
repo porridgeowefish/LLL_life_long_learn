@@ -74,6 +74,7 @@ func (s *Store) CommitParsed(sourceID, revisionID, parser, content string, trunc
 		return source, err
 	}
 	source.Status, source.FailureCode, source.Parser = "ready", "", parser
+	source.Retrieval = nil
 	source.ExtractedBytes, source.ExtractionTruncated, source.UpdatedAt = int64(len(data)), truncated, time.Now().UTC()
 	return source, writeJSON(path, source)
 }

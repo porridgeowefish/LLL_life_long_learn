@@ -22,19 +22,16 @@ import { clearDeletedProjectClientData } from '@/features/projects/lib/projectDe
 import s from './Sidebar.module.css';
 import { ConnectionBadge } from './ConnectionBadge';
 import { UpdateNotice } from './UpdateNotice';
-import { requestShutdown } from '@/features/settings/system';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
   { to: '/', label: '主页', icon: 'zap' },
   { to: '/usage', label: 'Token 用量', icon: 'clock' },
   { to: '/preferences', label: '学习偏好', icon: 'brain' },
-  { to: '/models', label: 'API 模型', icon: 'bot' },
-  { to: '/settings', label: '统一配置', icon: 'terminal' },
+
+  { to: '/settings', label: '设置', icon: 'terminal' },
 ];
 
 export function Sidebar() {
-  const [exiting,setExiting]=useState(false);
-  const exit=async()=>{if(exiting||!window.confirm('关闭 Learn-With-AI 本地服务？'))return;setExiting(true);try{await requestShutdown();}catch(err){setExiting(false);window.alert(`关闭失败：${(err as Error).message}`);}};
   const location = useLocation();
   const navigate = useNavigate();
   const selectedProjectId = useProjectStore((state) => state.selectedProjectId);
@@ -144,7 +141,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className={s.sidebar} aria-label="应用导航"><Link to="/" className={s.brand}><img src="/app-icon.svg" alt=""/>Learn-With-AI</Link>
+    <aside className={s.sidebar} aria-label="应用导航"><Link to="/" className={s.brand}><img src="/app-icon.png" alt=""/>Learn-With-AI</Link>
       <div className={s.head}>
         <span>导航</span>
       </div>
@@ -291,7 +288,7 @@ export function Sidebar() {
           />
         )}
       </div>
-      <div className={s.foot}><UpdateNotice/><ConnectionBadge/><div className={s.utilities}><a href="https://github.com/porridgeowefish/LLL_life_long_learn" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a><button onClick={() => void exit()} disabled={exiting}>{exiting?'退出中…':'退出'}</button></div></div>
+      <div className={s.foot}><UpdateNotice/><ConnectionBadge/><div className={s.utilities}><a href="https://github.com/porridgeowefish/LLL_life_long_learn" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a></div></div>
       <Modal
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

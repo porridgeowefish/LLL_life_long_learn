@@ -2,6 +2,8 @@ module github.com/xmz14/lll
 
 go 1.26.0
 
+replace github.com/giraffesyo/pdf => ./third_party/giraffesyo-pdf
+
 require github.com/fsnotify/fsnotify v1.10.1
 
 require (
