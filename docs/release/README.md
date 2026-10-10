@@ -4,8 +4,8 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.6.0-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.6.0-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.6.1-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.6.1-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
@@ -16,7 +16,7 @@ MSI 会检测已安装版本。新版升级会显示版本与覆盖确认；取�
 
 旧版自定义 EXE 安装会单独显示迁移确认。确认后先卸载旧应用文件，再安装 MSI 版本；学习数据保留。这个首次 EXE → MSI 迁移是单向的，新安装若失败需重新运行 MSI。后续 MSI → MSI 升级由 Windows Installer 提供事务回滚。升级前请关闭旧应用。
 
-Windows 默认程序目录为 %LOCALAPPDATA%/Programs/learn-with-ai，默认学习数据目录为 %LOCALAPPDATA%/learn-with-ai，两者分离。可从系统「已安装的应用」或 MSI 维护界面卸载，学习项目、笔记、资料和 API 配置保留。
+Windows 程序固定安装到 %LOCALAPPDATA%/Programs/learn-with-ai，安装向导不提供目录选择，命令行 INSTALLFOLDER 也无法覆盖此目录。旧版曾安装到其他目录的应用升级后迁入固定目录；旧目录中的非程序文件保留。默认学习数据目录仍为 %LOCALAPPDATA%/learn-with-ai，与程序分离。可从系统「已安装的应用」或 MSI 维护界面卸载，学习项目、笔记、资料和 API 配置保留。
 
 Windows 应用使用 Microsoft Edge WebView2 Runtime。MSI 会检查该组件；若未安装，会显示明确提示。可从微软 [WebView2 官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。缺少组件时不会转而打开普通浏览器冒充桌面应用。
 
@@ -34,7 +34,7 @@ macOS 默认数据为 ~/Library/Application Support/learn-with-ai；Linux 为 $X
 
 仓库 Start-LLL / npm run build / npm start 是快速源码验证工具，保留在仓库中，不进入公开 MSI。开发二进制统一生成到 dist/dev/，发布包位于 dist/releases/，dist/ 根目录不保留 EXE。npm run build:desktop 生成带图标的本机原生开发应用；只有显式执行 npm run desktop:install 才创建原生开发快捷方式，目标是 exe。安装版 MSI 只管理一个正式桌面入口。
 
-使用 node tools/release/build-release.js --version 0.6.0 --installers 在 Windows 构建全部现有目标；Windows MSI 使用固定版本 WiX，构建工具缓存放在 .artifacts/tooling/，不会作为应用运行依赖分发。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
+使用 node tools/release/build-release.js --version 0.6.1 --installers 在 Windows 构建全部现有目标；Windows MSI 使用固定版本 WiX，构建工具缓存放在 .artifacts/tooling/，不会作为应用运行依赖分发。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
 
 GitHub Actions 在 v 开头的标签或勾选 publish 的手动运行中发布 Release（全部平台冒烟测试通过后才发布）；不勾选时只生成构件。本地包附带 SHA256SUMS 与 THIRD_PARTY_NOTICES.txt。当前构件未进行代码签名。
 

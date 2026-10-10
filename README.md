@@ -58,7 +58,7 @@
 ### Windows 安装
 
 1. 双击 `learn-with-ai-<版本>-windows-amd64.msi`。
-2. 按向导阅读许可协议，选择安装目录（默认 `%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户，无需管理员权限）。
+2. 按向导阅读许可协议，安装到固定目录（`%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户，无需管理员权限，不能修改安装地址）。
 3. 完成后从**桌面**或**开始菜单**打开 **Learn-With-AI**。
 
 > 应用依赖 Microsoft Edge **WebView2 Runtime**（Windows 11 与大多数 Windows 10 已自带）。缺少时安装程序会明确提示，可从 [微软官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。当前安装包尚未代码签名，SmartScreen 提示时选择“更多信息 → 仍要运行”。
@@ -146,7 +146,7 @@ npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 | `npm run run` | 直接 `go run` 后端 |
 | `npm run build:desktop` | Windows：构建带图标的原生桌面开发版 |
 | `npm run stop` | 停止本地服务 |
-| `node tools/release/build-release.js --version 0.6.0 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
+| `node tools/release/build-release.js --version 0.6.1 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
 
 源码运行时数据默认写入仓库内的 `workspace/`（已被 Git 忽略），可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
 

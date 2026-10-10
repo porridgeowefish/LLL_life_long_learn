@@ -42,6 +42,12 @@ function main(input) {
     assert.match(metadata, /Dialog:/);
     assert.match(metadata, /Upgrade:/);
     assert.match(metadata, /Media:1/);
+    const dialogs = ps(
+      `$i=New-Object -ComObject WindowsInstaller.Installer;$d=$i.OpenDatabase('${path.resolve(input).replaceAll("'", "''")}',0);$v=$d.OpenView('SELECT Dialog FROM Dialog');$v.Execute();while($r=$v.Fetch()){Write-Output $r.StringData(1)}`,
+    );
+    assert(!/InstallDirDlg|BrowseDlg/.test(dialogs), "MSI still offers directory selection");
+    assert.match(dialogs, /WelcomeEulaDlg/);
+    assert.match(dialogs, /UpgradeConfirmDlg/);
     const match = path
       .basename(input)
       .match(/learn-with-ai-(\d+\.\d+\.\d+)-windows-(amd64|arm64)\.msi/);
@@ -52,21 +58,24 @@ function main(input) {
       `learn-with-ai-${match[1]}-windows-${match[2]}`,
     );
     assert(fs.existsSync(payload));
-    const folder = path.join(scratch, "installed");
-    const props = [`INSTALLFOLDER=${folder}`];
+    const folder = path.join(process.env.LOCALAPPDATA, "Programs", identity);
+    const override = path.join(scratch, "ignored-override");
+    const props = [`INSTALLFOLDER=${override}`];
     const base = buildMsi(payload, scratch, "0.5.0", match[2], { identity })[0];
     const next = buildMsi(payload, scratch, "0.5.1", match[2], { identity })[0];
     install(base, ["/i", ...props], path.join(scratch, "install.log"));
     installed = base;
     assert(fs.existsSync(path.join(folder, "learn-with-ai.exe")));
+    assert(!fs.existsSync(override), "Command-line folder override was accepted");
     fs.writeFileSync(path.join(folder, "learner-note.md"), "preserve");
     const original = fs.readFileSync(path.join(folder, "README.md"));
     fs.unlinkSync(path.join(folder, "README.md"));
-    install(base, ["/fa"], path.join(scratch, "repair.log"));
+    install(base, ["/fa", ...props], path.join(scratch, "repair.log"));
     assert.deepEqual(fs.readFileSync(path.join(folder, "README.md")), original);
     install(base, ["/i", ...props], path.join(scratch, "reinstall.log"));
     install(next, ["/i", ...props], path.join(scratch, "upgrade.log"));
     installed = next;
+    assert(!fs.existsSync(override), "Upgrade or repair accepted folder override");
     const downgrade = spawnSync(
       "msiexec.exe",
       [
@@ -133,7 +142,7 @@ function main(input) {
       fs.readFileSync(path.join(folder, "learner-note.md"), "utf8"),
       "preserve",
     );
-    // Without an explicit folder the MSI follows %LOCALAPPDATA%, beside learner data.
+    // Without an override the same fixed folder is used, beside learner data.
     install(base, ["/i"], path.join(scratch, "default-install.log"));
     installed = base;
     const defaultFolder = path.join(process.env.LOCALAPPDATA, "Programs", identity);
