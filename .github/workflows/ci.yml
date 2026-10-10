@@ -17,7 +17,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.25'
+          go-version: '1.26'
           cache: false
 
       - uses: actions/setup-node@v4
@@ -27,8 +27,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
 
-      - name: Repository quality gate (full)
-        run: npm run check:full
+      # Automated suites are local-only since v0.5.0, so CI runs the fast gate
+      # (format, vet, build, architecture, published tests, lint) plus a
+      # production frontend build. Maintainers run check:full locally.
+      - name: Repository quality gate (fast)
+        run: npm run check:fast
+
+      - name: Frontend production build
+        run: npm --prefix frontend run build
 
       - name: Upload quality evidence
         if: always()

@@ -1,8 +1,8 @@
-# AGENTS.md: LLL Agent Entry
+# AGENTS.md: learn-with-ai Agent Entry
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-18
 Source of truth: lightweight entry point for all AI coding agents.
 
 ## 0. Learning Runtime Boundary
@@ -52,7 +52,7 @@ Do not preload all delivered foundations. Use
 `docs/01-iterations/foundations/README.md` to select only the earlier slice whose
 implemented capability is relevant to the task.
 
-**LESSONS_LEARNED.md** contains 13 hard-won rules (Claude CLI modes, React
+**LESSONS_LEARNED.md** contains the numbered hard-won rules, with the live count stated in its own footer (Claude CLI modes, React
 state sync, math preprocessing, etc.). Every agent MUST read it before
 touching the launcher, the frontend, or any charter/primitive file.
 
@@ -65,6 +65,15 @@ skills (e.g. superpowers brainstorming/writing-plans) MUST detect this system
 and write INTO it — plans under `iteration-NN-<name>/plans/`, design folded
 into the iteration's own docs — and never create a parallel `docs/superpowers/`
 layer.
+
+### Publication boundary (since v0.5.0)
+
+Engineering docs under `docs/` (except `docs/release/` and `docs/images/`) and
+automated tests (`*_test.go`, `*.test.*`, `*.spec.*`, `tests/`, `frontend/e2e/`)
+are maintained locally and are not published. Keep writing them — they remain
+the delivery source of truth — but never `git add -f` new ones. Files tracked
+before v0.5.0 stay tracked. Public CI therefore runs `check:fast`; run
+`check:full` locally before release.
 
 ## 2. Team Principles
 
@@ -115,13 +124,13 @@ long-task refresh
 
 The frontend is a Vite + React 18 + TypeScript SPA under `frontend/`. The
 Go binary serves `frontend/dist/` in production with an SPA fallback
-(see `backend-go/internal/server/router.go`). Read `frontend/README.md`
+(see `backend-go/internal/transport/httpserver/router.go`). Read `frontend/README.md`
 before touching any UI code.
 
 Quick reference:
 
 ```text
-npm run dev        # Vite on :5173, proxies /api /files /events to Go :8787
+npm run dev        # Vite on :5173, proxies /api /files to Go :8787
 npm run build      # emits frontend/dist/
 npm run test       # Vitest run
 npm run test:watch # Vitest watch
@@ -130,7 +139,7 @@ npm run test:watch # Vitest watch
 State management boundary:
 
 ```text
-TanStack Query  — server state (projects, agents, sessions, memory, health)
+TanStack Query  — server state (projects, agents, sessions, preferences, folders, health)
 Zustand slices  — client state (ui, project, session, connection)
 ```
 

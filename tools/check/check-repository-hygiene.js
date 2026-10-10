@@ -23,7 +23,19 @@ if (tracked.status !== 0 || ignoredTracked.status !== 0) {
   process.exit(1);
 }
 
-const violations = ignoredTracked.stdout.split('\0').filter(Boolean);
+// Engineering docs and tests became local-only in v0.5.0 (see .gitignore).
+// Files tracked before that switch may stay tracked and keep being updated.
+const localOnlyLegacy = [
+  /^docs\//,
+  /^tests\//,
+  /^frontend\/e2e\//,
+  /_test\.go$/,
+  /\.(?:test|spec)\.(?:js|ts|tsx)$/,
+];
+const violations = ignoredTracked.stdout
+  .split('\0')
+  .filter(Boolean)
+  .filter(file => !localOnlyLegacy.some(pattern => pattern.test(file)));
 
 if (violations.length > 0) {
   console.error('Tracked paths must not match .gitignore:');

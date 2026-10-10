@@ -1,4 +1,4 @@
-# Contributing To LifeLongLearn
+# Contributing to Learn-With-AI
 
 Thanks for helping improve this local learning lab.
 
@@ -11,10 +11,15 @@ behavior, actual behavior, and screenshots or logs with secrets removed.
 ## Submit a change
 
 1. Fork the repository and create a focused branch.
-2. Read `AGENTS.md`, `docs/INDEX.md`, and the active iteration contract.
-3. Keep code, API contract, tests, and delivery notes aligned in the same PR.
-4. Run `go test ./backend-go/...`, `npm test` and `npm run build` in `frontend/`.
-5. Open a Pull Request explaining the learner-facing outcome and validation.
+2. Read `AGENTS.md` and `README.md`.
+3. Run `npm run check:fast` and `npm run build` before opening the PR.
+4. Open a Pull Request explaining the learner-facing outcome and how you
+   validated it (commands run, screenshots for UI changes).
+
+Since v0.5.0 the maintainer keeps engineering documents (`docs/`, except the
+release bundle and README images) and automated test suites in the local
+working copy only; new files under those paths are ignored by Git. Describe
+design notes and validation in the PR instead of adding them to the repository.
 
 Do not commit `config.local.json`, API keys, generated run data, or private
 learning projects. `npm run check:repo` verifies that every tracked path is

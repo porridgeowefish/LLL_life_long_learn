@@ -45,3 +45,23 @@ frontend/playwright-report/
 .idea/
 # Workspace-global learner preferences are local user data.
 /preferences.md
+
+# Temporary fixture-generation tooling is local-only.
+/.tmp/
+
+# Local-only engineering docs and automated tests (since v0.5.0).
+# Product/architecture/iteration documents and test suites now stay in the
+# maintainer's working copy. Paths that were already tracked remain tracked;
+# new ones are not published. README, LICENSE, README screenshots and the
+# docs bundled into release packages stay public.
+/docs/*
+!/docs/release/
+!/docs/images/
+/tests/
+/frontend/e2e/
+*_test.go
+*.test.js
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx

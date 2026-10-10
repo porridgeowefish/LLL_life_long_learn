@@ -1,0 +1,142 @@
+name: Installable release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Local artifact version (does not publish a Release)
+        required: true
+        default: '0.5.0'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            targets: windows/amd64,windows/arm64
+          - os: macos-latest
+            platform: darwin
+            targets: darwin/amd64,darwin/arm64
+          - os: ubuntu-latest
+            platform: linux
+            targets: linux/amd64,linux/arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-dotnet@v4
+        if: runner.os == 'Windows'
+        with:
+          dotnet-version: '8.0.x'
+      - name: Install frontend
+        run: npm --prefix frontend ci
+      # Unit tests are local-only since v0.5.0; this compiles the packaging
+      # tools and runs whichever tests are published. Installed-package
+      # smokes below are the release gate.
+      - name: Test portable infrastructure
+        run: |
+          go test -count=1 ./tools/installer ./tools/release/legacy-migrate ./backend-go/internal/platform/... ./backend-go/internal/modules/teacher/... ./backend-go/internal/modules/assets/... ./backend-go/internal/modules/assistant/internal/runtime ./backend-go/internal/modules/assistant/internal/launch
+      - name: Build, smoke and archive
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+          RELEASE_TARGETS: ${{ matrix.targets }}
+        run: |
+          RELEASE_VERSION="${RELEASE_VERSION#v}"
+          node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" --installers
+      - name: Windows installation, startup and uninstall smoke
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
+          node tools/release/msi-smoke.js "dist/releases/$version/learn-with-ai-$version-windows-amd64.msi"
+      - name: Validate Debian package manifests
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for package in dist/releases/*/*.deb; do
+            dpkg-deb --info "$package"
+            dpkg-deb --contents "$package"
+          done
+      - name: Linux user installation and Debian runtime smoke
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          node tools/release/linux-installer-smoke.js "dist/releases/$version/learn-with-ai-$version-linux-amd64-install.tar.gz"
+          sudo dpkg --install "dist/releases/$version/learn-with-ai-$version-linux-amd64.deb"
+          node tools/release/smoke.js /opt/learn-with-ai/learn-with-ai
+          node tools/release/source-import-smoke.js /opt/learn-with-ai/learn-with-ai
+          sudo dpkg --remove learn-with-ai
+      - name: macOS installed application smoke
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          version="${RELEASE_VERSION#v}"
+          architecture=arm64
+          if [ "$(uname -m)" = x86_64 ]; then architecture=amd64; fi
+          sudo installer -pkg "dist/releases/$version/learn-with-ai-$version-darwin-$architecture.pkg" -target /
+          node tools/release/smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
+          node tools/release/source-import-smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
+          # The ephemeral runner owns this package installation; no learner data is deleted.
+          sudo rm -rf /Applications/learn-with-ai.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: learn-with-ai-${{ matrix.platform }}
+          path: |
+            dist/releases/*/*.zip
+            dist/releases/*/*.tar.gz
+            dist/releases/*/*.msi
+            dist/releases/*/*.deb
+            dist/releases/*/*.pkg
+            dist/releases/*/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: bundle
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: learn-with-ai-*
+          path: packages
+      - name: Collect archives and checksums
+        shell: bash
+        run: |
+          mkdir release
+          find packages -type f \( -name '*.zip' -o -name '*.tar.gz' -o -name '*.msi' -o -name '*.deb' -o -name '*.pkg' \) -exec cp {} release/ \;
+          find packages -type f -name SHA256SUMS -exec cat {} \; | sort > release/SHA256SUMS
+          cd release
+          sha256sum --check SHA256SUMS
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release/* --verify-tag --generate-notes --title "$RELEASE_TAG"
+          fi
+
