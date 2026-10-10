@@ -2,7 +2,8 @@ const fs = require("node:fs"),
   os = require("node:os"),
   path = require("node:path"),
   assert = require("node:assert/strict");
-const { spawnSync } = require("node:child_process");
+const { spawn, spawnSync } = require("node:child_process");
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 const { buildMsi } = require("./windows-msi");
 const { repoRoot } = require("./package-layout");
 function ps(script) {
@@ -103,6 +104,19 @@ function main(input) {
     const evidence = JSON.parse(fs.readFileSync(nativeResult, "utf8"));
     assert.equal(evidence.ok, true);
     assert.equal(evidence.hasWindowIcon, true);
+    // A second launch must hand off to the running window and exit cleanly.
+    const single = path.join(scratch, "single-instance");
+    const first = spawn(path.join(folder, "learn-with-ai.exe"), ["--workspace", single], { cwd: scratch, stdio: "ignore" });
+    try {
+      const record = path.join(single, ".learn-with-ai.window");
+      for (let i = 0; i < 300 && !fs.existsSync(record); i++) sleep(100);
+      assert(fs.existsSync(record), "Running native window did not register itself");
+      const second = spawnSync(path.join(folder, "learn-with-ai.exe"), ["--workspace", single], { cwd: scratch, timeout: 20000 });
+      assert.equal(second.status, 0, "Second launch did not hand off to the running window");
+    } finally {
+      spawnSync("taskkill.exe", ["/PID", String(first.pid), "/F"], { windowsHide: true });
+      sleep(1500);
+    }
     const sourceImport = spawnSync(
       process.execPath,
       [

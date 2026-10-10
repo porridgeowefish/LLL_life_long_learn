@@ -56,7 +56,7 @@ func Start(options Options) (*Engine, error) {
 	}
 	instance, err := paths.AcquireWorkspaceInstance(paths.WORKSPACE)
 	if err != nil {
-		return nil, err
+		return nil, &BusyError{Workspace: paths.WORKSPACE, Err: err}
 	}
 	// A desktop owns a private IPv4 listener, even when a maintainer's server is running.
 	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(options.Port)))
@@ -74,6 +74,20 @@ func Start(options Options) (*Engine, error) {
 	go func() { _ = engine.server.Serve(listener) }()
 	return engine, nil
 }
+
+// BusyError reports that another process already owns the resolved workspace.
+// Workspace is the exact path the owner registered, so a second launch can
+// find and focus the running window instead of failing.
+type BusyError struct {
+	Workspace string
+	Err       error
+}
+
+func (e *BusyError) Error() string { return e.Err.Error() }
+func (e *BusyError) Unwrap() error { return e.Err }
+
+// windowRecordName is written by the running native window: "<hwnd> <pid>".
+const windowRecordName = ".learn-with-ai.window"
 
 func (engine *Engine) Close() {
 	engine.once.Do(func() {

@@ -2,6 +2,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -32,17 +33,20 @@ func run() int {
 	}
 	engine, err := desktop.Start(desktop.Options{Workspace: *workspace, Config: *config, Port: *port})
 	if err != nil {
-		if !*headless && *workspace != "" && desktop.FocusExisting(*workspace) {
-			return 0
-		}
-		if !*headless && *workspace == "" { // Resolve the same per-user root used by Start without attaching to a server.
-			if desktop.FocusExisting(desktop.DefaultWorkspace()) {
+		fmt.Fprintln(os.Stderr, err)
+		var busy *desktop.BusyError
+		if errors.As(err, &busy) {
+			// A second launch brings the running window forward instead of failing.
+			if !*headless && *smoke == "" && desktop.FocusExisting(busy.Workspace) {
 				return 0
 			}
+			if !*headless {
+				desktop.ShowError("Learn-With-AI 已经在运行，但没有找到它的窗口。\n\n学习数据正被另一个 Learn-With-AI 程序使用（例如开发版服务）。请先关闭那个程序，再重新打开。\n\n数据目录：" + busy.Workspace)
+			}
+			return 1
 		}
-		fmt.Fprintln(os.Stderr, err)
 		if !*headless {
-			desktop.ShowError(err.Error())
+			desktop.ShowError("Learn-With-AI 启动失败：\n\n" + err.Error())
 		}
 		return 1
 	}

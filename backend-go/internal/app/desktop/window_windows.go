@@ -30,28 +30,59 @@ func windowProperty(workspace string) *uint16 {
 	return windows.StringToUTF16Ptr(fmt.Sprintf("learn-with-ai.workspace.%x", sum))
 }
 
-// FocusExisting only touches a window tagged by this native desktop process.
-// The workspace file lock remains the authoritative single-writer boundary.
+// FocusExisting brings the running native window for workspace to the front.
+// The running window records "<hwnd> <pid>" in the workspace; the record is
+// trusted only while that window still exists and belongs to that process.
+// Windows tagged with the legacy workspace property remain a fallback.
 func FocusExisting(workspace string) bool {
+	record := filepath.Join(workspace, windowRecordName)
 	property := windowProperty(workspace)
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
+		if data, err := os.ReadFile(record); err == nil {
+			var hwnd uintptr
+			var pid uint32
+			if _, err := fmt.Sscanf(string(data), "%d %d", &hwnd, &pid); err == nil && ownsWindow(hwnd, pid) {
+				bringToFront(hwnd)
+				return true
+			}
+		}
 		var hwnd uintptr
 		for {
 			hwnd, _, _ = user32.NewProc("FindWindowExW").Call(0, hwnd, uintptr(unsafe.Pointer(windows.StringToUTF16Ptr("webview"))), 0)
 			if hwnd == 0 {
 				break
 			}
-			tag, _, _ := user32.NewProc("GetPropW").Call(hwnd, uintptr(unsafe.Pointer(property)))
-			if tag != 0 {
-				user32.NewProc("ShowWindow").Call(hwnd, 9)
-				user32.NewProc("SetForegroundWindow").Call(hwnd)
+			if tag, _, _ := user32.NewProc("GetPropW").Call(hwnd, uintptr(unsafe.Pointer(property))); tag != 0 {
+				bringToFront(hwnd)
 				return true
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
 	return false
+}
+
+func ownsWindow(hwnd uintptr, pid uint32) bool {
+	if hwnd == 0 || pid == 0 {
+		return false
+	}
+	if ok, _, _ := user32.NewProc("IsWindow").Call(hwnd); ok == 0 {
+		return false
+	}
+	var owner uint32
+	user32.NewProc("GetWindowThreadProcessId").Call(hwnd, uintptr(unsafe.Pointer(&owner)))
+	return owner == pid
+}
+
+func bringToFront(hwnd uintptr) {
+	const swRestore, swShow = 9, 5
+	if iconic, _, _ := user32.NewProc("IsIconic").Call(hwnd); iconic != 0 {
+		user32.NewProc("ShowWindow").Call(hwnd, swRestore)
+	} else {
+		user32.NewProc("ShowWindow").Call(hwnd, swShow)
+	}
+	user32.NewProc("SetForegroundWindow").Call(hwnd)
 }
 
 func ShowError(message string) {
@@ -88,6 +119,11 @@ func RunWindow(engine *Engine, smokeResult string) error {
 	user32.NewProc("SetPropW").Call(uintptr(view.Window()), uintptr(unsafe.Pointer(property)), 1)
 	defer user32.NewProc("RemovePropW").Call(uintptr(view.Window()), uintptr(unsafe.Pointer(property)))
 	applyWindowIcon(uintptr(view.Window()))
+	// Let a second launch find this window; removed when the window closes.
+	record := filepath.Join(engine.Workspace, windowRecordName)
+	if err := os.WriteFile(record, []byte(fmt.Sprintf("%d %d", uintptr(view.Window()), os.Getpid())), 0600); err == nil {
+		defer os.Remove(record)
+	}
 	view.SetSize(min(int(900*scale), int(width)), min(int(600*scale), int(height)), webview.HintMin)
 	if err := view.Bind("lllOpenExternal", func(raw string) error {
 		if !AllowedExternalURL(raw) {

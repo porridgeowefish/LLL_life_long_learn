@@ -138,7 +138,7 @@ npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 | `npm run run` | 直接 `go run` 后端 |
 | `npm run build:desktop` | Windows：构建带图标的原生桌面开发版 |
 | `npm run stop` | 停止本地服务 |
-| `node tools/release/build-release.js --version 0.5.0 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
+| `node tools/release/build-release.js --version 0.5.1 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
 
 源码运行时数据默认写入仓库内的 `workspace/`（已被 Git 忽略），可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
 
