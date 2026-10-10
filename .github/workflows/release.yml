@@ -6,9 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Local artifact version (does not publish a Release)
+        description: Release version (numeric major.minor.patch)
         required: true
         default: '0.5.0'
+      publish:
+        description: Publish GitHub Release v<version> from this commit after all smokes pass
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -110,12 +114,15 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
     needs: bundle
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/release-notes
       - uses: actions/download-artifact@v4
         with:
           pattern: learn-with-ai-*
@@ -128,15 +135,17 @@ jobs:
           find packages -type f -name SHA256SUMS -exec cat {} \; | sort > release/SHA256SUMS
           cd release
           sha256sum --check SHA256SUMS
-      - name: Publish tagged release
+      - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', inputs.version) }}
         run: |
+          notes=".github/release-notes/${RELEASE_TAG}.md"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" release/* --clobber
+          elif [ -f "$notes" ]; then
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --notes-file "$notes" --latest
           else
-            gh release create "$RELEASE_TAG" release/* --verify-tag --generate-notes --title "$RELEASE_TAG"
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --title "Learn-With-AI ${RELEASE_TAG#v}" --generate-notes --latest
           fi
-
