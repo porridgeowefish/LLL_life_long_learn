@@ -48,7 +48,7 @@ jobs:
       # smokes below are the release gate.
       - name: Test portable infrastructure
         run: |
-          go test -count=1 ./tools/installer ./tools/release/legacy-migrate ./backend-go/internal/platform/... ./backend-go/internal/modules/teacher/... ./backend-go/internal/modules/assets/... ./backend-go/internal/modules/assistant/internal/runtime ./backend-go/internal/modules/assistant/internal/launch
+          node tools/release/ci-run.js -- go test -count=1 ./tools/installer ./tools/release/legacy-migrate ./backend-go/internal/platform/... ./backend-go/internal/modules/teacher/... ./backend-go/internal/modules/assets/... ./backend-go/internal/modules/assistant/internal/runtime ./backend-go/internal/modules/assistant/internal/launch
       - name: Build, smoke and archive
         shell: bash
         env:
@@ -56,13 +56,13 @@ jobs:
           RELEASE_TARGETS: ${{ matrix.targets }}
         run: |
           RELEASE_VERSION="${RELEASE_VERSION#v}"
-          node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" --installers
+          node tools/release/ci-run.js -- node tools/release/build-release.js --version "$RELEASE_VERSION" --targets "$RELEASE_TARGETS" --installers
       - name: Windows installation, startup and uninstall smoke
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = '${{ inputs.version || github.ref_name }}'.TrimStart('v')
-          node tools/release/msi-smoke.js "dist/releases/$version/learn-with-ai-$version-windows-amd64.msi"
+          node tools/release/ci-run.js --temp-logs learn-msi-smoke- -- node tools/release/msi-smoke.js "dist/releases/$version/learn-with-ai-$version-windows-amd64.msi"
       - name: Validate Debian package manifests
         if: runner.os == 'Linux'
         shell: bash
@@ -78,10 +78,10 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           version="${RELEASE_VERSION#v}"
-          node tools/release/linux-installer-smoke.js "dist/releases/$version/learn-with-ai-$version-linux-amd64-install.tar.gz"
+          node tools/release/ci-run.js -- node tools/release/linux-installer-smoke.js "dist/releases/$version/learn-with-ai-$version-linux-amd64-install.tar.gz"
           sudo dpkg --install "dist/releases/$version/learn-with-ai-$version-linux-amd64.deb"
-          node tools/release/smoke.js /opt/learn-with-ai/learn-with-ai
-          node tools/release/source-import-smoke.js /opt/learn-with-ai/learn-with-ai
+          node tools/release/ci-run.js -- node tools/release/smoke.js /opt/learn-with-ai/learn-with-ai
+          node tools/release/ci-run.js -- node tools/release/source-import-smoke.js /opt/learn-with-ai/learn-with-ai
           sudo dpkg --remove learn-with-ai
       - name: macOS installed application smoke
         if: runner.os == 'macOS'
@@ -93,8 +93,8 @@ jobs:
           architecture=arm64
           if [ "$(uname -m)" = x86_64 ]; then architecture=amd64; fi
           sudo installer -pkg "dist/releases/$version/learn-with-ai-$version-darwin-$architecture.pkg" -target /
-          node tools/release/smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
-          node tools/release/source-import-smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
+          node tools/release/ci-run.js -- node tools/release/smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
+          node tools/release/ci-run.js -- node tools/release/source-import-smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
           # The ephemeral runner owns this package installation; no learner data is deleted.
           sudo rm -rf /Applications/learn-with-ai.app
       - uses: actions/upload-artifact@v4

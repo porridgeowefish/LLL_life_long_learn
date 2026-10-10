@@ -30,7 +30,9 @@ func TestDefaultsResolveAndValidate(t *testing.T) {
 }
 
 func TestSectionedShapeLoads(t *testing.T) {
-	path := writeConfig(t, `{
+	// Absolute on every OS; JSON-safe because ToSlash removes backslashes.
+	root := filepath.ToSlash(filepath.Join(t.TempDir(), "ws"))
+	path := writeConfig(t, strings.ReplaceAll(`{
   "server": {"host": "0.0.0.0", "port": 9000},
   "workspace": {"root": "D:/tmp/ws"},
   "ai": {
@@ -42,7 +44,7 @@ func TestSectionedShapeLoads(t *testing.T) {
   "assistant": {"runtime": "codex", "maxConcurrent": 3, "maxConcurrentPerProject": 1, "bins": {"codex": "cx"}},
   "image": {"enabled": true, "baseURL": "https://img", "apiKeyEnv": "LLL_IMAGE_API_KEY", "model": "gpt-image-2", "pythonBin": "python3"},
   "ui": {"theme": "night-ink"}
-}`)
+}`, "D:/tmp/ws", root))
 	cfg, prov, err := Load(Options{Path: path})
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +52,7 @@ func TestSectionedShapeLoads(t *testing.T) {
 	if cfg.Server.Host != "0.0.0.0" || cfg.Server.Port != 9000 {
 		t.Fatalf("server: %+v", cfg.Server)
 	}
-	if cfg.Workspace.Root != "D:/tmp/ws" {
+	if cfg.Workspace.Root != root {
 		t.Fatalf("workspace: %+v", cfg.Workspace)
 	}
 	if cfg.AI.DefaultProvider != "primary" || cfg.AI.SearchEngine != "bing" || len(cfg.AI.Providers) != 1 || cfg.AI.Bindings["teacher"].Model != "gpt" {
