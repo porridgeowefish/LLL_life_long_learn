@@ -1,119 +1,177 @@
+<div align="center">
 
-# LLL（荔枝读书）
+<img src="frontend/public/app-icon.svg" width="96" alt="Learn-With-AI" />
 
-LLL 是一个**本地优先的教师—助教型 AI 学习工作台**。它不再先生成一套固定教程再让用户阅读，而是让 API 教师持续和学习者对话，并把讨论中形成的理解异步沉淀为可编辑、可追溯的学习资产。
+# Learn-With-AI
 
-## 当前产品形态
+**本地优先的 AI 学习工作台：和 AI 教师对话，把理解沉淀成自己的复习稿、练习题和笔记。**
 
-### 教师：同步教学对话
+*A local-first AI learning workbench — learn by talking with an AI teacher, keep what you understood.*
 
-每个对话对应一个学习单元；对话先发生，单元和资产随学习过程逐渐形成。教师默认使用引导、澄清、验证、沉淀、复盘五种柔性教学动作，但学习者可以自然跳转话题，不受固定流程约束。
+[![Release](https://img.shields.io/github/v/release/porridgeowefish/LLL_life_long_learn?label=release&color=4f6b55)](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)
+[![CI](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-c9a35c)](./LICENSE)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6c746b)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 
-教师支持流式回复、可折叠的思考摘要、Markdown、LaTeX、Mermaid、安全 SVG 与图片展示。流式阶段按批次更新 Markdown，Mermaid 只在消息完成后渲染，避免不完整语法造成页面卡顿和抖动。长对话首次只读取最近 40 条消息，旧内容按需加载，助教或资料事件不会触发整段对话重渲染。模型与 Provider 可在独立的 API 模型页面统一配置，并能在对话框中随时切换。
+[下载安装](#-下载安装) · [使用流程](#-使用流程) · [从源码构建](#-从源码构建) · [常见问题](#-常见问题)
 
-### 助教：异步完成重活
+<img src="docs/images/teacher.png" alt="Learn-With-AI 教师对话界面" width="100%" />
 
-当任务涉及资料解析、深入调研、运行实验、生成图表、制作报告或更新教学资产时，教师会先说明任务内容、授权资料、预期产出和学习意义；学习者明确同意后，教师通过工具把任务交给可见的 Agent CLI。
+</div>
 
-助教在隔离工作区内运行，用户可以在真实终端中查看和手动终止。稳定写出的 `result-manifest.json` 是成果交付信号，交互式终端无需退出；助教完成自验收后，Go 服务只负责把其声明的目录原子发布为学习资产，并记录可恢复的运行状态。即使页面刷新、服务重启或终端结果晚到，任务也可以恢复和幂等补提交。
+## ✨ 特性
 
-### 资产：学习过程的长期结果
+- **AI 教师对话**：围绕一个学习单元持续提问、澄清、验证；支持流式回复、Markdown、表格、代码、LaTeX、Mermaid，模型可在对话框内随时切换。
+- **资料即上下文**：导入 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，本地解析成文本，教师回答时自动引用相关片段，不经过云端解析服务。
+- **自动笔记**：每 3 个成功回合（可调）由教师模型总结一次，记录关键概念、易错点与待复习项。
+- **复习稿与练习题**：可编辑、可回溯版本，支持分页阅读、划词批注与 Ask AI；重活可交给 Claude Code / Codex 等本地 Agent CLI 作为“助教”异步完成。
+- **学习节律与用量**：首页热力图记录每日投入，Token 用量按项目统计输入与输出。
+- **本地优先**：所有项目、对话、资料和配置都是本机上的普通文件，无数据库、无账号；API Key 只保存在本地配置中。
+- **原生桌面应用**：Windows 提供标准 MSI 安装包与独立应用窗口（WebView2），支持版本检测、覆盖确认、修复与卸载。
 
-资产不是内部 JSON 或文件路径的展示，而是面向学习者渲染后的内容：
+## 📸 截图
 
-- **引入**：学习动机、范围和入口问题；
-- **正文**：讲解、讨论结论、图表和多页材料；
-- **练习**：可作答的问题及配套解析；
-- **助教成果**：论文精读、实验报告、代码、SVG、图片、网页动画等任意受控交付物。
+| 资料库：本地解析，教师可读取 | 自动笔记：每 3 轮沉淀一次 |
+| --- | --- |
+| <img src="docs/images/sources.png" alt="资料库" /> | <img src="docs/images/notes.png" alt="自动笔记" /> |
+| **API 模型：任意 OpenAI / Anthropic 兼容服务** | **Token 用量与学习投入** |
+| <img src="docs/images/api-models.png" alt="API 模型配置" /> | <img src="docs/images/usage.png" alt="Token 用量" /> |
 
-核心资产可以继续编辑。长正文沿用原有阅读器的数字分页、上一页和下一页交互，按二级标题形成页面；底层仍只维护一份 `current.md`，分页不会拆散文档契约。正文保留选中文本后批注和 Ask AI 的能力。助教成果会自动进入资产视图，不要求用户去任务日志或文件夹中寻找。
+<sub>截图使用示例项目「Go 并发编程」的演示数据。</sub>
 
-### 资料：学习依据与本地知识库
+## 📦 下载安装
 
-资料可以在教师对话或资料页面上传。原文件、元数据、解析状态和派生内容都保存在项目目录中；需要云端模型解析时会先进行明确授权。助教生成的总结、调研、实验和图表也会以同一份规范化成果同时出现在资产与资料视图，不复制底层文件。资料引用使用稳定 ID，删除、失败和恢复均有文件契约。
+前往 [**Releases**](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest) 下载与系统对应的安装包。安装包已包含前端、后端和文档解析器，无需另装 Go、Node.js、Python 或 Office。
 
-### 学科地图：导航而非强约束
+| 系统 | 安装包 | 说明 |
+| --- | --- | --- |
+| Windows 10/11 x64 | `learn-with-ai-<版本>-windows-amd64.msi` | 推荐。原生应用窗口 |
+| Windows on ARM | `learn-with-ai-<版本>-windows-arm64.msi` | 原生应用窗口 |
+| macOS | `…-darwin-<arch>.pkg` / `…-app.tar.gz` | 当前在默认浏览器中打开界面 |
+| Debian / Ubuntu | `…-linux-<arch>.deb` | `sudo apt install ./文件名.deb` |
+| 其他 Linux | `…-linux-<arch>-install.tar.gz` | 解压后运行 `./install.sh` |
 
-学科总览和学习计划仍然用于展示学科边界、章节关系与推荐路线，但不限制一次只能学习一个主题。用户从学科地图进入对话，一个对话逐渐形成一个学习单元。
+每个版本都附带 `SHA256SUMS`，可用 `Get-FileHash`（Windows）或 `sha256sum -c`（Linux/macOS）校验。
 
-![学科地图 · 学科总览](docs/images/discipline-map.png)
+### Windows 安装
 
-## 核心原则
+1. 双击 `learn-with-ai-<版本>-windows-amd64.msi`。
+2. 按向导阅读许可协议，选择安装目录（默认 `%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户，无需管理员权限）。
+3. 完成后从**桌面**或**开始菜单**打开 **Learn-With-AI**。
 
-- **教师负责教学，助教负责重活**：同步体验与异步生产边界清晰。
-- **对话是过程，资产是结果**：资产来自真实学习上下文，不由 Agent 自由发挥。
-- **路径即契约，文件即接口**：对话、任务、资料和资产均使用本地可检查的稳定目录结构。
-- **显式授权和可见执行**：助教不会静默启动；用户同意后才打开真实 CLI。
-- **本地优先、可恢复**：不引入数据库或外部消息队列，重启后从文件恢复状态。
-- **偏好由学习者维护**：工作区只保留一个 `preferences.md`；教师与助教只读，当前不允许 AI 自动编辑或推断写回。
+> 应用依赖 Microsoft Edge **WebView2 Runtime**（Windows 11 与大多数 Windows 10 已自带）。缺少时安装程序会明确提示，可从 [微软官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。当前安装包尚未代码签名，SmartScreen 提示时选择“更多信息 → 仍要运行”。
 
-架构与迭代文档见 [docs/00-product-and-architecture](docs/00-product-and-architecture/README.md) 和 [Iteration 14](docs/01-iterations/iteration-14-modular-monolith-architecture/README.md)。文档与代码冲突时，以可运行代码和当前迭代契约为准。
+### 升级与覆盖安装
 
-## 部署
+直接运行新版本 MSI 即可。安装程序会**检测已安装的版本**，弹出“确认升级或覆盖安装”对话框，确认后才替换程序文件；选择取消则不做任何修改。
 
-### 前置要求
+- 同一版本再次运行 MSI 会进入**维护模式**，可选择修复或删除；
+- 不允许用旧版本覆盖新版本（降级会被拒绝）；
+- 检测到旧版 EXE 安装时会先征求确认再迁移；
+- 学习数据始终保留。
 
-- Node.js（用于构建前端）
-- Go ≥ 1.25（用于后端）
-- 至少一个 OpenAI 兼容的 API 模型配置（用于教师与 Ask AI）
-- 可选的 Claude Code、Codex CLI 或已接入的 Agent CLI（用于异步助教任务）
+### 查看本地已安装版本
 
-### 构建与运行
+- **设置 → 应用 → 已安装的应用**，搜索 Learn-With-AI，可看到版本号；
+- 或在 PowerShell 中执行：
+
+  ```powershell
+  Get-ItemProperty HKCU:\Software\learn-with-ai\Installer | Select-Object Version, InstallLocation
+  ```
+
+### 卸载
+
+以下任一方式均可：
+
+- **设置 → 应用 → 已安装的应用 → Learn-With-AI → 卸载**；
+- 再次运行同版本 MSI，选择“删除”；
+- 命令行：`msiexec /x learn-with-ai-<版本>-windows-amd64.msi`。
+
+卸载只移除程序文件和快捷方式。学习项目、笔记、资料和 API 配置保存在 `%LOCALAPPDATA%\learn-with-ai`，不会被删除；确认不再需要后可手动删除该文件夹。
+
+## 🧭 使用流程
+
+1. **配置模型**：左侧栏进入「API 模型」，添加一个 OpenAI 兼容或 Anthropic 接口（Base URL、API Key、模型名），点击「探测连接」确认可用并保存。
+2. **新建项目**：点击侧栏「项目」旁的 `+`，为一个主题创建学习单元，例如「Go 并发编程」。
+3. **导入资料**：在项目右上角「导入资料」，上传讲义、课件或表格。解析完成后显示“教师可读取”。
+4. **和教师对话**：在「教师」标签提问。教师会结合资料讲解、给出示例，并用小问题检查你的理解。
+5. **回顾与沉淀**：在「资产」标签查看自动笔记、编辑复习稿和练习题；在复习稿中划词即可批注或向 AI 追问。
+6. **（可选）启用助教**：在「统一配置」选择已安装的 Agent CLI（Claude Code、Codex 等）。教师需要整理复习稿或练习题时会先征求你的同意，再在可见终端中执行。
+
+数据默认位置：Windows `%LOCALAPPDATA%\learn-with-ai`；macOS `~/Library/Application Support/learn-with-ai`；Linux `$XDG_DATA_HOME/learn-with-ai` 或 `~/.local/share/learn-with-ai`。
+
+## 🏗 工作原理
+
+```mermaid
+flowchart LR
+  subgraph App["Learn-With-AI（单进程）"]
+    UI["React 界面<br/>WebView2 窗口"] -- "HTTP / SSE（127.0.0.1 私有端口）" --> Go["Go 服务"]
+  end
+  Go -- "教师 · 笔记 · Ask AI" --> LLM["OpenAI / Anthropic 兼容 API"]
+  Go -- "本地解析" --> Parser["PDF · DOCX · PPTX · XLSX · CSV · MD"]
+  Go -- "征得同意后" --> CLI["本地 Agent CLI（助教）"]
+  Go <--> FS[("工作区文件<br/>项目 · 对话 · 资料 · 资产")]
+```
+
+- **后端**：Go 1.26，标准库 HTTP 服务，文件即数据库，重启后从文件恢复任务状态。
+- **前端**：Vite + React 18 + TypeScript，TanStack Query 管理服务端状态，单一 SSE 通道推送事件。
+- **桌面**：Windows 版在同一进程内启动 Go 服务并用 WebView2 打开原生窗口；关闭窗口即停止服务。同一工作区只允许一个实例。
+- **打包**：GitHub Actions 在各平台原生构建；Windows MSI 由 WiX 生成，并在发布前完成真实的安装、修复、升级、降级拒绝、启动和卸载测试。
+
+## 🛠 从源码构建
+
+前置：Go ≥ 1.26、Node.js ≥ 20。
 
 ```bash
+git clone https://github.com/porridgeowefish/LLL_life_long_learn.git
 cd LLL_life_long_learn
-npm install --prefix frontend   # 首次需安装前端依赖
-npm run build                   # 构建前端到 frontend/dist/，并编译后端到 dist/lll.exe
-npm run start                   # 运行 dist/lll.exe，生产模式托管 frontend/dist/（含 SPA fallback）
+npm install --prefix frontend
+npm run build      # 构建前端到 frontend/dist/，并编译后端到 dist/
+npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 ```
 
-浏览器打开 `http://localhost:8787/`；健康检查 `GET http://localhost:8787/api/health` 返回 200 即代表服务正常。
+| 命令 | 作用 |
+| --- | --- |
+| `npm run dev --prefix frontend` | 前端热更新（:5173，代理到 Go :8787） |
+| `npm run run` | 直接 `go run` 后端 |
+| `npm run build:desktop` | Windows：构建带图标的原生桌面开发版 |
+| `npm run stop` | 停止本地服务 |
+| `node tools/release/build-release.js --version 0.5.0 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
 
-学习者数据（项目、对话、偏好、本地配置、诊断日志）默认全部写入仓库内的 `workspace/` 目录（已被 Git 忽略，见 [ADR-0023](docs/00-product-and-architecture/ADR/0023-workspace-default-and-root-surface-reduction.md)）；可用 `--workspace`、`LLL_WORKSPACE_ROOT` 或配置里的 `workspace.root` 整体迁移。
+源码运行时数据默认写入仓库内的 `workspace/`（已被 Git 忽略），可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
 
-首次运行后，在侧边栏进入 **API 模型**，添加 Provider、Base URL、API Key 和模型名称。教师对话与 Ask AI 共用这套模型配置；搜索引擎配置仍位于统一配置页面。Agent CLI 的账号、模型和密钥由 CLI 自身管理，LLL 只负责运行时选择、上下文封装和可见终端启动。
+## ❓ 常见问题
 
-> 开发时也可用 `npm run run`（即 `go run ./backend-go/cmd/lll`）直接从源码运行后端。
+<details>
+<summary><b>打开后提示需要 WebView2 Runtime</b></summary>
 
-### 桌面快捷方式（Windows）
+安装微软官方的 WebView2 Evergreen Runtime 后重新打开即可。应用不会退回到普通浏览器标签页。
+</details>
 
-```bash
-npm run desktop:install
-```
+<details>
+<summary><b>提示“workspace is already open”</b></summary>
 
-在桌面创建 `LifeLongLearn` 快捷方式。启动时会：若前端或后端源码比 `dist/lll.exe` / `frontend/dist/index.html` 新，则自动重新构建；随后后台启动 `dist/lll.exe`，等待 `/api/health` 就绪后打开浏览器并退出。若 `8787` 端口被本工作区旧的 LLL 进程占用，会先清理再启动新实例。
+同一个工作区只能被一个 Learn-With-AI 实例使用。已打开的窗口会被切换到前台；如果是源码版服务占用，先执行 `npm run stop`。
+</details>
 
-### 停止后台服务
+<details>
+<summary><b>扫描版 PDF 或旧版 DOC/PPT/XLS 无法读取</b></summary>
 
-```bash
-npm run stop
-```
+扫描件中没有可提取的文字层，会提示“未提取到文字”；旧版 Office 格式请另存为 DOCX/PPTX/XLSX 后再导入。单个文件上限 50 MB。
+</details>
 
-也可在前端界面点击 Exit 按钮停止。
+<details>
+<summary><b>API Key 存在哪里？会上传吗？</b></summary>
 
-## Agent 部署（推荐）
+API Key 只保存在本机工作区的 `config.local.json` 中，仅用于直接请求你配置的模型服务。项目本身没有服务器，也不收集任何数据。
+</details>
 
-把下面这段提示词整段复制给 AI Agent（如 Claude Code），它即可在本地完成 LLL 的安装、构建与运行：
+## 🤝 参与贡献
 
-> 请在当前机器上部署并运行 LLL（荔枝读书，本地 AI 学习工作台；Go 后端 + React 前端）。
-> 仓库根目录：从 https://github.com/porridgeowefish/LLL_life_long_learn clone 后的 `LLL_life_long_learn` 目录（下文所有命令都在该目录执行）。
-> 按以下步骤执行，每完成一步向我报告结果：
->
-> 1. 检查环境：已安装 Node.js 与 Go（≥ 1.22）；如需助教功能，再确认至少一个受支持的 Agent CLI 可用。缺失则先安装对应版本。
-> 2. 安装前端依赖：在 `frontend/` 目录执行 `npm install`。
-> 3. 构建：在仓库根目录执行 `npm run build`（构建前端到 `frontend/dist/`，并编译后端到 `dist/lll.exe`）。
-> 4. 启动：执行 `npm run start`（运行 `dist/lll.exe`，生产模式托管 `frontend/dist/` 并带 SPA fallback）。
-> 5. 健康检查：`GET http://localhost:8787/api/health` 应返回 200；通过后在浏览器打开 `http://localhost:8787/`。
-> 6. 若端口 `8787` 被占用，先执行 `npm run stop` 清理旧进程，再重新启动。
-> 7. 首次进入产品后，在“API 模型”页面添加 OpenAI 兼容 Provider 和模型；不要把真实 API Key 写入仓库或提交到 Git。
-> 8.（可选）`npm run desktop:install` 创建桌面快捷方式；`npm run stop` 停止后台服务。
->
-> 全程只做安装、构建、运行、验证，不要修改源码；任何步骤失败请附上完整命令输出再问我。
+欢迎通过 [Issues](https://github.com/porridgeowefish/LLL_life_long_learn/issues) 报告问题或提出建议，Pull Request 的流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
+## 📄 许可证
 
-## 许可证
-
-本项目以 [MIT License](./LICENSE) 开源发布。
-
-
-
+[MIT](./LICENSE) © 2026 Xiong Minzhe
