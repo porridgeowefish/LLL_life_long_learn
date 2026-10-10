@@ -31,7 +31,7 @@ func run() int {
 		fmt.Fprintln(os.Stderr, "desktop smoke requires --workspace and a native window")
 		return 1
 	}
-	engine, err := desktop.Start(desktop.Options{Workspace: *workspace, Config: *config, Port: *port})
+	engine, err := desktop.Start(desktop.Options{Workspace: *workspace, Config: *config, Port: *port, Version: Version})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		var busy *desktop.BusyError

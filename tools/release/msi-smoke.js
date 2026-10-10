@@ -133,6 +133,13 @@ function main(input) {
       fs.readFileSync(path.join(folder, "learner-note.md"), "utf8"),
       "preserve",
     );
+    // Without an explicit folder the MSI follows %LOCALAPPDATA%, beside learner data.
+    install(base, ["/i"], path.join(scratch, "default-install.log"));
+    installed = base;
+    const defaultFolder = path.join(process.env.LOCALAPPDATA, "Programs", identity);
+    assert(fs.existsSync(path.join(defaultFolder, "learn-with-ai.exe")), `Default install missing in ${defaultFolder}`);
+    install(base, ["/x"], path.join(scratch, "default-uninstall.log"));
+    installed = null;
     console.log(
       `MSI table inventory, isolated install/reinstall/repair/upgrade/downgrade/uninstall, native rendered window and icon, source import and data retention passed. Logs: ${scratch}`,
     );

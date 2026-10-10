@@ -21,6 +21,7 @@ import { clearDeletedProjectClientData } from '@/features/projects/lib/projectDe
 
 import s from './Sidebar.module.css';
 import { ConnectionBadge } from './ConnectionBadge';
+import { UpdateNotice } from './UpdateNotice';
 import { requestShutdown } from '@/features/settings/system';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
@@ -290,7 +291,7 @@ export function Sidebar() {
           />
         )}
       </div>
-      <div className={s.foot}><ConnectionBadge/><div className={s.utilities}><a href="https://github.com/porridgeowefish/LLL_life_long_learn" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a><button onClick={() => void exit()} disabled={exiting}>{exiting?'退出中…':'退出'}</button></div></div>
+      <div className={s.foot}><UpdateNotice/><ConnectionBadge/><div className={s.utilities}><a href="https://github.com/porridgeowefish/LLL_life_long_learn" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a><button onClick={() => void exit()} disabled={exiting}>{exiting?'退出中…':'退出'}</button></div></div>
       <Modal
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

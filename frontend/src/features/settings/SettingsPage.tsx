@@ -19,6 +19,8 @@ import type { ThemePreference } from '@/shared/lib/theme';
 import { SecretInput } from '@/shared/primitive/SecretInput';
 import s from './SettingsPage.module.css';
 import { TeacherNotesSettings } from './TeacherNotesSettings';
+import { useHealth } from '@/app/api/health';
+import { failedAttempt, useCheckUpdate, useInstallUpdate, useUpdateInfo } from './update';
 
 const ORDER: AgentRuntimeID[] = ['codebuddy', 'workbuddy', 'hermes', 'codex', 'trae', 'claude'];
 
@@ -59,6 +61,7 @@ export function SettingsPage() {
           </Button>
         </header>
 
+        <VersionAndDataSection />
         <AppearanceSection />
         <TeacherNotesSettings />
 
@@ -178,13 +181,54 @@ function AppearanceSection() {
   );
 }
 
+function VersionAndDataSection() {
+  const { data: health } = useHealth();
+  const { data: info } = useUpdateInfo();
+  const check = useCheckUpdate();
+  const install = useInstallUpdate();
+  const current = check.data ?? info;
+  const failed = failedAttempt(current);
+  let status = '';
+  if (check.isPending) status = '正在检查…';
+  else if (check.isError) status = `检查失败：${(check.error as Error).message}`;
+  else if (current?.error) status = current.error;
+  else if (current?.available) status = `发现新版本 ${current.latest}`;
+  else if (current) status = '已是最新版本';
+  return (
+    <section className={s.openSource} aria-labelledby="version-data-title">
+      <div>
+        <h2 id="version-data-title">版本与数据</h2>
+        <p>
+          {current ? <>当前版本 <strong>{current.current}</strong>{status && <> · {status}</>}</> : '版本信息仅在桌面应用中提供。'}
+        </p>
+        {failed && <p role="alert">上次更新到 {failed.version} 未完成（安装程序返回 {failed.exitCode}）。</p>}
+        <p>
+          学习数据目录 <code>{health?.workspace ?? '…'}</code>。项目、笔记、资料、偏好与 API 配置都保存在这里，升级和卸载都不会删除。
+        </p>
+      </div>
+      {current && (
+        <div className={s.openSourceActions}>
+          <a href="#check" onClick={(event) => { event.preventDefault(); check.mutate(); }}>检查更新</a>
+          {current.available && current.canInstall && !install.isSuccess && (
+            <a href="#install" onClick={(event) => { event.preventDefault(); if (!install.isPending && window.confirm(`更新到 ${current.latest}？应用会自动关闭并在安装后重新打开，学习数据不受影响。`)) install.mutate(); }}>
+              {install.isPending ? '正在下载…' : '立即更新'}
+            </a>
+          )}
+          {install.isSuccess && <span>正在安装，完成后自动重新打开</span>}
+          {install.isError && <span role="alert">{(install.error as Error).message}</span>}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function OpenSourceSection() {
   const repo = 'https://github.com/porridgeowefish/LLL_life_long_learn';
   return (
     <section className={s.openSource} aria-labelledby="open-source-title">
       <div>
         <h2 id="open-source-title">开源与反馈</h2>
-        <p>LifeLongLearn 欢迎问题反馈和代码贡献。当前仓库需由维护者开启公开 Issue 创建权限。</p>
+        <p>Learn-With-AI 欢迎问题反馈和代码贡献。</p>
       </div>
       <div className={s.openSourceActions}>
         <a href={`${repo}/issues`} target="_blank" rel="noreferrer">报告问题</a>

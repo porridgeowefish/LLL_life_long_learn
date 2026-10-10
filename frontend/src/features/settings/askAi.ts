@@ -121,7 +121,9 @@ export function useAskAiSettings() {
     queryFn: async () => {
       const res = await fetch(`${API_BASE}/api/settings/ask-ai`);
       if (!res.ok) throw new ApiError(res.status, 'settings failed', null);
-      return (await res.json()) as AskConfig;
+      // A fresh workspace has no config yet; the server then sends null lists.
+      const raw = (await res.json()) as Partial<AskConfig> & { providers?: AskProvider[] | null; bindings?: AskConfig['bindings'] | null };
+      return { ...raw, default: raw.default ?? '', searchEngine: raw.searchEngine || 'google', providers: raw.providers ?? [], bindings: raw.bindings ?? {} } as AskConfig;
     },
   });
 }

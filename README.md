@@ -29,7 +29,7 @@
 - **复习稿与练习题**：可编辑、可回溯版本，支持分页阅读、划词批注与 Ask AI；重活可交给 Claude Code / Codex 等本地 Agent CLI 作为“助教”异步完成。
 - **学习节律与用量**：首页热力图记录每日投入，Token 用量按项目统计输入与输出。
 - **本地优先**：所有项目、对话、资料和配置都是本机上的普通文件，无数据库、无账号；API Key 只保存在本地配置中。
-- **原生桌面应用**：Windows 提供标准 MSI 安装包与独立应用窗口（WebView2），支持版本检测、覆盖确认、修复与卸载。
+- **原生桌面应用**：Windows 提供标准 MSI 安装包与独立应用窗口（WebView2），支持版本检测、覆盖确认、修复与卸载，并能在应用内一键更新。
 
 ## 📸 截图
 
@@ -63,9 +63,17 @@
 
 > 应用依赖 Microsoft Edge **WebView2 Runtime**（Windows 11 与大多数 Windows 10 已自带）。缺少时安装程序会明确提示，可从 [微软官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。当前安装包尚未代码签名，SmartScreen 提示时选择“更多信息 → 仍要运行”。
 
+### 自动更新
+
+从 0.5.2 起，应用启动时会检查 GitHub 上的新版本。发现新版本后，侧栏底部会出现“发现新版本”提示；点击 **立即更新**，应用会下载安装包、用 Release 的 `SHA256SUMS` 校验、在后台静默安装，并在完成后自动重新打开。也可以在 **统一配置 → 版本与数据** 中手动检查更新。
+
+### 学习数据保存在哪里
+
+项目、对话、笔记、资料、学习偏好和 API 配置都保存在 `%LOCALAPPDATA%\learn-with-ai`（在 **统一配置 → 版本与数据** 中可以看到完整路径）。更新、修复和卸载都不会修改或删除这个目录。
+
 ### 升级与覆盖安装
 
-直接运行新版本 MSI 即可。安装程序会**检测已安装的版本**，弹出“确认升级或覆盖安装”对话框，确认后才替换程序文件；选择取消则不做任何修改。
+也可以直接运行新版本 MSI。安装程序会**检测已安装的版本**，弹出“确认升级或覆盖安装”对话框，确认后才替换程序文件；选择取消则不做任何修改。
 
 - 同一版本再次运行 MSI 会进入**维护模式**，可选择修复或删除；
 - 不允许用旧版本覆盖新版本（降级会被拒绝）；
@@ -138,7 +146,7 @@ npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 | `npm run run` | 直接 `go run` 后端 |
 | `npm run build:desktop` | Windows：构建带图标的原生桌面开发版 |
 | `npm run stop` | 停止本地服务 |
-| `node tools/release/build-release.js --version 0.5.1 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
+| `node tools/release/build-release.js --version 0.5.2 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
 
 源码运行时数据默认写入仓库内的 `workspace/`（已被 Git 忽略），可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
 

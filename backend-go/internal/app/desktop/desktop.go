@@ -21,6 +21,8 @@ import (
 type Options struct {
 	Workspace, Config string
 	Port              int
+	// Version is the running release version, used for update checks.
+	Version string
 }
 type Engine struct {
 	URL       string
@@ -69,7 +71,14 @@ func Start(options Options) (*Engine, error) {
 	os.Setenv("LEARN_WITH_AI_SERVER_PORT", strconv.Itoa(port))
 	app := bootstrap.Build()
 	engine := &Engine{URL: fmt.Sprintf("http://127.0.0.1:%d", port), Workspace: paths.WORKSPACE, Done: make(chan struct{}), app: app, instance: instance}
-	engine.server = &http.Server{Handler: app.Server.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	// Desktop-only routes (update check and in-app install) sit in front of the
+	// shared application server.
+	updates := newUpdater(options.Version, paths.WORKSPACE).handler(engine.URL, func() { engine.Close() })
+	mux := http.NewServeMux()
+	mux.Handle("/api/system/update", updates)
+	mux.Handle("/api/system/update/", updates)
+	mux.Handle("/", app.Server.Handler())
+	engine.server = &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	app.Server.SetShutdownFunc(func() { time.Sleep(200 * time.Millisecond); engine.Close() })
 	go func() { _ = engine.server.Serve(listener) }()
 	return engine, nil
