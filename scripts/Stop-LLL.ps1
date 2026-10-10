@@ -30,7 +30,7 @@ function Get-ProcessPath {
 }
 
 $repoRoot = Get-RepoRoot
-$exePath = Join-Path $repoRoot 'dist\learn-with-ai.exe'
+$exePath = Join-Path $repoRoot 'dist\dev\learn-with-ai.exe'
 $ownerPid = Get-PortOwner -Port $Port
 
 if (-not $ownerPid) {

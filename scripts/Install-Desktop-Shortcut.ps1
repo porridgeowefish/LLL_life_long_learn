@@ -4,7 +4,7 @@
 )
 $ErrorActionPreference = 'Stop'
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$appPath = Join-Path $repoRoot 'dist\learn-with-ai-desktop.exe'
+$appPath = Join-Path $repoRoot 'dist\dev\learn-with-ai-desktop.exe'
 $iconPath = Join-Path $repoRoot 'scripts\assets\learn-with-ai.ico'
 if (-not (Test-Path -LiteralPath $appPath -PathType Leaf)) { throw 'Run npm run build:desktop before creating the native developer shortcut.' }
 if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) { $WorkspaceRoot = Join-Path $repoRoot 'workspace' }

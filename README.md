@@ -136,7 +136,7 @@ flowchart LR
 git clone https://github.com/porridgeowefish/LLL_life_long_learn.git
 cd LLL_life_long_learn
 npm install --prefix frontend
-npm run build      # 构建前端到 frontend/dist/，并编译后端到 dist/
+npm run build      # 构建前端到 frontend/dist/，并编译后端到 dist/dev/
 npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 ```
 

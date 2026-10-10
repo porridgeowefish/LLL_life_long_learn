@@ -173,7 +173,7 @@ try {
   } else {
     $workspaceRoot = (Resolve-Path -LiteralPath $WorkspaceRoot).Path
   }
-  $exePath = Join-Path $repoRoot 'dist\learn-with-ai.exe'
+  $exePath = Join-Path $repoRoot 'dist\dev\learn-with-ai.exe'
   $tmpDir = Join-Path $workspaceRoot 'tmp\desktop-launcher'
   $pidFile = Join-Path $tmpDir 'lll.pid'
   $outLog = Join-Path $tmpDir 'lll.out.log'

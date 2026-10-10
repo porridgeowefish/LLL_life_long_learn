@@ -2,11 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawn, spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '../..');
-const binary = path.join(root, 'dist', process.platform === 'win32' ? 'learn-with-ai.exe' : 'learn-with-ai');
+const binary = path.join(root, 'dist', 'dev', process.platform === 'win32' ? 'learn-with-ai.exe' : 'learn-with-ai');
 const action = process.argv[2];
 if (action === 'build-desktop') {
   if (process.platform !== 'win32') throw new Error('Native desktop developer build currently requires Windows');
-  const desktop = path.join(root, 'dist', 'learn-with-ai-desktop.exe');
+  const desktop = path.join(root, 'dist', 'dev', 'learn-with-ai-desktop.exe');
   fs.mkdirSync(path.dirname(desktop), { recursive: true });
   const version = require('../../package.json').version + '-dev';
   const built = spawnSync('go', ['build', '-ldflags', `-H windowsgui -X main.Version=${version}`, '-o', desktop, './backend-go/cmd/desktop'], { cwd: root, stdio: 'inherit', windowsHide: true });
