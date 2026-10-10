@@ -65,3 +65,4 @@ frontend/playwright-report/
 *.test.tsx
 *.spec.ts
 *.spec.tsx
+/frontend/src/test/

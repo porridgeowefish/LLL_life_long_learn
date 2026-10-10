@@ -69,11 +69,11 @@ layer.
 ### Publication boundary (since v0.5.0)
 
 Engineering docs under `docs/` (except `docs/release/` and `docs/images/`) and
-automated tests (`*_test.go`, `*.test.*`, `*.spec.*`, `tests/`, `frontend/e2e/`)
-are maintained locally and are not published. Keep writing them — they remain
-the delivery source of truth — but never `git add -f` new ones. Files tracked
-before v0.5.0 stay tracked. Public CI therefore runs `check:fast`; run
-`check:full` locally before release.
+automated tests (`*_test.go`, `*.test.*`, `*.spec.*`, `tests/`, `frontend/e2e/`,
+`frontend/src/test/`) are maintained locally and are not published. Keep
+writing them — they remain the delivery source of truth — but never
+`git add -f` them; `check:repo` rejects tracked ignored paths. Public CI
+therefore runs `check:fast`; run `check:full` locally before release.
 
 ## 2. Team Principles
 

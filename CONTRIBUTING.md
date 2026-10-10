@@ -18,7 +18,8 @@ behavior, actual behavior, and screenshots or logs with secrets removed.
 
 Since v0.5.0 the maintainer keeps engineering documents (`docs/`, except the
 release bundle and README images) and automated test suites in the local
-working copy only; new files under those paths are ignored by Git. Describe
+working copy only; those paths are ignored by Git and not part of the public
+repository. Describe
 design notes and validation in the PR instead of adding them to the repository.
 
 Do not commit `config.local.json`, API keys, generated run data, or private
