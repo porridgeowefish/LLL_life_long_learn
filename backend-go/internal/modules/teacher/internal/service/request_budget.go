@@ -5,6 +5,7 @@ import (
 	"errors"
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	"net/url"
 	"unicode/utf8"
 )
 
@@ -81,6 +82,13 @@ func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, erro
 	b := requestBudget{window: 32768, output: 8192, margin: 1024}
 	if p.ContextWindowTokens > 0 {
 		b.window = p.ContextWindowTokens
+	} else if p.Model == "glm-5.3" {
+		// Verified GLM-5.3 model capacity (2026-10-11). Legacy connections
+		// omit this field; do not incorrectly constrain the first-party model
+		// to the generic fallback. Unknown relays retain the safe fallback.
+		if endpoint, err := url.Parse(p.BaseURL); err == nil && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
+			b.window = 1000000
+		}
 	}
 	if p.Kind == "anthropic" && p.Thinking {
 		b.thinking = 2048

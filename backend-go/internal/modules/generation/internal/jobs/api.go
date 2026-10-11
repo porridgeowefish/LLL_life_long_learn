@@ -454,7 +454,9 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		if err != nil {
 			return Job{}, err
 		}
-		payload["review"] = review.Content
+		if in.Kind != "review" {
+			payload["review"] = review.Content
+		}
 		annotations, err := assets.NewAnnotations(slug)
 		if err != nil {
 			return Job{}, err
