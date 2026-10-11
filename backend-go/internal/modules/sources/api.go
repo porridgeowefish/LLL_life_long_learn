@@ -3,6 +3,7 @@ package sources
 
 import (
 	"context"
+	enhancement "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/enhancement"
 	ocr "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/ocr"
 	processing "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/processing"
 	retrieval "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/retrieval"
@@ -43,6 +44,26 @@ type SourceEvidencePreview = retrieval.EvidencePreview
 type SourceOutlineNode = retrieval.Node
 type SourceSearchHit = retrieval.Hit
 type RetrievalStatus = impl.RetrievalStatus
+type StructureRequest = impl.StructureRequest
+type StructureJob = impl.StructureJob
+type RevisionGuard = impl.RevisionGuard
+
+var ErrDerivedConflict = impl.ErrDerivedConflict
+
+func ConfigureStructureEvents(event func(string, StructureJob)) { enhancement.ConfigureEvents(event) }
+func CreateStructureJob(ctx context.Context, slug, sourceID string, req StructureRequest) (StructureJob, error) {
+	return enhancement.Create(ctx, slug, sourceID, req, false)
+}
+func GetStructureJob(slug, sourceID, jobID string) (StructureJob, error) {
+	return enhancement.Get(slug, sourceID, jobID)
+}
+func CancelStructureJob(slug, sourceID, jobID string) (StructureJob, error) {
+	return enhancement.Cancel(slug, sourceID, jobID)
+}
+func CancelProjectStructureJobs(slug string) error { return enhancement.CancelProject(slug) }
+func CancelSourceStructureJobs(slug, sourceID string) error {
+	return enhancement.CancelSource(slug, sourceID)
+}
 
 func NewReader(store *Store) *Reader { return retrieval.New(store) }
 

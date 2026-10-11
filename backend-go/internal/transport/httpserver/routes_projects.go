@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
+	"github.com/xmz14/lll/backend-go/internal/modules/generation"
 	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	folderstore "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
@@ -48,7 +49,11 @@ func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusConflict, "project_has_active_session")
 		return
 	}
-	if err := workspace.DeleteProject(slug); err != nil {
+	deleteProject := workspace.DeleteProject
+	if s.generation != nil {
+		deleteProject = s.generation.DeleteProject
+	}
+	if err := deleteProject(slug); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			httpx.Error(w, http.StatusNotFound, "project not found")
 			return
@@ -91,9 +96,10 @@ type createProjectRequest struct {
 }
 
 type learningScopeSourceRequest struct {
-	Type    string `json:"type"`
-	MapSlug string `json:"mapSlug"`
-	TopicID string `json:"topicId"`
+	MapVersionID string `json:"mapVersionId,omitempty"`
+	Type         string `json:"type"`
+	MapSlug      string `json:"mapSlug"`
+	TopicID      string `json:"topicId"`
 }
 
 // handleListProjects returns the indexed project tree.
@@ -160,6 +166,9 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cache.Invalidate(slug)
 	state, _ := workspace.ReadProjectState(slug)
+	if s.generation != nil {
+		s.generation.ReviveProject(slug)
+	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{"project": state})
 }
 
@@ -175,19 +184,17 @@ func resolveMapLearningScope(source learningScopeSourceRequest) (learningscope.S
 	if err != nil || state.ProjectType != workspace.ProjectTypeDisciplineMap {
 		return learningscope.Scope{}, errors.New("invalid_scope_source")
 	}
-	root, err := workspace.ProjectRootForSlug(source.MapSlug)
-	if err != nil {
-		return learningscope.Scope{}, errors.New("invalid_scope_source")
-	}
-	catalog, err := readDisciplineTopics(root)
+	projection, err := generation.ReadMap(source.MapSlug, source.MapVersionID)
 	if err != nil {
 		return learningscope.Scope{}, errors.New("discipline_topics_unavailable")
 	}
-	topic, ok := learningscope.FindTopic(catalog, source.TopicID)
+	topic, ok := learningscope.FindTopic(projection.Topics, source.TopicID)
 	if !ok {
 		return learningscope.Scope{}, errors.New("discipline_topic_not_found")
 	}
-	return learningscope.SnapshotFromTopic(source.MapSlug, topic, time.Now()), nil
+	scope := learningscope.SnapshotFromTopic(source.MapSlug, topic, time.Now())
+	scope.Source.MapVersionID = projection.MapVersionID
+	return scope, nil
 }
 
 // handleGetProject returns one project's full state.

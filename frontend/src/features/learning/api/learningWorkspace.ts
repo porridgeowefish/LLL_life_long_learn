@@ -117,6 +117,8 @@ export interface LearningSource {
   displayName: string;
   status: 'stored' | 'processing' | 'ready' | 'opaque' | 'failed' | 'tombstoned' | 'deleted';
   currentRevisionId: string;
+  derivedVersionId?: string;
+  coverage?: { complete?: boolean; gaps?: string[] };
   failureCode?: string;
   parser?: string;
   extractedBytes?: number;
@@ -254,7 +256,7 @@ export function useDeleteBodyAnnotation(slug: string) {
 }
 
 export function useSources(slug: string) {
-  return useQuery({ queryKey: keys.sources(slug), queryFn: async () => (await http.get<{ sources: LearningSource[] }>(`/api/projects/${encodeURIComponent(slug)}/sources`)).sources, enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((source) => source.status === 'processing') ? 2500 : false });
+  return useQuery({ queryKey: keys.sources(slug), queryFn: async () => (await http.get<{ sources: LearningSource[] }>(`/api/projects/${encodeURIComponent(slug)}/sources`)).sources, enabled: Boolean(slug), refetchInterval: (query) => query.state.data?.some((source) => source.status === 'processing'||source.status==='stored') ? 2500 : false });
 }
 
 export function useSource(slug: string, sourceId: string) {
@@ -269,13 +271,13 @@ export function sourceFileURL(slug: string, sourceId: string, revisionId: string
   return `/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(sourceId)}/revisions/${encodeURIComponent(revisionId)}/files/${encodeURIComponent(fileKey)}`;
 }
 
-export const MAX_SOURCE_FILE_BYTES = 50 * 1024 * 1024;
+export const MAX_SOURCE_FILE_BYTES = 100 * 1024 * 1024;
 
 export function useUploadSource(slug: string) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async ({ file }: { file: File }) => {
-      if (file.size > MAX_SOURCE_FILE_BYTES) throw new Error('单文件不能超过 50MB');
+      if (file.size > MAX_SOURCE_FILE_BYTES) throw new Error('单文件不能超过 100MiB');
       const form = new FormData();
       form.set('operationId', crypto.randomUUID());
       form.set('displayName', file.name);

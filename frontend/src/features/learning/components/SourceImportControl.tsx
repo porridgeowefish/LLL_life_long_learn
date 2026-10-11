@@ -27,7 +27,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
       if (!extensions.includes(extension ?? '')) {
         result = { name: file.name, failed: true, message: extension === 'doc' ? '请另存为 DOCX 后导入' : '暂不支持此格式' };
       } else if (file.size > MAX_SOURCE_FILE_BYTES) {
-        result = { name: file.name, failed: true, message: '文件超过 50 MB，请拆分后导入' };
+        result = { name: file.name, failed: true, message: '文件超过 100 MiB，请拆分后导入' };
       } else {
         try {
           const response = await upload.mutateAsync({ file });
@@ -48,7 +48,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
   const summary = [saved ? `已保存 ${saved} 份` : '', failed ? `${failed} 份导入失败` : ''].filter(Boolean).join(' · ');
 
   return <div className={`${s.control} ${compact ? s.compact : ''}`}>
-    <button type="button" className={s.importButton} disabled={busy} onClick={() => input.current?.click()} title="本地自动解析 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV；每份不超过 50 MB。旧版 DOC 请另存为 DOCX。">
+    <button type="button" className={s.importButton} disabled={busy} onClick={() => input.current?.click()} title="本地自动解析 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV；每份不超过 100 MiB。旧版 DOC 请另存为 DOCX。">
       {busy ? '正在导入…' : '导入资料'}
     </button>
     <input ref={input} type="file" accept={fileTypes} multiple hidden onChange={event => void choose(event)} aria-label="选择要导入的资料" />

@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/xmz14/lll/backend-go/internal/app/integration"
 	"github.com/xmz14/lll/backend-go/internal/compatibility/artifactwatch"
 	"github.com/xmz14/lll/backend-go/internal/compatibility/iteration13migration"
 	"github.com/xmz14/lll/backend-go/internal/compatibility/sessionstore"
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	"github.com/xmz14/lll/backend-go/internal/modules/generation"
 	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	preferences "github.com/xmz14/lll/backend-go/internal/modules/preferences"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
@@ -60,12 +60,14 @@ func Build() *App {
 		imageCfg = nil
 	}
 	broadcaster := httpx.NewBroadcaster()
+	sources.ConfigureStructureEvents(func(slug string, job sources.StructureJob) {
+		broadcaster.Emit("source-structure-job-updated", map[string]any{"projectSlug": slug, "sourceId": job.SourceID, "jobId": job.ID, "status": job.Status, "coverage": job.Coverage})
+	})
 	watcher, err := artifactwatch.Start(paths.PROJECTS_ROOT, broadcaster.Emit)
 	if err != nil {
 		println("artifactwatch: start warning:", err.Error())
 	}
 	teacherService := teacher.New(nil)
-	teacherService.Authorizer = integration.TeacherTaskAuthorizer{}
 	teacherService.OnSourceReading = func(event map[string]any) {
 		broadcaster.Emit("source-reading", event)
 	}
@@ -77,6 +79,14 @@ func Build() *App {
 	})
 	sourceProcessor.ProjectBlocked = func(slug string) bool { return cutover[slug] }
 	sourceProcessor.Start(context.Background())
+	generationService := generation.New(nil)
+	generationService.ProjectBlocked = func(slug string) bool { return cutover[slug] }
+	generationService.OnUpdated = func(slug string, job generation.Job) {
+		broadcaster.Emit("generation-job-updated", map[string]any{"projectSlug": slug, "jobId": job.ID, "status": job.Status, "phase": job.Phase, "progress": job.Progress})
+	}
+	if err := generationService.Start(context.Background()); err != nil {
+		println("generation startup:", err.Error())
+	}
 	server := httpserver.New(httpserver.Dependencies{
 		ClaudeBin: bin, ClaudeAvailable: probeBin(bin, "--version"),
 		Runtime: assistant.ResolveRuntime(runtimeCfg), RuntimeOptions: assistant.ListRuntimes(runtimeCfg),
@@ -85,15 +95,10 @@ func Build() *App {
 		Agents: registry, Sessions: sessionstore.New(), Cache: projectindex.NewIndex(),
 		MigrationReady: migration.Ready, MigrationFailed: migration.FailedProjects,
 		SourceProcessor: sourceProcessor,
+		Generation:      generationService,
 	})
 	execution := assistant.NewExecution(server.RuntimeSnapshot)
-	dispatcher := assistant.NewDispatcher(execution, broadcaster)
-	assistantDeps := integration.AssistantDependencies(func(task assistant.Task) {
-		_, _, _ = server.RecordAssistantPublication(task)
-	})
-	assistantDeps.ProjectBlocked = func(slug string) bool { return cutover[slug] }
-	dispatcher.Configure(assistantDeps)
-	server.AttachExecution(execution, dispatcher)
+	server.AttachExecution(execution, nil)
 	notes := teacher.NewNoteService(nil)
 	notes.ProjectBlocked = func(slug string) bool { return cutover[slug] }
 	notes.OnInitializationFailure = func(slug string, err error) { println("teacher notes initialization:", slug, err.Error()) }
@@ -110,11 +115,6 @@ func Build() *App {
 			println("teacher notes:", projectSlug, err.Error())
 		}
 	}
-	teacherService.OnTask = func(projectSlug string, task teacher.DelegatedTask) {
-		broadcaster.Emit("assistant-task-updated", map[string]any{"projectSlug": projectSlug, "task": task})
-		dispatcher.Notify()
-	}
-	dispatcher.Start()
 	return &App{Server: server}
 }
 

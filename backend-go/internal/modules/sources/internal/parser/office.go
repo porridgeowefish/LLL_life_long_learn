@@ -22,15 +22,17 @@ const (
 )
 
 type officeArchive struct {
-	ctx       context.Context
-	entries   map[string]*zip.File
-	readBytes int64
+	ctx        context.Context
+	entries    map[string]*zip.File
+	readBytes  int64
+	wordStyles map[string]int
+	wordLists  map[string]string
 }
 
 func selectedXML(name, ext string) bool {
 	switch ext {
 	case ".docx":
-		return name == "word/document.xml" || name == "word/footnotes.xml" || name == "word/endnotes.xml" || strings.HasPrefix(name, "word/header") && strings.HasSuffix(name, ".xml") || strings.HasPrefix(name, "word/footer") && strings.HasSuffix(name, ".xml")
+		return name == "word/styles.xml" || name == "word/numbering.xml" || name == "word/document.xml" || name == "word/footnotes.xml" || name == "word/endnotes.xml" || strings.HasPrefix(name, "word/header") && strings.HasSuffix(name, ".xml") || strings.HasPrefix(name, "word/footer") && strings.HasSuffix(name, ".xml")
 	case ".pptx":
 		return name == "ppt/presentation.xml" || name == "ppt/_rels/presentation.xml.rels" || strings.HasPrefix(name, "ppt/slides/") && (strings.HasSuffix(name, ".xml") || strings.HasSuffix(name, ".rels")) || strings.HasPrefix(name, "ppt/notesSlides/") && strings.HasSuffix(name, ".xml")
 	case ".xlsx":
@@ -148,6 +150,9 @@ func (a *officeArchive) walk(name string, visit func(xml.Token) error) error {
 }
 
 func (a *officeArchive) text(name string, out *boundedText) error {
+	if strings.HasPrefix(name, "word/") || strings.HasPrefix(name, "ppt/") {
+		return a.structuredText(name, out)
+	}
 	inText := 0
 	return a.walk(name, func(token xml.Token) error {
 		switch t := token.(type) {
@@ -178,12 +183,15 @@ func (a *officeArchive) text(name string, out *boundedText) error {
 	})
 }
 func (a *officeArchive) word(out *boundedText) error {
+	if err := a.loadWordProperties(); err != nil {
+		return err
+	}
 	if err := a.text("word/document.xml", out); err != nil {
 		return err
 	}
 	var extras []string
 	for name := range a.entries {
-		if selectedXML(name, ".docx") && name != "word/document.xml" {
+		if selectedXML(name, ".docx") && name != "word/document.xml" && name != "word/styles.xml" && name != "word/numbering.xml" {
 			extras = append(extras, name)
 		}
 	}

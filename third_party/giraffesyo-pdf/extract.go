@@ -47,10 +47,11 @@ import (
 // A Glyph carrying only Text, X, Y, Advance, and Size (for example one
 // supplied by an OCR hook) is treated as upright horizontal text.
 type Glyph struct {
-	Text    string  // decoded text, non-empty
-	X, Y    float64 // origin: where the baseline starts
-	Advance float64 // displacement along the baseline in page units
-	Size    float64 // effective font size
+	ActualText bool    // Tagged replacement text, distinguished from decoded font glyphs.
+	Text       string  // decoded text, non-empty
+	X, Y       float64 // origin: where the baseline starts
+	Advance    float64 // displacement along the baseline in page units
+	Size       float64 // effective font size
 
 	// Direction is the unit direction the baseline runs in. Ascent and
 	// Descent are the vectors from the baseline to the far and near
@@ -1429,13 +1430,16 @@ func (w *walker) finishMarkedContent(mark markedContent) {
 			size = 1
 		}
 		advance := float64(len([]rune(mark.actualText))) * size * 0.5
-		w.glyphs.add(positionedGlyph(mark.actualText, trm, size, mark.gs.rise, advance))
+		glyph := positionedGlyph(mark.actualText, trm, size, mark.gs.rise, advance)
+		glyph.ActualText = true
+		w.glyphs.add(glyph)
 		return
 	}
 	// The replacement spans from the first glyph's origin to the last
 	// glyph's baseline end.
 	glyph := replaced[0]
 	glyph.Text = mark.actualText
+	glyph.ActualText = true
 	end := replaced[len(replaced)-1].Baseline().End
 	dx, dy := end.X-glyph.X, end.Y-glyph.Y
 	glyph.Advance = math.Hypot(dx, dy)

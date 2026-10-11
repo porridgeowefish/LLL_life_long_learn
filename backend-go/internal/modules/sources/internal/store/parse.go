@@ -1,8 +1,6 @@
 package store
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"os"
 	"path/filepath"
@@ -10,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 )
 
 // OriginalPath resolves only the sealed original within its revision directory.
@@ -45,6 +43,9 @@ func (s *Store) OriginalPath(sourceID string) (Source, Revision, string, error) 
 // CommitParsed validates the active revision and holds the same lock as deletion.
 // A completed parser cannot resurrect an original tombstoned while it was running.
 func (s *Store) CommitParsed(sourceID, revisionID, parser, content string, truncated bool) (Source, error) {
+	return s.commitParsed(sourceID, revisionID, parser, content, truncated, nil)
+}
+func (s *Store) commitParsed(sourceID, revisionID, parserName, content string, truncated bool, structure *parser.Structure) (Source, error) {
 	if !safeID(sourceID, "source_") || !safeID(revisionID, "srev_") || len(content) > 4<<20 || !utf8.ValidString(content) {
 		return Source{}, errors.New("invalid parsed content")
 	}
@@ -64,16 +65,14 @@ func (s *Store) CommitParsed(sourceID, revisionID, parser, content string, trunc
 		return source, err
 	}
 	data := []byte(content)
-	if err := workspace.AtomicWriteFile(filepath.Join(filepath.Dir(revisionPath), "derived", "content.md"), data, 0o644); err != nil {
+	if err := s.publishDerivedLocked(&revision, map[string][]byte{"content.md": data}, map[string]string{"content.md": "text/markdown; charset=utf-8"}, structure, ""); err != nil {
 		return source, err
 	}
-	sum := sha256.Sum256(data)
-	revision.DerivedFiles = []FileRef{{Key: "content", Path: "derived/content.md", MediaType: "text/markdown; charset=utf-8", Bytes: int64(len(data)), SHA256: "sha256:" + hex.EncodeToString(sum[:])}}
 	revision.ParseTaskID = ""
 	if err := writeJSON(revisionPath, revision); err != nil {
 		return source, err
 	}
-	source.Status, source.FailureCode, source.Parser = "ready", "", parser
+	source.Status, source.FailureCode, source.Parser = "ready", "", parserName
 	source.Retrieval = nil
 	source.ExtractedBytes, source.ExtractionTruncated, source.UpdatedAt = int64(len(data)), truncated, time.Now().UTC()
 	return source, writeJSON(path, source)

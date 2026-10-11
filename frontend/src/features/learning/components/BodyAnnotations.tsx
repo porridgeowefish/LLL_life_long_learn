@@ -10,6 +10,7 @@ import {
   useDeleteBodyAnnotation,
 } from '@/features/learning/api/learningWorkspace';
 import { AskAiPanel } from '@/features/learning/components/AskAiPanel';
+import { Modal } from '@/shared/primitive/Modal';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { selectionEndpointRect, type SelectionRect } from '@/shared/lib/selectionGeometry';
 import { applyHighlights, selectionToTextAnchor } from '@/shared/lib/summaryHighlights';
@@ -29,6 +30,7 @@ interface SelectionState {
 export function BodyAnnotations({ slug, content, assetVersionId, pageIndex }: { slug: string; content: string; assetVersionId: string; pageIndex?: number }) {
   const markdownRef = useRef<HTMLDivElement>(null);
   const [selection, setSelection] = useState<SelectionState | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const annotations = useBodyAnnotations(slug);
   const create = useCreateBodyAnnotation(slug);
   const remove = useDeleteBodyAnnotation(slug);
@@ -130,6 +132,8 @@ export function BodyAnnotations({ slug, content, assetVersionId, pageIndex }: { 
         </div>,
         document.body,
       )}
+      <button type="button" className={s.drawerButton} onClick={()=>setDrawerOpen(true)}>批注 · {annotations.data?.length ?? 0}</button>
+      <Modal open={drawerOpen} onOpenChange={setDrawerOpen} title="正文批注">
       <aside className={s.panel} aria-label="正文批注">
         <header><h3>批注</h3><span>{annotations.data?.length ?? 0}</span></header>
         <p className={s.hint}>选中正文即可保存，或就原文向 AI 提问。</p>
@@ -163,6 +167,7 @@ export function BodyAnnotations({ slug, content, assetVersionId, pageIndex }: { 
           ))}
         </div>
       </aside>
+      </Modal>
       <AskAiPanel />
     </>
   );

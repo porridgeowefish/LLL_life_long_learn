@@ -31,6 +31,7 @@ export interface MermaidBlock {
 export interface MarkdownRender {
   html: string;
   mermaid: MermaidBlock[];
+  interactive: Array<{ id: string; code: string }>;
 }
 
 // Configure marked once. We do NOT add the KaTeX extension here — math
@@ -58,7 +59,7 @@ function extractSVG(md: string): { stripped: string; placeholders: Map<string, s
       ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i,
     });
     placeholders.set(id, clean);
-    return `<div class="inline-svg" data-inline-svg="${id}">${id}</div>`;
+    return `<div class="inline-svg" data-inline-svg="svg-${index - 1}">${id}</div>`;
   });
   // Streaming tail: an svg fence whose closing ``` has not arrived yet must
   // not fall through to marked — an unclosed fence turns the entire rest of
@@ -240,8 +241,16 @@ DOMPurify.addHook('afterSanitizeAttributes', (node) => {
 export function renderMarkdown(input: string, options?: { streaming?: boolean }): MarkdownRender {
   const streaming = options?.streaming ?? false;
 
+  // GUI scripts remain opaque to marked/math and never enter host innerHTML.
+  const interactive: MarkdownRender['interactive'] = [];
+  const withoutGUI = input.replace(/```[ \t]*html-interactive[ \t]*\r?\n([\s\S]*?)```/gi, (_, code: string) => {
+    if (interactive.length >= 8 || code.length > 200_000) return '<p>交互图示超过显示预算。</p>';
+    const id = `gui-${interactive.length}`; interactive.push({ id, code });
+    return `<div data-interactive-id="${id}" class="interactive-placeholder"></div>`;
+  }).replace(/```[ \t]*html-interactive[ \t]*\r?\n[\s\S]*$/i, '<div class="mermaid-placeholder">交互图示正在生成…</div>');
+
   // Step 1: extract math BEFORE marked touches anything.
-  const { stripped, placeholders } = extractMath(input);
+  const { stripped, placeholders } = extractMath(withoutGUI);
 
   // Step 2: fenced SVG is treated as display media, sanitized before it can
   // enter the general Markdown HTML pipeline. External fetches and active SVG
@@ -272,12 +281,12 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
   // Step 5: sanitize. KaTeX tags/attrs are whitelisted so the MathML
   // half of the output (used for screen readers + copy) survives.
   const safe = DOMPurify.sanitize(withMath, {
-    ADD_ATTR: ['data-mermaid-id', 'data-inline-svg', 'viewBox', ...KATEX_ATTRS],
+    ADD_ATTR: ['data-mermaid-id', 'data-inline-svg', 'data-interactive-id', 'viewBox', ...KATEX_ATTRS],
     ADD_TAGS: KATEX_TAGS,
     FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed'],
   });
 
-  return { html: safe, mermaid: blocks };
+  return { html: safe, mermaid: blocks, interactive };
 }
 
 export function useMarkdown(input: string, streaming = false): MarkdownRender {

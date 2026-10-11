@@ -671,7 +671,20 @@ func (s *Server) handleDeleteSource(w http.ResponseWriter, r *http.Request) {
 		learningWorkspaceError(w, err)
 		return
 	}
-	source, err := store.Tombstone(r.PathValue("sourceId"))
+	var source sourcestore.Source
+	mutate := func() error {
+		if e := sourcestore.CancelSourceStructureJobs(r.PathValue("id"), r.PathValue("sourceId")); e != nil {
+			return e
+		}
+		var e error
+		source, e = store.Tombstone(r.PathValue("sourceId"))
+		return e
+	}
+	if s.generation != nil {
+		err = s.generation.SourceMutation(mutate)
+	} else {
+		err = mutate()
+	}
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -687,22 +700,25 @@ func (s *Server) handlePermanentDeleteSource(w http.ResponseWriter, r *http.Requ
 		httpx.Error(w, http.StatusBadRequest, "permanent deletion confirmation is required")
 		return
 	}
-	tasks, err := assistant.NewTaskStore(r.PathValue("id"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
-	active, err := tasks.HasActiveSource(r.PathValue("sourceId"))
-	if err != nil {
-		learningWorkspaceError(w, err)
-		return
-	}
 	store, err := sourcestore.New(r.PathValue("id"))
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
 	}
-	source, err := store.PermanentlyDelete(r.PathValue("sourceId"), active)
+	var source sourcestore.Source
+	mutate := func() error {
+		if e := sourcestore.CancelSourceStructureJobs(r.PathValue("id"), r.PathValue("sourceId")); e != nil {
+			return e
+		}
+		var e error
+		source, e = store.PermanentlyDelete(r.PathValue("sourceId"), false)
+		return e
+	}
+	if s.generation != nil {
+		err = s.generation.SourceMutation(mutate)
+	} else {
+		err = mutate()
+	}
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return
@@ -761,23 +777,28 @@ func (s *Server) handleReadSourceContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	source, revision, err := store.Get(r.PathValue("sourceId"))
-	if err != nil || source.Status != "ready" || revision.RevisionID != r.PathValue("revisionId") || len(revision.DerivedFiles) != 1 {
+	if err != nil || source.Status != "ready" || revision.RevisionID != r.PathValue("revisionId") {
 		http.NotFound(w, r)
 		return
 	}
-	content := revision.DerivedFiles[0]
-	if content.Key != "content" || content.Path != "derived/content.md" || !strings.HasPrefix(strings.ToLower(content.MediaType), "text/markdown") {
+	var content sourcestore.FileRef
+	for _, file := range revision.DerivedFiles {
+		if file.Key == "content" {
+			content = file
+			break
+		}
+	}
+	if content.Key != "content" || !strings.HasPrefix(strings.ToLower(content.MediaType), "text/markdown") {
 		http.NotFound(w, r)
 		return
 	}
-	root, _ := workspace.ProjectRootForSlug(r.PathValue("id"))
-	path, ok := safeWorkspaceFile(filepath.Join(root, "sources", source.SourceID, "revisions", revision.RevisionID), content.Path)
-	if !ok {
+	_, _, body, err := store.ReadRevision(source.SourceID, revision.RevisionID, content.SHA256)
+	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	http.ServeFile(w, r, path)
+	_, _ = w.Write(body)
 }
 
 func safeWorkspaceFile(base, relative string) (string, bool) {

@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-const indexerVersion = "lexical-1"
+const indexerVersion = "structured-2"
 
 type indexNode struct {
 	ID     string     `json:"nodeId"`
@@ -31,6 +31,8 @@ type chunk struct {
 	Length int      `json:"length"`
 }
 type index struct {
+	DerivedVersionID    string                 `json:"derivedVersionId,omitempty"`
+	StructureHash       string                 `json:"structureHash,omitempty"`
 	SchemaVersion       int                    `json:"schemaVersion"`
 	SourceID            string                 `json:"sourceId"`
 	RevisionID          string                 `json:"revisionId"`
@@ -124,6 +126,8 @@ func terms(text string) []string {
 }
 func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
 	ix := &index{SchemaVersion: 1, SourceID: d.SourceID, RevisionID: d.RevisionID, ContentHash: d.ContentHash, IndexerVersion: indexerVersion, BuiltAt: time.Now().UTC(), ExtractionTruncated: d.ExtractionCoverage.ExtractionTruncated, ReadableBytes: len(body), Postings: map[string]map[int]int{}}
+	ix.DerivedVersionID = d.DerivedVersionID
+	ix.StructureHash = d.StructureHash
 	offset := 0
 	fence := ""
 	var stack []int
@@ -187,7 +191,13 @@ func buildIndex(ctx context.Context, d Document, body string) (*index, error) {
 	boundaries = append(boundaries, len(body))
 	sort.Ints(boundaries)
 	start := 0
+	protected := protectedBlocks(body)
 	add := func(end int) {
+		for _, b := range protected {
+			if end > b.Start && end < b.End {
+				end = b.End
+			}
+		}
 		if end <= start {
 			return
 		}

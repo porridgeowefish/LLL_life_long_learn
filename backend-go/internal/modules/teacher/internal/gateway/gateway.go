@@ -148,7 +148,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 					} `json:"tool_calls"`
 				} `json:"delta"`
 			} `json:"choices"`
-			Usage struct {
+			Usage *struct {
 				PromptTokens     int `json:"prompt_tokens"`
 				CompletionTokens int `json:"completion_tokens"`
 			} `json:"usage"`
@@ -178,7 +178,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 				buffers.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
 			}
 		}
-		if chunk.Usage.PromptTokens+chunk.Usage.CompletionTokens > 0 {
+		if chunk.Usage != nil {
 			emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": chunk.Usage.PromptTokens, "outputTokens": chunk.Usage.CompletionTokens}})
 		}
 		return nil
@@ -402,12 +402,12 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				Signature   string `json:"signature"`
 			} `json:"delta"`
 			Message struct {
-				Usage struct {
+				Usage *struct {
 					InputTokens  int `json:"input_tokens"`
 					OutputTokens int `json:"output_tokens"`
 				} `json:"usage"`
 			} `json:"message"`
-			Usage struct {
+			Usage *struct {
 				InputTokens  int `json:"input_tokens"`
 				OutputTokens int `json:"output_tokens"`
 			} `json:"usage"`
@@ -419,7 +419,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		case "message_start":
 			// message_start carries usage nested inside its message envelope;
 			// input token counts only exist there.
-			if event.Message.Usage.InputTokens > 0 {
+			if event.Message.Usage != nil {
 				emit(Event{Type: "usage", Usage: map[string]int{"inputTokens": event.Message.Usage.InputTokens}})
 			}
 		case "content_block_start":
@@ -493,7 +493,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				delete(toolBuffers.values, event.Index)
 			}
 		case "message_delta":
-			if event.Usage.OutputTokens > 0 {
+			if event.Usage != nil {
 				emit(Event{Type: "usage", Usage: map[string]int{"outputTokens": event.Usage.OutputTokens}})
 			}
 		case "message_stop":

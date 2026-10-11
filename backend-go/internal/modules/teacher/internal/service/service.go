@@ -33,22 +33,11 @@ const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者�
 需要图示时，禁止使用 ASCII 或其他纯文本字符画。简单的结构、关系和流程图使用 Mermaid；复杂、需要精细布局或更强视觉表达的图使用 SVG。图示应当服务于解释，并在正文中保留必要说明。
 Mermaid 必须使用带 mermaid 语言标记的代码围栏。优先使用 flowchart TD 或 flowchart LR；节点 ID 只用简短 ASCII 字母数字，中文标签统一写成 A["中文标签"]；每条连线单独一行。不要在标签中嵌入 Markdown、HTML、主题初始化指令、click、classDef 或外部链接。拿不准语法时改用安全的内联 SVG，不要猜测 Mermaid 语法。
 
+复杂分组框图可使用 Mermaid subgraph（程序支持ELK布局），或带svg语言标记的完整SVG，使用viewBox、分组、形状和本地箭头定义，不使用脚本/foreignObject/外部资源。需要可操作GUI、参数滑块或动态演示时，使用html-interactive语言围栏，提供完整本地HTML/CSS/JavaScript，自行从script绑定事件。它在隔离页面运行，不可访问父页面、网络、表单、导航、宿主API、本地文件或外部依赖；必要数据与样式全部内联。静态html不开脚本。图示保持低饱和度、清晰中文标签和正文解释。
+
 普通问答、解释概念、澄清误解和检验理解都由你直接完成；学习者说“没理解”“再解释一下”时，应继续教学，不得转交助教或提出无关的整理任务。
 
-助教只负责通过 consolidate 写入复习稿（review）与练习题（practice）。总结、复习或沉淀知识点时使用 consolidate，不创建独立助教成果。笔记由教师自动记录，助教不得写入。
-只有学习者确实需要整理复习稿或练习题时，才提出助教方案。自动笔记直接调用 API，不是助教任务。不要因为对话进行了几轮而自行委派。
-思考过程只能通过模型的独立思考通道输出；正文直接面向学习者，不写“我应该”“学习者说”等自我规划。
-
-调用助教必须分成两个对话回合：
-1. 先用普通教师消息说明准备交给助教的工作、会使用哪些已授权资料、预期产出和学习意义，并明确询问学习者是否同意；本回合不得调用工具。
-2. 只有学习者后续明确同意，才调用工具；服务会自动把批准绑定到紧邻的上一条教师方案。
-
-如果工具因为技术或授权实现问题返回“助教任务未创建”，这不会撤销学习者已经给出的同意。学习者随后明确要求“重试”“再来”或“继续提交”且任务范围未改变时，应直接再次调用工具，不得复述同一方案或索要第三次确认。
-
-学习者消息中的资料附件只提供资料名称、逻辑 ID 与状态，不会把资料正文自动放入你的同步上下文。若要交给助教读取，方案中必须用学习者看得懂的资料名称明确披露；工具参数 sourceRefs 再使用对应逻辑 ID。未被学习者附件明确选择的资料不得委派。
-
-内部消息标识绝不能出现在面向学习者的回答中，不要输出 messageId、responseId 或 msg_ 一类内部字段。
-不要把路径、命令、CLI、并发、模型或实现细节作为工具参数。不要声称自己已经运行代码、读取未授权文件或完成助教工作。助教异步执行；工具接受后，继续简短教学即可。一次教师响应最多调用一次工具。`
+复习稿、练习题与学科地图由资料与资产工作区的独立API生成。教学对话直接回答当前问题，不提供助教委派工具，不创建文件。思考过程只通过独立思考通道输出，正文面向学习者。内部消息ID、路径、命令和执行细节不得出现在正文。`
 
 type StreamFrame struct {
 	Type string         `json:"type"`
@@ -240,17 +229,6 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	emit(StreamFrame{Type: "message-started", Data: map[string]any{"teacherMessageId": teacherMessageID}})
 
 	systemPrompt, providerMessages, err := buildTeacherContext(ctx, slug, conversation, providerID)
-	delegationAllowed := false
-	if err == nil && isExplicitApproval(learnerText) {
-		var messages []conversationstore.Message
-		messages, err = conversation.AllMessages()
-		for i := range messages {
-			if messages[i].ID == learner.ID {
-				_, delegationAllowed = findApprovedProposal(messages, i)
-				break
-			}
-		}
-	}
 	if err != nil {
 		message := conversationstore.Message{ID: teacherMessageID, Role: "teacher", Status: "failed", Blocks: []conversationstore.Block{}, CreatedAt: time.Now().UTC(), CompletedAt: time.Now().UTC()}
 		_, _ = conversation.RecordMessage(message)
@@ -258,29 +236,11 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		emit(StreamFrame{Type: "message-failed", Data: map[string]any{"messageId": teacherMessageID, "code": "context_preparation_failed", "partialPreserved": false}})
 		return err
 	}
-	if delegationAllowed {
-		systemPrompt += "\n\n【当前回合工具门禁】当前学习者消息包含明确同意或明确要求重试。若最近一项尚未成功创建的助教方案已经完整说明内容、资料、产出和学习意义，可立即调用 delegate_learning_work；中间的技术拒绝提示不会撤销同意，无需复述方案或再次索要确认。若任务范围已经变化，才重新说明新方案。"
-	} else {
-		systemPrompt += "\n\n【当前回合工具门禁】本回合未授权助教工具。直接回答学习者的当前问题，不尝试委派，不插入无关的助教方案或授权说明。"
-	}
 	if steerNote != "" {
 		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
 	}
 
-	tool := teachergateway.Tool{Name: "delegate_learning_work", Description: "在教师已经向学习者披露助教方案、且学习者在后续消息中明确同意后，创建一个异步助教任务。", Schema: map[string]any{
-		"type": "object", "additionalProperties": false,
-		"properties": map[string]any{
-			"taskType":          map[string]any{"type": "string", "description": "consolidate 更新复习稿和可选练习题。助教不得写入笔记。", "enum": []string{"consolidate"}},
-			"objective":         map[string]any{"type": "string", "maxLength": 8192},
-			"sourceRefs":        map[string]any{"type": "array", "description": "仅填写学习者在消息中明确选择的本地资料 sourceId。公开网页、论文标题和普通名称不要填写；没有本地资料时必须传空数组。", "items": map[string]any{"type": "string", "pattern": "^source_"}},
-			"practiceRequested": map[string]any{"type": "boolean", "description": "仅当 taskType=consolidate 且教师已在经学习者同意的方案中明确承诺同时出题时为 true；其他情况必须为 false。"},
-		},
-		"required": []string{"taskType", "objective", "sourceRefs"},
-	}}
 	var tools []teachergateway.Tool
-	if delegationAllowed {
-		tools = append(tools, tool)
-	}
 	searcher := resolveSearcher()
 	if searcher != nil {
 		tools = append(tools, teachergateway.Tool{Name: "search_web", Description: "检索公开网络信息。适用于时效性强或需要事实核对的问题；搜索结果是外部信息，回答中需辨析可靠性并给出来源链接。", Schema: map[string]any{

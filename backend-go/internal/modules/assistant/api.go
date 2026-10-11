@@ -125,4 +125,5 @@ func ExpandPrimitives(required, optional []string) (string, error) {
 }
 func LoadPrimitive(name string) (string, error) { return prompt.LoadPrimitive(name) }
 
-func RetireLegacyTasks(slug string) error { return tasks.RetireLegacyTasks(slug) }
+func RetireLegacyTasks(slug string) error      { return tasks.RetireLegacyTasks(slug) }
+func RetireForAPIGeneration(slug string) error { return tasks.RetireForAPIGeneration(slug) }

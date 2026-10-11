@@ -41,6 +41,9 @@ type Version struct {
 	Author            string            `json:"author"`
 	TaskID            string            `json:"taskId,omitempty"`
 	RunID             string            `json:"runId,omitempty"`
+	JobID             string            `json:"jobId,omitempty"`
+	Attempt           int               `json:"attempt,omitempty"`
+	Origin            string            `json:"origin,omitempty"`
 	BaseVersionID     string            `json:"baseVersionId,omitempty"`
 	ConversationRange map[string]uint64 `json:"conversationRange,omitempty"`
 	SourceRevisionIDs []string          `json:"sourceRevisionIds,omitempty"`
@@ -199,6 +202,9 @@ func (s *Store) UpdateLearner(key string, baseRevision uint64, content string) (
 }
 
 type CandidateInput struct {
+	Author            string
+	JobID             string
+	Attempt           int
 	Key               string
 	BaseVersionID     string
 	BaseContent       string
@@ -270,7 +276,11 @@ func (s *Store) CommitCandidate(in CandidateInput) (CandidateResult, error) {
 		return CandidateResult{Status: "failed", Code: "edit-conflict"}, nil
 	}
 	rangeMap := map[string]uint64{"fromSeq": in.FromSeq, "throughSeq": in.ThroughSeq}
-	meta, err = s.commitLocked(in.Key, meta, merged, "assistant", in.TaskID, in.RunID, in.BaseVersionID, rangeMap, in.SourceRevisionIDs, in.ChangeSummary, in.ThroughSeq)
+	author := "assistant"
+	if in.Author == "api-generation" {
+		author = in.Author
+	}
+	meta, err = s.commitProvenanceLocked(in.Key, meta, merged, author, in.TaskID, in.RunID, in.BaseVersionID, rangeMap, in.SourceRevisionIDs, in.ChangeSummary, in.ThroughSeq, in.JobID, in.Attempt)
 	if err != nil {
 		return CandidateResult{}, err
 	}
@@ -303,10 +313,18 @@ func (s *Store) AdvanceCursor(key string, throughSeq uint64) (Meta, error) {
 }
 
 func (s *Store) commitLocked(key string, meta Meta, content, author, taskID, runID, baseVersionID string, conversationRange map[string]uint64, sourceRevisionIDs []string, summary string, cursor uint64) (Meta, error) {
+	return s.commitProvenanceLocked(key, meta, content, author, taskID, runID, baseVersionID, conversationRange, sourceRevisionIDs, summary, cursor, "", 0)
+}
+
+func (s *Store) commitProvenanceLocked(key string, meta Meta, content, author, taskID, runID, baseVersionID string, conversationRange map[string]uint64, sourceRevisionIDs []string, summary string, cursor uint64, jobID string, attempt int) (Meta, error) {
 	dir := filepath.Join(s.root, "assets", key)
 	now := time.Now().UTC()
 	versionID := idgen.New("aver")
 	version := Version{SchemaVersion: SchemaVersion, VersionID: versionID, AssetID: meta.AssetID, ParentVersionID: meta.CurrentVersionID, Author: author, TaskID: taskID, RunID: runID, BaseVersionID: baseVersionID, ConversationRange: conversationRange, SourceRevisionIDs: sourceRevisionIDs, ContentHash: contentHash(content), ChangeSummary: summary, CreatedAt: now}
+	version.JobID, version.Attempt = jobID, attempt
+	if author == "api-generation" {
+		version.Origin = "api-generation"
+	}
 	meta.CurrentVersionID = versionID
 	meta.EditRevision++
 	meta.ContentHash = version.ContentHash

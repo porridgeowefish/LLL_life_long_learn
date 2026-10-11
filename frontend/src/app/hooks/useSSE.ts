@@ -69,6 +69,8 @@ function ensureConnection() {
     SSE_EVENTS.learningActivityUpdated,
     SSE_EVENTS.sourceUpdated,
     SSE_EVENTS.annotationUpdated,
+    SSE_EVENTS.generationJobUpdated,
+    SSE_EVENTS.sourceStructureJobUpdated,
   ];
   for (const name of fanoutNames) {
     es.addEventListener(name, (e) => {

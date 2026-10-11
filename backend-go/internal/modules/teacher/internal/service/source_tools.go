@@ -30,6 +30,8 @@ func sourceTools() []gateway.Tool {
 		{Name: "read_source", Description: "通过服务发行的locator或cursor连续读取原文，并获得实际证据和下一范围。", Schema: schema(map[string]any{"sourceId": id, "revisionId": id, "locator": id, "cursor": id, "maxTokens": map[string]any{"type": "integer", "minimum": 1, "maximum": 4000}}, "sourceId", "revisionId")},
 	}
 }
+
+func GenerationSourceTools() []gateway.Tool { return sourceTools() }
 func isSourceTool(name string) bool {
 	switch name {
 	case "list_source_documents", "get_source_outline", "search_source", "read_source":

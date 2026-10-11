@@ -23,8 +23,9 @@ function mermaidApi() {
         deterministicIds: true,
         suppressErrorRendering: true,
         flowchart: { htmlLabels: false, useMaxWidth: true },
+        layout: 'elk',
       });
-      return module.default;
+      return import('@mermaid-js/layout-elk').then(layouts => { module.default.registerLayoutLoaders(layouts.default); return module.default; });
     });
   }
   return apiPromise;

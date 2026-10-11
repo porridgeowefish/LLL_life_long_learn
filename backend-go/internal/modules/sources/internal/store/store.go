@@ -21,7 +21,7 @@ import (
 
 const (
 	SchemaVersion        = 1
-	DefaultFileLimit     = int64(50 << 20)
+	DefaultFileLimit     = int64(100 << 20)
 	DefaultUnitByteLimit = int64(1 << 30)
 )
 
@@ -31,6 +31,7 @@ type Source struct {
 	DisplayName         string           `json:"displayName"`
 	Status              string           `json:"status"`
 	CurrentRevisionID   string           `json:"currentRevisionId"`
+	DerivedVersionID    string           `json:"derivedVersionId,omitempty"`
 	TombstonedAt        *time.Time       `json:"tombstonedAt,omitempty"`
 	PermanentlyDeleted  *time.Time       `json:"permanentlyDeletedAt,omitempty"`
 	FailureCode         string           `json:"failureCode,omitempty"`
@@ -88,14 +89,15 @@ type Privacy struct {
 }
 
 type Revision struct {
-	SchemaVersion int       `json:"schemaVersion"`
-	RevisionID    string    `json:"revisionId"`
-	SourceID      string    `json:"sourceId"`
-	Original      FileRef   `json:"original"`
-	DerivedFiles  []FileRef `json:"derivedFiles"`
-	ParseTaskID   string    `json:"parseTaskId,omitempty"`
-	Privacy       Privacy   `json:"privacy"`
-	CreatedAt     time.Time `json:"createdAt"`
+	SchemaVersion    int       `json:"schemaVersion"`
+	RevisionID       string    `json:"revisionId"`
+	SourceID         string    `json:"sourceId"`
+	Original         FileRef   `json:"original"`
+	DerivedFiles     []FileRef `json:"derivedFiles"`
+	ParseTaskID      string    `json:"parseTaskId,omitempty"`
+	Privacy          Privacy   `json:"privacy"`
+	CreatedAt        time.Time `json:"createdAt"`
+	DerivedVersionID string    `json:"derivedVersionId,omitempty"`
 }
 
 type Store struct {
@@ -115,8 +117,8 @@ func New(slug string) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	if state.ProjectType != workspace.ProjectTypeSystemLearning {
-		return nil, errors.New("sources require system-learning project")
+	if state.ProjectType != workspace.ProjectTypeSystemLearning && state.ProjectType != workspace.ProjectTypeDisciplineMap {
+		return nil, errors.New("sources require a learning or map project")
 	}
 	root, err := workspace.ProjectRootForSlug(slug)
 	if err != nil {
@@ -226,6 +228,18 @@ func (s *Store) List() ([]Source, error) {
 		}
 		var source Source
 		if readJSON(filepath.Join(s.root, entry.Name(), "source.json"), &source) == nil {
+			if source.Status != "deleted" && source.Status != "tombstoned" {
+				var rev Revision
+				if readJSON(filepath.Join(s.root, source.SourceID, "revisions", source.CurrentRevisionID, "revision.json"), &rev) == nil {
+					source.DerivedVersionID = rev.DerivedVersionID
+					if source.DerivedVersionID == "" {
+						source.DerivedVersionID = "unparsed"
+						if len(rev.DerivedFiles) > 0 {
+							source.DerivedVersionID = "legacy"
+						}
+					}
+				}
+			}
 			out = append(out, source)
 		}
 	}
@@ -247,6 +261,22 @@ func (s *Store) Get(sourceID string) (Source, Revision, error) {
 	if err := readJSON(filepath.Join(s.root, sourceID, "revisions", source.CurrentRevisionID, "revision.json"), &revision); err != nil && source.PermanentlyDeleted == nil {
 		return Source{}, Revision{}, err
 	}
+	if source.PermanentlyDeleted == nil {
+		if len(revision.DerivedFiles) > 0 || revision.DerivedVersionID != "" {
+			var err error
+			revision, err = s.resolveDerivedLocked(revision, "")
+			if err != nil {
+				return source, revision, err
+			}
+		}
+	}
+	if revision.DerivedVersionID == "" {
+		revision.DerivedVersionID = "unparsed"
+		if len(revision.DerivedFiles) > 0 {
+			revision.DerivedVersionID = "legacy"
+		}
+	}
+	source.DerivedVersionID = revision.DerivedVersionID
 	return source, revision, nil
 }
 
@@ -281,15 +311,11 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 	if !safeID(sourceID, "source_") || !safeID(revisionID, "srev_") {
 		return Revision{}, errors.New("invalid source identity")
 	}
-	content, ok := files["content.md"]
-	if !ok || len(files) != 1 || len(mediaTypes) != 1 || !strings.HasPrefix(strings.ToLower(strings.TrimSpace(mediaTypes["content.md"])), "text/markdown") {
-		return Revision{}, errors.New("derived source content must be exactly one content.md markdown file")
-	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var source Source
-	if err := readJSON(filepath.Join(s.root, sourceID, "source.json"), &source); err != nil {
-		return Revision{}, err
+	if e := readJSON(filepath.Join(s.root, sourceID, "source.json"), &source); e != nil {
+		return Revision{}, e
 	}
 	if source.Status == "deleted" || source.Status == "tombstoned" {
 		return Revision{}, ErrSourceDeleted
@@ -297,51 +323,25 @@ func (s *Store) CommitDerived(sourceID, revisionID string, files map[string][]by
 	if source.CurrentRevisionID != revisionID {
 		return Revision{}, ErrRevisionChanged
 	}
-	revisionPath := filepath.Join(s.root, sourceID, "revisions", revisionID, "revision.json")
-	var revision Revision
-	if err := readJSON(revisionPath, &revision); err != nil {
-		return Revision{}, err
+	var rev Revision
+	if e := readJSON(filepath.Join(s.root, sourceID, "revisions", revisionID, "revision.json"), &rev); e != nil {
+		return rev, e
 	}
-	derivedDir := filepath.Join(filepath.Dir(revisionPath), "derived")
-	var refs []FileRef
-	for key, data := range map[string][]byte{"content.md": content} {
-		clean := filepath.Clean(filepath.FromSlash(key))
-		if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
-			return Revision{}, fmt.Errorf("invalid derived path: %q", key)
-		}
-		path := filepath.Join(derivedDir, clean)
-		if err := workspace.AtomicWriteFile(path, data, 0o644); err != nil {
-			return Revision{}, err
-		}
-		sum := sha256.Sum256(data)
-		refs = append(refs, FileRef{Key: strings.TrimSuffix(filepath.Base(clean), filepath.Ext(clean)), Path: filepath.ToSlash(filepath.Join("derived", clean)), MediaType: mediaTypes[key], Bytes: int64(len(data)), SHA256: "sha256:" + hex.EncodeToString(sum[:])})
-	}
-	sort.Slice(refs, func(i, j int) bool { return refs[i].Path < refs[j].Path })
-	revision.DerivedFiles = refs
-	if err := writeJSON(revisionPath, revision); err != nil {
-		return Revision{}, err
-	}
-	return revision, nil
+	e := s.publishDerivedLocked(&rev, files, mediaTypes, nil, "")
+	return rev, e
 }
 
 // ReadContent returns the canonical parsed Markdown for a ready source. It is
 // the only source body that a teacher citation may place in provider context.
 func (s *Store) ReadContent(sourceID string) (string, error) {
-	source, revision, err := s.Get(sourceID)
-	if err != nil || source.Status != "ready" || len(revision.DerivedFiles) != 1 {
-		return "", os.ErrNotExist
+	source, rev, e := s.Get(sourceID)
+	if e != nil {
+		return "", e
 	}
-	file := revision.DerivedFiles[0]
-	if file.Key != "content" || file.Path != "derived/content.md" || !strings.HasPrefix(strings.ToLower(file.MediaType), "text/markdown") {
-		return "", os.ErrNotExist
-	}
-	data, err := os.ReadFile(filepath.Join(s.root, source.SourceID, "revisions", revision.RevisionID, filepath.FromSlash(file.Path)))
-	if err != nil {
-		return "", err
-	}
-	return string(data), nil
+	_, _, data, e := s.ReadRevision(sourceID, source.CurrentRevisionID, "")
+	_ = rev
+	return string(data), e
 }
-
 func (s *Store) Tombstone(sourceID string) (Source, error) {
 	now := time.Now().UTC()
 	source, err := s.SetStatus(sourceID, "tombstoned", "", "")

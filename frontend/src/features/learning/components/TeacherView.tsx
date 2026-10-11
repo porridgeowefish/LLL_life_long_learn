@@ -14,7 +14,6 @@ import {
   resumeTeacherTurn,
   learningWorkspaceKeys,
   useAssistantTasks,
-  useAssets,
   useConversation,
   useSources,
   type AssistantTask,
@@ -47,14 +46,12 @@ interface LiveResponse {
 
 const STREAM_FLUSH_MS = 64;
 const STREAM_SCROLL_MS = 96;
-const terminalTaskStatuses = new Set<AssistantTask['status']>(['succeeded', 'partial', 'failed', 'cancelled']);
 
 export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const queryClient = useQueryClient();
   const conversation = useConversation(slug);
   const tasksQuery = useAssistantTasks(slug);
   const sourcesQuery = useSources(slug);
-  const assetsQuery = useAssets(slug);
   const modelSettings = useAskAiSettings();
   const [input, setInput] = useState('');
   const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
@@ -62,7 +59,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const [error, setError] = useState('');
   const [editingQueue, setEditingQueue] = useState<{ queueId: string; content: string } | null>(null);
   const [copiedMessageId, setCopiedMessageId] = useState('');
-  const [taskNotice, setTaskNotice] = useState<{ task: AssistantTask; text: string } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptContentRef = useRef<HTMLDivElement>(null);
@@ -71,7 +67,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const scrollTimer = useRef<number | null>(null);
   const pendingDeltas = useRef({ text: '', reasoning: '' });
   const deltaTimer = useRef<number | null>(null);
-  const previousTaskStates = useRef<Map<string, AssistantTask['status']> | null>(null);
   const reasoningOpen = useRef(new Map<string, boolean>());
   const getReasoningOpen = useCallback((messageID: string) => reasoningOpen.current.get(messageID) ?? false, []);
   const setReasoningOpen = useCallback((messageID: string, open: boolean) => {
@@ -81,26 +76,8 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const sourceNames = useMemo(() => new Map((sourcesQuery.data ?? []).map((source) => [source.sourceId, source.displayName])), [sourcesQuery.data]);
   const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status === 'ready'), [sourcesQuery.data]);
   const availableModels = useMemo(() => (modelSettings.data?.providers ?? []).filter((provider) => provider.id && provider.model && provider.baseURL), [modelSettings.data?.providers]);
-  const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === 'queued' || task.status === 'running'), [tasksQuery.data]);
-  const selectedModel = availableModels.find((provider) => provider.id === providerId);
   const conversationReady = Boolean(conversation.data);
 
-  useEffect(() => {
-    const current = new Map((tasksQuery.data ?? []).map((task) => [task.id, task.status]));
-    const seen = readSeenTasks(slug);
-    const completed = (tasksQuery.data ?? []).filter((task) => terminalTaskStatuses.has(task.status) && !seen.has(task.id));
-    const transitioned = previousTaskStates.current
-      ? completed.filter((task) => {
-        const before = previousTaskStates.current?.get(task.id);
-        return before === 'queued' || before === 'running';
-      })
-      : completed;
-    const task = [...transitioned].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
-    if (task) {
-      setTaskNotice({ task, text: taskCompletionText(task) });
-    }
-    previousTaskStates.current = current;
-  }, [slug, tasksQuery.data]);
 
   useEffect(() => {
     if (!providerId && availableModels.length) setProviderId(modelSettings.data?.bindings?.teacher?.providerId || modelSettings.data?.default || availableModels[0].id);
@@ -148,7 +125,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         if (transcript && followStream.current) transcript.scrollTop = transcript.scrollHeight;
       });
     }, STREAM_SCROLL_MS);
-  }, [conversation.data?.messages.length, live?.learner.id, live?.text, live?.teacherId, live?.notice, taskNotice]);
+  }, [conversation.data?.messages.length, live?.learner.id, live?.text, live?.teacherId, live?.notice]);
 
   // Initial history and deferred Markdown/Mermaid layout do not finish in the
   // same frame. Keep the viewport pinned while the content settles; once the
@@ -398,14 +375,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     });
   };
 
-  const dismissTaskNotice = () => {
-    if (!taskNotice) return;
-    const key = `lll.teacher.seenTasks.${slug}`;
-    const seen = readSeenTasks(slug);
-    seen.add(taskNotice.task.id);
-    localStorage.setItem(key, JSON.stringify([...seen].slice(-200)));
-    setTaskNotice(null);
-  };
+
 
 
   return (
@@ -452,7 +422,6 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             ], createdAt: new Date().toISOString() }} tasks={live.taskIds.map((id) => tasksById.get(id) ?? { id, type: 'consolidate', objective: '助教任务', status: 'queued', createdAt: '', updatedAt: '' })} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} notice={live.notice} streaming />
           </>
         )}
-        {taskNotice && <div className={s.taskNotice} role="status"><div><strong>{taskNotice.text}</strong><span>{taskNotice.task.objective}</span></div><div><button type="button" onClick={dismissTaskNotice}>知道了</button></div></div>}
         {error && <div className={s.error}>{error}</div>}
         <div className={s.streamAnchor} aria-hidden="true" />
         </div>
@@ -500,43 +469,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       </form>
       </div>
       </div>
-      <aside className={s.dataRail} aria-label="学习单元数据">
-        <header><span>UNIT SIGNALS</span><h2>学习数据</h2></header>
-        <dl>
-          <div><dt>对话</dt><dd>{conversation.data?.totalMessages ?? conversation.data?.messages.length ?? 0}<small> 条消息</small></dd></div>
-          <div><dt>资料</dt><dd>{availableSources.length}<small> 份可引用</small></dd></div>
-          <div><dt>助教</dt><dd>{activeTasks.length ? activeTasks.length : (tasksQuery.data?.length ?? 0)}<small>{activeTasks.length ? ' 项进行中' : ' 项记录'}</small></dd></div>
-        </dl>
-        <section>
-          <span>当前模型</span>
-          <strong>{selectedModel?.name || selectedModel?.model || '使用默认配置'}</strong>
-          {selectedModel?.name && <small>{selectedModel.model}</small>}
-        </section>
-        <section>
-          <span>教学资产</span>
-          <ul>{(assetsQuery.data ?? []).map((assetMeta) => <li key={assetMeta.key}><i /><span>{assetMeta.title}</span><small>v{assetMeta.editRevision}</small></li>)}</ul>
-        </section>
-        <p>助教在后台异步工作；任务被接受后会显示在对应教师消息下方。</p>
-      </aside>
+
     </section>
   );
-}
-
-function readSeenTasks(slug: string) {
-  try {
-    const value = JSON.parse(localStorage.getItem(`lll.teacher.seenTasks.${slug}`) || '[]');
-    return new Set<string>(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
-  } catch {
-    return new Set<string>();
-  }
-}
-
-function taskCompletionText(task: AssistantTask) {
-  if (task.status === 'cancelled') return '助教任务已在终端取消。';
-  if (task.status === 'failed') return '助教任务执行失败，请查看任务说明。';
-  if (task.status === 'partial') return '助教已部分完成，可查看已提交的成果。';
-  if (Object.values(task.result?.assetUpdates ?? {}).includes('updated')) return '助教已完成，教学资产已经更新。';
-  return '助教任务已完成。';
 }
 
 function handleFrame(frame: TeacherStreamFrame, setLive: React.Dispatch<React.SetStateAction<LiveResponse | null>>) {
@@ -581,7 +516,7 @@ interface MessageActions {
   onRegenerate: () => void;
 }
 
-const Message = memo(function Message({ slug, message, tasks, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
+const Message = memo(function Message({ slug, message, sourceNames, getReasoningOpen, setReasoningOpen, notice, streaming = false, actions }: { slug: string; message: ConversationMessage; tasks: AssistantTask[]; sourceNames: Map<string, string>; getReasoningOpen: (messageID: string) => boolean; setReasoningOpen: (messageID: string, open: boolean) => void; notice?: string; streaming?: boolean; actions?: MessageActions }) {
   const teacher = message.role === 'teacher';
   const [selectedEvidence, setSelectedEvidence] = useState('');
   const citations = message.sourceCitations ?? [];
@@ -609,9 +544,7 @@ const Message = memo(function Message({ slug, message, tasks, sourceNames, getRe
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
         {notice && <div className={s.notice}>{notice}</div>}
-        {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}
-        {tasks.map((task) => <TaskCard key={task.id} slug={slug} task={task} />)}
-        {actions && !streaming && (
+        {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}        {actions && !streaming && (
           <div className={s.messageActions}>
             <button type="button" className={s.iconButton} title={actions.copied ? '已复制' : '复制原文'} aria-label={actions.copied ? '已复制' : '复制原文'} onClick={() => void actions.onCopy(message)}><CopyIcon />{actions.copied && <span className={s.copiedMark}>已复制</span>}</button>
             <button type="button" className={s.iconButton} title="下载本条文本" aria-label="下载本条文本" onClick={() => actions.onDownload(message)}><DownloadIcon /></button>
@@ -667,16 +600,4 @@ function sameTasks(left: AssistantTask[], right: AssistantTask[]) {
     const other = right[index];
     return task.id === other?.id && task.status === other.status && task.updatedAt === other.updatedAt;
   });
-}
-
-function TaskCard({ task }: { slug: string; task: AssistantTask }) {
-  const label: Record<AssistantTask['status'], string> = { queued: '等待助教', running: '助教执行中', succeeded: '助教已完成', partial: '部分完成', failed: '执行失败', cancelled: '已在终端取消' };
-  return (
-    <div className={s.taskCard} data-status={task.status}>
-      <div><span className={s.taskDot} /><strong>{label[task.status] ?? '助教任务'}</strong><small>{task.phase ? ` · ${task.phase}` : ''}</small></div>
-      <p>{task.objective || '助教正在处理已确认的工作。'}</p>
-      {task.result?.summary && <p className={s.taskResult}>{task.result.summary}</p>}
-      {task.failure && <p className={s.taskFailure}>{task.failure.message}{task.failure.suggestion ? ` ${task.failure.suggestion}` : ''}</p>}
-    </div>
-  );
 }

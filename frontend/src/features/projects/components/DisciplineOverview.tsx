@@ -3,9 +3,6 @@ import { useNavigate } from 'react-router-dom';
 
 import {
   useDisciplineLearningPlan,
-  useDisciplineOverview,
-  useDisciplineTopics,
-  useGenerateDisciplineOverview,
   useSaveDisciplineLearningPlan,
 } from '@/features/projects/api/projects';
 import { useFolders, useSaveFolders } from '@/features/projects/api/folders';
@@ -14,7 +11,8 @@ import { EmptyState } from '@/shared/primitive/EmptyState';
 import { Icon } from '@/shared/primitive/Icon';
 import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { assignProject, type FolderLayout } from '@/features/projects/lib/folders';
-import { useSessionStore } from '@/shared/store/slices/session';
+import { GenerationControl, SourceImportControl, SourcesView } from '@/features/learning';
+import { useDisciplineMap } from '../api/disciplineMap';
 import type {
   DisciplineLearningPlanResponse,
   DisciplineLearningTask,
@@ -104,19 +102,18 @@ function cleanHeading(value: string): string {
 
 export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
   const navigate = useNavigate();
-  const setActiveSession = useSessionStore((state) => state.setActiveSession);
-  const overview = useDisciplineOverview(slug);
-  const disciplineTopics = useDisciplineTopics(slug);
+  const projection = useDisciplineMap(slug);
+  const overview = { ...projection, data: projection.data ? {content: projection.data.overviewMarkdown} : undefined };
+  const disciplineTopics = {data: projection.data?.topics};
   const learningPlan = useDisciplineLearningPlan(slug);
   const saveLearningPlan = useSaveDisciplineLearningPlan(slug);
-  const generate = useGenerateDisciplineOverview(slug);
   const folders = useFolders();
   const saveFolders = useSaveFolders();
   const [createOpen, setCreateOpen] = useState(false);
   const [initialTitle, setInitialTitle] = useState('');
   const [initialScopeSource, setInitialScopeSource] = useState<LearningScopeSource>();
   const [launchNotice, setLaunchNotice] = useState('');
-  const [activeView, setActiveView] = useState<'overview' | 'plan'>('overview');
+  const [activeView, setActiveView] = useState<'overview' | 'plan' | 'sources'>('overview');
   const articleRef = useRef<HTMLElement>(null);
   const documentBodyRef = useRef<HTMLDivElement>(null);
   const content = overview.data?.content ?? '';
@@ -158,7 +155,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       ? disciplineTopics.data?.topics.find((candidate) => candidate.id === topicId)
       : topicCatalogByTitle.get(topicTitle);
     if (topicTitle && !topic) {
-      setLaunchNotice('这个主题还没有可用的范围定义。请重新调用百科 Agent 生成主题边界后再开始系统学习。');
+      setLaunchNotice('这个主题还没有可用的范围定义。请重新生成地图中的主题边界后再开始系统学习。');
       return;
     }
     setInitialTitle(topic?.title ?? topicTitle);
@@ -166,20 +163,11 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       type: 'discipline-map',
       mapSlug: slug,
       topicId: topic.id,
+      mapVersionId: projection.data?.mapVersionId,
     } : undefined);
     setCreateOpen(true);
   };
 
-  const launchOverviewAgent = async () => {
-    setLaunchNotice('');
-    try {
-      const result = await generate.mutateAsync();
-      setActiveSession(result.session.id);
-      setLaunchNotice('百科 Agent CLI 已在可见终端启动；它写入学科总览后，本页会自动刷新。');
-    } catch {
-      // Mutation error is rendered beside the trigger.
-    }
-  };
 
   useEffect(() => {
     const host = documentBodyRef.current;
@@ -253,40 +241,15 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
             >
               学习计划
             </button>
+            <button type="button" role="tab" aria-selected={activeView==='sources'} onClick={()=>setActiveView('sources')}>参考资料</button>
           </div>
         </div>
-        <div className={s.actionStack}>
-          <div className={s.actions}>
-            <Button variant="outline" onClick={() => void launchOverviewAgent()} loading={generate.isPending}>
-              {generate.isPending
-                ? '正在启动 Agent CLI'
-                : overviewPending
-                  ? '调用百科 Agent'
-                  : '重新调用百科 Agent'}
-            </Button>
-          </div>
-          {generate.isPending && (
-            <div className={s.generationStatus} role="status">
-              <Icon name="terminal" size={14} />
-              正在创建会话并打开所选 Agent CLI…
-            </div>
-          )}
-          {launchNotice && !generate.isPending && (
-            <div className={s.generationStatus} role="status">
-              <Icon name="terminal" size={14} />
-              {launchNotice}
-            </div>
-          )}
-          {generate.error && (
-            <div className={s.generationError} role="alert">
-              生成失败：{(generate.error as Error).message}
-            </div>
-          )}
-        </div>
+        <div className={s.actionStack}><GenerationControl slug={slug} kind="discipline-map"/><SourceImportControl slug={slug}/></div>
       </header>
 
+      {launchNotice&&<p role="status">{launchNotice}</p>}
       <main className={s.scroll}>
-        {activeView === 'plan' ? (
+        {activeView === 'sources' ? <SourcesView slug={slug}/> : activeView === 'plan' ? (
           learningPlan.isLoading ? (
             <div className={s.loading}>正在读取学习计划…</div>
           ) : learningPlan.error ? (
@@ -308,14 +271,8 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
           <section className={s.emptyOverview}>
             <Icon name="book" size={28} />
             <h2>还没有学科总览</h2>
-            <p>调用百科智能体后，这里会成为该学科统一的总览入口。</p>
-            <Button
-              variant="primary"
-              onClick={() => void launchOverviewAgent()}
-              loading={generate.isPending}
-            >
-              {generate.isPending ? '正在启动 Agent CLI…' : '调用百科 Agent'}
-            </Button>
+            <p>生成地图后，这里会成为该学科统一的总览入口。</p>
+            <GenerationControl slug={slug} kind="discipline-map"/>
           </section>
         ) : (
           <article ref={articleRef} className={s.paper}>

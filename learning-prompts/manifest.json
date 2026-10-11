@@ -1,0 +1,95 @@
+{
+  "sources": [
+    {
+      "version": "iteration-21",
+      "path": "backend-go/internal/modules/assistant/internal/tasks/execute.go",
+      "sha256": "f95b3b5ecdfa0f4b7e9354eff8d0c64500556c20a2d186cc64048f9e2ffca00b"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/charters/explain.md",
+      "sha256": "d0ffc0f2a181b4669d3193c312fe2a1b8c653dc602ca4502b89f58997fcc783a"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/charters/practice.md",
+      "sha256": "8499eb06d8dce8efb5e5e98c415433d6ba34ff01cadf42e46d87e3b0ceb39272"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/charters/encyclopedia.md",
+      "sha256": "82c950c48c69b0fa604df2dc94125a6c6ce185c1a47e7ae316fb2431b05b0dbe"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/registry/explain.json",
+      "sha256": "ccceccdd4cc4c2e7a835b22f0409e9258e71578f05f6e1e5b1b480a9306d8646"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/registry/practice.json",
+      "sha256": "229c1c910a7f71ec30cf7847882024e253ff088a2be9414a0d7d57a17e1ba7f8"
+    },
+    {
+      "version": "iteration-21",
+      "path": "learning-agents/registry/encyclopedia.json",
+      "sha256": "9ac8ceea58566238f2cfe117f9192b8d652902f6dce1b2ee5f3072fc13183324"
+    }
+  ],
+  "version": "iteration-22-v1",
+  "schemaVersion": 1,
+  "resources": [
+    {
+      "path": "learning-prompts/common.md",
+      "sha256": "df27244e47f82761e4d747085e247a6e863edfefaa3f05ee9406a3ffda563744"
+    },
+    {
+      "path": "learning-prompts/discipline-map.md",
+      "sha256": "ea9facf2964831cb2f747845c4c5b73869da2a5ecde04260eada77c8e2435e96"
+    },
+    {
+      "path": "learning-prompts/practice.md",
+      "sha256": "9c00367a5395ab5e96e91c8f7cb0e656abb5df6d8c1eae23d47662505101b056"
+    },
+    {
+      "path": "learning-prompts/review.md",
+      "sha256": "3476117def492011aa2226b45f1665488603ae73d82488abe42d978d84bffeae"
+    },
+    {
+      "path": "learning-prompts/primitives/analogy.md",
+      "sha256": "e30434a4b42920e80a6a4cc93a55fb78333d7bd6574c95d7b373dc6dc6d01dce"
+    },
+    {
+      "path": "learning-prompts/primitives/boundary_map.md",
+      "sha256": "299f60fa66c89aee9ee2602bcbcf4e70e4095fadcd570f09282fc119f6393ab1"
+    },
+    {
+      "path": "learning-prompts/primitives/concept_graph.md",
+      "sha256": "676817e42292d993431176d78599fe10fed1cb596a6475cefeb714733e0d3965"
+    },
+    {
+      "path": "learning-prompts/primitives/first_principles.md",
+      "sha256": "7d5d8ac01151baa37baa9222f371a1516393f7a96e59b85814b9dd8788d98119"
+    },
+    {
+      "path": "learning-prompts/primitives/mece_decompose.md",
+      "sha256": "028a5dbeeed983046bd432a1a7217100f1d08690ff44b5478e1e4366e488736a"
+    },
+    {
+      "path": "learning-prompts/primitives/misconception.md",
+      "sha256": "e1573e4aae2c28db850de6f20dad1dac29da3697d005ef041d84dc6805ec19fc"
+    },
+    {
+      "path": "learning-prompts/primitives/prerequisite_scaffold.md",
+      "sha256": "930b39be2b0710ba7110825380bb5b475123a57767e26b0bc4ba01e81e3d9599"
+    },
+    {
+      "path": "learning-prompts/primitives/research_question_frame.md",
+      "sha256": "d522bfa00d12c03613664c60702302a64b289aef59316b20519bf6678de8b337"
+    },
+    {
+      "path": "learning-prompts/primitives/transfer.md",
+      "sha256": "64eddb9054ace0d8370bcf8554d0ec0a23e1cafd11f17d6ff6b5e80dd6e468cb"
+    }
+  ]
+}

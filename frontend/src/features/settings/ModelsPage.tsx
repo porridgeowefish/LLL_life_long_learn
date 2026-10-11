@@ -1,121 +1,158 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAskAiSettings, useProbeAskAi, useSaveAskAiSettings, type AskConfig, type AskProvider } from './askAi';
+import { discoverModels, useAskAiSettings, useProbeAskAi, useSaveAskAiSettings, type AskConfig, type AskProvider } from './askAi';
 import { applyProviderPreset, CODING_PLAN_LINKS, presetForProvider, PROVIDER_PRESETS } from './providerPresets';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
+import { Modal } from '@/shared/primitive/Modal';
 import { SecretInput } from '@/shared/primitive/SecretInput';
 import s from './ModelsPage.module.css';
 
-const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: config.providers.map(provider => ({ ...provider })),
+const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: config.providers.map(p => ({ ...p })),
   bindings: Object.fromEntries(Object.entries(config.bindings ?? {}).map(([key, value]) => [key, { ...value }])),
 });
-const freshProvider = (): AskProvider => applyProviderPreset({ id: `provider-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-  kind: 'openai', baseURL: '', apiKey: '', model: '' }, PROVIDER_PRESETS[0]);
-
+const PURPOSES = [ ['teacher', '教师'], ['annotationAskAI', 'Ask AI'], ['review', '复习稿'], ['practice', '练习'],
+  ['disciplineMap', '学科地图'], ['documentStructure', '文档公式识别'] ] as const;
+interface Editor { token: number; provider: AskProvider; original: string; isNew: boolean; presetId: string }
 export function ModelsPage() {
   const settings = useAskAiSettings();
   const save = useSaveAskAiSettings();
   const probe = useProbeAskAi();
   const [draft, setDraft] = useState<AskConfig | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const editorRef = useRef<Editor | null>(null);
   const dirtyRef = useRef(false);
   const revision = useRef(0);
-  const [customIds, setCustomIds] = useState<Set<string>>(new Set());
+  const token = useRef(0);
+  const [dirty, setDirty] = useState(false);
+  const [discard, setDiscard] = useState(false);
+  const [probeResult, setProbeResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const [detected, setDetected] = useState<Map<string, string>>(new Map());
+  const [discovered, setDiscovered] = useState<string[]>([]);
+  const [catalogBusy, setCatalogBusy] = useState(false);
+  const [catalogMessage, setCatalogMessage] = useState('');
+  editorRef.current = editor;
   useEffect(() => { if (settings.data && !dirtyRef.current) setDraft(copyConfig(settings.data)); }, [settings.data]);
-
-  const edit = (change: (current: AskConfig) => AskConfig) => {
-    dirtyRef.current = true; revision.current += 1; setDirty(true); if (!save.isPending) save.reset();
+  const editConfig = (change: (current: AskConfig) => AskConfig) => {
+    dirtyRef.current = true; revision.current++; setDirty(true); save.reset();
     setDraft(current => current ? change(current) : current);
   };
-  const patchProvider = (id: string, patch: Partial<AskProvider>) => {
-    probe.reset();
-    edit(current => {
-      const bindings = { ...current.bindings };
-      if (patch.model !== undefined) {
-        for (const key of ['teacher', 'annotationAskAI']) {
-          if (bindings[key]?.providerId === id) bindings[key] = { providerId: id };
-        }
-      }
-      return { ...current, bindings, providers: current.providers.map(provider => provider.id === id ? { ...provider, ...patch } : provider) };
+  const openEditor = (provider?: AskProvider) => {
+    const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, PROVIDER_PRESETS[0]);
+    const next = { token: ++token.current, provider: value, original: JSON.stringify(value), isNew: !provider, presetId: presetForProvider(value)?.id ?? 'custom' };
+    editorRef.current = next; setEditor(next); setDiscard(false); setProbeResult(null); setDiscovered([]); setCatalogMessage(''); setCatalogBusy(false); probe.reset(); save.reset();
+  };
+  const closeEditor = (force = false) => {
+    if (save.isPending) return;
+    if (!force && editorRef.current && JSON.stringify(editorRef.current.provider) !== editorRef.current.original) { setDiscard(true); return; }
+    editorRef.current = null; setEditor(null); token.current++; setDiscard(false); setProbeResult(null); setCatalogBusy(false);
+  };
+  const patch = (update: Partial<AskProvider>, presetId?: string) => {
+    setProbeResult(null); setDiscard(false); setCatalogMessage(''); setCatalogBusy(false); probe.reset();
+    setEditor(current => {
+      if (!current) return current;
+      const next = { ...current, provider: { ...current.provider, ...update }, ...(presetId ? { presetId } : {}) };
+      editorRef.current = next; return next;
     });
   };
-  const setBinding = (key: string, providerId: string, model?: string) => edit(current => {
-    const bindings = { ...current.bindings };
-    if (providerId) bindings[key] = { providerId, ...(model !== undefined ? { model } : {}) };
-    else delete bindings[key];
-    return { ...current, bindings, ...(key === 'teacher' ? { default: providerId } : {}) };
-  });
-  const removeProvider = (id: string) => {
-    probe.reset();
-    edit(current => {
-      const providers = current.providers.filter(provider => provider.id !== id);
-      const fallback = providers[0]?.id ?? '';
-      const bindings = { ...current.bindings };
-      for (const [key, binding] of Object.entries(bindings)) {
-        if (binding.providerId !== id) continue;
-        if (fallback && key !== 'ocr') bindings[key] = { providerId: fallback };
-        else delete bindings[key];
-      }
-      return { ...current, providers, bindings, default: current.default === id ? fallback : current.default };
-    });
-  };
-  const onSave = () => {
-    if (!draft) return;
-    const savedRevision = revision.current;
-    save.mutate(copyConfig(draft), { onSuccess: () => {
-      if (revision.current === savedRevision) { dirtyRef.current = false; setDirty(false); }
+  const persist = (next: AskConfig, done?: () => void) => {
+    const at = ++revision.current;
+    save.mutate(copyConfig(next), { onSuccess: () => {
+      if (revision.current !== at) return;
+      setDraft(copyConfig(next)); dirtyRef.current = false; setDirty(false); done?.();
     } });
   };
-  if (settings.isError && !draft) return <section className={s.section} role="alert">模型配置读取失败：{(settings.error as Error).message}</section>;
+  const saveEditor = () => {
+    if (!draft || !editor) return;
+    const current = editor;
+    const next = copyConfig(draft);
+    next.providers = current.isNew ? [...next.providers, { ...current.provider }] : next.providers.map(p => p.id === current.provider.id ? { ...current.provider } : p);
+    if (!next.default && current.isNew) next.default = current.provider.id;
+    // Purpose-specific overrides are learner choices, not stale connection fields.
+    persist(next, () => { if (editorRef.current?.token === current.token) { editorRef.current = null; setEditor(null); token.current++; } });
+  };
+  const probeEditor = () => {
+    if (!editor) return;
+    const currentToken = editor.token, fingerprint = JSON.stringify(editor.provider);
+    probe.mutate({ providerId: editor.provider.id, inline: { ...editor.provider } }, {
+      onSuccess: result => { if (editorRef.current?.token !== currentToken || JSON.stringify(editorRef.current.provider) !== fingerprint) return;
+        setProbeResult(result); if (result.ok) setDetected(old => new Map(old).set(editor.provider.id, fingerprint)); },
+      onError: () => { if (editorRef.current?.token === currentToken && JSON.stringify(editorRef.current.provider) === fingerprint) setProbeResult({ ok: false, error: '连接检测失败，请检查地址与密钥。' }); },
+    });
+  };
+  const loadModels = async () => {
+    if (!editor) return;
+    const currentToken = editor.token, fingerprint = JSON.stringify(editor.provider);
+    setCatalogBusy(true); setCatalogMessage('');
+    const matches = () => editorRef.current?.token === currentToken && JSON.stringify(editorRef.current.provider) === fingerprint;
+    try {
+      const result = await discoverModels({ providerId: editor.provider.id, inline: { ...editor.provider } });
+      if (matches()) { setDiscovered(result.models.map(model => model.id)); setCatalogMessage(result.source === 'provider' ? '已获取提供方模型目录' : '当前使用核验预置目录'); }
+    } catch { if (matches()) setCatalogMessage('模型目录暂不可用，可选择预置或填写自定义模型。'); }
+    finally { if (matches()) setCatalogBusy(false); }
+  };
+  const setBinding = (key: string, providerId: string, model?: string) => editConfig(current => {
+    const bindings = { ...current.bindings };
+    if (providerId) bindings[key] = { providerId, ...(model ? { model } : {}) }; else {
+      delete bindings[key];
+      if (key === 'documentStructure') delete bindings.ocr;
+    }
+    return { ...current, bindings, ...(key === 'teacher' ? { default: providerId } : {}) };
+  });
+  if (settings.isError && !draft) return <section className={s.section} role="alert">模型配置读取失败</section>;
   if (!draft) return <section className={s.section} aria-busy="true">加载模型配置…</section>;
-  const providerOptions = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
-
+  const preset = editor ? PROVIDER_PRESETS.find(p => p.id === editor.presetId) : undefined;
+  const modelIds = [...new Set([...(preset?.models.map(m => m.id) ?? []), ...discovered, ...(editor?.provider.model ? [editor.provider.model] : [])])];
+  const options = draft.providers.map(provider => <option key={provider.id} value={provider.id}>{provider.name || provider.model || '未命名连接'}</option>);
   return <section className={s.section} aria-labelledby="api-connections-title">
     <header className={s.header}><h2 id="api-connections-title">API 模型</h2><div className={s.actions}>
-      <Button size="sm" variant="outline" onClick={() => edit(current => { const provider = freshProvider(); return { ...current, providers: [...current.providers, provider], default: current.default || provider.id }; })}><Icon name="plus" size={14} />添加连接</Button>
-      <Button size="sm" loading={save.isPending} onClick={onSave}>保存配置</Button>
+      <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加连接</Button>
+      <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
-    {save.isError && <p className={s.error} role="alert">保存失败：{(save.error as Error).message}</p>}
-    <p className={s.saveStatus} role="status">{dirty ? '有未保存的修改' : save.isSuccess ? '配置已保存' : ''}</p>
+    {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
+    {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">
-      {!draft.providers.length && <p className={s.empty}>尚未添加 API 连接。</p>}
-      {draft.providers.map((provider, index) => {
-        const preset = customIds.has(provider.id) ? undefined : presetForProvider(provider);
-        const currentProbe = probe.variables?.providerId === provider.id && JSON.stringify(probe.variables?.inline) === JSON.stringify(provider);
-        const error = currentProbe ? (probe.isError ? (probe.error as Error).message : probe.data?.ok === false ? (probe.data.error || '提供方未返回成功响应') : undefined) : undefined;
-        return <article key={provider.id} className={s.card} aria-label={`API 连接 ${index + 1}`}>
-          <div className={s.formGrid}>
-            <label>提供方<select value={preset?.id ?? 'custom'} onChange={event => {
-              const selected = PROVIDER_PRESETS.find(item => item.id === event.target.value);
-              setCustomIds(current => { const next = new Set(current); if (selected) next.delete(provider.id); else next.add(provider.id); return next; });
-              if (selected) patchProvider(provider.id, applyProviderPreset(provider, selected)); else probe.reset();
-            }}>{(['官方', '聚合 / 中转', '套餐'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(item => item.group === group).map(item => <option key={item.id} value={item.id} disabled={item.disabled}>{item.name}{item.disabled ? '（仅适用编程客户端）' : ''}</option>)}{group === '套餐' && CODING_PLAN_LINKS.map(item => <option key={item.id} value={item.id} disabled>{item.name}（编程 CLI 专用）</option>)}</optgroup>)}<option value="custom">自行配置</option></select></label>
-            {preset && <label>模型<select value={provider.model} onChange={event => { const model = preset.models.find(item => item.id === event.target.value)!; patchProvider(provider.id, { model: model.id, contextWindowTokens: model.contextWindowTokens }); }}>{preset.models.map((model, modelIndex) => <option key={model.id} value={model.id}>{model.id}{modelIndex === 0 ? '（推荐）' : ''}</option>)}</select></label>}
-            {!preset && <>
-              <label>显示名称<input value={provider.name ?? ''} onChange={event => patchProvider(provider.id, { name: event.target.value })} /></label>
-              <label>接口协议<select value={provider.kind} onChange={event => patchProvider(provider.id, { kind: event.target.value as AskProvider['kind'] })}><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select></label>
-              <label>模型名称<input value={provider.model} onChange={event => patchProvider(provider.id, { model: event.target.value })} /></label>
-              <label className={s.wide}>Base URL<input value={provider.baseURL} onChange={event => patchProvider(provider.id, { baseURL: event.target.value })} /></label>
-              <label>上下文 Token<input type="number" min={16384} step={1024} value={provider.contextWindowTokens ?? ''} placeholder="留空使用安全估计" onChange={event => patchProvider(provider.id, { contextWindowTokens: event.target.value ? Number(event.target.value) : undefined })} /></label>
-              <div className={s.flags}><label><input type="checkbox" checked={!!provider.reasoning} onChange={event => patchProvider(provider.id, { reasoning: event.target.checked })} />显示思考过程</label>{provider.kind === 'anthropic' && <label><input type="checkbox" checked={!!provider.thinking} onChange={event => patchProvider(provider.id, { thinking: event.target.checked })} />启用思考</label>}</div>
-            </>}
-            <label className={s.wide}>API Key<SecretInput value={provider.apiKey} onChange={value => patchProvider(provider.id, { apiKey: value, apiKeyEnv: '' })} />{provider.apiKeyEnv && !provider.apiKey && <small>已使用环境变量密钥；留空保留。</small>}</label>
-          </div>
-          <div className={s.cardFooter}><div className={s.links}>{preset && <><a href={preset.keyURL} target="_blank" rel="noreferrer">获取 Key</a><a href={preset.docsURL} target="_blank" rel="noreferrer">官方文档</a>{preset.planURL && <a href={preset.planURL} target="_blank" rel="noreferrer">Token Plan</a>}{preset.note && <span>{preset.note}</span>}</>}</div><div className={s.actions}>
-            {currentProbe && probe.data?.ok && <span className={s.connected} role="status">已连通</span>}
-            <Button size="sm" variant="outline" loading={!!(currentProbe && probe.isPending)} onClick={() => probe.mutate({ providerId: provider.id, inline: { ...provider } })}>探测连接</Button>
-            <Button size="sm" variant="ghost" onClick={() => removeProvider(provider.id)}>删除</Button>
-          </div></div>{error && <p className={s.error} role="alert">连接失败：{error}</p>}
-        </article>;
-      })}
+      {!draft.providers.length && <p className={s.empty}>添加 API 连接后即可开始学习。</p>}
+      {draft.providers.map(provider => <button key={provider.id} type="button" className={s.preview} aria-label={`编辑 ${provider.name || provider.model || '未命名连接'}`} disabled={save.isPending} onClick={() => openEditor(provider)}>
+        <span className={`${s.connectionIcon} ${detected.get(provider.id) === JSON.stringify(provider) ? s.detected : ''}`} title={detected.get(provider.id) === JSON.stringify(provider) ? '已检测' : '尚未检测'}><Icon name="link" /></span>
+        <span className={s.previewText}><strong>{provider.name || provider.model || '未命名连接'}</strong><small>{provider.model}</small></span><Icon name="pen" size={14} />
+      </button>)}
     </div>
     <div className={s.bindings}>
-      <label>教师默认模型<select value={draft.bindings?.teacher?.providerId ?? draft.default} disabled={!draft.providers.length} onChange={event => setBinding('teacher', event.target.value)}>{!draft.providers.length && <option value="">先添加连接</option>}{providerOptions}</select></label>
-      <label>Ask AI 默认模型<select value={draft.bindings?.annotationAskAI?.providerId ?? draft.default} disabled={!draft.providers.length} onChange={event => setBinding('annotationAskAI', event.target.value)}>{!draft.providers.length && <option value="">先添加连接</option>}{providerOptions}</select></label>
-      <label>OCR 图片识别<select value={draft.bindings?.ocr?.providerId ?? ''} onChange={event => setBinding('ocr', event.target.value, '')}><option value="">停用</option>{providerOptions}</select></label>
-      {draft.bindings?.ocr?.providerId && <label>OCR 模型覆盖<input value={draft.bindings.ocr.model ?? ''} placeholder="使用连接的模型" onChange={event => setBinding('ocr', draft.bindings!.ocr.providerId, event.target.value)} /></label>}
-      <label>搜索引擎<select value={draft.searchEngine} onChange={event => edit(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
+      {PURPOSES.map(([key, label]) => {
+        const binding = draft.bindings?.[key];
+        const value = binding?.providerId ?? (key === 'teacher' ? draft.default : key === 'documentStructure' ? draft.bindings?.ocr?.providerId ?? '' : '');
+        const missing = value && !draft.providers.some(p => p.id === value);
+        return <div key={key} className={s.bindingRow}><label>{label}<select disabled={save.isPending} value={value} onChange={event => setBinding(key, event.target.value)}>
+          <option value="">{key === 'documentStructure' ? '关闭视觉识别' : key === 'teacher' ? '选择连接' : '使用教师默认'}</option>
+          {missing && <option value={value}>连接已移除，请重新选择</option>}{options}
+        </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<input aria-label={`${label}模型覆盖`} value={binding.model ?? ''} disabled={save.isPending} placeholder="使用连接模型" onChange={event => setBinding(key, binding.providerId, event.target.value)} /></label>}</div>;
+      })}
+      <label>搜索引擎<select value={draft.searchEngine} disabled={save.isPending} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
     </div>
-    <details className={s.planNotes}><summary>编程套餐适用范围</summary>{CODING_PLAN_LINKS.map(item => <a key={item.id} href={item.docsURL} target="_blank" rel="noreferrer">{item.name}：{item.note}</a>)}</details>
+    <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择提供方和模型，填写 Key。" className={s.connectionModal}
+      footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={!editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>
+      {editor && <><div className={s.formGrid}>
+        <label className={s.wide}>提供方<select value={editor.presetId} onChange={event => {
+          const selected = PROVIDER_PRESETS.find(item => item.id === event.target.value); setDiscovered([]); setCatalogBusy(false);
+          if (selected) patch(applyProviderPreset(editor.provider, selected), selected.id); else patch({}, 'custom');
+        }}>{(['套餐', '官方', '聚合 / 中转'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(p => p.group === group).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}<option value="custom">自行配置</option></select></label>
+        {preset ? <label className={s.wide}>模型<input aria-label="模型" list="connection-models" value={editor.provider.model} onChange={event => { const known = preset.models.find(m => m.id === event.target.value); patch({ model: event.target.value, contextWindowTokens: known?.contextWindowTokens }); }} /><datalist id="connection-models">{modelIds.map(id => <option key={id} value={id} />)}</datalist><small>可从列表选择，也可填写该提供方支持的模型。</small></label> : <>
+          <label>显示名称<input value={editor.provider.name ?? ''} onChange={event => patch({ name: event.target.value })} /></label>
+          <label>接口协议<select value={editor.provider.kind} onChange={event => patch({ kind: event.target.value as AskProvider['kind'] })}><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select></label>
+          <label className={s.wide}>模型名称<input list="connection-models" value={editor.provider.model} onChange={event => patch({ model: event.target.value })} /><datalist id="connection-models">{discovered.map(id => <option key={id} value={id} />)}</datalist></label>
+          <label className={s.wide}>Base URL<input value={editor.provider.baseURL} onChange={event => patch({ baseURL: event.target.value })} /></label>
+          <label className={s.wide}>上下文 Token<input type="number" min={16384} step={1024} value={editor.provider.contextWindowTokens ?? ''} placeholder="留空使用安全估计" onChange={event => patch({ contextWindowTokens: event.target.value ? Number(event.target.value) : undefined })} /></label>
+        </>}
+        <label className={s.wide}>API Key<SecretInput value={editor.provider.apiKey} onChange={value => patch({ apiKey: value, apiKeyEnv: '' })} />{editor.provider.apiKeyEnv && !editor.provider.apiKey && <small>已使用环境变量密钥，留空保留。</small>}</label>
+        <div className={`${s.flags} ${s.wide}`}><label><input type="checkbox" checked={!!editor.provider.reasoning} onChange={event => patch({ reasoning: event.target.checked })} />显示思考摘要</label>{editor.provider.kind === 'anthropic' && <label><input type="checkbox" checked={!!editor.provider.thinking} onChange={event => patch({ thinking: event.target.checked })} />启用思考</label>}</div>
+      </div><div className={s.links}>{preset && <><a href={preset.keyURL} target="_blank" rel="noreferrer">获取 Key</a><a href={preset.docsURL} target="_blank" rel="noreferrer">官方文档</a>{preset.planURL && <a href={preset.planURL} target="_blank" rel="noreferrer">套餐</a>}</>}{preset?.note && <p>{preset.note}</p>}</div>
+      <div className={s.cardFooter}><div className={s.actions}><Button size="sm" variant="outline" loading={probe.isPending} onClick={probeEditor}>探测连接</Button><Button size="sm" variant="ghost" loading={catalogBusy} onClick={() => { void loadModels(); }}>获取模型列表</Button></div>
+        {!editor.isNew && <Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => { editConfig(current => ({ ...current, providers: current.providers.filter(p => p.id !== editor.provider.id) })); closeEditor(true); }}>删除</Button>}
+      </div>{probeResult && <p role="status" className={probeResult.ok ? s.connected : s.error}>{probeResult.ok ? '已连通' : probeResult.error || '连接失败'}</p>}{catalogMessage && <p className={s.saveStatus} role="status">{catalogMessage}</p>}
+      {save.isError && <p className={s.error} role="alert">保存失败，输入已保留，请重试。</p>}
+      {discard && <div className={s.discard} role="alert"><span>放弃未保存的修改？</span><Button size="sm" variant="ghost" onClick={() => setDiscard(false)}>继续编辑</Button><Button size="sm" onClick={() => closeEditor(true)}>放弃修改</Button></div>}
+      </>}
+    </Modal>
+    <details className={s.planNotes}><summary>套餐说明</summary>{CODING_PLAN_LINKS.map(item => <a key={item.id} href={item.docsURL} target="_blank" rel="noreferrer">{item.name}：{item.note}</a>)}</details>
   </section>;
 }

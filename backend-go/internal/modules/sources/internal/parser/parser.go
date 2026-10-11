@@ -17,14 +17,15 @@ import (
 
 const (
 	MaxContentBytes  = 4 << 20
-	MaxInputBytes    = 50 << 20
+	MaxInputBytes    = 100 << 20
 	truncationMarker = "\n\n[内容已截断：资料文本超过提取上限。]\n"
 )
 
 type Result struct {
-	Content   string `json:"content"`
-	Truncated bool   `json:"truncated"`
-	Parser    string `json:"parser"`
+	Content   string     `json:"content"`
+	Truncated bool       `json:"truncated"`
+	Parser    string     `json:"parser"`
+	Structure *Structure `json:"structure,omitempty"`
 }
 
 type parseError struct {
@@ -100,7 +101,7 @@ func Extract(ctx context.Context, path, filename string) (result Result, err err
 		return Result{}, failure("invalid_document", errors.New("source must be a regular file"))
 	}
 	if stat.Size() > MaxInputBytes {
-		return Result{}, failure("resource_limit", errors.New("source exceeds 50 MiB"))
+		return Result{}, failure("resource_limit", errors.New("source exceeds 100 MiB"))
 	}
 	out := &boundedText{ctx: ctx}
 	switch ext {
@@ -128,8 +129,13 @@ func Extract(ctx context.Context, path, filename string) (result Result, err err
 		return Result{}, err
 	}
 	result.Content, result.Truncated = out.String(), out.truncated
+	result.Structure = out.structure
+	if result.Structure == nil {
+		result.Structure = StructureFromMarkdown(result.Content, "local")
+	}
+	result.Structure.Coverage.CompleteWithinScope = !result.Truncated && len(result.Structure.Coverage.Reasons) == 0
 	if strings.TrimSpace(result.Content) == "" {
-		return Result{}, failure("no_extractable_text", errors.New("document has no extractable text; scanned or outlined pages require OCR"))
+		return result, failure("no_extractable_text", errors.New("document has no extractable text; scanned or outlined pages require OCR"))
 	}
 	return result, nil
 }
@@ -140,6 +146,7 @@ type boundedText struct {
 	ctx       context.Context
 	b         bytes.Buffer
 	truncated bool
+	structure *Structure
 }
 
 func (b *boundedText) Write(p []byte) (int, error) {

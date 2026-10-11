@@ -12,6 +12,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	"github.com/xmz14/lll/backend-go/internal/modules/generation"
 	learningscope "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	progressstore "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
@@ -245,24 +246,24 @@ func looseJSONTextField(text, key string, nextKeys ...string) string {
 }
 
 func (s *Server) handleGetDisciplineOverview(w http.ResponseWriter, r *http.Request) {
-	state, root, ok := requireDisciplineMap(w, r.PathValue("id"))
+	state, _, ok := requireDisciplineMap(w, r.PathValue("id"))
 	if !ok {
 		return
 	}
-	data, err := os.ReadFile(filepath.Join(root, "overview.md"))
+	projection, err := generation.ReadMap(r.PathValue("id"), r.URL.Query().Get("versionId"))
 	if err != nil {
 		httpx.Error(w, http.StatusNotFound, "overview_not_found")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"title": state.Title, "content": string(data)})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"title": state.Title, "content": projection.OverviewMarkdown, "mapVersionId": projection.MapVersionID, "format": projection.Format})
 }
 
 func (s *Server) handleGetDisciplineTopics(w http.ResponseWriter, r *http.Request) {
-	_, root, ok := requireDisciplineMap(w, r.PathValue("id"))
+	_, _, ok := requireDisciplineMap(w, r.PathValue("id"))
 	if !ok {
 		return
 	}
-	catalog, err := readDisciplineTopics(root)
+	projection, err := generation.ReadMap(r.PathValue("id"), r.URL.Query().Get("versionId"))
 	if os.IsNotExist(err) {
 		httpx.WriteJSON(w, http.StatusOK, learningscope.EmptyCatalog())
 		return
@@ -271,7 +272,7 @@ func (s *Server) handleGetDisciplineTopics(w http.ResponseWriter, r *http.Reques
 		httpx.Error(w, http.StatusInternalServerError, "read_discipline_topics")
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, catalog)
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"schemaVersion": projection.Topics.SchemaVersion, "topics": projection.Topics.Topics, "updatedAt": projection.Topics.UpdatedAt, "mapVersionId": projection.MapVersionID, "format": projection.Format})
 }
 
 func readDisciplineTopics(root string) (learningscope.Catalog, error) {

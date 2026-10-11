@@ -63,6 +63,7 @@ export interface LearningScopeSource {
   type: 'discipline-map';
   mapSlug: string;
   topicId: string;
+  mapVersionId?: string;
 }
 
 export interface ProjectTypeAdviceRequest {

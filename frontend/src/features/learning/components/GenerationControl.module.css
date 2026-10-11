@@ -1,0 +1,10 @@
+.control { display:flex; flex-wrap:wrap; gap:10px; align-items:center; min-width:0; }
+.control button { padding:7px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--fg); }
+.status { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:12px; }
+.status progress { max-width:160px; width:100%; accent-color:var(--accent); }
+.fields { display:grid; gap:16px; }
+.fields label { display:grid; gap:6px; font-size:13px; }
+.fields input,.fields select { min-width:0; max-width:100%; padding:8px; border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:6px; }
+.fields fieldset { min-width:0; border:1px solid var(--border); padding:12px; display:grid; gap:10px; }
+.fields .source { display:flex; align-items:center; flex-wrap:wrap; overflow-wrap:anywhere; }
+.fields small { color:var(--muted); }

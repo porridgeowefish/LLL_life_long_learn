@@ -103,7 +103,7 @@
 }
 
 .paper {
-  width: min(100%, 980px);
+  width: 100%;
   margin: 0 auto;
   padding: 28px 32px 48px;
   border: 1px solid var(--border);
@@ -308,7 +308,7 @@
 }
 
 .planPage {
-  width: min(100%, 980px);
+  width: 100%;
   margin: 0 auto;
   padding: 28px 32px 36px;
   border: 1px solid var(--border);
@@ -476,7 +476,7 @@
 }
 
 .error {
-  width: min(100%, 980px);
+  width: 100%;
   margin: 12px auto 0;
   color: var(--pink);
 }

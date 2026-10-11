@@ -1,0 +1,21 @@
+import { useEffect, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { http } from '@/shared/client';
+import { subscribeToSSE } from '@/app/hooks/useSSE';
+import { SSE_EVENTS } from '@/shared/lib/constants';
+import type { LearningSource } from '../api/learningWorkspace';
+interface StructureJob {id:string;status:'queued'|'running'|'succeeded'|'failed'|'cancelled'|'interrupted'}
+export function SourceStructureControl({slug,source}:{slug:string;source:LearningSource}) {
+ const qc=useQueryClient(),storageKey=`lll.source.structure.${slug}.${source.sourceId}`;
+ const [jobId,setJobId]=useState(()=>localStorage.getItem(storageKey)??'');
+ const operation=useRef('');
+ useEffect(()=>{operation.current='';},[source.currentRevisionId,source.derivedVersionId]);
+ const endpoint=`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(source.sourceId)}/structure-jobs`;
+ const query=useQuery({queryKey:['source-structure',slug,source.sourceId,jobId],enabled:Boolean(jobId),queryFn:()=>http.get<{job:StructureJob}>(`${endpoint}/${encodeURIComponent(jobId)}`),refetchInterval:q=>q.state.data?.job.status==='queued'||q.state.data?.job.status==='running'?1500:false});
+ const active=query.data?.job.status==='queued'||query.data?.job.status==='running';
+ useEffect(()=>subscribeToSSE(SSE_EVENTS.sourceStructureJobUpdated,payload=>{if((payload as {projectSlug?:string;sourceId?:string}).projectSlug===slug&&(payload as {sourceId?:string}).sourceId===source.sourceId){void query.refetch();void qc.invalidateQueries({queryKey:['learning-workspace',slug,'sources']});}}),[qc,slug,source.sourceId,jobId]);
+ useEffect(()=>{if(query.data?.job.status==='succeeded')void qc.invalidateQueries({queryKey:['learning-workspace',slug,'sources']});},[query.data?.job.status,qc,slug]);
+ const action=useMutation({mutationFn:(cancel:boolean)=>cancel?http.post<{job:StructureJob}>(`${endpoint}/${encodeURIComponent(jobId)}/cancel`,{}):http.post<{job:StructureJob}>(endpoint,{operationId:operation.current||(operation.current=crypto.randomUUID()),revisionId:source.currentRevisionId,baseDerivedVersionId:source.derivedVersionId}),onSuccess:result=>{operation.current='';setJobId(result.job.id);localStorage.setItem(storageKey,result.job.id);void qc.invalidateQueries({queryKey:['source-structure',slug,source.sourceId]});}});
+ if(!source.derivedVersionId||!(/\.pdf$/i.test(source.displayName)))return null;
+ return <div>{active?<><span role="status">正在识别</span><button type="button" disabled={action.isPending} onClick={()=>action.mutate(true)}>取消识别</button></>:<button type="button" disabled={action.isPending} onClick={()=>action.mutate(false)}>{query.data?.job.status==='failed'||query.data?.job.status==='interrupted'?'重试识别':'继续识别'}</button>}{action.isError&&<span role="alert">未开始识别，请检查文档识别配置或刷新资料。</span>}</div>;
+}

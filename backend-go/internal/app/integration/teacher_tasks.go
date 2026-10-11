@@ -2,6 +2,7 @@
 package integration
 
 import (
+	"errors"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	"github.com/xmz14/lll/backend-go/internal/modules/teacher"
 )
@@ -9,6 +10,11 @@ import (
 type TeacherTaskAuthorizer struct{}
 
 func (TeacherTaskAuthorizer) CreateDelegation(projectSlug string, input teacher.DelegationInput) (teacher.DelegatedTask, bool, error) {
+	return teacher.DelegatedTask{}, false, errors.New("learning CLI delegation retired; use generation jobs")
+}
+
+// Legacy authorizer implementation is retained for migration evidence only.
+func legacyCreateDelegation(projectSlug string, input teacher.DelegationInput) (teacher.DelegatedTask, bool, error) {
 	store, err := assistant.NewTaskStore(projectSlug)
 	if err != nil {
 		return teacher.DelegatedTask{}, false, err

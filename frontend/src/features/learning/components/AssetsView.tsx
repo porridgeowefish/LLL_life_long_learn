@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useAsset, useAssets, useSaveAsset } from '../api/learningWorkspace';
-import { MarkdownView } from '@/shared/primitive/MarkdownView';
+import { PracticeReader } from './PracticeReader';
+import { GenerationControl } from './GenerationControl';
 import { NotesView } from './NotesView';
 import { ReviewReader } from './ReviewReader';
 import s from './AssetsView.module.css';
 
 type AssetKey = 'review' | 'practice';
 export function AssetsView({slug}:{slug:string}) {
- const [view,setView]=useState<AssetKey | 'notes'>('review');
+ const [view,setViewState]=useState<AssetKey | 'notes'>(()=>{const saved=localStorage.getItem(`lll.assets.view.${slug}`);return saved==='practice'||saved==='notes'?saved:'review';});
+ const setView=(next:AssetKey|'notes')=>{setViewState(next);localStorage.setItem(`lll.assets.view.${slug}`,next);};
  const key:AssetKey=view==='notes'?'review':view;
  const [editing,setEditing]=useState(false);
  const [draft,setDraft]=useState('');
@@ -15,7 +17,7 @@ export function AssetsView({slug}:{slug:string}) {
  const asset=useAsset(slug,key);
  const save=useSaveAsset(slug,key);
  useEffect(()=>{if(!editing)setDraft(asset.data?.content??'');},[asset.data?.content,editing]);
- useEffect(()=>{setView('review');setEditing(false);setDraft('');},[slug]);
+ useEffect(()=>{const saved=localStorage.getItem(`lll.assets.view.${slug}`);setViewState(saved==='practice'||saved==='notes'?saved:'review');setEditing(false);setDraft('');},[slug]);
  const commit=()=>{if(!asset.data)return;save.mutate({baseEditRevision:asset.data.meta.editRevision,content:draft},{onSuccess:()=>setEditing(false)});};
  return <section className={s.assets}>
   <div className={s.assetTabs}>
@@ -25,11 +27,12 @@ export function AssetsView({slug}:{slug:string}) {
   {view==='notes'?<NotesView slug={slug}/>:<div className={`${s.layout} ${key==='review'?s.withNotes:''}`}>
    <article className={s.document}>
     <header><div><span>教学资产</span><h2>{asset.data?.meta.title??'加载中…'}</h2></div><div className={s.actions}>
+     <GenerationControl slug={slug} kind={key} disabled={editing}/>
      {editing?<><button onClick={()=>setEditing(false)}>取消</button><button className={s.primary} onClick={commit} disabled={save.isPending}>保存</button></>:<button onClick={()=>setEditing(true)} disabled={!asset.data}>编辑</button>}
     </div></header>
     {asset.isError&&<div className={s.error} role="alert">资产读取失败，请重试。</div>}
     {save.isError&&<div className={s.error} role="alert">保存失败：资产可能已经被更新，请刷新后再编辑。</div>}
-    {editing?<textarea className={s.editor} value={draft} onChange={event=>setDraft(event.target.value)} spellCheck={false}/>:asset.data?.content?(key==='review'?<ReviewReader slug={slug} content={asset.data.content} assetVersionId={asset.data.meta.currentVersionId}/>:<MarkdownView source={asset.data.content} className={s.markdown}/>):<div className={s.empty}>这份资产还是空的。可以直接编辑，或请助教整理复习稿与练习题。</div>}
+    {editing?<textarea className={s.editor} value={draft} onChange={event=>setDraft(event.target.value)} spellCheck={false}/>:asset.data?.content?(key==='review'?<ReviewReader slug={slug} content={asset.data.content} assetVersionId={asset.data.meta.currentVersionId}/>:<PracticeReader content={asset.data.content} versionId={asset.data.meta.currentVersionId}/>):<div className={s.empty}>这份资产还是空的。可以直接编辑，或使用上方按钮生成。</div>}
    </article>
   </div>}
  </section>;

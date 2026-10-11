@@ -8,6 +8,7 @@ import (
 	"time"
 
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/enhancement"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
 )
@@ -62,7 +63,7 @@ func (p *Processor) drain(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if unit.ProjectType != projects.ProjectTypeSystemLearning || (p.ProjectBlocked != nil && p.ProjectBlocked(unit.Slug)) {
+		if (unit.ProjectType != projects.ProjectTypeSystemLearning && unit.ProjectType != projects.ProjectTypeDisciplineMap) || (p.ProjectBlocked != nil && p.ProjectBlocked(unit.Slug)) {
 			continue
 		}
 		st, err := store.New(unit.Slug)
@@ -89,6 +90,9 @@ func (p *Processor) drain(ctx context.Context) {
 			source, err = Process(ctx, st, source.SourceID)
 			if err == nil && p.OnUpdated != nil {
 				p.OnUpdated(unit.Slug, source)
+			}
+			if err == nil && (source.Status == "ready" || source.FailureCode == "no_extractable_text") {
+				enhancement.NotifyAutomatic(unit.Slug, st, source.SourceID)
 			}
 		}
 	}
@@ -118,5 +122,5 @@ func Process(ctx context.Context, st *store.Store, sourceID string) (store.Sourc
 	if parseErr != nil {
 		return st.FailParse(sourceID, revision.RevisionID, parser.ErrorCode(parseErr))
 	}
-	return st.CommitParsed(sourceID, revision.RevisionID, result.Parser, result.Content, result.Truncated)
+	return st.CommitStructured(sourceID, revision.RevisionID, result.Parser, result.Content, result.Truncated, result.Structure)
 }

@@ -5,6 +5,17 @@
 .saveStatus { font-size: .75rem; color: var(--muted); margin: -5px 0 0; }
 .saveStatus:empty { display: none; }
 .list { display: grid; gap: 10px; min-width: 0; }
+.preview { display:flex; align-items:center; gap:12px; width:100%; padding:12px 14px; text-align:left; border:1px solid var(--border); background:var(--card); border-radius:10px; color:var(--fg); cursor:pointer; font:inherit; }
+.preview:hover { border-color:var(--accent); }
+.previewText { display:flex; flex-direction:column; flex:1; min-width:0; gap:3px; }
+.previewText strong { font-size:.85rem; overflow-wrap:anywhere; }
+.previewText small { font-size:.73rem; color:var(--muted); overflow-wrap:anywhere; }
+.connectionIcon { display:flex; padding:8px; border-radius:9px; color:var(--muted); background:var(--ink-soft); }
+.detected { color:var(--accent-ink); background:var(--accent-soft); }
+.connectionModal { width:min(680px, calc(100vw - 32px)); }
+.bindingRow { display:grid; gap:6px; min-width:0; }
+.modelOverride { font-size:.7rem; }
+.discard { display:flex; flex-wrap:wrap; align-items:center; gap:8px; border-top:1px solid var(--border); margin-top:12px; padding-top:10px; font-size:.8rem; }
 .card { min-width: 0; padding: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); }
 .formGrid, .bindings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; }
 .formGrid label, .bindings label { display: flex; flex-direction: column; gap: 5px; min-width: 0; font-size: .76rem; color: var(--muted); }

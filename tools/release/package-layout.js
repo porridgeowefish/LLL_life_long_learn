@@ -27,8 +27,8 @@ function packagePaths(goos, arch, root = repoRoot) {
       throw new Error(`Nonregular resource forbidden: ${relative}`);
     }
   }
-  for (const relative of ['frontend/dist', 'learning-agents', 'config/config.example.json', 'LICENSE', 'docs/release/README.md', 'docs/release/THIRD_PARTY_NOTICES.txt']) walk(relative);
-  if (!names.includes('frontend/dist/index.html') || !names.some(name => name.startsWith('learning-agents/registry/') && name.endsWith('.json'))) {
+  for (const relative of ['frontend/dist', 'learning-agents', 'learning-prompts', 'config/config.example.json', 'LICENSE', 'docs/release/README.md', 'docs/release/THIRD_PARTY_NOTICES.txt']) walk(relative);
+  if (!names.includes('frontend/dist/index.html') || !names.includes('learning-prompts/review.md') || !names.includes('learning-prompts/manifest.json') || !names.some(name => name.startsWith('learning-agents/registry/') && name.endsWith('.json'))) {
     throw new Error('Release resources are incomplete');
   }
   return names;

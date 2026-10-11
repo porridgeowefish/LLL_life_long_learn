@@ -52,10 +52,15 @@ func (s *Store) readRevisionLocked(sourceID, revisionID, hash string) (Source, R
 	if err := readJSON(filepath.Join(path, "revision.json"), &revision); err != nil {
 		return source, revision, nil, err
 	}
-	if len(revision.DerivedFiles) != 1 || revision.DerivedFiles[0].Path != "derived/content.md" || revision.DerivedFiles[0].Key != "content" {
+	revision, err := s.resolveDerivedLocked(revision, hash)
+	if err != nil {
+		return source, revision, nil, err
+	}
+	ref, ok := canonicalRef(revision)
+	if !ok {
 		return source, revision, nil, ErrSourceNotReadable
 	}
-	bodyPath := filepath.Join(path, "derived", "content.md")
+	bodyPath := filepath.Join(path, filepath.FromSlash(ref.Path))
 	real, err := filepath.EvalSymlinks(bodyPath)
 	if err != nil {
 		return source, revision, nil, err
@@ -82,7 +87,7 @@ func (s *Store) readRevisionLocked(sourceID, revisionID, hash string) (Source, R
 	}
 	sum := sha256.Sum256(data)
 	actual := "sha256:" + hex.EncodeToString(sum[:])
-	if actual != revision.DerivedFiles[0].SHA256 || hash != "" && actual != hash {
+	if actual != ref.SHA256 || hash != "" && actual != hash {
 		return source, revision, nil, ErrRevisionChanged
 	}
 	return source, revision, data, nil

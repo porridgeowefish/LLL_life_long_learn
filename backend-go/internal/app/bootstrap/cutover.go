@@ -1,11 +1,6 @@
 package bootstrap
 
 import (
-	"encoding/json"
-	"errors"
-	"os"
-	"path/filepath"
-
 	"github.com/xmz14/lll/backend-go/internal/modules/assets"
 	"github.com/xmz14/lll/backend-go/internal/modules/assistant"
 	projects "github.com/xmz14/lll/backend-go/internal/modules/projects"
@@ -20,25 +15,8 @@ func CutoverLearningAssets() map[string]bool {
 		return blocked
 	}
 	for _, project := range index {
-		if project.ProjectType != projects.ProjectTypeSystemLearning {
-			continue
-		}
-		root, err := projects.ProjectRootForSlug(project.Slug)
-		if err == nil {
-			var journal struct {
-				State string `json:"state"`
-			}
-			data, readErr := os.ReadFile(filepath.Join(root, "migrations", "iteration-18.json"))
-			if readErr == nil {
-				err = json.Unmarshal(data, &journal)
-			} else if !errors.Is(readErr, os.ErrNotExist) {
-				err = readErr
-			}
-			if err == nil && journal.State != "completed" {
-				err = assistant.RetireLegacyTasks(project.Slug)
-			}
-		}
-		if err == nil {
+		err := assistant.RetireForAPIGeneration(project.Slug)
+		if err == nil && project.ProjectType == projects.ProjectTypeSystemLearning {
 			_, err = assets.MigrateReview(project.Slug)
 		}
 		if err != nil {

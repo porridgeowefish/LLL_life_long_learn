@@ -47,12 +47,15 @@ func (s *Server) handleGetAIServices(w http.ResponseWriter, r *http.Request) {
 			}
 			resource.Providers = append(resource.Providers, aiServiceProvider{ID: provider.ID, Kind: kind, Name: provider.Name, BaseURL: provider.BaseURL, APIKey: provider.APIKey, APIKeyEnv: provider.APIKeyEnv})
 		}
-		for _, name := range []string{"teacher", "annotationAskAI", "conversationCompaction"} {
+		for _, name := range []string{"teacher", "annotationAskAI", "conversationCompaction", "notes", "ocr", "documentStructure", "review", "practice", "disciplineMap"} {
 			if binding, ok := cfg.Bindings[name]; ok {
 				resource.Bindings[name] = aiServiceBinding{ProviderID: binding.ProviderID, Model: binding.Model}
 				continue
 			}
-			if provider := cfg.Find(""); provider != nil {
+			if name == "documentStructure" || name == "ocr" {
+				continue
+			}
+			if provider := cfg.FindExact(cfg.Default); provider != nil {
 				resource.Bindings[name] = aiServiceBinding{ProviderID: provider.ID, Model: provider.Model}
 			}
 		}

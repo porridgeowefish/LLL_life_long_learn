@@ -16,11 +16,16 @@ type Result struct {
 	TruncationReason string     `json:"truncationReason,omitempty"`
 }
 type Coverage struct {
-	ReadableBytes       int  `json:"readableBytes"`
-	ExtractionTruncated bool `json:"extractionTruncated"`
-	CompleteWithinScope bool `json:"completeWithinScope"`
+	ReadableBytes       int      `json:"readableBytes"`
+	ExtractionTruncated bool     `json:"extractionTruncated"`
+	CompleteWithinScope bool     `json:"completeWithinScope"`
+	OmittedBlocks       []string `json:"omittedBlocks,omitempty"`
+	UnreadUnits         []int    `json:"unreadUnits,omitempty"`
+	Reasons             []string `json:"reasons,omitempty"`
 }
 type Document struct {
+	DerivedVersionID   string   `json:"derivedVersionId,omitempty"`
+	StructureHash      string   `json:"structureHash,omitempty"`
 	SourceID           string   `json:"sourceId"`
 	RevisionID         string   `json:"revisionId"`
 	ContentHash        string   `json:"contentHash"`
@@ -45,17 +50,20 @@ type Range struct {
 	UnitRanges []UnitRange `json:"unitRanges,omitempty"`
 }
 type Citation struct {
-	EvidenceID   string      `json:"evidenceId"`
-	SourceID     string      `json:"sourceId"`
-	RevisionID   string      `json:"revisionId"`
-	ContentHash  string      `json:"contentHash"`
-	StartByte    int         `json:"startByte"`
-	EndByte      int         `json:"endByte"`
-	StartLine    int         `json:"startLine"`
-	EndLine      int         `json:"endLine"`
-	UnitRanges   []UnitRange `json:"unitRanges,omitempty"`
-	DisplayRange string      `json:"displayRange"`
-	QuoteHash    string      `json:"quoteHash"`
+	DerivedVersionID string      `json:"derivedVersionId,omitempty"`
+	StructureHash    string      `json:"structureHash,omitempty"`
+	Provenance       string      `json:"provenance,omitempty"`
+	EvidenceID       string      `json:"evidenceId"`
+	SourceID         string      `json:"sourceId"`
+	RevisionID       string      `json:"revisionId"`
+	ContentHash      string      `json:"contentHash"`
+	StartByte        int         `json:"startByte"`
+	EndByte          int         `json:"endByte"`
+	StartLine        int         `json:"startLine"`
+	EndLine          int         `json:"endLine"`
+	UnitRanges       []UnitRange `json:"unitRanges,omitempty"`
+	DisplayRange     string      `json:"displayRange"`
+	QuoteHash        string      `json:"quoteHash"`
 }
 type Node struct {
 	NodeID     string `json:"nodeId"`

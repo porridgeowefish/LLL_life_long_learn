@@ -36,10 +36,11 @@ func (r *Reader) EnsureIndex(ctx context.Context, sourceID string) error {
 	if source.Status == "deleted" || source.Status == "tombstoned" {
 		return store.ErrSourceDeleted
 	}
-	if source.Status != "ready" || len(revision.DerivedFiles) != 1 {
+	if source.Status != "ready" {
 		return store.ErrSourceNotReadable
 	}
-	d := Document{SourceID: sourceID, RevisionID: revision.RevisionID, ContentHash: revision.DerivedFiles[0].SHA256, Name: source.DisplayName, Readable: true, ExtractionCoverage: Coverage{ExtractionTruncated: source.ExtractionTruncated}}
+	d := Document{SourceID: sourceID, RevisionID: revision.RevisionID, Name: source.DisplayName, Readable: true, ExtractionCoverage: Coverage{ExtractionTruncated: source.ExtractionTruncated}}
+	bindDerived(&d, revision)
 	_, _, err = r.load(ctx, d)
 	return err
 }
@@ -62,18 +63,20 @@ var signingKey = func() []byte {
 var buildLocks sync.Map
 
 type handle struct {
-	Project    string `json:"p"`
-	Source     string `json:"s,omitempty"`
-	Revision   string `json:"r,omitempty"`
-	Hash       string `json:"h,omitempty"`
-	Version    string `json:"v"`
-	Kind       string `json:"k"`
-	Start      int    `json:"a"`
-	End        int    `json:"b"`
-	ScopeStart int    `json:"x,omitempty"`
-	ScopeEnd   int    `json:"y,omitempty"`
-	Offset     int    `json:"o,omitempty"`
-	Snapshot   string `json:"t,omitempty"`
+	DerivedVersion string `json:"d,omitempty"`
+	StructureHash  string `json:"g,omitempty"`
+	Project        string `json:"p"`
+	Source         string `json:"s,omitempty"`
+	Revision       string `json:"r,omitempty"`
+	Hash           string `json:"h,omitempty"`
+	Version        string `json:"v"`
+	Kind           string `json:"k"`
+	Start          int    `json:"a"`
+	End            int    `json:"b"`
+	ScopeStart     int    `json:"x,omitempty"`
+	ScopeEnd       int    `json:"y,omitempty"`
+	Offset         int    `json:"o,omitempty"`
+	Snapshot       string `json:"t,omitempty"`
 }
 
 func (r *Reader) issue(h handle) string {
@@ -151,13 +154,21 @@ func (r *Reader) Snapshot(ctx context.Context) ([]Document, error) {
 		if source.Retrieval != nil {
 			d.IndexState = source.Retrieval.State
 		}
-		if len(rev.DerivedFiles) == 1 {
-			d.ContentHash = rev.DerivedFiles[0].SHA256
-		}
+		bindDerived(&d, rev)
 		if source.Status == "ready" {
 			_, _, body, err := r.store.ReadRevision(d.SourceID, d.RevisionID, d.ContentHash)
 			d.Readable = err == nil
 			d.ExtractionCoverage.ReadableBytes = len(body)
+			d.ExtractionCoverage.CompleteWithinScope = err == nil && !source.ExtractionTruncated
+			structure, structureErr := r.store.ReadDerivedStructure(d.SourceID, d.RevisionID, d.DerivedVersionID, d.ContentHash, d.StructureHash)
+			if structureErr != nil {
+				d.ExtractionCoverage.CompleteWithinScope = false
+			} else {
+				d.ExtractionCoverage.CompleteWithinScope = d.ExtractionCoverage.CompleteWithinScope && structure.Coverage.CompleteWithinScope && len(structure.Coverage.UnreadUnits) == 0 && len(structure.Coverage.OmittedBlocks) == 0
+				d.ExtractionCoverage.OmittedBlocks = append([]string(nil), structure.Coverage.OmittedBlocks...)
+				d.ExtractionCoverage.UnreadUnits = append([]int(nil), structure.Coverage.UnreadUnits...)
+				d.ExtractionCoverage.Reasons = append([]string(nil), structure.Coverage.Reasons...)
+			}
 		}
 		switch {
 		case strings.Contains(d.Type, "pdf"):
@@ -172,6 +183,18 @@ func (r *Reader) Snapshot(ctx context.Context) ([]Document, error) {
 		out = append(out, d)
 	}
 	return out, nil
+}
+
+func bindDerived(d *Document, rev store.Revision) {
+	d.DerivedVersionID = rev.DerivedVersionID
+	for _, f := range rev.DerivedFiles {
+		if f.Key == "content" {
+			d.ContentHash = f.SHA256
+		}
+		if f.Key == "structure" {
+			d.StructureHash = f.SHA256
+		}
+	}
 }
 func snapshotHash(snapshot []Document) string {
 	data, _ := json.Marshal(snapshot)
@@ -196,7 +219,7 @@ func (r *Reader) load(ctx context.Context, d Document) (*index, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
-	_, _, data, err := r.store.ReadRevision(d.SourceID, d.RevisionID, d.ContentHash)
+	_, _, data, err := r.store.ReadDerivedRevision(d.SourceID, d.RevisionID, d.DerivedVersionID, d.ContentHash, d.StructureHash)
 	if err != nil {
 		return nil, "", err
 	}
@@ -246,6 +269,9 @@ func (r *Reader) load(ctx context.Context, d Document) (*index, string, error) {
 	return ix, body, nil
 }
 func validIndex(ix *index, d Document, bytes int) bool {
+	if ix.DerivedVersionID != d.DerivedVersionID || ix.StructureHash != d.StructureHash {
+		return false
+	}
 	if ix.SchemaVersion != 1 || ix.IndexerVersion != indexerVersion || ix.SourceID != d.SourceID || ix.RevisionID != d.RevisionID || ix.ContentHash != d.ContentHash || ix.ReadableBytes != bytes || len(ix.Chunks) == 0 || len(ix.Chunks) > 20000 || len(ix.Nodes) > 10000 {
 		return false
 	}
@@ -328,7 +354,7 @@ func (r *Reader) List(ctx context.Context, snapshot []Document, args ListArgs) R
 	return res
 }
 func (r *Reader) locator(d Document, start, end int) string {
-	return r.issue(handle{Kind: "locator", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, Start: start, End: end, ScopeStart: start, ScopeEnd: end})
+	return r.issue(handle{Kind: "locator", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, DerivedVersion: d.DerivedVersionID, StructureHash: d.StructureHash, Start: start, End: end, ScopeStart: start, ScopeEnd: end})
 }
 func (r *Reader) Outline(ctx context.Context, snapshot []Document, args OutlineArgs) Result {
 	if args.Limit < 0 || args.Limit > 50 || args.Target != nil && args.Cursor != "" {
@@ -347,7 +373,7 @@ func (r *Reader) Outline(ctx context.Context, snapshot []Document, args OutlineA
 	start, end := 0, len(body)
 	if args.Cursor != "" {
 		h, e := r.decode(args.Cursor, "outline")
-		if e != nil || h.Source != d.SourceID || h.Revision != d.RevisionID || h.Hash != d.ContentHash {
+		if e != nil || h.Source != d.SourceID || h.Revision != d.RevisionID || h.Hash != d.ContentHash || h.DerivedVersion != "" && h.DerivedVersion != d.DerivedVersionID || h.StructureHash != "" && h.StructureHash != d.StructureHash {
 			return fail("cursor_expired")
 		}
 		offset = h.Offset
@@ -399,7 +425,7 @@ func (r *Reader) Outline(ctx context.Context, snapshot []Document, args OutlineA
 		res.Status = "partial"
 		res.Truncated = true
 		res.TruncationReason = "budget_or_page_limit"
-		res.Continuation = r.issue(handle{Kind: "outline", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, Start: start, End: end, Offset: offset})
+		res.Continuation = r.issue(handle{Kind: "outline", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, DerivedVersion: d.DerivedVersionID, StructureHash: d.StructureHash, Start: start, End: end, Offset: offset})
 	}
 	markIncompleteCoverage(&res, ix.Partial, ix.ExtractionTruncated)
 	return res
@@ -537,6 +563,11 @@ func (r *Reader) Search(ctx context.Context, snapshot []Document, args SearchArg
 		}
 		size := min(180, remaining)
 		start, end := previewRange(c.body, c.c, args.Queries, size)
+		var fits bool
+		start, end, fits = alignPreview(c.body, start, end, remaining)
+		if !fits {
+			continue
+		}
 		quote := c.body[start:end]
 		citation, err := r.evidence(ctx, c.d, c.ix, c.body, start, end)
 		if err != nil {
@@ -606,7 +637,7 @@ func (r *Reader) Read(ctx context.Context, snapshot []Document, args ReadArgs) R
 		kind, value = "read", args.Cursor
 	}
 	h, err := r.decode(value, kind)
-	if err != nil || h.Source != d.SourceID || h.Revision != d.RevisionID || h.Hash != d.ContentHash {
+	if err != nil || h.Source != d.SourceID || h.Revision != d.RevisionID || h.Hash != d.ContentHash || h.DerivedVersion != "" && h.DerivedVersion != d.DerivedVersionID || h.StructureHash != "" && h.StructureHash != d.StructureHash {
 		return fail(map[bool]string{true: "cursor_expired", false: "invalid_locator"}[kind == "read"])
 	}
 	if !validRange(body, h.Start, h.End) || h.ScopeStart < 0 || h.ScopeEnd > len(body) || h.ScopeStart > h.Start || h.ScopeEnd < h.End {
@@ -614,6 +645,16 @@ func (r *Reader) Read(ctx context.Context, snapshot []Document, args ReadArgs) R
 	}
 	budget := limit(args.MaxTokens, 2000, 4000)
 	end := h.Start + tokenPrefix(body[h.Start:h.End], budget)
+	end = safeEnd(body, h.Start, end)
+	if end == h.Start {
+		for _, b := range protectedBlocks(body) {
+			if b.Start <= h.Start && h.Start < b.End {
+				_, next := r.adjacent(d, body, h.ScopeStart, h.ScopeEnd, h.Start, b.End, budget)
+				data := ReadData{Body: "", ScopeRange: rangeFor(ix, body, h.ScopeStart, h.ScopeEnd), Coverage: Coverage{ReadableBytes: len(body), CompleteWithinScope: false, OmittedBlocks: []string{b.ID}}, Next: next}
+				return Result{Status: "partial", Data: data, Continuation: next, Truncated: true, TruncationReason: "omitted-structure-block"}
+			}
+		}
+	}
 	if end == h.Start {
 		return fail("budget_exhausted")
 	}
@@ -629,7 +670,7 @@ func (r *Reader) Read(ctx context.Context, snapshot []Document, args ReadArgs) R
 			break
 		}
 	}
-	data := ReadData{Body: body[h.Start:end], Ranges: []Range{rangeFor(ix, body, h.Start, end)}, ScopeRange: rangeFor(ix, body, h.ScopeStart, h.ScopeEnd), HeadingPath: path, Coverage: Coverage{ReadableBytes: len(body), ExtractionTruncated: ix.ExtractionTruncated, CompleteWithinScope: end == h.ScopeEnd}, Previous: previous, Next: next, EvidenceID: citation.EvidenceID, Citation: citation}
+	data := ReadData{Body: body[h.Start:end], Ranges: []Range{rangeFor(ix, body, h.Start, end)}, ScopeRange: rangeFor(ix, body, h.ScopeStart, h.ScopeEnd), HeadingPath: path, Coverage: Coverage{ReadableBytes: len(body), ExtractionTruncated: ix.ExtractionTruncated, CompleteWithinScope: end == h.ScopeEnd && !ix.ExtractionTruncated}, Previous: previous, Next: next, EvidenceID: citation.EvidenceID, Citation: citation}
 	res := Result{Status: "ok", Data: data}
 	if end < h.End {
 		res.Status = "partial"
@@ -651,14 +692,14 @@ func validRange(body string, start, end int) bool {
 func (r *Reader) adjacent(d Document, body string, scopeStart, scopeEnd, start, end, budget int) (string, string) {
 	previous, next := "", ""
 	if end < scopeEnd {
-		next = r.issue(handle{Kind: "read", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, Start: end, End: scopeEnd, ScopeStart: scopeStart, ScopeEnd: scopeEnd})
+		next = r.issue(handle{Kind: "read", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, DerivedVersion: d.DerivedVersionID, StructureHash: d.StructureHash, Start: end, End: scopeEnd, ScopeStart: scopeStart, ScopeEnd: scopeEnd})
 	}
 	if start > scopeStart {
 		prevStart := max(scopeStart, start-budget*3)
 		for prevStart < start && !utf8.RuneStart(body[prevStart]) {
 			prevStart++
 		}
-		previous = r.issue(handle{Kind: "read", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, Start: prevStart, End: start, ScopeStart: scopeStart, ScopeEnd: start})
+		previous = r.issue(handle{Kind: "read", Source: d.SourceID, Revision: d.RevisionID, Hash: d.ContentHash, DerivedVersion: d.DerivedVersionID, StructureHash: d.StructureHash, Start: prevStart, End: start, ScopeStart: scopeStart, ScopeEnd: start})
 	}
 	return previous, next
 }
@@ -677,7 +718,7 @@ func (r *Reader) Continuation(ctx context.Context, snapshot []Document, sourceID
 	if !validRange(body, startByte, endByte) {
 		return "", fail("invalid_locator").Error
 	}
-	return r.issue(handle{Kind: "read", Source: sourceID, Revision: revisionID, Hash: hash, Start: startByte, End: endByte, ScopeStart: startByte, ScopeEnd: endByte}), nil
+	return r.issue(handle{Kind: "read", Source: sourceID, Revision: revisionID, Hash: hash, DerivedVersion: d.DerivedVersionID, StructureHash: d.StructureHash, Start: startByte, End: endByte, ScopeStart: startByte, ScopeEnd: endByte}), nil
 }
 func hashText(text string) string {
 	sum := sha256.Sum256([]byte(text))
@@ -693,6 +734,18 @@ func (r *Reader) evidence(ctx context.Context, d Document, ix *index, body strin
 		return Citation{}, err
 	}
 	citation := Citation{EvidenceID: "evidence_" + hex.EncodeToString(raw), SourceID: d.SourceID, RevisionID: d.RevisionID, ContentHash: d.ContentHash, StartByte: start, EndByte: end, StartLine: rng.StartLine, EndLine: rng.EndLine, UnitRanges: rng.UnitRanges, DisplayRange: display(rng), QuoteHash: hashText(body[start:end])}
+	citation.DerivedVersionID = d.DerivedVersionID
+	citation.StructureHash = d.StructureHash
+	citation.Provenance = "local"
+	if st, e := r.store.ReadDerivedStructure(d.SourceID, d.RevisionID, d.DerivedVersionID, d.ContentHash, d.StructureHash); e == nil {
+		for _, u := range st.Units {
+			for _, b := range u.Blocks {
+				if start < b.Range.End && end > b.Range.Start && b.Provenance != "local" {
+					citation.Provenance = b.Provenance
+				}
+			}
+		}
+	}
 	encoded, _ := json.Marshal(citation)
 	err := r.store.PublishRetrieval(d.SourceID, d.RevisionID, d.ContentHash, citation.EvidenceID+".json", encoded)
 	return citation, err
@@ -719,7 +772,7 @@ func (r *Reader) Preview(ctx context.Context, sourceID, evidenceID string) (Evid
 	if json.Unmarshal(raw, &citation) != nil || citation.EvidenceID != evidenceID || citation.SourceID != sourceID {
 		return EvidencePreview{}, os.ErrNotExist
 	}
-	_, _, body, err := r.store.ReadRevision(sourceID, citation.RevisionID, citation.ContentHash)
+	_, _, body, err := r.store.ReadDerivedRevision(sourceID, citation.RevisionID, citation.DerivedVersionID, citation.ContentHash, citation.StructureHash)
 	if err != nil {
 		return EvidencePreview{}, err
 	}
@@ -727,7 +780,7 @@ func (r *Reader) Preview(ctx context.Context, sourceID, evidenceID string) (Evid
 	if !validRange(text, citation.StartByte, citation.EndByte) || hashText(text[citation.StartByte:citation.EndByte]) != citation.QuoteHash {
 		return EvidencePreview{}, store.ErrRevisionChanged
 	}
-	d := Document{SourceID: sourceID, RevisionID: citation.RevisionID, ContentHash: citation.ContentHash}
+	d := Document{SourceID: sourceID, RevisionID: citation.RevisionID, ContentHash: citation.ContentHash, DerivedVersionID: citation.DerivedVersionID, StructureHash: citation.StructureHash}
 	previous, next := r.adjacent(d, text, 0, len(text), citation.StartByte, citation.EndByte, 1000)
 	return EvidencePreview{Citation: citation, Quote: text[citation.StartByte:citation.EndByte], Previous: previous, Next: next}, nil
 }
@@ -760,6 +813,15 @@ func (r *Reader) PreviewAdjacent(ctx context.Context, sourceID, evidenceID, dire
 	snapshot, err := r.Snapshot(ctx)
 	if err != nil {
 		return EvidencePreview{}, err
+	}
+	for i := range snapshot {
+		if snapshot[i].SourceID == sourceID {
+			snapshot[i].RevisionID = preview.RevisionID
+			snapshot[i].ContentHash = preview.ContentHash
+			snapshot[i].DerivedVersionID = preview.DerivedVersionID
+			snapshot[i].StructureHash = preview.StructureHash
+			snapshot[i].Readable = true
+		}
 	}
 	result := r.Read(ctx, snapshot, ReadArgs{SourceID: sourceID, RevisionID: preview.RevisionID, Cursor: cursor, MaxTokens: 1000})
 	if result.Error != nil {

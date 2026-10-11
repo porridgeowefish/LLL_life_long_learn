@@ -1,0 +1,25 @@
+.body { min-width:0; line-height:1.8; overflow-wrap:anywhere; color:var(--fg); }
+.body :where(h1,h2,h3,h4,h5,h6) { color:var(--fg); line-height:1.4; font-weight:650; margin:1.4em 0 .65em; }
+.body :where(h1) { font-size:1.7em; }.body :where(h2) { font-size:1.35em; }.body :where(h3) { font-size:1.15em; }
+.body :where(p,ul,ol,blockquote,pre,table) { margin:.8em 0; }.body :where(ul,ol) { padding-left:1.65em; }
+.body :where(li) { margin:.25em 0; }.body :where(blockquote) { border-left:3px solid var(--accent); padding-left:1em; color:var(--muted); }
+.body :where(a) { color:var(--accent-ink); text-decoration:underline; text-underline-offset:3px; }
+.body :where(table) { display:block; width:max-content; max-width:100%; overflow-x:auto; border-collapse:collapse; }
+.body :where(th,td) { padding:8px 12px; border:1px solid var(--border); }.body :where(th) { background:var(--surface-tint); }
+.body :where(pre) { overflow:auto; padding:14px; border:1px solid var(--border); border-radius:8px; background:var(--surface-sunken); line-height:1.65; }
+.body :where(code) { font-family:ui-monospace,Consolas,monospace; font-size:.9em; }.body :where(p code,li code) { padding:2px 5px; background:var(--ink-soft); border-radius:4px; }
+.body :global(.katex-display) { overflow-x:auto; overflow-y:hidden; padding:6px 0; }
+.body :global(.inline-svg), .body :global(.mermaid-placeholder), .body :global(.interactive-placeholder) { position:relative; min-width:0; margin:18px 0; width:100%; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--card); }
+.body :global(.diagram-stage) { overflow:hidden; min-height:80px; padding:14px; touch-action:none; cursor:grab; }
+.body :global(.diagram-stage:active) { cursor:grabbing; }
+.body :global(.diagram-stage svg) { display:block; width:100%; max-width:100%; height:auto; max-height:760px; }
+.body :global(.diagram-tools) { display:flex; justify-content:flex-end; gap:4px; padding:5px 8px; border-bottom:1px solid var(--border); background:var(--surface-tint); }
+.body :global(.diagram-tools button), .body :global(.media-fullscreen-toggle) { width:30px; height:28px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--accent-ink); cursor:pointer; font-size:17px; }
+.body :global(.diagram-tools button::before) { content:attr(data-glyph); }
+.body :global(.media-fullscreen-toggle) { position:absolute; top:5px; right:8px; z-index:1; }
+.body :global(.media-fullscreen-toggle::before) { content:'⤢'; }
+.body :global(.media-fullscreen) { position:fixed; inset:32px; z-index:190; margin:0; display:flex; flex-direction:column; box-shadow:var(--shadow-lg); background:var(--card); }
+.body :global(.media-fullscreen .diagram-stage) { flex:1; display:grid; place-items:center; }.body :global(.media-fullscreen svg) { max-height:calc(100vh - 130px); }
+.body :global(.interactive-placeholder iframe) { display:block; width:100%; border:0; min-height:240px; background:#fff; }
+.body :global(.media-fullscreen iframe) { flex:1; height:100%!important; }
+@media (max-width:560px) { .body :global(.media-fullscreen) { inset:10px; } }

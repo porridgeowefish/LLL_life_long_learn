@@ -28,6 +28,8 @@ export const SSE_EVENTS = {
   learningAssetUpdated: 'learning-asset-updated',
   learningActivityUpdated: 'learning-activity-updated',
   sourceUpdated: 'source-updated',
+  generationJobUpdated: 'generation-job-updated',
+  sourceStructureJobUpdated: 'source-structure-job-updated',
 } as const;
 
 export type SSEEventName = (typeof SSE_EVENTS)[keyof typeof SSE_EVENTS];

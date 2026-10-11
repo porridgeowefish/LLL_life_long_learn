@@ -74,6 +74,24 @@ func (b requestBudget) check(req gateway.Request) error {
 	}
 	return nil
 }
+
+// CheckGenerationRequest uses the same complete serialized-input estimator as
+// teaching turns, without dropping any mandatory generation instructions.
+func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, error) {
+	b := requestBudget{window: 32768, output: 8192, margin: 1024}
+	if p.ContextWindowTokens > 0 {
+		b.window = p.ContextWindowTokens
+	}
+	if p.Kind == "anthropic" && p.Thinking {
+		b.thinking = 2048
+	}
+	b.output = max(1, min(b.output, b.window/4))
+	b.margin = min(b.margin, b.window/16)
+	if req.MaxOutputTokens > 0 {
+		b.output = req.MaxOutputTokens
+	}
+	return b.available(req), b.check(req)
+}
 func (b requestBudget) trimInitial(req *gateway.Request) error {
 	// Only complete historical messages are removed, before any tool exchange.
 	// The latest learner turn is mandatory and is never sliced or discarded.

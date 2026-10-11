@@ -2,6 +2,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
 
 import { useMarkdown } from '@/shared/hooks/useMarkdown';
 import { mountMermaidBlocks } from '@/shared/lib/mermaidRenderer';
+import { mountInteractiveBlocks } from '@/shared/lib/interactiveMarkdown';
+import { mountDiagramControls } from '@/shared/lib/diagramControls';
+import s from './MarkdownView.module.css';
 
 interface MarkdownViewProps {
   source: string;
@@ -19,7 +22,7 @@ const STREAM_MARKDOWN_INTERVAL_MS = 120;
 
 export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(function MarkdownView({ source, className, streaming = false }, forwardedRef) {
   const bufferedSource = useBufferedStreamValue(source, streaming);
-  const { html, mermaid } = useMarkdown(bufferedSource, streaming);
+  const { html, mermaid, interactive } = useMarkdown(bufferedSource, streaming);
   const hostRef = useRef<HTMLDivElement>(null);
   useImperativeHandle(forwardedRef, () => hostRef.current as HTMLDivElement, []);
 
@@ -28,8 +31,15 @@ export const MarkdownView = forwardRef<HTMLDivElement, MarkdownViewProps>(functi
     return mountMermaidBlocks(hostRef.current, mermaid, 'markdown-view');
   }, [streaming, html, mermaid]);
 
+  useEffect(() => {
+    if (streaming || !hostRef.current) return;
+    const stopGUI = mountInteractiveBlocks(hostRef.current, interactive);
+    const stopDiagrams = mountDiagramControls(hostRef.current);
+    return () => { stopGUI(); stopDiagrams(); };
+  }, [streaming, html, interactive]);
+
   return (
-    <div ref={hostRef} className={className} dangerouslySetInnerHTML={{ __html: html }} />
+    <div ref={hostRef} className={`${s.body} ${className ?? ''}`} dangerouslySetInnerHTML={{ __html: html }} />
   );
 });
 

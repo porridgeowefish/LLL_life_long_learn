@@ -13,6 +13,7 @@ import (
 	providers "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/providers"
 	service "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/service"
 	usage "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/usagestore"
+	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
 
 const (
@@ -69,6 +70,16 @@ type (
 var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
 
 func New(gateway Gateway) *Service { return service.New(gateway) }
+
+func CheckGenerationRequest(req GatewayRequest, p ProviderConfig) (int, error) {
+	return service.CheckGenerationRequest(req, p)
+}
+func SourceTools() []Tool { return service.GenerationSourceTools() }
+
+type WebSearcher = websearch.Searcher
+type WebSearchResult = websearch.Result
+
+func ConfiguredWebSearch() WebSearcher { return websearch.Configured() }
 
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }
 

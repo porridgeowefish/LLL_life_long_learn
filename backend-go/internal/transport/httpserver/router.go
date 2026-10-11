@@ -19,6 +19,7 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/httpx"
 	"github.com/xmz14/lll/backend-go/internal/imageconfig"
 	assistant "github.com/xmz14/lll/backend-go/internal/modules/assistant"
+	"github.com/xmz14/lll/backend-go/internal/modules/generation"
 	runprogress "github.com/xmz14/lll/backend-go/internal/modules/learning"
 	projectindex "github.com/xmz14/lll/backend-go/internal/modules/projects"
 	"github.com/xmz14/lll/backend-go/internal/modules/sources"
@@ -40,6 +41,7 @@ type Server struct {
 	watcher         *artifactwatch.Watcher
 	shutdown        func()
 	teacher         *teacher.Service
+	generation      *generation.Service
 	agentExecution  AgentExecutionService
 	dispatcher      *assistant.Dispatcher
 	activeTeacher   *teacher.ActiveResponses
@@ -75,6 +77,7 @@ type Dependencies struct {
 	RunProgress     *runprogress.RunStore
 	Watcher         *artifactwatch.Watcher
 	Teacher         *teacher.Service
+	Generation      *generation.Service
 	Broadcaster     *httpx.Broadcaster
 	Agents          *assistant.Registry
 	Sessions        *sessionstore.Store
@@ -97,6 +100,7 @@ func New(deps Dependencies) *Server {
 		runProgress:     deps.RunProgress,
 		watcher:         deps.Watcher,
 		teacher:         deps.Teacher,
+		generation:      deps.Generation,
 		activeTeacher:   teacher.NewActiveResponses(),
 		migrationReady:  deps.MigrationReady,
 		migrationFailed: deps.MigrationFailed,
@@ -158,10 +162,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/health", s.handleHealth)
 	mux.HandleFunc("POST /api/system/shutdown", s.handleShutdown)
 	mux.HandleFunc("GET /api/settings/agent-runtime", s.handleGetAgentRuntimeSettings)
-	mux.HandleFunc("PUT /api/settings/agent-runtime", s.handlePutAgentRuntimeSettings)
+	mux.HandleFunc("PUT /api/settings/agent-runtime", s.handleRetiredLearning)
 	mux.HandleFunc("GET /api/settings/ask-ai", s.handleGetAskAiSettings)
 	mux.HandleFunc("PUT /api/settings/ask-ai", s.handlePutAskAiSettings)
 	mux.HandleFunc("POST /api/settings/ask-ai/probe", s.handleProbeAskAi)
+	mux.HandleFunc("POST /api/model-connections/models", s.handleModelCatalog)
 	mux.HandleFunc("GET /api/settings/ai-services", s.handleGetAIServices)
 	mux.HandleFunc("PUT /api/settings/ai-services", s.handlePutAIServices)
 	mux.HandleFunc("POST /api/settings/ai-services/probe", s.handleProbeAIServices)
@@ -181,9 +186,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/zones/{zone}", s.handleGetZone)
 	mux.HandleFunc("GET /api/projects/{id}/discipline-overview", s.handleGetDisciplineOverview)
 	mux.HandleFunc("GET /api/projects/{id}/discipline-topics", s.handleGetDisciplineTopics)
+	mux.HandleFunc("GET /api/projects/{id}/discipline-map", s.handleDisciplineMap)
+	mux.HandleFunc("POST /api/projects/{id}/generation-jobs", s.handleCreateGeneration)
+	mux.HandleFunc("GET /api/projects/{id}/generation-jobs", s.handleListGeneration)
+	mux.HandleFunc("GET /api/projects/{id}/generation-jobs/{jobId}", s.handleGetGeneration)
+	mux.HandleFunc("POST /api/projects/{id}/generation-jobs/{jobId}/cancel", s.handleCancelGeneration)
+	mux.HandleFunc("POST /api/projects/{id}/generation-jobs/{jobId}/retry", s.handleRetryGeneration)
 	mux.HandleFunc("GET /api/projects/{id}/learning-plan", s.handleGetDisciplineLearningPlan)
 	mux.HandleFunc("PUT /api/projects/{id}/learning-plan", s.handlePutDisciplineLearningPlan)
-	mux.HandleFunc("POST /api/projects/{id}/discipline-overview/generate", s.handleGenerateDisciplineOverview)
+	mux.HandleFunc("POST /api/projects/{id}/discipline-overview/generate", s.handleRetiredLearning)
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/turns", s.handleTeacherTurn)
@@ -204,6 +215,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/sources", s.handleListSources)
 	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/retry", s.handleRetrySource)
+	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/structure-jobs", s.handleCreateStructure)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}", s.handleGetStructure)
+	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}/cancel", s.handleCancelStructure)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/evidence/{evidenceId}", s.handleSourceEvidence)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/retrieval", s.handleSourceRetrievalStatus)
@@ -216,14 +230,14 @@ func (s *Server) Handler() http.Handler {
 
 	// Agents
 	mux.HandleFunc("GET /api/agents", s.handleListAgents)
-	mux.HandleFunc("POST /api/agents/{id}/invoke", s.handleInvokeAgent)
+	mux.HandleFunc("POST /api/agents/{id}/invoke", s.handleRetiredLearning)
 
 	// Sessions
 	mux.HandleFunc("GET /api/sessions", s.handleListSessions)
 	mux.HandleFunc("GET /api/sessions/active", s.handleListActiveSessions)
-	mux.HandleFunc("POST /api/projects/{id}/explain/resume", s.handleResumeExplainSession)
+	mux.HandleFunc("POST /api/projects/{id}/explain/resume", s.handleRetiredLearning)
 	mux.HandleFunc("GET /api/sessions/{id}", s.handleGetSession)
-	mux.HandleFunc("POST /api/sessions/{id}/follow-up", s.handleFollowUp)
+	mux.HandleFunc("POST /api/sessions/{id}/follow-up", s.handleRetiredLearning)
 	mux.HandleFunc("POST /api/sessions/{id}/cancel", s.handleCancelSession)
 
 	// Legacy project file reads and learner-owned zone edits. Project memory is
@@ -255,18 +269,18 @@ func (s *Server) Handler() http.Handler {
 	// Practice
 	mux.HandleFunc("GET /api/projects/{id}/practice/tasks", s.handleGetPracticeTasks)
 	mux.HandleFunc("GET /api/projects/{id}/practice/draft", s.handleGetPracticeDraft)
-	mux.HandleFunc("PUT /api/projects/{id}/practice/draft", s.handlePutPracticeDraft)
-	mux.HandleFunc("POST /api/projects/{id}/practice/submit", s.handleSubmitPractice)
-	mux.HandleFunc("POST /api/projects/{id}/practice/attempts", s.handleCreatePracticeAttempt)
+	mux.HandleFunc("PUT /api/projects/{id}/practice/draft", s.handleRetiredLearning)
+	mux.HandleFunc("POST /api/projects/{id}/practice/submit", s.handleRetiredLearning)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts", s.handleRetiredLearning)
 	mux.HandleFunc("GET /api/projects/{id}/practice/attempts/latest", s.handleGetLatestPracticeAttempt)
-	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/objective/{taskId}/check", s.handleCheckObjective)
-	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/submit", s.handleSubmitPracticeAttempt)
-	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/evaluation", s.handleRequestPracticeEvaluation)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/objective/{taskId}/check", s.handleRetiredLearning)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/submit", s.handleRetiredLearning)
+	mux.HandleFunc("POST /api/projects/{id}/practice/attempts/{attempt}/evaluation", s.handleRetiredLearning)
 	mux.HandleFunc("GET /api/projects/{id}/practice/evaluation", s.handleGetPracticeEvaluation)
 	mux.HandleFunc("GET /api/projects/{id}/progress", s.handleGetProgress)
 
 	// Explain infographic
-	mux.HandleFunc("POST /api/projects/{id}/explain/infographic", s.handleRequestExplainInfographic)
+	mux.HandleFunc("POST /api/projects/{id}/explain/infographic", s.handleRetiredLearning)
 	mux.HandleFunc("GET /api/projects/{id}/explain/infographic", s.handleGetExplainInfographic)
 
 	// Run progress reports from injected Claude Code hooks (Phase C).
@@ -308,6 +322,9 @@ func (s *Server) SetShutdownFunc(fn func()) {
 
 // Close releases background resources (the artifact file watcher).
 func (s *Server) Close() {
+	if s.generation != nil {
+		s.generation.Close()
+	}
 	if s.sourceProcessor != nil {
 		s.sourceProcessor.Close()
 	}

@@ -156,3 +156,10 @@ export function useProbeAskAi() {
     },
   });
 }
+
+export interface ModelCatalog { models: Array<{ id: string; contextWindowTokens?: number; vision?: boolean | null }>; source: 'provider' | 'preset'; verifiedAt: string }
+export async function discoverModels(body: { providerId?: string; inline?: AskProvider }): Promise<ModelCatalog> {
+  const res = await fetch(`${API_BASE}/api/model-connections/models`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) throw new ApiError(res.status, 'model catalog unavailable', null);
+  return await res.json() as ModelCatalog;
+}
