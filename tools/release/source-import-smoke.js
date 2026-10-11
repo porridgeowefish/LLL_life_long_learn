@@ -72,8 +72,9 @@ async function main(binary){
    try{
     assert.equal(req.url,'/v1/chat/completions');assert.equal(req.method,'POST');
     assert.equal(req.headers.authorization,'Bearer installed-smoke-placeholder');
-    let raw='';for await(const chunk of req){raw+=chunk;assert(raw.length<16*1024*1024,'fake request too large')}
-    const request=JSON.parse(raw);received.push(request.model);
+    const chunks=[];let receivedBytes=0;
+    for await(const chunk of req){receivedBytes+=chunk.length;assert(receivedBytes<16*1024*1024,'fake request too large');chunks.push(chunk)}
+    const request=JSON.parse(Buffer.concat(chunks).toString('utf8'));received.push(request.model);
     const kind=request.model.replace('smoke-','');
     if(kind==='vision'){
      assert(!request.stream,'vision must use page extraction protocol');
