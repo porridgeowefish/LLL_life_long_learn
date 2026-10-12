@@ -147,7 +147,8 @@ function main(input) {
       { windowsHide: true, stdio: "inherit", timeout: 120000 },
     );
     assert.equal(sourceImport.status, 0, "Installed parser lifecycle failed");
-    install(next, ["/x"], path.join(scratch, "uninstall.log"));
+    // The same-version rebuild replaced `next`, so uninstall the package that is installed now.
+    install(installed, ["/x"], path.join(scratch, "uninstall.log"));
     installed = null;
     assert(!fs.existsSync(path.join(folder, "learn-with-ai.exe")));
     assert.equal(
