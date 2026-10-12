@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeftIcon, ChevronRightIcon } from '@radix-ui/react-icons';
+import type { ReactNode } from 'react';
 
 import { BodyAnnotations } from './BodyAnnotations';
 import readerStyles from '@/features/learning/components/ExplainReader.module.css';
@@ -9,7 +10,7 @@ interface BodyPage {
   title: string;
 }
 
-export function ReviewReader({ slug, content, assetVersionId }: { slug: string; content: string; assetVersionId: string }) {
+export function ReviewReader({ slug, content, assetVersionId, renderBody }: { slug: string; content: string; assetVersionId: string; renderBody?: (pageIndex: number) => ReactNode }) {
   const pages = useMemo(() => bodyPages(content), [content]);
   const [pageIndex, setPageIndex] = useState(0);
   const pageTabRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -54,7 +55,7 @@ export function ReviewReader({ slug, content, assetVersionId }: { slug: string; 
       </div>
     </header>
     <main className={`${readerStyles.reader} ${assetStyles.bodyPage}`}>
-      <BodyAnnotations slug={slug} content={content} assetVersionId={assetVersionId} pageIndex={currentIndex} />
+      {renderBody ? renderBody(currentIndex) : <BodyAnnotations slug={slug} content={content} assetVersionId={assetVersionId} pageIndex={currentIndex} />}
     </main>
   </div>;
 }

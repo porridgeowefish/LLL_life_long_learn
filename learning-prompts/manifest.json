@@ -36,7 +36,7 @@
       "sha256": "9ac8ceea58566238f2cfe117f9192b8d652902f6dce1b2ee5f3072fc13183324"
     }
   ],
-  "version": "iteration-22.2",
+  "version": "iteration-23.1",
   "schemaVersion": 1,
   "resources": [
     {
@@ -53,7 +53,7 @@
     },
     {
       "path": "learning-prompts/review.md",
-      "sha256": "6eb34c411cf44bb506f6877ec50ea9b409b0ec173a1dcabba55a1c0c219f6df0"
+      "sha256": "c8ec9cb86bc6af76a8c2a86d34607061035816cc6c4b656fc8e78100b39b5014"
     },
     {
       "path": "learning-prompts/primitives/analogy.md",

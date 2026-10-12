@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { discoverModels, useAskAiSettings, useProbeAskAi, useSaveAskAiSettings, type AskConfig, type AskProvider } from './askAi';
-import { applyProviderPreset, CODING_PLAN_LINKS, presetForProvider, PROVIDER_PRESETS } from './providerPresets';
+import { applyProviderPreset, CODING_PLAN_LINKS, presetForProvider, PROVIDER_PRESETS, type ProviderPreset } from './providerPresets';
 import { Button } from '@/shared/primitive/Button';
 import { Icon } from '@/shared/primitive/Icon';
 import { Modal } from '@/shared/primitive/Modal';
@@ -36,8 +36,8 @@ export function ModelsPage() {
     dirtyRef.current = true; revision.current++; setDirty(true); save.reset();
     setDraft(current => current ? change(current) : current);
   };
-  const openEditor = (provider?: AskProvider) => {
-    const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, PROVIDER_PRESETS[0]);
+  const openEditor = (provider?: AskProvider, initialPreset: ProviderPreset = PROVIDER_PRESETS[0]) => {
+    const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, initialPreset);
     const next = { token: ++token.current, provider: value, original: JSON.stringify(value), isNew: !provider, presetId: presetForProvider(value)?.id ?? 'custom' };
     editorRef.current = next; setEditor(next); setDiscard(false); setProbeResult(null); setDiscovered([]); setCatalogMessage(''); setCatalogBusy(false); probe.reset(); save.reset();
   };
@@ -108,6 +108,10 @@ export function ModelsPage() {
       <Button size="sm" variant="outline" disabled={save.isPending} onClick={() => openEditor()}><Icon name="plus" size={14} />添加连接</Button>
       <Button size="sm" loading={save.isPending && !editor} onClick={() => persist(draft)}>保存配置</Button>
     </div></header>
+    <div className={s.trial}>
+      <div><a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">领取腾讯云免费体验额度</a><p>领取后创建 API Key，在这里添加连接；额度与有效期以控制台为准。</p></div>
+      <Button size="sm" disabled={save.isPending} onClick={() => openEditor(undefined, PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!)}>配置 TokenHub 试用</Button>
+    </div>
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">

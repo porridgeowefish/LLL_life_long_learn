@@ -8,3 +8,4 @@ export type { AutoNotesSettings } from './api/notes';
 export { GenerationControl } from './components/GenerationControl';
 export { SourceImportControl } from './components/SourceImportControl';
 export { SourcesView } from './components/SourcesView';
+export { LearningDemo } from './components/LearningDemo';

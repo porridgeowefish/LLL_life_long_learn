@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useHealth } from '@/app/api/health';
@@ -10,6 +10,7 @@ import { EmptyState } from '@/shared/primitive/EmptyState';
 import { ProjectCard } from '@/features/projects/components/ProjectCard';
 import { LearningRhythm } from '@/features/projects/components/LearningRhythm';
 import { CreateProjectModal } from '@/features/projects/components/CreateProjectModal';
+import { LearningDemo } from '@/features/learning';
 
 import s from './HomePage.module.css';
 
@@ -18,12 +19,29 @@ export function HomePage() {
   const modalOpen = useUiStore((s) => s.createProjectModalOpen);
   const openModal = useUiStore((s) => s.openCreateProjectModal);
   const closeModal = useUiStore((s) => s.closeCreateProjectModal);
+  const [demoOpen, setDemoOpen] = useState(false);
+  const demoOpener = useRef<HTMLButtonElement | null>(null);
+  const replayButton = useRef<HTMLButtonElement>(null);
+  const openDemo = (button: HTMLButtonElement) => { demoOpener.current = button; setDemoOpen(true); };
+  const [dismissed, setDismissed] = useState(() => {
+    try { return localStorage.getItem('lll.onboarding.v1.dismissed') === '1'; }
+    catch { return false; }
+  });
+  const dismissGuide = () => {
+    try { localStorage.setItem('lll.onboarding.v1.dismissed', '1'); }
+    catch { /* The current visit still respects dismissal without browser storage. */ }
+    setDismissed(true);
+    setDemoOpen(false);
+  };
+  const closeDemo = () => {
+    dismissGuide();
+    requestAnimationFrame(() => { (demoOpener.current?.isConnected ? demoOpener.current : replayButton.current)?.focus(); });
+  };
 
   const { data: health } = useHealth();
   const { data: projectsData, isLoading: projectsLoading } = useProjects();
 
   const projects = (projectsData?.projects ?? []).filter(project => project.projectType === 'discipline-map');
-  const runtime = health?.agentRuntime?.runtime;
 
   return (
     <div className={s.host}>
@@ -35,12 +53,22 @@ export function HomePage() {
               本地学习工作台 · 当前工作区 <code>{health?.workspace ?? '…'}</code>
             </p>
           </div>
+          <div className={s.headerActions}>
+          <Button ref={replayButton} onClick={event => openDemo(event.currentTarget)}>体验示例</Button>
           <Button variant="primary" iconLeft={<Icon name="plus" size={14} />} onClick={openModal}>
             新建项目
           </Button>
+          </div>
         </header>
 
-        <OnboardingBanner runtimeName={runtime?.name} runtimeReady={runtime?.available ?? false} />
+        {!dismissed && <section className={s.onboarding} aria-label="新用户引导">
+          <div className={s.onboardingHead}>
+            <span className={s.onboardingIcon}><img src="/img/lychee-teacher.png" alt="" aria-hidden="true" /></span>
+            <div><h2>先跟着一个好问题，学一次</h2><p>用梯度下降体验提问、复习、练习和笔记。示例已经准备好，无需配置 API。</p></div>
+          </div>
+          <div className={s.onboardingExample}><strong>为什么沿负梯度更新？</strong><p>梯度指向局部增长最快的方向，反向走一小步就有下降的趋势；但走多远，还要看学习率。</p></div>
+          <div className={s.onboardingActions}><Button variant="primary" onClick={event => openDemo(event.currentTarget)}>跟着示例开始</Button><Button variant="ghost" onClick={closeDemo}>跳过引导</Button></div>
+        </section>}
 
         <LearningRhythm projects={projects} />
 
@@ -76,46 +104,7 @@ export function HomePage() {
         onOpenChange={(v) => (v ? openModal() : closeModal())}
         onCreated={(slug) => navigate(`/project/${slug}`)}
       />
+      {demoOpen && <LearningDemo onClose={closeDemo} onStart={() => { dismissGuide(); openModal(); }} onConfigure={() => { dismissGuide(); navigate('/settings'); }} />}
     </div>
-  );
-}
-
-interface OnboardingBannerProps {
-  runtimeName?: string;
-  runtimeReady: boolean;
-}
-
-function OnboardingBanner({ runtimeName, runtimeReady }: OnboardingBannerProps) {
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem('lll-onboarding-dismissed') === '1');
-  if (dismissed) return null;
-  return (
-    <section className={s.onboarding}>
-      <div className={s.onboardingHead}>
-        <span className={s.onboardingIcon}>
-          <img src="/img/lychee-teacher.png" alt="" aria-hidden="true" />
-        </span>
-        <div>
-          <h2>开始之前</h2>
-          <p>
-            当前运行时：{runtimeName ?? 'Agent CLI'} · {runtimeReady ? '已就绪' : '未就绪，先去统一配置确认安装'}
-          </p>
-        </div>
-      </div>
-      <div className={s.onboardingSteps}>
-        <span>1. 在统一配置选择 CLI</span>
-        <span>2. 创建学习项目</span>
-        <span>3. 进入项目调用学习 Agent</span>
-      </div>
-      <Button
-        variant="outline"
-        iconLeft={<Icon name="x" size={13} />}
-        onClick={() => {
-          localStorage.setItem('lll-onboarding-dismissed', '1');
-          setDismissed(true);
-        }}
-      >
-        知道了
-      </Button>
-    </section>
   );
 }
