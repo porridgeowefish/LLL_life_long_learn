@@ -476,11 +476,28 @@ func (s *Store) AllMessages() ([]Message, error) {
 }
 
 func (s *Store) SequencedMessages() ([]SequencedMessage, error) {
+	return s.sequencedMessages(nil)
+}
+
+// SequencedMessagesThrough seals both visibility and message order at the
+// cutoff. Later response supersession must not change a queued summary input.
+func (s *Store) SequencedMessagesThrough(throughSeq uint64) ([]SequencedMessage, error) {
+	return s.sequencedMessages(&throughSeq)
+}
+
+func (s *Store) sequencedMessages(throughSeq *uint64) ([]SequencedMessage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, events, err := s.loadLocked()
+	meta, events, err := s.loadLocked()
 	if err != nil {
 		return nil, err
+	}
+	if throughSeq != nil {
+		if *throughSeq > meta.LatestSeq {
+			return nil, errors.New("conversation cutoff exceeds latest sequence")
+		}
+		cutoff := sort.Search(len(events), func(i int) bool { return events[i].Seq > *throughSeq })
+		events = events[:cutoff]
 	}
 	hidden := hiddenTeacherMessages(events)
 	var messages []SequencedMessage

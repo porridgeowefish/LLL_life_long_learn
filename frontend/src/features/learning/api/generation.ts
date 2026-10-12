@@ -11,8 +11,9 @@ export interface GenerationJob {
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
   phase: 'waiting' | 'preparing' | 'generating' | 'validating' | 'publishing' | 'done';
   providerId: string; model: string; questionCount?: number;
-  progress: { indeterminate?: boolean; completedUnits?: number; totalUnits?: number; unitLabel?: string };
+  progress: { indeterminate?: boolean; completedUnits?: number; totalUnits?: number; unitLabel?: string; outputTokens?: number; tokensEstimated?: boolean };
   errorCode?: string; updatedAt: string;
+  checkpoint?: { afterSeq:number; throughSeq:number; hasMoreConversation:boolean };
 }
 export interface GenerationRequest { operationId: string; kind: GenerationKind; providerId?: string; model?: string; sourceIds?: string[]; questionCount?: number; mapMode?: 'general' | 'sources' }
 export const generationKey = (slug: string) => ['learning-workspace', slug, 'generation-jobs'] as const;
@@ -23,8 +24,13 @@ export function useGenerationJobs(slug: string) {
   const connectionStatus=useConnectionStore(state=>state.status);
   useEffect(()=>{if(connectionStatus==='open')void qc.invalidateQueries({queryKey:generationKey(slug)});},[connectionStatus,qc,slug]);
   useEffect(() => subscribeToSSE(SSE_EVENTS.generationJobUpdated, payload => {
-    if ((payload as {projectSlug?: string}).projectSlug !== slug) return;
-    void qc.invalidateQueries({queryKey: generationKey(slug)});
+    const event=payload as {projectSlug?:string;jobId:string;status:GenerationJob['status'];phase:GenerationJob['phase'];progress:GenerationJob['progress']};
+    if (event.projectSlug !== slug) return;
+    const snapshot=qc.getQueryData<{jobs:GenerationJob[]}>(generationKey(slug));
+    if(snapshot?.jobs.some(job=>job.id===event.jobId))qc.setQueryData(generationKey(slug),{...snapshot,jobs:snapshot.jobs.map(job=>job.id===event.jobId?{...job,status:event.status,phase:event.phase,progress:event.progress}:job)});
+    else void qc.invalidateQueries({queryKey: generationKey(slug)});
+    if(event.status==='running'||event.status==='queued')return;
+    void qc.invalidateQueries({queryKey:generationKey(slug)});
     void qc.invalidateQueries({queryKey: ['learning-workspace', slug, 'assets']});
     void qc.invalidateQueries({queryKey: ['projects', slug, 'discipline-map']});
     void qc.invalidateQueries({queryKey: ['usage']});

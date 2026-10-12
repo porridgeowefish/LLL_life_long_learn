@@ -76,6 +76,9 @@ func CheckGenerationRequest(req GatewayRequest, p ProviderConfig) (int, error) {
 }
 func SourceTools() []Tool { return service.GenerationSourceTools() }
 
+func GenerationOutputTokens(p ProviderConfig) int   { return service.GenerationOutputTokens(p) }
+func GenerationThinkingTokens(p ProviderConfig) int { return service.GenerationThinkingTokens(p) }
+
 type WebSearcher = websearch.Searcher
 type WebSearchResult = websearch.Result
 

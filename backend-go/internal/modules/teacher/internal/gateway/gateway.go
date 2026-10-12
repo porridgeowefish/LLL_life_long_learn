@@ -64,13 +64,14 @@ type Event struct {
 }
 
 type Request struct {
-	System          string
-	Messages        []Message
-	Tools           []Tool
-	ProviderID      string
-	BindingName     string
-	Model           string
-	MaxOutputTokens int
+	System            string
+	Messages          []Message
+	Tools             []Tool
+	ProviderID        string
+	BindingName       string
+	Model             string
+	MaxOutputTokens   int
+	MaxThinkingTokens int
 }
 
 type Gateway interface {
@@ -131,8 +132,10 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 			return io.EOF
 		}
 		var chunk struct {
+			Error   json.RawMessage `json:"error"`
 			Choices []struct {
-				Delta struct {
+				FinishReason string `json:"finish_reason"`
+				Delta        struct {
 					Content          string `json:"content"`
 					ReasoningContent string `json:"reasoning_content"`
 					ReasoningSummary string `json:"reasoning_summary"`
@@ -156,7 +159,14 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 		if err := json.Unmarshal(payload, &chunk); err != nil {
 			return nil
 		}
+		if len(chunk.Error) > 0 && string(chunk.Error) != "null" {
+			return errors.New("provider stream error")
+		}
 		for _, choice := range chunk.Choices {
+			if choice.FinishReason == "length" {
+				emit(Event{Type: "output-limit"})
+			}
+			emitOutputProgress(emit, choice.Delta.Content+firstNonEmpty(choice.Delta.ReasoningContent, choice.Delta.Reasoning, choice.Delta.ReasoningText, choice.Delta.ReasoningSummary))
 			if choice.Delta.ReasoningContent != "" {
 				emit(Event{Type: "provider-reasoning-delta", Delta: choice.Delta.ReasoningContent})
 			}
@@ -175,6 +185,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 				}
 			}
 			for _, call := range choice.Delta.ToolCalls {
+				emitOutputProgress(emit, call.Function.Arguments)
 				buffers.add(call.Index, call.ID, call.Function.Name, call.Function.Arguments)
 			}
 		}
@@ -357,13 +368,21 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 	}
 	if p.Thinking && replayableThinking {
-		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": 2048}
-		body["max_tokens"] = 10240
+		thinkingBudget := 2048
+		if in.MaxThinkingTokens > 0 {
+			thinkingBudget = in.MaxThinkingTokens
+		}
+		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": thinkingBudget}
+		body["max_tokens"] = 8192 + thinkingBudget
 	}
 	if in.MaxOutputTokens > 0 {
 		body["max_tokens"] = in.MaxOutputTokens
 		if p.Thinking && replayableThinking {
-			body["max_tokens"] = in.MaxOutputTokens + 2048
+			thinkingBudget := 2048
+			if in.MaxThinkingTokens > 0 {
+				thinkingBudget = in.MaxThinkingTokens
+			}
+			body["max_tokens"] = in.MaxOutputTokens + thinkingBudget
 		}
 	}
 	if len(in.Tools) > 0 {
@@ -394,6 +413,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				Input    json.RawMessage `json:"input"`
 			} `json:"content_block"`
 			Delta struct {
+				StopReason  string `json:"stop_reason"`
 				Type        string `json:"type"`
 				Text        string `json:"text"`
 				Thinking    string `json:"thinking"`
@@ -416,6 +436,8 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			return nil
 		}
 		switch event.Type {
+		case "error":
+			return errors.New("provider stream error")
 		case "message_start":
 			// message_start carries usage nested inside its message envelope;
 			// input token counts only exist there.
@@ -442,6 +464,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				emit(Event{Type: "reasoning-summary-delta", Delta: event.ContentBlock.Thinking})
 			}
 		case "content_block_delta":
+			emitOutputProgress(emit, firstNonEmpty(event.Delta.Text, event.Delta.Thinking, event.Delta.Summary, event.Delta.PartialJSON))
 			shape.delta(event.Index, event.Delta.Type)
 			switch event.Delta.Type {
 			case "text_delta":
@@ -493,6 +516,9 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 				delete(toolBuffers.values, event.Index)
 			}
 		case "message_delta":
+			if event.Delta.StopReason == "max_tokens" {
+				emit(Event{Type: "output-limit"})
+			}
 			if event.Usage != nil {
 				emit(Event{Type: "usage", Usage: map[string]int{"outputTokens": event.Usage.OutputTokens}})
 			}
@@ -519,6 +545,14 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// Progress exposes counts, never reasoning text. It also works when reasoning
+// summaries are disabled, and counts tool argument output exactly once.
+func emitOutputProgress(emit func(Event), text string) {
+	if text != "" {
+		emit(Event{Type: "output-progress", Usage: map[string]int{"characters": len([]rune(text))}})
+	}
 }
 
 func streamJSONLines(ctx context.Context, url string, p askaiconfig.Provider, body any, onData func([]byte) error, onEnd func()) error {
@@ -566,10 +600,7 @@ func streamJSONLines(ctx context.Context, url string, p askaiconfig.Provider, bo
 	if err := scanner.Err(); err != nil {
 		return err
 	}
-	if onEnd != nil {
-		onEnd()
-	}
-	return nil
+	return io.ErrUnexpectedEOF
 }
 
 // streamShape fingerprints one anthropic stream's block/delta labeling so

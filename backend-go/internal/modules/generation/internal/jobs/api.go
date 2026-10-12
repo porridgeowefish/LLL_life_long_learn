@@ -37,10 +37,12 @@ type Input struct {
 	MapMode       string   `json:"mapMode,omitempty"`
 }
 type Progress struct {
-	CompletedUnits int    `json:"completedUnits,omitempty"`
-	TotalUnits     int    `json:"totalUnits,omitempty"`
-	UnitLabel      string `json:"unitLabel,omitempty"`
-	Indeterminate  bool   `json:"indeterminate"`
+	OutputTokens    int    `json:"outputTokens,omitempty"`
+	TokensEstimated bool   `json:"tokensEstimated"`
+	CompletedUnits  int    `json:"completedUnits,omitempty"`
+	TotalUnits      int    `json:"totalUnits,omitempty"`
+	UnitLabel       string `json:"unitLabel,omitempty"`
+	Indeterminate   bool   `json:"indeterminate"`
 }
 type Coverage struct {
 	Sources             []sources.SourceDocument `json:"sources"`
@@ -49,29 +51,37 @@ type Coverage struct {
 	Gap                 string                   `json:"gap,omitempty"`
 }
 type Job struct {
-	SchemaVersion int       `json:"schemaVersion"`
-	ID            string    `json:"id"`
-	RootJobID     string    `json:"rootJobId"`
-	RetryOf       string    `json:"retryOf,omitempty"`
-	Attempt       int       `json:"attempt"`
-	OperationID   string    `json:"operationId"`
-	Kind          string    `json:"kind"`
-	Status        string    `json:"status"`
-	Phase         string    `json:"phase"`
-	ProviderID    string    `json:"providerId"`
-	Model         string    `json:"model"`
-	QuestionCount int       `json:"questionCount,omitempty"`
-	MapMode       string    `json:"mapMode,omitempty"`
-	Progress      Progress  `json:"progress"`
-	Coverage      Coverage  `json:"coverage"`
-	ResultRefs    []string  `json:"resultRefs"`
-	ErrorCode     string    `json:"errorCode,omitempty"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-	Intent        Input     `json:"intent"`
-	RequestIDs    []string  `json:"requestIds,omitempty"`
+	Checkpoint    *Checkpoint `json:"checkpoint,omitempty"`
+	SchemaVersion int         `json:"schemaVersion"`
+	ID            string      `json:"id"`
+	RootJobID     string      `json:"rootJobId"`
+	RetryOf       string      `json:"retryOf,omitempty"`
+	Attempt       int         `json:"attempt"`
+	OperationID   string      `json:"operationId"`
+	Kind          string      `json:"kind"`
+	Status        string      `json:"status"`
+	Phase         string      `json:"phase"`
+	ProviderID    string      `json:"providerId"`
+	Model         string      `json:"model"`
+	QuestionCount int         `json:"questionCount,omitempty"`
+	MapMode       string      `json:"mapMode,omitempty"`
+	Progress      Progress    `json:"progress"`
+	Coverage      Coverage    `json:"coverage"`
+	ResultRefs    []string    `json:"resultRefs"`
+	ErrorCode     string      `json:"errorCode,omitempty"`
+	CreatedAt     time.Time   `json:"createdAt"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
+	Intent        Input       `json:"intent"`
+	RequestIDs    []string    `json:"requestIds,omitempty"`
+}
+type Checkpoint struct {
+	AfterSeq            uint64 `json:"afterSeq"`
+	ThroughSeq          uint64 `json:"throughSeq"`
+	HasMoreConversation bool   `json:"hasMoreConversation"`
 }
 type frozenInput struct {
+	MaxOutputTokens   int                      `json:"maxOutputTokens,omitempty"`
+	MaxThinkingTokens int                      `json:"maxThinkingTokens,omitempty"`
 	WebSearchEnabled  bool                     `json:"webSearchEnabled"`
 	System            string                   `json:"system"`
 	PromptHash        string                   `json:"promptHash"`
@@ -450,6 +460,24 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 			return Job{}, e
 		}
 		payload["currentAsset"] = f.BaseAsset.Content
+		// Only published work advances this checkpoint. Failed/cancelled jobs
+		// must never make the next summary skip unprocessed conversation.
+		previousRanges := []sources.SourceCitation{}
+		for _, previous := range jobs {
+			if previous.Kind != in.Kind || previous.Status != "succeeded" {
+				continue
+			}
+			for _, citation := range previous.Coverage.ReadRanges {
+				for _, doc := range f.Sources {
+					if citation.SourceID == doc.SourceID && citation.RevisionID == doc.RevisionID && citation.ContentHash == doc.ContentHash {
+						previousRanges = append(previousRanges, citation)
+					}
+				}
+			}
+			break
+		}
+		f.InitialReadRanges = previousRanges
+		payload["checkpoint"] = map[string]any{"afterSeq": f.BaseAsset.Meta.ConversationCursor, "readRanges": previousRanges}
 		review, err := st.Get("review")
 		if err != nil {
 			return Job{}, err
@@ -490,12 +518,16 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 			return Job{}, e
 		}
 		f.ThroughSeq = m.LatestSeq
-		proj, e := c.SnapshotThrough(m.LatestSeq)
+		proj, e := c.SequencedMessagesThrough(m.LatestSeq)
 		if e != nil {
 			return Job{}, e
 		}
-		messages := []map[string]string{}
-		for _, message := range proj.Messages {
+		messages := []map[string]any{}
+		for _, sequenced := range proj {
+			if sequenced.Seq <= f.BaseAsset.Meta.ConversationCursor || sequenced.Seq > m.LatestSeq {
+				continue
+			}
+			message := sequenced.Message
 			if message.Status != "completed" {
 				continue
 			}
@@ -506,10 +538,11 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 				}
 			}
 			if len(parts) > 0 {
-				messages = append(messages, map[string]string{"role": message.Role, "content": strings.Join(parts, "\n\n")})
+				messages = append(messages, map[string]any{"seq": sequenced.Seq, "role": message.Role, "content": strings.Join(parts, "\n\n")})
 			}
 		}
 		payload["conversation"] = messages
+		payload["conversationRange"] = map[string]uint64{"fromSeq": f.BaseAsset.Meta.ConversationCursor + 1, "throughSeq": f.ThroughSeq}
 	} else {
 		m, e := ReadMap(slug, "")
 		if e != nil && !errors.Is(e, os.ErrNotExist) {
@@ -546,7 +579,9 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		return Job{}, e
 	}
 	f.Messages = []teacher.GatewayMessage{{Role: "user", Content: string(raw)}}
-	req := teacher.GatewayRequest{System: system, Messages: f.Messages, ProviderID: p.ID, Model: p.Model, MaxOutputTokens: 8192}
+	f.MaxOutputTokens = teacher.GenerationOutputTokens(p)
+	f.MaxThinkingTokens = teacher.GenerationThinkingTokens(p)
+	req := teacher.GatewayRequest{System: system, Messages: f.Messages, ProviderID: p.ID, Model: p.Model, MaxOutputTokens: f.MaxOutputTokens, MaxThinkingTokens: f.MaxThinkingTokens}
 	if len(f.Sources) > 0 {
 		req.Tools = teacher.SourceTools()
 	}
@@ -554,12 +589,35 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	if f.WebSearchEnabled {
 		req.Tools = append(req.Tools, webSearchTool())
 	}
-	if _, e = teacher.CheckGenerationRequest(req, p); e != nil {
+	if _, e = teacher.CheckGenerationRequest(req, p); e != nil && in.Kind != "discipline-map" {
+		// Seal the largest complete prefix that fits. The rest remains after
+		// the committed cursor for the next explicit summary; no message is sliced.
+		messages, _ := payload["conversation"].([]map[string]any)
+		for e != nil && len(messages) > 1 {
+			messages = messages[:len(messages)-1]
+			f.ThroughSeq = messages[len(messages)-1]["seq"].(uint64)
+			payload["conversation"] = messages
+			payload["conversationRange"] = map[string]uint64{"fromSeq": f.BaseAsset.Meta.ConversationCursor + 1, "throughSeq": f.ThroughSeq}
+			payload["hasMoreConversation"] = true
+			raw, e = json.Marshal(payload)
+			if e != nil {
+				return Job{}, e
+			}
+			f.Messages[0].Content = string(raw)
+			req.Messages = f.Messages
+			_, e = teacher.CheckGenerationRequest(req, p)
+		}
+	}
+	if e != nil {
 		return Job{}, problem("input-budget-exhausted", 409)
 	}
 	now := time.Now().UTC()
 	id := idgen.New("gen")
 	j := Job{SchemaVersion: 1, ID: id, RootJobID: id, Attempt: 1, OperationID: in.OperationID, Kind: in.Kind, Status: "queued", Phase: "waiting", ProviderID: p.ID, Model: p.Model, QuestionCount: in.QuestionCount, MapMode: in.MapMode, Progress: Progress{Indeterminate: true}, Coverage: Coverage{Sources: f.Sources, ReadRanges: append([]sources.SourceCitation{}, f.InitialReadRanges...)}, ResultRefs: []string{}, CreatedAt: now, UpdatedAt: now, Intent: in}
+	if in.Kind != "discipline-map" {
+		more, _ := payload["hasMoreConversation"].(bool)
+		j.Checkpoint = &Checkpoint{AfterSeq: f.BaseAsset.Meta.ConversationCursor, ThroughSeq: f.ThroughSeq, HasMoreConversation: more}
+	}
 	if parent != nil {
 		j.RootJobID = parent.RootJobID
 		j.RetryOf = parent.ID

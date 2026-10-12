@@ -212,6 +212,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}", s.handleGetLearningAsset)
 	mux.HandleFunc("PUT /api/projects/{id}/assets/{assetKey}", s.handlePutLearningAsset)
 	mux.HandleFunc("GET /api/projects/{id}/assets/{assetKey}/versions", s.handleListLearningAssetVersions)
+	mux.HandleFunc("GET /api/projects/{id}/assets/practice/rounds", s.handlePracticeRounds)
 	mux.HandleFunc("GET /api/projects/{id}/sources", s.handleListSources)
 	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/retry", s.handleRetrySource)

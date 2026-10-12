@@ -89,6 +89,11 @@ export interface LearningAsset {
   contentKind: 'markdown';
 }
 
+export interface PracticeRound { versionId:string; content:string; createdAt:string; legacyAnswers?:Record<string,{answer:unknown;explanation?:string}> }
+export function usePracticeRounds(slug:string,enabled=true){
+ return useQuery({queryKey:['learning-workspace',slug,'assets','practice','rounds'],queryFn:async()=>(await http.get<{rounds:PracticeRound[]}>(`/api/projects/${encodeURIComponent(slug)}/assets/practice/rounds`)).rounds,enabled:enabled&&Boolean(slug)});
+}
+
 export interface BodyAnnotationMessage {
   id: string;
   role: 'learner' | 'assistant';

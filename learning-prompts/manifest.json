@@ -36,7 +36,7 @@
       "sha256": "9ac8ceea58566238f2cfe117f9192b8d652902f6dce1b2ee5f3072fc13183324"
     }
   ],
-  "version": "iteration-22-v1",
+  "version": "iteration-22.2",
   "schemaVersion": 1,
   "resources": [
     {
@@ -49,11 +49,11 @@
     },
     {
       "path": "learning-prompts/practice.md",
-      "sha256": "9c00367a5395ab5e96e91c8f7cb0e656abb5df6d8c1eae23d47662505101b056"
+      "sha256": "fb541e97e1eaa9a9a623cd5091f22a5c33d9eed9518b02a3ea87d975e83eb6af"
     },
     {
       "path": "learning-prompts/review.md",
-      "sha256": "3476117def492011aa2226b45f1665488603ae73d82488abe42d978d84bffeae"
+      "sha256": "6eb34c411cf44bb506f6877ec50ea9b409b0ec173a1dcabba55a1c0c219f6df0"
     },
     {
       "path": "learning-prompts/primitives/analogy.md",

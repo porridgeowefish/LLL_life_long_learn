@@ -79,6 +79,41 @@ func (b requestBudget) check(req gateway.Request) error {
 // CheckGenerationRequest uses the same complete serialized-input estimator as
 // teaching turns, without dropping any mandatory generation instructions.
 func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, error) {
+	b := generationBudget(p)
+	if req.MaxOutputTokens > 0 {
+		b.output = req.MaxOutputTokens
+	}
+	if p.Kind == "anthropic" && p.Thinking && req.MaxThinkingTokens > 0 {
+		b.thinking = req.MaxThinkingTokens
+	}
+	return b.available(req), b.check(req)
+}
+
+// Long teaching artifacts need room after the provider's reasoning phase.
+// Keep unknown providers within the existing conservative output allowance.
+func GenerationOutputTokens(p aiconfig.Provider) int {
+	b := generationBudget(p)
+	output := 8192
+	if endpoint, err := url.Parse(p.BaseURL); err == nil && p.Model == "glm-5.3" && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
+		output = 81920
+	}
+	return max(1, min(output, b.window/4))
+}
+
+// Generation-only thinking allowance; normal teaching requests retain 2048.
+func GenerationThinkingTokens(p aiconfig.Provider) int {
+	if p.Kind != "anthropic" || !p.Thinking {
+		return 0
+	}
+	b := generationBudget(p)
+	thinking := 2048
+	if endpoint, err := url.Parse(p.BaseURL); err == nil && p.Model == "glm-5.3" && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
+		thinking = 20480
+	}
+	return max(1, min(thinking, b.window/16))
+}
+
+func generationBudget(p aiconfig.Provider) requestBudget {
 	b := requestBudget{window: 32768, output: 8192, margin: 1024}
 	if p.ContextWindowTokens > 0 {
 		b.window = p.ContextWindowTokens
@@ -95,10 +130,7 @@ func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, erro
 	}
 	b.output = max(1, min(b.output, b.window/4))
 	b.margin = min(b.margin, b.window/16)
-	if req.MaxOutputTokens > 0 {
-		b.output = req.MaxOutputTokens
-	}
-	return b.available(req), b.check(req)
+	return b
 }
 func (b requestBudget) trimInitial(req *gateway.Request) error {
 	// Only complete historical messages are removed, before any tool exchange.

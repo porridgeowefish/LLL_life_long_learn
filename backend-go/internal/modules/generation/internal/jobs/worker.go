@@ -206,6 +206,8 @@ func (s *Service) claim(ctx context.Context) (string, Job, bool) {
 	if e != nil {
 		return "", Job{}, false
 	}
+	var oldest Job
+	selectedSlug, selectedRoot := "", ""
 	for _, p := range list {
 		if s.deleted[p.Slug] || (s.ProjectBlocked != nil && s.ProjectBlocked(p.Slug)) {
 			continue
@@ -223,12 +225,15 @@ func (s *Service) claim(ctx context.Context) (string, Job, bool) {
 			if j.Status != "queued" {
 				continue
 			}
-			j.Status = "running"
-			j.Phase = "preparing"
-			if s.saveLocked(p.Slug, root, &j) != nil {
-				return "", Job{}, false
+			if selectedSlug == "" || j.CreatedAt.Before(oldest.CreatedAt) || (j.CreatedAt.Equal(oldest.CreatedAt) && j.ID < oldest.ID) {
+				oldest, selectedSlug, selectedRoot = j, p.Slug, root
 			}
-			return p.Slug, j, true
+		}
+	}
+	if selectedSlug != "" {
+		oldest.Status, oldest.Phase = "running", "preparing"
+		if s.saveLocked(selectedSlug, selectedRoot, &oldest) == nil {
+			return selectedSlug, oldest, true
 		}
 	}
 	return "", Job{}, false
@@ -245,7 +250,7 @@ func (s *Service) phase(slug string, j *Job, phase string) bool {
 	return e == nil && s.saveLocked(slug, root, j) == nil
 }
 func (s *Service) execute(parent context.Context, slug string, j Job) {
-	ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(parent, 100*time.Minute)
 	defer cancel()
 	s.mu.Lock()
 	current, e := getJob(slug, j.ID)
@@ -270,7 +275,15 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		s.fail(slug, j, "provider-unavailable")
 		return
 	}
-	req := teacher.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: 8192}
+	outputBudget := f.MaxOutputTokens
+	if outputBudget == 0 {
+		outputBudget = teacher.GenerationOutputTokens(p)
+	}
+	thinkingBudget := f.MaxThinkingTokens
+	if thinkingBudget == 0 {
+		thinkingBudget = teacher.GenerationThinkingTokens(p)
+	}
+	req := teacher.GatewayRequest{System: f.System, Messages: f.Messages, ProviderID: j.ProviderID, Model: j.Model, MaxOutputTokens: outputBudget, MaxThinkingTokens: thinkingBudget}
 	if len(f.Sources) > 0 {
 		req.Tools = teacher.SourceTools()
 	}
@@ -297,6 +310,9 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	sourceCalls := 0
 	sourceTokens := 0
 	webCalls := 0
+	completedTokens := 0
+	completedTokensEstimated := false
+	lastProgress := time.Time{}
 	for round := 0; round < 8; round++ {
 		available, e := teacher.CheckGenerationRequest(req, p)
 		if e != nil {
@@ -324,10 +340,33 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		var pending []teacher.ToolCall
 		var thinking []json.RawMessage
 		var tokens map[string]int
+		limited, rawProgress := false, false
+		characters := 0
+		updateProgress := func(force bool) {
+			j.Progress.OutputTokens = completedTokens + (characters+2)/3
+			j.Progress.TokensEstimated = true
+			if value, ok := tokens["outputTokens"]; ok {
+				j.Progress.OutputTokens = completedTokens + value
+				j.Progress.TokensEstimated = completedTokensEstimated
+			}
+			if force || time.Since(lastProgress) >= 500*time.Millisecond {
+				if s.phase(slug, &j, "generating") {
+					lastProgress = time.Now()
+				}
+			}
+		}
 		err := s.gateway.Stream(ctx, req, func(ev teacher.GatewayEvent) {
 			switch ev.Type {
+			case "output-limit":
+				limited = true
+			case "output-progress":
+				rawProgress = true
+				characters += ev.Usage["characters"]
 			case "text-delta":
 				body.WriteString(ev.Delta)
+				if !rawProgress {
+					characters += len([]rune(ev.Delta))
+				}
 			case "provider-content-delta":
 				providerContent.WriteString(ev.Delta)
 			case "provider-reasoning-delta":
@@ -350,10 +389,14 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 					}
 				}
 			}
+			updateProgress(ev.Type == "usage")
 			if body.Len()+providerContent.Len()+providerReasoning.Len() > 4<<20 || len(pending) > 12 {
 				cancel()
 			}
 		})
+		updateProgress(true)
+		completedTokens = j.Progress.OutputTokens
+		completedTokensEstimated = j.Progress.TokensEstimated
 		s.mu.Lock()
 		if saved, lookupErr := getJob(slug, j.ID); !s.deleted[slug] && lookupErr == nil && saved.ID == j.ID {
 			usageErr := appendUsage(root, Usage{RequestID: requestID, JobID: j.ID, Attempt: j.Attempt, ProviderID: j.ProviderID, Model: j.Model, State: "request-finished", Known: tokens != nil, Tokens: tokens, CreatedAt: time.Now().UTC()})
@@ -368,6 +411,10 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 				code = "request-interrupted"
 			}
 			s.fail(slug, j, code)
+			return
+		}
+		if limited {
+			s.fail(slug, j, "output-limit")
 			return
 		}
 		if body.Len() > 4<<20 {
@@ -517,9 +564,9 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	}
 	j.Status = "succeeded"
 	j.Phase = "done"
-	j.Progress = Progress{CompletedUnits: 1, TotalUnits: 1, UnitLabel: "成果", Indeterminate: false}
+	j.Progress.CompletedUnits, j.Progress.TotalUnits, j.Progress.UnitLabel, j.Progress.Indeterminate = 1, 1, "成果", false
 	if j.Kind == "practice" {
-		j.Progress = Progress{CompletedUnits: j.QuestionCount, TotalUnits: j.QuestionCount, UnitLabel: "题", Indeterminate: false}
+		j.Progress.CompletedUnits, j.Progress.TotalUnits, j.Progress.UnitLabel = j.QuestionCount, j.QuestionCount, "题"
 	}
 	_ = s.saveLocked(slug, root, &j)
 }

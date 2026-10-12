@@ -8,7 +8,7 @@
 .document header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 22px; border-bottom: 1px solid var(--border); }
 .document header span { color: var(--muted); font-size: 10px; letter-spacing: .08em; }
 .document h2 { margin-top: 5px; font: 500 26px/1.25 Georgia, 'Songti SC', serif; }
-.actions { display: flex; flex-wrap: wrap; gap: 7px; min-width:0; }
+.actions { display: flex; flex-wrap: wrap; align-items:flex-start; gap: 7px; min-width:0; }
 .actions button { padding: 6px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); background: transparent; font-size: 11px; }
 .actions .primary { border-color: var(--accent); color: var(--on-accent); background: var(--accent); }
 .markdown { padding-top: 28px; line-height: 1.8; }
@@ -36,10 +36,19 @@
 .generatedDescription { margin: 22px 0 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
 .openArtifact { padding: 7px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--fg); font-size: 11px; text-decoration: none; }
 .practice { padding-top: 24px; }
+.roundPager { display:flex; align-items:center; justify-content:center; gap:16px; margin-top:20px; font-size:13px; }
+.roundPager button { padding:7px 12px; border:1px solid var(--border); border-radius:7px; background:var(--card); color:var(--fg); }
+.roundPager button:disabled { opacity:.4; cursor:default; }
 .practiceList { display: grid; gap: 14px; }
 .exercise { padding: 18px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-translucent); }
 .exerciseNo { display: block; margin-bottom: 10px; color: var(--accent-ink); font-size: 10px; font-weight: 800; letter-spacing: .1em; }
 .practiceField { margin: 9px 0; }
+.practiceField textarea { display:block; box-sizing:border-box; width:100%; min-height:96px; margin-top:8px; padding:12px; font:inherit; color:var(--fg); background:var(--card); border:1px solid var(--border); border-radius:7px; resize:vertical; }
+.optionList { border:0; padding:0; margin:14px 0; }
+.optionList legend { font-size:12px; color:var(--muted); margin-bottom:8px; }
+.option input { accent-color:var(--accent); flex:0 0 auto; }
+.option span { min-width:0; }
+.option span :global(p) { margin:0; }
 .practiceField > strong { display: block; margin-bottom: 4px; color: var(--muted); font-size: 10px; letter-spacing: .05em; }
 .fieldMarkdown { line-height: 1.75; }
 .fieldMarkdown :global(p) { margin: 0; }

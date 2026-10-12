@@ -553,6 +553,20 @@ func (s *Server) handleListLearningAssetVersions(w http.ResponseWriter, r *http.
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"versions": versions})
 }
 
+func (s *Server) handlePracticeRounds(w http.ResponseWriter, r *http.Request) {
+	store, err := assetstore.New(r.PathValue("id"))
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	rounds, err := store.PracticeRounds()
+	if err != nil {
+		learningWorkspaceError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"rounds": rounds})
+}
+
 func (s *Server) handleListSources(w http.ResponseWriter, r *http.Request) {
 	store, err := sourcestore.New(r.PathValue("id"))
 	if err != nil {

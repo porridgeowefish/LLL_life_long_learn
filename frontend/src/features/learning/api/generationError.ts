@@ -15,6 +15,12 @@ const messages: Record<string,string> = {
  'migration-blocked':'旧任务尚未完成兼容迁移，请先关闭旧版程序后重新启动。',
  'generation-unavailable':'生成服务未就绪，请重新启动应用。',
  'provider-failed':'模型服务调用失败，请检查连接、套餐权限与额度。',
+ 'output-limit':'模型已达到单次输出上限，正文可能被截断。请减少题数或分批总结后重试。',
+ 'empty-output':'模型没有返回正文，请重试或检查模型的思考与输出配置。',
+ 'invalid-practice-output':'练习题未完整满足题数、答案或解析要求，请减少题数后重试。',
+ 'invalid-map-output':'地图正文与主题目录不一致，未替换旧地图，请重试。',
+ 'invalid-review-output':'复习稿缺少完整章节，未替换旧稿，请重试。',
+ 'edit-conflict':'生成期间原稿已修改，旧稿已保留，请重新生成。',
  'request-interrupted':'生成已中断，可重新发起。',
  'operation-conflict':'本次提交内容已变化，请关闭弹窗后重新生成。',
 };
