@@ -76,6 +76,18 @@ function main(input) {
     install(next, ["/i", ...props], path.join(scratch, "upgrade.log"));
     installed = next;
     assert(!fs.existsSync(override), "Upgrade or repair accepted folder override");
+    // Local and CI builds can have the same version but different package bytes.
+    // They must major-upgrade instead of returning Windows Installer 1638.
+    const rebuiltPayload = path.join(scratch, "rebuilt-payload");
+    fs.cpSync(payload, rebuiltPayload, { recursive: true });
+    const rebuiltReadme = Buffer.concat([original, Buffer.from("\nRebuilt package smoke\n")]);
+    fs.writeFileSync(path.join(rebuiltPayload, "README.md"), rebuiltReadme);
+    const rebuilt = buildMsi(rebuiltPayload, path.join(scratch, "rebuilt"), "0.5.1", match[2], { identity })[0];
+    install(rebuilt, ["/i", ...props], path.join(scratch, "same-version-upgrade.log"));
+    installed = rebuilt;
+    assert.deepEqual(fs.readFileSync(path.join(folder, "README.md")), rebuiltReadme, "Same-version rebuilt payload was not installed");
+    assert.equal(fs.readFileSync(path.join(folder, "learner-note.md"), "utf8"), "preserve");
+    install(rebuilt, ["/i", ...props], path.join(scratch, "same-version-reinstall.log"));
     const downgrade = spawnSync(
       "msiexec.exe",
       [
@@ -150,7 +162,7 @@ function main(input) {
     install(base, ["/x"], path.join(scratch, "default-uninstall.log"));
     installed = null;
     console.log(
-      `MSI table inventory, isolated install/reinstall/repair/upgrade/downgrade/uninstall, native rendered window and icon, source import and data retention passed. Logs: ${scratch}`,
+      `MSI table inventory, isolated install/reinstall/repair/upgrade/same-version-rebuild/downgrade/uninstall, native rendered window and icon, source import and data retention passed. Logs: ${scratch}`,
     );
   } finally {
     if (installed)

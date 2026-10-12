@@ -23,7 +23,9 @@ function msiIdentity(version, arch, identity = "learn-with-ai") {
   if (!["amd64", "arm64"].includes(arch))
     throw new Error("Unsupported MSI architecture");
   return {
-    productCode: guid(`${identity}:${arch}:${version}`),
+    // A rebuilt MSI has a new PackageCode. Give it a new ProductCode too so
+    // the existing same-version MajorUpgrade policy can replace local/CI builds.
+    productCode: crypto.randomUUID().toUpperCase(),
     upgradeCode: guid(`${identity}:${arch}:upgrade`),
   };
 }
