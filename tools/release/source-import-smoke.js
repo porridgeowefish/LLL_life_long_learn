@@ -57,7 +57,7 @@ async function main(binary){
   // prompt resources and embedded PDF renderer are usable after installation.
   const promptRoot=path.resolve(__dirname,'../../learning-prompts');
   const review='# Packaged review\n## Concepts\nLexical environments retain captured bindings.\n';
-  const practice='## 第1题\n题型：short-answer · 难度：1/5\nExplain a captured binding in a new callback.\n### 参考答案\nThe callback retains its lexical environment.\n### 解析\nThe binding outlives the outer call.\n';
+  const practice='## 第1题\n题型：single-choice · 难度：1/5\nA callback runs after its outer function returns. What happens to a captured binding?\nA. The callback retains its lexical environment.\nB. The binding disappears when the outer call returns.\n### 参考答案\n答案：A\n### 解析\nA is correct because the captured binding outlives the outer call. B confuses the outer call lifetime with the retained lexical environment.\n';
   const map={overviewMarkdown:'# Test discipline\n## 这门学科研究什么\nObjects and evidence.\n## 学科边界\nA bounded discipline.\n## 主要研究领域与知识架构\n',topics:{schemaVersion:1,topics:[]}};
   for(let chapter=1;chapter<=4;chapter++){
    const chapterTitle='领域'+chapter;map.overviewMarkdown+='### '+chapterTitle+'\n';
