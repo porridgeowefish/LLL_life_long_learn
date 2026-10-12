@@ -24,6 +24,7 @@ import {
 import { useAskAiSettings } from '@/features/settings';
 
 import { SourceCitations } from './SourceCitations';
+import { LearningProgress, readLearningProgress, withoutLearningProgress } from './LearningProgress';
 import s from './TeacherView.module.css';
 
 interface SearchStatus {
@@ -540,9 +541,10 @@ const Message = memo(function Message({ slug, message, sourceNames, getReasoning
         {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
-          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(block.source ?? '')} className={s.markdown} streaming={streaming} />
+          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? withoutLearningProgress(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
+        {teacher && !streaming && message.status === 'completed' && <LearningProgress slug={slug} value={readLearningProgress(messageMarkdown(message))} />}
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}        {actions && !streaming && (
           <div className={s.messageActions}>

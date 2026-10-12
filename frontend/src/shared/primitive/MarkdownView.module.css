@@ -1,4 +1,6 @@
 .body { min-width:0; line-height:1.8; overflow-wrap:anywhere; color:var(--fg); }
+/* Pagination must win over table/media display rules, including inline styles. */
+.body :global([hidden]) { display:none!important; }
 .body :where(h1,h2,h3,h4,h5,h6) { color:var(--fg); line-height:1.4; font-weight:650; margin:1.4em 0 .65em; }
 .body :where(h1) { font-size:1.7em; }.body :where(h2) { font-size:1.35em; }.body :where(h3) { font-size:1.15em; }
 .body :where(p,ul,ol,blockquote,pre,table) { margin:.8em 0; }.body :where(ul,ol) { padding-left:1.65em; }

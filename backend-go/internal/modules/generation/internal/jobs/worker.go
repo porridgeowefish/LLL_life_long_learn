@@ -275,10 +275,7 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 		s.fail(slug, j, "provider-unavailable")
 		return
 	}
-	outputBudget := f.MaxOutputTokens
-	if outputBudget == 0 {
-		outputBudget = teacher.GenerationOutputTokens(p)
-	}
+	outputBudget := teacher.GenerationOutputTokens(p)
 	thinkingBudget := f.MaxThinkingTokens
 	if thinkingBudget == 0 {
 		thinkingBudget = teacher.GenerationThinkingTokens(p)

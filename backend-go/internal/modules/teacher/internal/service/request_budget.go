@@ -5,7 +5,9 @@ import (
 	"errors"
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	gateway "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/gateway"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"net/url"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -28,13 +30,15 @@ type requestBudget struct{ window, output, thinking, margin int }
 var errContextBudgetExhausted = errors.New("teacher context budget exhausted; current learner message retained")
 
 func budgetForProvider(id string) requestBudget {
-	b := requestBudget{window: 32768, output: 8192, margin: 1024}
+	b := requestBudget{window: 124576, output: platformconfig.ModelOutputTokens, margin: 1024}
 	if cfg, err := aiconfig.Load(); err == nil && cfg != nil {
 		p := cfg.Resolve("teacher")
 		if id != "" {
 			p = cfg.Find(id)
 		}
 		if p != nil {
+			b = generationBudget(*p)
+			b.output = GenerationOutputTokens(*p)
 			if p.ContextWindowTokens > 0 {
 				b.window = p.ContextWindowTokens
 			}
@@ -42,12 +46,6 @@ func budgetForProvider(id string) requestBudget {
 				b.thinking = 2048
 			}
 		}
-	}
-	if b.output > b.window/4 {
-		b.output = b.window / 4
-	}
-	if b.output < 1 {
-		b.output = 1
 	}
 	if b.margin > b.window/16 {
 		b.margin = b.window / 16
@@ -67,7 +65,8 @@ func (b requestBudget) input(req gateway.Request) int {
 	return n
 }
 func (b requestBudget) available(req gateway.Request) int {
-	return b.window - b.output - b.thinking - b.margin - b.input(req)
+	// Anthropic thinking and OpenAI reasoning both consume the same 100k ceiling.
+	return b.window - b.output - b.margin - b.input(req)
 }
 func (b requestBudget) check(req gateway.Request) error {
 	if b.available(req) < 0 {
@@ -80,24 +79,15 @@ func (b requestBudget) check(req gateway.Request) error {
 // teaching turns, without dropping any mandatory generation instructions.
 func CheckGenerationRequest(req gateway.Request, p aiconfig.Provider) (int, error) {
 	b := generationBudget(p)
-	if req.MaxOutputTokens > 0 {
-		b.output = req.MaxOutputTokens
-	}
 	if p.Kind == "anthropic" && p.Thinking && req.MaxThinkingTokens > 0 {
 		b.thinking = req.MaxThinkingTokens
 	}
 	return b.available(req), b.check(req)
 }
 
-// Long teaching artifacts need room after the provider's reasoning phase.
-// Keep unknown providers within the existing conservative output allowance.
+// Every model uses the same learner-authorized single-request output ceiling.
 func GenerationOutputTokens(p aiconfig.Provider) int {
-	b := generationBudget(p)
-	output := 8192
-	if endpoint, err := url.Parse(p.BaseURL); err == nil && p.Model == "glm-5.3" && (endpoint.Hostname() == "open.bigmodel.cn" || endpoint.Hostname() == "api.z.ai") {
-		output = 81920
-	}
-	return max(1, min(output, b.window/4))
+	return platformconfig.ModelOutputTokens
 }
 
 // Generation-only thinking allowance; normal teaching requests retain 2048.
@@ -114,10 +104,12 @@ func GenerationThinkingTokens(p aiconfig.Provider) int {
 }
 
 func generationBudget(p aiconfig.Provider) requestBudget {
-	b := requestBudget{window: 32768, output: 8192, margin: 1024}
+	// Unknown connections retain the previous ~23k input allowance plus the explicit output
+	// reservation. This is a local budgeting fallback, not a model capability.
+	b := requestBudget{window: 124576, output: platformconfig.ModelOutputTokens, margin: 1024}
 	if p.ContextWindowTokens > 0 {
 		b.window = p.ContextWindowTokens
-	} else if p.Model == "glm-5.3" {
+	} else if strings.TrimSpace(p.Model) == "glm-5.3" {
 		// Verified GLM-5.3 model capacity (2026-10-11). Legacy connections
 		// omit this field; do not incorrectly constrain the first-party model
 		// to the generic fallback. Unknown relays retain the safe fallback.
@@ -125,10 +117,28 @@ func generationBudget(p aiconfig.Provider) requestBudget {
 			b.window = 1000000
 		}
 	}
+	if p.ContextWindowTokens == 0 {
+		if endpoint, err := url.Parse(p.BaseURL); err == nil && endpoint.Hostname() == "tokenhub.tencentmaas.com" {
+			model := strings.TrimSpace(p.Model)
+			switch model {
+			case "hy4-preview", "deepseek/deepseek-flash", "deepseek-v4.1-flash", "deepseek-v4-flash-202605", "deepseek-v4-pro-202606",
+				"deepseek/deepseek-v4-flash-0731", "deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-pro-0813", "deepseek/deepseek-v4-pro",
+				"deepseek/deepseek-v4-flash-vision-exp", "deepseek-v4-flash-0731", "deepseek-v4-pro-0813", "deepseek-v4-flash", "deepseek-v4-pro",
+				"glm-5.3-flash", "glm-5.3-flashx", "glm-5.3", "glm-5.2", "kimi-k3", "kimi-k2.8-preview", "minimax-m3",
+				"mimo-v2.6-pro", "mimo-v2.6-flash", "mimo-v2.5-pro", "step-5-preview":
+				b.window = 1000000
+			case "hy3", "kimi-k2.7-code-highspeed", "kimi-k2.7-code", "kimi-k2.6":
+				b.window = 256000
+			case "glm-5v-turbo", "minimax-m2.7":
+				b.window = 200000
+			case "hunyuan-role-latest", "hy-role":
+				b.window = 32000
+			}
+		}
+	}
 	if p.Kind == "anthropic" && p.Thinking {
 		b.thinking = 2048
 	}
-	b.output = max(1, min(b.output, b.window/4))
 	b.margin = min(b.margin, b.window/16)
 	return b
 }

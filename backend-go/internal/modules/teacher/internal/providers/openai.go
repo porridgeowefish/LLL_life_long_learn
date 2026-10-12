@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
 	"strings"
@@ -17,11 +18,13 @@ func openAIBody(p Provider, system string, msgs []Message, stream bool) ([]byte,
 		out = append(out, Message{Role: "system", Content: system})
 	}
 	out = append(out, msgs...)
-	return json.Marshal(map[string]any{
+	body := map[string]any{
 		"model":    p.Model,
 		"messages": out,
 		"stream":   stream,
-	})
+	}
+	body[platformconfig.ModelOutputLimitKey(p.BaseURL, p.Model)] = platformconfig.ModelOutputTokens
+	return json.Marshal(body)
 }
 
 func streamOpenAI(ctx context.Context, p Provider, system string, msgs []Message, onFrame func(Frame)) error {

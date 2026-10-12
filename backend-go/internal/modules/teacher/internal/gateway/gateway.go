@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,6 +19,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	askaiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 )
 
 // Message is one provider-facing conversation turn. ToolCalls is set on
@@ -116,9 +116,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 		messages = append(messages, openAIMessage(message))
 	}
 	body := map[string]any{"model": p.Model, "messages": messages, "stream": true, "stream_options": map[string]any{"include_usage": true}}
-	if in.MaxOutputTokens > 0 {
-		body[openAIOutputLimitKey(p)] = in.MaxOutputTokens
-	}
+	body[openAIOutputLimitKey(p)] = platformconfig.ModelOutputTokens
 	if len(in.Tools) > 0 {
 		var tools []map[string]any
 		for _, tool := range in.Tools {
@@ -206,16 +204,7 @@ func streamOpenAI(ctx context.Context, p askaiconfig.Provider, in Request, emit 
 }
 
 func openAIOutputLimitKey(p askaiconfig.Provider) string {
-	endpoint, _ := url.Parse(p.BaseURL)
-	if endpoint != nil && (endpoint.Hostname() == "api.openai.com" || endpoint.Hostname() == "api.groq.com") {
-		return "max_completion_tokens"
-	}
-	model := strings.ToLower(p.Model)
-	if model == "chat-latest" || strings.HasPrefix(model, "gpt-5") || strings.HasPrefix(model, "gpt-6") ||
-		strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") || strings.HasPrefix(model, "o4") {
-		return "max_completion_tokens"
-	}
-	return "max_tokens"
+	return platformconfig.ModelOutputLimitKey(p.BaseURL, p.Model)
 }
 
 // The provider stream is processed synchronously, so a request-local buffer is
@@ -357,7 +346,7 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 		}
 		previousTool = message.ToolCallID != ""
 	}
-	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": 8192}
+	body := map[string]any{"model": p.Model, "system": in.System, "messages": messages, "stream": true, "max_tokens": platformconfig.ModelOutputTokens}
 	// Merely offering tools must not change the configured thinking channel.
 	// Older externally supplied tool history lacking signed blocks still uses
 	// the non-thinking request shape; live tool rounds retain them in memory.
@@ -373,17 +362,6 @@ func streamAnthropic(ctx context.Context, p askaiconfig.Provider, in Request, em
 			thinkingBudget = in.MaxThinkingTokens
 		}
 		body["thinking"] = map[string]any{"type": "enabled", "budget_tokens": thinkingBudget}
-		body["max_tokens"] = 8192 + thinkingBudget
-	}
-	if in.MaxOutputTokens > 0 {
-		body["max_tokens"] = in.MaxOutputTokens
-		if p.Thinking && replayableThinking {
-			thinkingBudget := 2048
-			if in.MaxThinkingTokens > 0 {
-				thinkingBudget = in.MaxThinkingTokens
-			}
-			body["max_tokens"] = in.MaxOutputTokens + thinkingBudget
-		}
 	}
 	if len(in.Tools) > 0 {
 		var tools []map[string]any

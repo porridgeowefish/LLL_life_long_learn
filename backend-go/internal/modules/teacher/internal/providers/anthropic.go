@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	platformconfig "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
 	"strings"
@@ -14,7 +15,7 @@ import (
 func anthropicBody(p Provider, system string, msgs []Message, stream bool) ([]byte, error) {
 	req := map[string]any{
 		"model":      p.Model,
-		"max_tokens": 4096,
+		"max_tokens": platformconfig.ModelOutputTokens,
 		"stream":     stream,
 		"messages":   msgs,
 	}
@@ -23,7 +24,6 @@ func anthropicBody(p Provider, system string, msgs []Message, stream bool) ([]by
 	}
 	if p.Thinking {
 		req["thinking"] = map[string]any{"type": "enabled", "budget_tokens": 1024}
-		req["max_tokens"] = 5120 // must exceed budget_tokens
 	}
 	return json.Marshal(req)
 }

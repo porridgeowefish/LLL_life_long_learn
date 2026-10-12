@@ -5,13 +5,29 @@ export interface ProviderPreset {
   models: readonly { id: string; contextWindowTokens?: number }[];
   docsURL: string; keyURL: string; planURL?: string; note?: string; disabled?: boolean;
 }
+// Ordinary TokenHub chat models, verified against the official catalog on 2026-10-12.
+// Offline models and dedicated translation/media-generation APIs are not teaching models.
+const TOKENHUB_MODELS = [
+  { id: 'deepseek-v4.1-flash', contextWindowTokens: 1000000 },
+  ...['hy4-preview', 'deepseek/deepseek-flash', 'deepseek-v4-flash-202605',
+    'deepseek/deepseek-v4-flash-0731', 'deepseek/deepseek-v4-flash', 'deepseek-v4-pro-202606',
+    'deepseek/deepseek-v4-pro-0813', 'deepseek/deepseek-v4-pro', 'deepseek/deepseek-v4-flash-vision-exp',
+    'deepseek-v4-flash-0731', 'deepseek-v4-pro-0813', 'deepseek-v4-flash', 'deepseek-v4-pro',
+    'glm-5.3-flash', 'glm-5.3-flashx', 'glm-5.3', 'glm-5.2', 'kimi-k3', 'kimi-k2.8-preview',
+    'minimax-m3', 'mimo-v2.6-pro', 'mimo-v2.6-flash', 'mimo-v2.5-pro', 'step-5-preview']
+    .map(id => ({ id, contextWindowTokens: 1000000 })),
+  ...['hy3', 'kimi-k2.7-code-highspeed', 'kimi-k2.7-code', 'kimi-k2.6']
+    .map(id => ({ id, contextWindowTokens: 256000 })),
+  ...['glm-5v-turbo', 'minimax-m2.7'].map(id => ({ id, contextWindowTokens: 200000 })),
+  ...['hunyuan-role-latest', 'hy-role'].map(id => ({ id, contextWindowTokens: 32000 })),
+];
 export const PROVIDER_PRESETS: readonly ProviderPreset[] = [
   { id: 'tencent-personal-plan', name: '腾讯云 · 个人通用 Token Plan', group: '套餐', kind: 'openai', baseURL: 'https://api.lkeap.cloud.tencent.com/plan/v3', models: ['tc-code-latest', 'deepseek/deepseek-flash', 'deepseek-v4-flash-202605', 'deepseek-v4-pro-202606', 'minimax-m2.7', 'minimax-m3', 'glm-5.2', 'glm-5.3', 'glm-5.3-flash', 'hy4-preview', 'kimi-k2.7-code', 'kimi-k3', 'mimo-v2.6-flash'].map(id => ({ id })), docsURL: 'https://cloud.tencent.com/document/product/1823/130119', keyURL: 'https://console.cloud.tencent.com/tokenhub/tokenplan', planURL: 'https://cloud.tencent.com/document/product/1823/130060', note: '个人套餐限官方允许的 AI 工具；自建应用后端受官方使用限制。' },
   { id: 'tencent-personal-anthropic', name: '腾讯云 · 个人通用 Token Plan（Anthropic）', group: '套餐', kind: 'anthropic', baseURL: 'https://api.lkeap.cloud.tencent.com/plan/anthropic', models: ['tc-code-latest', 'deepseek/deepseek-flash', 'deepseek-v4-flash-202605', 'deepseek-v4-pro-202606', 'minimax-m2.7', 'minimax-m3', 'glm-5.2', 'glm-5.3', 'glm-5.3-flash', 'hy4-preview', 'kimi-k2.7-code', 'kimi-k3', 'mimo-v2.6-flash'].map(id => ({ id })), docsURL: 'https://cloud.tencent.com/document/product/1823/130119', keyURL: 'https://console.cloud.tencent.com/tokenhub/tokenplan', planURL: 'https://cloud.tencent.com/document/product/1823/130060', note: '使用个人通用套餐专属 Key；官方用途限制同上。' },
   { id: 'glm-coding', name: '智谱 · GLM Coding Plan', group: '套餐', kind: 'openai', baseURL: 'https://open.bigmodel.cn/api/coding/paas/v4', models: [{ id: 'glm-5.3', contextWindowTokens: 1000000 }, { id: 'glm-5.3-flash' }], docsURL: 'https://zcode.z.ai/cn/docs/configuration', keyURL: 'https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys', planURL: 'https://bigmodel.cn/glm-coding', note: '使用编程套餐 API Key；仅限 Coding 场景，可用模型与额度以账号权限为准。' },
   { id: 'glm-coding-anthropic', name: '智谱 · GLM Coding Plan（Anthropic）', group: '套餐', kind: 'anthropic', baseURL: 'https://open.bigmodel.cn/api/anthropic', models: [{ id: 'glm-5.3', contextWindowTokens: 1000000 }, { id: 'glm-5.3-flash' }], docsURL: 'https://zcode.z.ai/cn/docs/configuration', keyURL: 'https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys', planURL: 'https://bigmodel.cn/glm-coding', note: '使用编程套餐 API Key；仅限 Coding 场景，可用模型与额度以账号权限为准。' },
   { id: 'openai', name: 'OpenAI', group: '官方', kind: 'openai', baseURL: 'https://api.openai.com/v1', models: [{ id: 'chat-latest', contextWindowTokens: 400000 }], docsURL: 'https://developers.openai.com/api/docs/models/chat-latest', keyURL: 'https://platform.openai.com/api-keys' },
-  { id: 'tencent-tokenhub', name: '腾讯云 · TokenHub（免费体验 / 普通 API）', group: '官方', kind: 'openai', baseURL: 'https://tokenhub.tencentmaas.com/v1', models: [{ id: 'deepseek-v4.1-flash', contextWindowTokens: 1000000 }, { id: 'glm-5.3', contextWindowTokens: 1000000 }], docsURL: 'https://cloud.tencent.com/document/product/1823/130058', keyURL: 'https://console.cloud.tencent.com/tokenhub/apikey', note: '先在模型广场领取体验额度，创建普通 API Key，选择已启用的模型。额度与有效期以控制台为准。' },
+  { id: 'tencent-tokenhub', name: '腾讯云 · TokenHub（免费体验 / 普通 API）', group: '官方', kind: 'openai', baseURL: 'https://tokenhub.tencentmaas.com/v1', models: TOKENHUB_MODELS, docsURL: 'https://cloud.tencent.com/document/product/1823/130058', keyURL: 'https://console.cloud.tencent.com/tokenhub/apikey', note: '选择控制台已开通且有额度的模型；列表不代表账号权限。GLM-5V-Turbo 将于 2026-10-30 下线。额度与有效期以控制台为准。' },
   { id: 'claude', name: 'Claude', group: '官方', kind: 'anthropic', baseURL: 'https://api.anthropic.com', models: [{ id: 'claude-sonnet-5-5' }, { id: 'claude-haiku-5-5' }, { id: 'claude-opus-5-5' }], docsURL: 'https://platform.claude.com/docs/en/models/overview', keyURL: 'https://platform.claude.com/settings/keys' },
   { id: 'gemini', name: 'Google Gemini', group: '官方', kind: 'openai', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', models: ['gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.1-pro-preview', 'gemini-3-flash-preview'].map(id => ({ id })), docsURL: 'https://ai.google.dev/gemini-api/docs/openai', keyURL: 'https://aistudio.google.com/api-keys' },
   { id: 'deepseek', name: 'DeepSeek', group: '官方', kind: 'openai', baseURL: 'https://api.deepseek.com', models: [{ id: 'deepseek-flash' }, { id: 'deepseek-v4-pro' }], docsURL: 'https://api-docs.deepseek.com/', keyURL: 'https://platform.deepseek.com/api_keys' },

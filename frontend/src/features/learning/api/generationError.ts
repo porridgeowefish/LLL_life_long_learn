@@ -15,7 +15,7 @@ const messages: Record<string,string> = {
  'migration-blocked':'旧任务尚未完成兼容迁移，请先关闭旧版程序后重新启动。',
  'generation-unavailable':'生成服务未就绪，请重新启动应用。',
  'provider-failed':'模型服务调用失败，请检查连接、套餐权限与额度。',
- 'output-limit':'模型已达到单次输出上限，正文可能被截断。请减少题数或分批总结后重试。',
+ 'output-limit':'提供方返回输出截断。应用单次输出上限为 100,000 token；提供方仍可能有更低限制。未完成内容没有覆盖原稿，可重试或换模型。',
  'empty-output':'模型没有返回正文，请重试或检查模型的思考与输出配置。',
  'invalid-practice-output':'练习题未完整满足题数、答案或解析要求，请减少题数后重试。',
  'invalid-map-output':'地图正文与主题目录不一致，未替换旧地图，请重试。',

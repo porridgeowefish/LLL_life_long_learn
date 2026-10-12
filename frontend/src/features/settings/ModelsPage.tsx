@@ -13,6 +13,15 @@ const copyConfig = (config: AskConfig): AskConfig => ({ ...config, providers: co
 const PURPOSES = [ ['teacher', '教师'], ['annotationAskAI', 'Ask AI'], ['review', '复习稿'], ['practice', '练习'],
   ['disciplineMap', '学科地图'], ['documentStructure', '文档公式识别'] ] as const;
 interface Editor { token: number; provider: AskProvider; original: string; isNew: boolean; presetId: string }
+function ModelSelect({ value, models, label, disabled, onChange }: { value: string; models: string[]; label: string; disabled?: boolean; onChange: (model: string) => void }) {
+  const [custom, setCustom] = useState(false);
+  const ids = [...new Set([...models, ...(value ? [value] : [])])];
+  return <><select aria-label={label} value={custom ? '__custom__' : value} disabled={disabled} onChange={event => {
+    if (event.target.value === '__custom__') setCustom(true);
+    else { setCustom(false); onChange(event.target.value); }
+  }}><option value="">使用连接模型</option>{ids.map(id => <option key={id} value={id}>{id}</option>)}<option value="__custom__">其他模型（手动填写）</option></select>
+  {custom && <input aria-label={`${label}自定义名称`} value={value} disabled={disabled} placeholder="填写提供方文档中的 model 标识" onChange={event => onChange(event.target.value)} />}</>;
+}
 export function ModelsPage() {
   const settings = useAskAiSettings();
   const save = useSaveAskAiSettings();
@@ -36,7 +45,7 @@ export function ModelsPage() {
     dirtyRef.current = true; revision.current++; setDirty(true); save.reset();
     setDraft(current => current ? change(current) : current);
   };
-  const openEditor = (provider?: AskProvider, initialPreset: ProviderPreset = PROVIDER_PRESETS[0]) => {
+  const openEditor = (provider?: AskProvider, initialPreset: ProviderPreset = PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!) => {
     const value = provider ? { ...provider } : applyProviderPreset({ id: crypto.randomUUID(), kind: 'openai', baseURL: '', apiKey: '', model: '' }, initialPreset);
     const next = { token: ++token.current, provider: value, original: JSON.stringify(value), isNew: !provider, presetId: presetForProvider(value)?.id ?? 'custom' };
     editorRef.current = next; setEditor(next); setDiscard(false); setProbeResult(null); setDiscovered([]); setCatalogMessage(''); setCatalogBusy(false); probe.reset(); save.reset();
@@ -112,6 +121,17 @@ export function ModelsPage() {
       <div><a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">领取腾讯云免费体验额度</a><p>领取后创建 API Key，在这里添加连接；额度与有效期以控制台为准。</p></div>
       <Button size="sm" disabled={save.isPending} onClick={() => openEditor(undefined, PROVIDER_PRESETS.find(item => item.id === 'tencent-tokenhub')!)}>配置 TokenHub 试用</Button>
     </div>
+    <details className={s.setupGuide} open={!draft.providers.length}>
+      <summary>第一次配置？按这五步完成</summary>
+      <ol>
+        <li><strong>领取额度。</strong>打开上方腾讯云模型广场，登录并按控制台要求开通服务，在“新用户福利”领取体验额度，记下有额度的模型。</li>
+        <li><strong>复制密钥。</strong><a href="https://console.cloud.tencent.com/tokenhub/apikey" target="_blank" rel="noreferrer">打开 Key 管理</a>，创建普通 API Key 并复制。免费体验使用普通 API Key。</li>
+        <li><strong>添加连接。</strong>点击“配置 TokenHub 试用”，从模型下拉框选刚才有额度的模型，把复制的密钥粘贴到 API Key；接口地址会自动填好。</li>
+        <li><strong>检测并保存。</strong>点击“探测连接”，看到“已连通”后点击“保存连接”。失败时检查 Key 是否完整、该模型是否已开通、额度是否可用。</li>
+        <li><strong>用于学习。</strong>在下面“教师”中选这个连接，再点击“保存配置”。复习稿、练习和 Ask AI 默认跟随教师。回到项目即可提问。</li>
+      </ol>
+      <p>其他提供方：点击“添加连接”→选择提供方→选择模型→通过“获取 Key”打开对应平台复制密钥→检测并保存。新增第一个连接会自动成为教师默认；已有连接时需在下方手动切换教师。</p>
+    </details>
     {!editor && save.isError && <p className={s.error} role="alert">保存失败，请重试。</p>}
     {dirty && <p className={s.saveStatus} role="status">有未保存的用途配置</p>}
     <div className={s.list} aria-label="已配置模型">
@@ -126,21 +146,29 @@ export function ModelsPage() {
         const binding = draft.bindings?.[key];
         const value = binding?.providerId ?? (key === 'teacher' ? draft.default : key === 'documentStructure' ? draft.bindings?.ocr?.providerId ?? '' : '');
         const missing = value && !draft.providers.some(p => p.id === value);
+        const provider = draft.providers.find(p => p.id === value);
+        const bindingModels = provider ? [...(presetForProvider(provider)?.models.map(m => m.id) ?? []), provider.model] : [];
         return <div key={key} className={s.bindingRow}><label>{label}<select disabled={save.isPending} value={value} onChange={event => setBinding(key, event.target.value)}>
           <option value="">{key === 'documentStructure' ? '关闭视觉识别' : key === 'teacher' ? '选择连接' : '使用教师默认'}</option>
           {missing && <option value={value}>连接已移除，请重新选择</option>}{options}
-        </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<input aria-label={`${label}模型覆盖`} value={binding.model ?? ''} disabled={save.isPending} placeholder="使用连接模型" onChange={event => setBinding(key, binding.providerId, event.target.value)} /></label>}</div>;
+        </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<ModelSelect key={binding.providerId} label={`${label}模型覆盖`} value={binding.model ?? ''} models={bindingModels} disabled={save.isPending} onChange={model => setBinding(key, binding.providerId, model)} /></label>}</div>;
       })}
       <label>搜索引擎<select value={draft.searchEngine} disabled={save.isPending} onChange={event => editConfig(current => ({ ...current, searchEngine: event.target.value as AskConfig['searchEngine'] }))}><option value="google">Google</option><option value="bing">Bing</option></select></label>
     </div>
     <Modal open={!!editor} onOpenChange={open => { if (!open) closeEditor(); }} title={editor?.isNew ? '添加 API 连接' : 'API 连接详情'} description="选择提供方和模型，填写 Key。" className={s.connectionModal}
       footer={<><Button size="sm" variant="ghost" disabled={save.isPending} onClick={() => closeEditor(true)}>取消</Button><Button size="sm" variant="primary" loading={save.isPending} disabled={!editor?.provider.model.trim() || !editor.provider.baseURL.trim()} onClick={saveEditor}>保存连接</Button></>}>
-      {editor && <><div className={s.formGrid}>
+      {editor && <>
+        <ol className={s.editorGuide}>
+          <li>{preset?.id === 'tencent-tokenhub' ? <>先在<a href="https://console.cloud.tencent.com/tokenhub/models" target="_blank" rel="noreferrer">模型广场</a>领取额度，然后<a href={preset.keyURL} target="_blank" rel="noreferrer">创建普通 API Key</a>并复制。</> : <>在提供方平台开通服务，通过下方“获取 Key”创建并复制 API Key。</>}</li>
+          <li>下拉选择已开通的模型，把密钥粘贴到 API Key。提供方的接口地址已经预填。</li>
+          <li>点击“探测连接”，成功后“保存连接”；随后在配置页选择教师连接并“保存配置”。</li>
+        </ol>
+        <div className={s.formGrid}>
         <label className={s.wide}>提供方<select value={editor.presetId} onChange={event => {
           const selected = PROVIDER_PRESETS.find(item => item.id === event.target.value); setDiscovered([]); setCatalogBusy(false);
           if (selected) patch(applyProviderPreset(editor.provider, selected), selected.id); else patch({}, 'custom');
         }}>{(['套餐', '官方', '聚合 / 中转'] as const).map(group => <optgroup key={group} label={group}>{PROVIDER_PRESETS.filter(p => p.group === group).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}<option value="custom">自行配置</option></select></label>
-        {preset ? <label className={s.wide}>模型<input aria-label="模型" list="connection-models" value={editor.provider.model} onChange={event => { const known = preset.models.find(m => m.id === event.target.value); patch({ model: event.target.value, contextWindowTokens: known?.contextWindowTokens }); }} /><datalist id="connection-models">{modelIds.map(id => <option key={id} value={id} />)}</datalist><small>可从列表选择，也可填写该提供方支持的模型。</small></label> : <>
+        {preset ? <label className={s.wide}>模型<ModelSelect key={`${editor.token}-${preset.id}`} label="模型" value={editor.provider.model} models={modelIds} onChange={model => { const known = preset.models.find(m => m.id === model); patch({ model, contextWindowTokens: known?.contextWindowTokens }); }} /><small>直接选择已开通的模型。填好 Key 后，“获取模型列表”可补充该账号的模型。</small></label> : <>
           <label>显示名称<input value={editor.provider.name ?? ''} onChange={event => patch({ name: event.target.value })} /></label>
           <label>接口协议<select value={editor.provider.kind} onChange={event => patch({ kind: event.target.value as AskProvider['kind'] })}><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option></select></label>
           <label className={s.wide}>模型名称<input list="connection-models" value={editor.provider.model} onChange={event => patch({ model: event.target.value })} /><datalist id="connection-models">{discovered.map(id => <option key={id} value={id} />)}</datalist></label>

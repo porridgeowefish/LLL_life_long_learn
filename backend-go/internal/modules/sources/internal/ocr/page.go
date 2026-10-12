@@ -81,10 +81,14 @@ func ExtractPage(ctx context.Context, p PageProvider, image []byte) (PageResult,
 	defer c()
 	encoded := base64.StdEncoding.EncodeToString(image)
 	url := strings.TrimRight(p.BaseURL, "/") + "/chat/completions"
-	payload := map[string]any{"model": p.Model, "max_tokens": 8192, "messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": extractionPrompt}, map[string]any{"type": "image_url", "image_url": map[string]string{"url": "data:image/png;base64," + encoded}}}}}}
+	payload := map[string]any{"model": p.Model, "max_tokens": config.ModelOutputTokens, "messages": []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "text", "text": extractionPrompt}, map[string]any{"type": "image_url", "image_url": map[string]string{"url": "data:image/png;base64," + encoded}}}}}}
 	if p.Kind == "anthropic" {
 		url = strings.TrimRight(p.BaseURL, "/") + "/v1/messages"
 		payload["messages"] = []any{map[string]any{"role": "user", "content": []any{map[string]any{"type": "image", "source": map[string]string{"type": "base64", "media_type": "image/png", "data": encoded}}, map[string]string{"type": "text", "text": extractionPrompt}}}}
+	}
+	if p.Kind != "anthropic" {
+		delete(payload, "max_tokens")
+		payload[config.ModelOutputLimitKey(p.BaseURL, p.Model)] = config.ModelOutputTokens
 	}
 	body, e := json.Marshal(payload)
 	if e != nil {

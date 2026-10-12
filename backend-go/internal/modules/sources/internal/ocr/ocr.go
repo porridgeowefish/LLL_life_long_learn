@@ -138,7 +138,7 @@ func extract(ctx context.Context, provider visionProvider, mediaType string, ima
 		url = strings.TrimRight(provider.BaseURL, "/") + "/v1/messages"
 		body := map[string]any{
 			"model":      provider.Model,
-			"max_tokens": 8192,
+			"max_tokens": platformconfig.ModelOutputTokens,
 			"messages": []map[string]any{{"role": "user", "content": []map[string]any{
 				{"type": "image", "source": map[string]any{"type": "base64", "media_type": mediaType, "data": encoded}},
 				{"type": "text", "text": extractionPrompt},
@@ -149,6 +149,7 @@ func extract(ctx context.Context, provider visionProvider, mediaType string, ima
 		url = strings.TrimRight(provider.BaseURL, "/") + "/chat/completions"
 		body := map[string]any{
 			"model": provider.Model,
+			platformconfig.ModelOutputLimitKey(provider.BaseURL, provider.Model): platformconfig.ModelOutputTokens,
 			"messages": []map[string]any{{"role": "user", "content": []map[string]any{
 				{"type": "text", "text": extractionPrompt},
 				{"type": "image_url", "image_url": map[string]any{"url": "data:" + mediaType + ";base64," + encoded}},
