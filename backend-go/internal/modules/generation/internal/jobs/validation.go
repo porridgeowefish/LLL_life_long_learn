@@ -75,6 +75,12 @@ var metadata = regexp.MustCompile(`^题型：\s*(single-choice|multiple-choice|t
 var optionLine = regexp.MustCompile(`^([A-Z])[.、．)]\s*.+`)
 var optionAnswer = regexp.MustCompile(`\b[A-Z]\b`)
 
+// New practice rounds are objective only: the first answer line is the
+// machine-gradable key the learner UI scores against.
+var objectiveKinds = map[string]bool{"single-choice": true, "multiple-choice": true, "true-false": true}
+var answerKey = regexp.MustCompile(`^答案[：:]\s*(.+?)\s*$`)
+var choiceKey = regexp.MustCompile(`^[A-Z](?:\s*[、,，]\s*[A-Z])*$`)
+
 func ValidatePractice(body string, count int) error {
 	type item struct{ lines []markdownLine }
 	items := []item{}
@@ -104,7 +110,7 @@ func ValidatePractice(body string, count int) error {
 		kind := ""
 		difficulty := 0
 		section := "question"
-		question, answer, explanation := "", "", ""
+		question, answer, explanation, firstAnswerLine := "", "", "", ""
 		options := map[string]bool{}
 		for _, line := range it.lines {
 			if !line.structural && (strings.HasPrefix(line.text, "```") || strings.HasPrefix(line.text, "~~~") || line.text == "$$") {
@@ -133,6 +139,9 @@ func ValidatePractice(body string, count int) error {
 					options[m[1]] = true
 				}
 			case "answer":
+				if answer == "" && strings.TrimSpace(line.text) != "" {
+					firstAnswerLine = strings.TrimSpace(line.text)
+				}
 				answer += line.text
 			case "explanation":
 				explanation += line.text
@@ -143,10 +152,23 @@ func ValidatePractice(body string, count int) error {
 		}
 		lastDifficulty = difficulty
 		difficulties[difficulty] = true
+		if !objectiveKinds[kind] {
+			return fmt.Errorf("subjective question")
+		}
+		key := answerKey.FindStringSubmatch(firstAnswerLine)
+		if key == nil {
+			return fmt.Errorf("answer key line")
+		}
+		if kind == "true-false" && key[1] != "正确" && key[1] != "错误" {
+			return fmt.Errorf("true-false answer")
+		}
 		if kind == "single-choice" || kind == "multiple-choice" {
+			if !choiceKey.MatchString(key[1]) {
+				return fmt.Errorf("choice answer")
+			}
 			selected := []string{}
 			seen := map[string]bool{}
-			for _, label := range optionAnswer.FindAllString(answer, -1) {
+			for _, label := range optionAnswer.FindAllString(key[1], -1) {
 				if !seen[label] {
 					seen[label] = true
 					selected = append(selected, label)
@@ -162,6 +184,9 @@ func ValidatePractice(body string, count int) error {
 			}
 			if kind == "single-choice" && len(selected) != 1 {
 				return fmt.Errorf("single choice answer")
+			}
+			if kind == "multiple-choice" && len(selected) < 2 {
+				return fmt.Errorf("multiple choice answer")
 			}
 		}
 	}

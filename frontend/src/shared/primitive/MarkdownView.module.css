@@ -12,16 +12,19 @@
 .body :where(code) { font-family:ui-monospace,Consolas,monospace; font-size:.9em; }.body :where(p code,li code) { padding:2px 5px; background:var(--ink-soft); border-radius:4px; }
 .body :global(.katex-display) { overflow-x:auto; overflow-y:hidden; padding:6px 0; }
 .body :global(.inline-svg), .body :global(.mermaid-placeholder), .body :global(.interactive-placeholder) { position:relative; min-width:0; margin:18px 0; width:100%; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--card); }
-.body :global(.diagram-stage) { overflow:hidden; min-height:80px; padding:14px; touch-action:none; cursor:grab; }
+.body :global(.diagram-stage) { display:block; overflow:auto; min-height:80px; padding:14px; touch-action:none; cursor:grab; }
 .body :global(.diagram-stage:active) { cursor:grabbing; }
-.body :global(.diagram-stage svg) { display:block; width:100%; max-width:100%; height:auto; max-height:760px; }
+/* Width comes from diagramControls: natural width when it fits, never shrunk
+   below a legible floor (the stage pans instead). */
+.body :global(.diagram-stage svg) { display:block; width:100%; height:auto; margin:0 auto; }
 .body :global(.diagram-tools) { display:flex; justify-content:flex-end; gap:4px; padding:5px 8px; border-bottom:1px solid var(--border); background:var(--surface-tint); }
 .body :global(.diagram-tools button), .body :global(.media-fullscreen-toggle) { width:30px; height:28px; border:1px solid var(--border); border-radius:5px; background:var(--card); color:var(--accent-ink); cursor:pointer; font-size:17px; }
 .body :global(.diagram-tools button::before) { content:attr(data-glyph); }
 .body :global(.media-fullscreen-toggle) { position:absolute; top:5px; right:8px; z-index:1; }
 .body :global(.media-fullscreen-toggle::before) { content:'⤢'; }
-.body :global(.media-fullscreen) { position:fixed; inset:32px; z-index:190; margin:0; display:flex; flex-direction:column; box-shadow:var(--shadow-lg); background:var(--card); }
-.body :global(.media-fullscreen .diagram-stage) { flex:1; display:grid; place-items:center; }.body :global(.media-fullscreen svg) { max-height:calc(100vh - 130px); }
+.body :global(.media-fullscreen) { position:fixed; inset:32px; z-index:190; margin:0; width:auto; height:auto; display:flex; flex-direction:column; box-shadow:var(--shadow-lg); background:var(--card); }
+.body :global(.media-fullscreen .diagram-stage) { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; }
+.body :global(.media-fullscreen .diagram-stage svg) { width:100%!important; height:100%!important; min-width:0!important; max-width:none!important; max-height:none; }
 .body :global(.interactive-placeholder iframe) { display:block; width:100%; border:0; min-height:240px; background:#fff; }
 .body :global(.media-fullscreen iframe) { flex:1; height:100%!important; }
 @media (max-width:560px) { .body :global(.media-fullscreen) { inset:10px; } }

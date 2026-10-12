@@ -51,7 +51,7 @@ export function LearningDemo({ onClose, onStart, onConfigure }: { onClose: () =>
           <ReviewReader slug="" content={demoReview} assetVersionId="guided-example-v1" renderBody={pageIndex => <DemoReviewBody key={pageIndex} pageIndex={pageIndex} onSave={quote => setAnnotations(current => current.includes(quote) ? current : [...current, quote])} />} />
           {annotations.length > 0 && <aside className={s.saved}><h3>本次批注 · {annotations.length}</h3>{annotations.map(quote => <blockquote key={quote}>{quote}</blockquote>)}</aside>}
         </div>}
-        <div hidden={step !== 2} className={s.padded}><p className={s.note}>临时作答，不自动评分。</p><PracticeReader content={demoPractice} versionId="guided-example-v1" /></div>
+        <div hidden={step !== 2} className={s.padded}><p className={s.note}>临时作答：提交后自动判分，示例成绩不会保存。</p><PracticeReader content={demoPractice} versionId="guided-example-v1" /></div>
         {step === 3 && <section className={s.padded}><label className={s.noteField}>我的示例笔记<textarea value={notes} onChange={event => setNotes(event.target.value)} /></label><p className={s.note} role="status">修改会在本次体验中保留。</p>{annotations.length > 0 && <aside className={s.saved}><h3>刚才保存的复习批注</h3>{annotations.map(quote => <blockquote key={quote}>{quote}</blockquote>)}</aside>}</section>}
         {step === 4 && <section className={s.padded}><h2>让学习有据可查</h2><details className={s.resource}><summary>查看示例资料节选</summary><MarkdownView source={demoSource} /></details><p className={s.note}>示例不上传文件。开始自己的项目后，可以导入真实资料、查看引用，并选择生成复习或练习所需的资料范围。</p></section>}
         {step === 5 && <section className={s.padded}><h2>把一个知识点放回体系</h2><p className={s.note}>优化方法 · 示例地图</p>

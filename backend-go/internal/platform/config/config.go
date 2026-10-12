@@ -226,6 +226,11 @@ func workspaceBase() string {
 	if v := strings.TrimSpace(os.Getenv("WORKSPACE")); v != "" {
 		return v
 	}
+	// A test binary without an explicit override must stay in its scratch
+	// workspace: config.local.json holds the learner's real API keys.
+	if paths.TestScratchWorkspace != "" {
+		return paths.TestScratchWorkspace
+	}
 	// Single derivation shared with the filesystem package: without an
 	// override the workspace is <repo>/workspace, so the config file lookup
 	// and the runtime path variables can never disagree (LESSONS_LEARNED #16).

@@ -62,3 +62,22 @@
 .answer { margin-top:18px; border-top:1px solid var(--border); padding-top:12px; }
 .answer summary { cursor:pointer; color:var(--accent-ink); }
 @media(max-width:700px){.document header{flex-wrap:wrap;gap:12px;}}
+
+/* ---- objective practice test (0.7.6) ---- */
+.option[data-key] { outline:1.5px solid color-mix(in srgb, var(--accent) 60%, transparent); background:var(--accent-soft); }
+.option[data-picked]:not([data-key]) { outline:1.5px solid color-mix(in srgb, var(--pink) 55%, transparent); }
+.exercise[data-result='correct'] { border-color:color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.exercise[data-result='wrong'] { border-color:color-mix(in srgb, var(--pink) 45%, var(--border)); }
+.verdictRight, .verdictWrong { margin:10px 0 0; font-size:12px; font-weight:650; }
+.verdictRight { color:var(--accent-ink); }
+.verdictWrong { color:var(--pink); }
+.answerHidden { margin:14px 0 0; padding-top:10px; border-top:1px solid var(--border); color:var(--muted); font-size:12px; }
+.scoreCard { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin:0 0 16px; padding:14px 18px; border:1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius:10px; background:var(--accent-soft); }
+.scoreCard > div:first-child { display:grid; gap:3px; }
+.scoreCard strong { font-size:18px; color:var(--accent-ink); font-variant-numeric:tabular-nums; }
+.scoreCard span { color:var(--muted); font-size:11px; }
+.scoreActions { display:flex; gap:8px; }
+.scoreActions button, .submitBar button { padding:7px 13px; border:1px solid var(--border); border-radius:7px; color:var(--fg); background:var(--card); font-size:12px; }
+.submitBar { position:sticky; bottom:0; z-index:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:12px; margin-top:16px; padding:12px 0; border-top:1px solid var(--border); background:var(--card); color:var(--muted); font-size:12px; }
+.submitBar .primary { border-color:var(--accent); color:var(--on-accent); background:var(--accent); font-weight:650; }
+.submitBar button:disabled, .scoreActions button:disabled { opacity:.45; cursor:default; }

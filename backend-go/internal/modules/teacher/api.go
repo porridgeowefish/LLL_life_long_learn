@@ -71,6 +71,13 @@ var ErrQueueItemNotFound = conversation.ErrQueueItemNotFound
 
 func New(gateway Gateway) *Service { return service.New(gateway) }
 
+const (
+	FeynmanFinishRequest = service.FeynmanFinishRequest
+	FeynmanOpening       = service.FeynmanOpening
+)
+
+func FeynmanSystemPrompt(review string) string { return service.FeynmanSystemPrompt(review) }
+
 func CheckGenerationRequest(req GatewayRequest, p ProviderConfig) (int, error) {
 	return service.CheckGenerationRequest(req, p)
 }

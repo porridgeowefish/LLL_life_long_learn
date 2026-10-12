@@ -24,7 +24,7 @@ import {
 import { useAskAiSettings } from '@/features/settings';
 
 import { SourceCitations } from './SourceCitations';
-import { LearningProgress, readLearningProgress, withoutLearningProgress } from './LearningProgress';
+import { LearningProgress, QuickReplies, readLearningProgress, withoutLearningProgress } from './LearningProgress';
 import s from './TeacherView.module.css';
 
 interface SearchStatus {
@@ -220,12 +220,18 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     event.preventDefault();
     const content = input.trim();
     if (!content) return;
+    await send(content);
+  };
+
+  // Typed messages and quick-reply buttons share one send path, so a button
+  // click is recorded exactly like the learner typing the same words.
+  const send = async (content: string) => {
     setError('');
     const attachmentRefs: string[] = [];
     if (live) {
       // Sending while streaming queues durably server-side; the queue chips
       // above the composer reflect and edit that state.
-      setInput('');
+      setInput((current) => current.trim() === content ? '' : current);
       try {
         await queueTeacherTurn(slug, { operationId: crypto.randomUUID(), content, attachmentRefs, providerId: providerId || undefined });
         await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
@@ -235,7 +241,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       }
       return;
     }
-    setInput('');
+    setInput((current) => current.trim() === content ? '' : current);
     followStream.current = true;
     pendingDeltas.current = { text: '', reasoning: '' };
     const operationId = crypto.randomUUID();
@@ -358,6 +364,13 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === 'teacher') return messages[i];
     return null;
   }, [conversation.data?.messages]);
+  // Quick replies follow only the newest completed teacher answer, and only
+  // when nothing newer (a learner turn) has been sent after it.
+  const quickReplyTarget = useMemo(() => {
+    const messages = conversation.data?.messages ?? [];
+    const last = messages[messages.length - 1];
+    return last && last.role === 'teacher' && last.status === 'completed' && queueItems.length === 0 ? last : null;
+  }, [conversation.data?.messages, queueItems.length]);
   const latestResponseRef = useRef('');
   useEffect(() => {
     latestResponseRef.current = conversation.data?.latestResponseId ?? '';
@@ -398,6 +411,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
             onRegenerate: regenerate,
           }} />
         ))}
+        {!live && quickReplyTarget && <QuickReplies suggestions={readLearningProgress(messageMarkdown(quickReplyTarget))?.replies ?? []} onSend={(text) => void send(text)} />}
         {live && (
           <>
             <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />

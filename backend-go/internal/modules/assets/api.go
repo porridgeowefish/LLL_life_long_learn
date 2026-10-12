@@ -25,6 +25,11 @@ type (
 	CandidateResult = assetstore.CandidateResult
 	MigrationResult = assetstore.MigrationResult
 
+	PracticeResult   = assetstore.PracticeResult
+	PracticeItemMark = assetstore.PracticeItemMark
+	FeynmanSession   = assetstore.FeynmanSession
+	FeynmanMessage   = assetstore.FeynmanMessage
+
 	State           = annotationstore.State
 	Anchors         = annotationstore.Anchors
 	Message         = annotationstore.Message
@@ -33,6 +38,12 @@ type (
 	CreateInput     = annotationstore.CreateInput
 	Event           = annotationstore.Event
 	AnnotationStore = annotationstore.Store
+)
+
+var (
+	ErrInvalidPracticeResult  = assetstore.ErrInvalidPracticeResult
+	ErrPracticeRoundNotFound  = assetstore.ErrPracticeRoundNotFound
+	ErrFeynmanSessionNotFound = assetstore.ErrFeynmanSessionNotFound
 )
 
 func New(slug string) (*Store, error) { return assetstore.New(slug) }

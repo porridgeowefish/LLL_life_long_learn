@@ -76,6 +76,7 @@ func init() {
 		if err != nil {
 			panic("paths: test workspace: " + err.Error())
 		}
+		TestScratchWorkspace = scratch
 		if err := ConfigureWorkspace(scratch); err != nil {
 			panic("paths: configure workspace: " + err.Error())
 		}
@@ -90,6 +91,12 @@ func init() {
 	FRONTEND_ROOT = filepath.Join(PROJECT_ROOT, "frontend", "dist")
 	FRONTEND_INDEX = filepath.Join(FRONTEND_ROOT, "index.html")
 }
+
+// TestScratchWorkspace is the throwaway workspace a go test binary starts
+// with. Other packages that derive data locations independently of WORKSPACE
+// (the config file) use it so an unisolated test can never write into the
+// developer's real <repo>/workspace. Empty in every non-test process.
+var TestScratchWorkspace string
 
 // isTestBinary reports whether the current process is a compiled go test
 // binary, so package init can keep unisolated tests away from real data.
