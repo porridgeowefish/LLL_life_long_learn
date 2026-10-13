@@ -23,8 +23,8 @@ export function SourcesView({ slug }: { slug: string }) {
         <div className={s.list}>
           {visible.map((source) => <article key={source.sourceId}>
             <div className={s.fileIcon}>{extension(source.displayName)}</div>
-            <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}</div>
-            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time><SourceStructureControl slug={slug} source={source}/>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}</div>
+            <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}<SourceStructureControl slug={slug} source={source}/></div>
+            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}</div>
           </article>)}
           {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传资料</div>}
         </div>

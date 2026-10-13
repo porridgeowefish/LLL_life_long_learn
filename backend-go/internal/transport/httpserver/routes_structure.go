@@ -26,7 +26,7 @@ func structureError(w http.ResponseWriter, e error) {
 		case "invalid-arguments", "invalid-pages", "unsupported-structure-format", "no-candidate-pages":
 			status = 400
 			code = e.Error()
-		case "operation-conflict", "structure-active", "structure-unavailable", "provider-unavailable":
+		case "operation-conflict", "structure-active", "structure-unavailable", "provider-unavailable", "vision-model-unsupported", "vision-binding-required", "windows-ocr-unavailable":
 			status = 409
 			code = e.Error()
 		case "structure-queue-full":
@@ -35,6 +35,14 @@ func structureError(w http.ResponseWriter, e error) {
 		}
 	}
 	httpx.WriteJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": code}})
+}
+func (s *Server) handleListStructure(w http.ResponseWriter, r *http.Request) {
+	jobs, err := sources.ListStructureJobs(r.PathValue("id"), r.PathValue("sourceId"))
+	if err != nil {
+		structureError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, map[string]any{"jobs": jobs, "localOCRAvailable": sources.LocalOCRAvailable(), "configuredOCRAvailable": sources.ConfiguredPageOCRAvailable()})
 }
 func (s *Server) handleCreateStructure(w http.ResponseWriter, r *http.Request) {
 	var req sources.StructureRequest

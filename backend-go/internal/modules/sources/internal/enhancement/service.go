@@ -146,6 +146,15 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 	}
 	valid := map[int]bool{}
 	recognized := map[int]bool{}
+	// Empty system OCR results remain unread in the document, but must not
+	// repeatedly occupy the next default batch. Explicit page requests can retry.
+	for _, previous := range jobs {
+		if p.Kind == "windows-local" && previous.Status == "succeeded" && previous.ProviderID == "windows-local-ocr" {
+			for _, n := range previous.EmptyPages {
+				recognized[n] = true
+			}
+		}
+	}
 	for _, u := range structure.Units {
 		if u.Kind == "page" {
 			valid[u.Number] = true
@@ -277,7 +286,7 @@ func run(t task) {
 			return
 		}
 		j.Status = "failed"
-		j.ErrorCode = "structure-failed"
+		j.ErrorCode = failureCode(e)
 		if ctx.Err() != nil {
 			j.Status = "interrupted"
 			j.ErrorCode = "structure-interrupted"
@@ -285,12 +294,23 @@ func run(t task) {
 		if errors.Is(e, store.ErrDerivedConflict) {
 			j.ErrorCode = "derived-conflict"
 		}
-		if e != nil && (e.Error() == "automatic-budget-limit" || e.Error() == "vision-output-truncated" || e.Error() == "vision-output-limit") {
-			j.ErrorCode = e.Error()
-		}
 		j, _ = t.st.SaveStructureJob(t.sourceID, j)
 	}
 	emit(t.slug, j)
+}
+
+func failureCode(err error) string {
+	if err != nil {
+		switch err.Error() {
+		case "vision-model-unsupported", "vision-binding-required", "provider-unavailable",
+			"vision-request-failed", "vision-provider-error", "vision-no-text", "vision-invalid-response",
+			"vision-output-truncated", "vision-output-limit", "vision-request-limit", "automatic-budget-limit",
+			"windows-ocr-unavailable", "windows-ocr-invalid-output", "windows-ocr-no-text",
+			"render-batch-limit", "render-input-limit", "render-image-limit", "renderer-unavailable", "resource-limit":
+			return err.Error()
+		}
+	}
+	return "structure-failed"
 }
 
 type usage struct {
@@ -383,10 +403,21 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 			return "", nil, nil, e
 		}
 		if callErr != nil {
+			if provider.Kind == "windows-local" && callErr.Error() == "windows-ocr-no-text" {
+				j.EmptyPages = append(j.EmptyPages, page)
+				*j, e = t.st.SaveStructureJob(t.sourceID, *j)
+				if e != nil {
+					return "", nil, nil, e
+				}
+				continue
+			}
 			return "", nil, nil, callErr
 		}
 		replacements[page] = fmt.Sprintf("## 第 %d 页\n\n%s\n\n", page, result.Content)
 		images[fmt.Sprintf("images/page-%d.png", page)] = image
+	}
+	if len(replacements) == 0 && strings.TrimSpace(body) == "" {
+		return "", nil, nil, errors.New("windows-ocr-no-text")
 	}
 	provenance := "vision"
 	if provider.Kind == "windows-local" {

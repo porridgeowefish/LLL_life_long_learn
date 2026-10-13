@@ -149,7 +149,7 @@ export function ModelsPage() {
         const provider = draft.providers.find(p => p.id === value);
         const bindingModels = provider ? [...(presetForProvider(provider)?.models.map(m => m.id) ?? []), provider.model] : [];
         return <div key={key} className={s.bindingRow}><label>{label}<select disabled={save.isPending} value={value} onChange={event => setBinding(key, event.target.value)}>
-          <option value="">{key === 'documentStructure' ? '关闭视觉识别' : key === 'teacher' ? '选择连接' : '使用教师默认'}</option>
+          <option value="">{key === 'documentStructure' ? '系统免费 OCR（Windows）' : key === 'teacher' ? '选择连接' : '使用教师默认'}</option>
           {missing && <option value={value}>连接已移除，请重新选择</option>}{options}
         </select></label>{binding?.providerId && <label className={s.modelOverride}>模型覆盖<ModelSelect key={binding.providerId} label={`${label}模型覆盖`} value={binding.model ?? ''} models={bindingModels} disabled={save.isPending} onChange={model => setBinding(key, binding.providerId, model)} /></label>}</div>;
       })}

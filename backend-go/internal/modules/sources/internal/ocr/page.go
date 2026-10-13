@@ -9,12 +9,38 @@ import (
 	config "github.com/xmz14/lll/backend-go/internal/platform/config"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
 )
 
 type PageProvider struct{ ID, Kind, BaseURL, APIKey, Model string }
+
+func LocalPageAvailable() bool {
+	_, available := localPageProvider()
+	return available
+}
+
+// These GLM flagship IDs accept text only. Unknown/custom routes remain
+// provider-controlled; do not guess capabilities from arbitrary model names.
+func knownTextOnlyModel(baseURL, model string) bool {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+	switch u.Hostname() {
+	case "open.bigmodel.cn", "api.z.ai", "tokenhub.tencentmaas.com", "tokenhub-intl.tencentcloudmaas.com":
+	default:
+		return false
+	}
+	switch strings.ToLower(model) {
+	case "glm-5", "glm-5.1", "glm-5.2", "glm-5.3", "glm-5-turbo":
+		return true
+	}
+	return false
+}
+
 type PageResult struct {
 	Content string
 	Tokens  map[string]int
@@ -84,6 +110,9 @@ func ResolvePageProvider(providerID, model string) (PageProvider, error) {
 		}
 		if key == "" || p.BaseURL == "" || model == "" || (p.Kind != "openai" && p.Kind != "anthropic") {
 			return PageProvider{}, errors.New("provider-unavailable")
+		}
+		if knownTextOnlyModel(p.BaseURL, model) {
+			return PageProvider{}, errors.New("vision-model-unsupported")
 		}
 		return PageProvider{ID: p.ID, Kind: p.Kind, BaseURL: p.BaseURL, APIKey: key, Model: model}, nil
 	}

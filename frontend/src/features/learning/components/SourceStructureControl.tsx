@@ -1,21 +1,109 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { http } from '@/shared/client';
+import { ApiError, http } from '@/shared/client';
 import { subscribeToSSE } from '@/app/hooks/useSSE';
 import { SSE_EVENTS } from '@/shared/lib/constants';
 import type { LearningSource } from '../api/learningWorkspace';
-interface StructureJob {id:string;status:'queued'|'running'|'succeeded'|'failed'|'cancelled'|'interrupted'}
-export function SourceStructureControl({slug,source}:{slug:string;source:LearningSource}) {
- const qc=useQueryClient(),storageKey=`lll.source.structure.${slug}.${source.sourceId}`;
- const [jobId,setJobId]=useState(()=>localStorage.getItem(storageKey)??'');
- const operation=useRef('');
- useEffect(()=>{operation.current='';},[source.currentRevisionId,source.derivedVersionId]);
- const endpoint=`/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(source.sourceId)}/structure-jobs`;
- const query=useQuery({queryKey:['source-structure',slug,source.sourceId,jobId],enabled:Boolean(jobId),queryFn:()=>http.get<{job:StructureJob}>(`${endpoint}/${encodeURIComponent(jobId)}`),refetchInterval:q=>q.state.data?.job.status==='queued'||q.state.data?.job.status==='running'?1500:false});
- const active=query.data?.job.status==='queued'||query.data?.job.status==='running';
- useEffect(()=>subscribeToSSE(SSE_EVENTS.sourceStructureJobUpdated,payload=>{if((payload as {projectSlug?:string;sourceId?:string}).projectSlug===slug&&(payload as {sourceId?:string}).sourceId===source.sourceId){void query.refetch();void qc.invalidateQueries({queryKey:['learning-workspace',slug,'sources']});}}),[qc,slug,source.sourceId,jobId]);
- useEffect(()=>{if(query.data?.job.status==='succeeded')void qc.invalidateQueries({queryKey:['learning-workspace',slug,'sources']});},[query.data?.job.status,qc,slug]);
- const action=useMutation({mutationFn:(cancel:boolean)=>cancel?http.post<{job:StructureJob}>(`${endpoint}/${encodeURIComponent(jobId)}/cancel`,{}):http.post<{job:StructureJob}>(endpoint,{operationId:operation.current||(operation.current=crypto.randomUUID()),revisionId:source.currentRevisionId,baseDerivedVersionId:source.derivedVersionId}),onSuccess:result=>{operation.current='';setJobId(result.job.id);localStorage.setItem(storageKey,result.job.id);void qc.invalidateQueries({queryKey:['source-structure',slug,source.sourceId]});}});
- if(!source.derivedVersionId||!(/\.pdf$/i.test(source.displayName)))return null;
- return <div>{active?<><span role="status">正在识别扫描页</span><button type="button" disabled={action.isPending} onClick={()=>action.mutate(true)}>取消识别</button></>:<button type="button" disabled={action.isPending} onClick={()=>action.mutate(false)}>{action.isPending?'正在准备…':query.data?.job.status==='failed'||query.data?.job.status==='interrupted'?'重试识别':source.coverage?.unreadPages||source.status==='failed'?'识别扫描页':'继续识别'}</button>}{query.data?.job.status==='succeeded'&&<small role="status">本批已完成；其余页可继续分批识别</small>}{action.isError&&<span role="alert">识别未开始：Windows 需安装简体中文 OCR 语言包；也可在设置中选择文档识别模型。已有识别任务时请等待其完成。</span>}</div>;
+import s from './SourceStructureControl.module.css';
+
+interface StructureJob {
+  id: string;
+  revisionId: string;
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
+  providerId: string;
+  model?: string;
+  errorCode?: string;
+  emptyPages?: number[];
+}
+interface JobList { jobs: StructureJob[]; localOCRAvailable: boolean; configuredOCRAvailable?: boolean }
+
+const messages: Record<string, string> = {
+  'structure-active': '已有识别任务，正在同步状态，请等待完成。',
+  'vision-model-unsupported': '当前文档模型不支持图片输入，请使用免费识别或选择视觉模型。',
+  'vision-binding-required': '未配置文档识别模型，且系统中文 OCR 不可用。',
+  'windows-ocr-unavailable': '系统中文 OCR 不可用，请检查 Windows 简体中文 OCR 语言包。',
+  'provider-unavailable': '文档模型连接不可用，请检查其配置。',
+  'vision-provider-error': '文档模型拒绝了图片请求，请检查图片能力、接口和额度。',
+  'vision-request-failed': '文档模型连接失败，请检查网络后重试。',
+  'vision-no-text': '文档模型未返回文字，可改用免费识别。',
+  'windows-ocr-no-text': '本批页面未识别到文字，原件已保留。',
+  'vision-output-truncated': '文档模型输出被截断，请减少页数或调整模型。',
+  'structure-queue-full': '识别队列已满，请稍后再试。',
+  'derived-conflict': '资料版本已更新，正在同步，请重新识别。',
+  'structure-interrupted': '识别被中断，可重新开始。',
+  'no-candidate-pages': '没有新的待识别页；未读页可对照原件核查。',
+  'automatic-budget-limit': '自动识别额度已用完，可手动继续识别。',
+};
+function errorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    const body = error.body as { error?: { code?: string } } | null;
+    const code = body?.error?.code ?? '';
+    if (messages[code]) return messages[code];
+    if (error.status === 0) return '无法连接本地服务，请重试。';
+    return `识别未开始（HTTP ${error.status}），请重试。`;
+  }
+  return '识别未开始，请重试。';
+}
+
+export function SourceStructureControl({ slug, source }: { slug: string; source: LearningSource }) {
+  const qc = useQueryClient();
+  const operation = useRef('');
+  const endpoint = `/api/projects/${encodeURIComponent(slug)}/sources/${encodeURIComponent(source.sourceId)}/structure-jobs`;
+  const supported = Boolean(source.derivedVersionId) && /\.pdf$/i.test(source.displayName);
+  const queryKey = ['source-structure', slug, source.sourceId, source.currentRevisionId];
+  const query = useQuery({
+    queryKey, enabled: supported,
+    queryFn: () => http.get<JobList>(endpoint),
+    refetchInterval: q => q.state.data?.jobs.some(job => job.status === 'queued' || job.status === 'running') ? 1500 : false,
+  });
+  const job = query.data?.jobs.find(item => item.revisionId === source.currentRevisionId);
+  const active = job?.status === 'queued' || job?.status === 'running';
+  useEffect(() => { operation.current = ''; }, [slug, source.sourceId, source.currentRevisionId, source.derivedVersionId]);
+  useEffect(() => subscribeToSSE(SSE_EVENTS.sourceStructureJobUpdated, payload => {
+    const event = payload as { projectSlug?: string; sourceId?: string };
+    if (event.projectSlug === slug && event.sourceId === source.sourceId) {
+      void query.refetch();
+      void qc.invalidateQueries({ queryKey: ['learning-workspace', slug, 'sources'] });
+    }
+  }), [qc, slug, source.sourceId, query.refetch]);
+  useEffect(() => {
+    if (job?.status === 'succeeded') void qc.invalidateQueries({ queryKey: ['learning-workspace', slug, 'sources'] });
+  }, [job?.id, job?.status, qc, slug]);
+  const action = useMutation({
+    mutationFn: (mode: 'cancel' | 'local' | 'configured') => mode === 'cancel'
+      ? http.post<{ job: StructureJob }>(`${endpoint}/${encodeURIComponent(job!.id)}/cancel`, {})
+      : http.post<{ job: StructureJob }>(endpoint, {
+        operationId: operation.current || (operation.current = crypto.randomUUID()),
+        revisionId: source.currentRevisionId, baseDerivedVersionId: source.derivedVersionId,
+        ...(mode === 'local' ? { providerId: 'windows-local-ocr' } : {}),
+      }),
+    onSuccess: result => {
+      operation.current = '';
+      qc.setQueryData<JobList>(queryKey, previous => ({
+        localOCRAvailable: previous?.localOCRAvailable ?? false,
+        configuredOCRAvailable: previous?.configuredOCRAvailable,
+        jobs: [result.job, ...(previous?.jobs ?? []).filter(item => item.id !== result.job.id)],
+      }));
+      void query.refetch();
+    },
+    onError: () => { operation.current = ''; void query.refetch(); },
+  });
+  if (!supported) return null;
+  const local = query.data?.localOCRAvailable;
+  const failed = job?.status === 'failed' || job?.status === 'interrupted';
+  return <div className={s.control}>
+    <div className={s.actions}>
+      {active ? <>
+        <small role="status">{job.status === 'queued' ? '等待识别' : '正在识别扫描页'} · {job.providerId === 'windows-local-ocr' ? '免费系统 OCR' : job.model || '文档模型'}</small>
+        <button type="button" disabled={action.isPending} onClick={() => action.mutate('cancel')}>取消识别</button>
+      </> : <>
+        <button type="button" disabled={action.isPending || query.isLoading} onClick={() => action.mutate(local ? 'local' : 'configured')}>{action.isPending ? '正在准备…' : local ? '免费识别' : failed ? '重试识别' : '识别扫描页'}</button>
+        {local && query.data?.configuredOCRAvailable && <button type="button" className={s.secondary} disabled={action.isPending} onClick={() => action.mutate('configured')}>模型识别</button>}
+      </>}
+    </div>
+    {query.isError && <small role="alert">任务状态读取失败。<button type="button" onClick={() => void query.refetch()}>刷新状态</button></small>}
+    {action.isError ? <small role="alert" className={s.failure}>{errorMessage(action.error)}</small>
+      : failed && <small role="alert" className={s.failure}>{messages[job.errorCode ?? ''] ?? '本批识别失败，原有文字和原件已保留。可使用免费识别或检查文档模型。'}</small>}
+    {job?.status === 'succeeded' && <small role="status">本批已完成{job.emptyPages?.length ? ` · ${job.emptyPages.length} 页未识别到文字，仍保留为未读` : ''}；其余页可继续分批识别</small>}
+  </div>;
 }

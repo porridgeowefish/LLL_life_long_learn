@@ -224,6 +224,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/sources", s.handleUploadSource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/retry", s.handleRetrySource)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/structure-jobs", s.handleCreateStructure)
+	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/structure-jobs", s.handleListStructure)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}", s.handleGetStructure)
 	mux.HandleFunc("POST /api/projects/{id}/sources/{sourceId}/structure-jobs/{jobId}/cancel", s.handleCancelStructure)
 	mux.HandleFunc("GET /api/projects/{id}/sources/{sourceId}", s.handleGetSource)

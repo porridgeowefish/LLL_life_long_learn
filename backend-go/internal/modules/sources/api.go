@@ -8,6 +8,7 @@ import (
 	processing "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/processing"
 	retrieval "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/retrieval"
 	impl "github.com/xmz14/lll/backend-go/internal/modules/sources/internal/store"
+	"sort"
 )
 
 const DefaultFileLimit = impl.DefaultFileLimit
@@ -56,6 +57,29 @@ func CreateStructureJob(ctx context.Context, slug, sourceID string, req Structur
 }
 func GetStructureJob(slug, sourceID, jobID string) (StructureJob, error) {
 	return enhancement.Get(slug, sourceID, jobID)
+}
+
+func ListStructureJobs(slug, sourceID string) ([]StructureJob, error) {
+	st, err := impl.New(slug)
+	if err != nil {
+		return nil, err
+	}
+	jobs, err := st.StructureJobs(sourceID)
+	if err != nil {
+		return nil, err
+	}
+	if jobs == nil {
+		jobs = []StructureJob{}
+	}
+	sort.Slice(jobs, func(i, j int) bool { return jobs[i].CreatedAt.After(jobs[j].CreatedAt) })
+	return jobs, nil
+}
+
+func LocalOCRAvailable() bool { return ocr.LocalPageAvailable() }
+
+func ConfiguredPageOCRAvailable() bool {
+	provider, err := ocr.ResolvePageProvider("", "")
+	return err == nil && provider.Kind != "windows-local"
 }
 func CancelStructureJob(slug, sourceID, jobID string) (StructureJob, error) {
 	return enhancement.Cancel(slug, sourceID, jobID)

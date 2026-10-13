@@ -33,6 +33,7 @@ type StructureJob struct {
 	ProviderID             string                   `json:"providerId"`
 	Model                  string                   `json:"model"`
 	Pages                  []int                    `json:"pages"`
+	EmptyPages             []int                    `json:"emptyPages,omitempty"`
 	Automatic              bool                     `json:"automatic,omitempty"`
 	OriginalHash           string                   `json:"originalHash"`
 	Intent                 StructureRequest         `json:"intent"`
