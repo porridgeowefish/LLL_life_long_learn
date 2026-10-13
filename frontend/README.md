@@ -1,112 +1,36 @@
 # learn-with-ai Frontend
 
-Vite + React 18 + TypeScript single-page app for the LifeLongLearn workbench.
+Vite + React 18 + TypeScript SPA。安装依赖和开发脚本由 package.json 定义。
 
-## Stack
+## 开发与构建
 
-- **Build**: Vite 5 + `@vitejs/plugin-react` (production bundle in `dist/`)
-- **Framework**: React 18 + TypeScript 5
-- **Routing**: `react-router-dom@6` (path-param routes, lazy-loaded pages)
-- **Server state**: `@tanstack/react-query@5`
-- **Client state**: `zustand@4` (slices for ui / project / session / connection)
-- **Forms**: `react-hook-form` + `zod`
-- **UI primitives**: self-written + `@radix-ui/react-dialog` (headless)
-- **Styling**: CSS Modules + `src/styles/tokens.css` (v2 design tokens)
-- **Markdown**: `marked` + `dompurify` + `mermaid` (lazy-loaded)
-- **Tests**: Vitest + Testing Library + MSW (Playwright deferred)
-
-## Layout
-
-```
-frontend/
-├── index.html                    Vite entry (just <div id="root">)
-├── package.json                  npm scripts + deps
-├── vite.config.ts                dev server + proxy + build config
-├── tsconfig.json / .node.json
-├── public/
-│   ├── img/icons.svg             SVG sprite (10 line icons)
-│   └── logo-lifelonglearn.svg
-└── src/
-    ├── app/                      entry, router, layout, SSE, connection state
-    ├── features/                 learning, projects, agents, legacy-zones,
-    │                             preferences, and settings vertical slices
-    │   └── <feature>/index.ts    the only supported cross-feature import surface
-    └── shared/                   primitives, HTTP client, query keys, common
-                                  hooks, stores, pure helpers, types, and styles
-```
-
-## State Management
-
-| Layer | What lives here | Examples |
-|---|---|---|
-| **TanStack Query** (server) | Anything that lives on the backend | `useProjects`, `useHealth`, `useAgents`, `useRecentSessions` |
-| **Zustand** (client) | UI state, selection, SSE buffer | `useUiStore`, `useProjectStore`, `useSessionStore`, `useConnectionStore` |
-
-The boundary is "data we fetched" (server) vs "what the user clicked" (client).
-
-## Routes
-
-| Path | Page | Notes |
-|---|---|---|
-| `/` | HomePage | dashboard with stats + project grid + recent runs |
-| `/project/:id/:zone?` | ProjectPage | zone is a path param; defaults to Explain if absent |
-| `/agents` | AgentsPage | registry grid + detail panel |
-| `/memory` | redirect | compatibility redirect to the current project flow |
-| `*` | redirect to `/` | |
-
-## SSE Strategy
-
-A single `useSSE()` hook is mounted once at `<AppShell />`. It opens one
-`/api/events` connection and fans events out to subscribers via
-`subscribeToSSE(eventName, handler)`. The connection status flows into
-`useConnectionStore`, which `ConnectionBadge` reads.
-
-This eliminates the legacy pattern where every page opened its own
-EventSource.
-
-## Development
-
-```bash
-# Terminal 1: Go backend on :8787
-go run ./backend-go/cmd/lll
-
-# Terminal 2: Vite dev server on :5173
-cd frontend
-npm install        # one-time
+```text
+npm install
 npm run dev
+npm run build
+npm run test
+npm run test:e2e
+npm run lint
 ```
 
-Vite proxies `/api`, `/files`, `/events` to `:8787`, so the dev experience
-is API-live with hot module reload. Open `http://localhost:5173`.
+从 frontend/ 执行。Vite 开发端口为 5173，代理到本地 Go 服务；生产产物在 frontend/dist/。
+后端通过 SPA fallback 支持客户端路由。项目根 npm run run 启动 Go 服务。
 
-## Production
+## 代码归属
 
-```bash
-cd frontend
-npm run build      # emits dist/
-cd ..
-go run ./backend-go/cmd/lll
-# Open http://localhost:8787 — Go serves dist/ with SPA fallback.
-```
+app/ 拥有路由、Providers、AppShell 和唯一全局 SSE。features/ 拥有业务切片，跨 feature 只使用公开 index。
+shared/ 拥有共享 UI、HTTP、类型和富文本工具。
+TanStack Query 管理服务端状态，Zustand 管理本地界面与选择。页面不得另开全局 EventSource。
 
-The Go binary's `spaHandler` (see `backend-go/internal/transport/httpserver/router.go`)
-serves `dist/index.html` for any path that is not a known API route and
-does not match a real file. That lets react-router own client-side routes
-like `/project/abc/Explain`.
+当前路由以 [router.tsx](src/app/router.tsx) 为准：首页、项目、用量、偏好和设置。
+memory、models 是兼容重定向，不是独立产品页面。
 
-## Testing
+## 维护知识
 
-```bash
-npm run test       # Vitest run (44 files / 149 tests today)
-npm run test:watch # Vitest watch mode
-```
+- [项目知识入口](../docs/harness-skill/README.md)
+- [前端状态、路由和富文本](../docs/harness-skill/facts/frontend.md)
+- [工程边界](../docs/harness-skill/facts/architecture.md)
+- [教学提示资源](../docs/harness-skill/facts/prompts.md)
+- [调试约束与浏览器验证](../docs/harness-skill/rules/debugging.md)
 
-Critical browser paths live in `e2e/critical.spec.ts`. Install Chromium once
-with `npx playwright install chromium`, then run `npm run test:e2e`.
-
-## Decisions
-
-See the refactor plan at `~/.claude/plans/snazzy-launching-beaver.md` and
-`docs/00-product-and-architecture/AGENT_PRIMITIVES.md` for the design
-rationale (CSS Modules over Tailwind, single SSE connection, lazy-loaded
-mermaid, etc.).
+工程知识和自动化测试在维护者工作区本地保存，不 force-add。浏览器与运行验证记录在对应 Harness 迭代中。

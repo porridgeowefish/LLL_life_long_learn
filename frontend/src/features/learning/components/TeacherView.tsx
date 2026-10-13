@@ -12,6 +12,7 @@ import {
   steerQueuedTurn,
   streamTeacherTurn,
   resumeTeacherTurn,
+  startTeacherOpening,
   learningWorkspaceKeys,
   useAssistantTasks,
   useConversation,
@@ -24,7 +25,7 @@ import {
 import { useAskAiSettings } from '@/features/settings';
 
 import { SourceCitations } from './SourceCitations';
-import { LearningProgress, QuickReplies, readLearningProgress, withoutLearningProgress } from './LearningProgress';
+import { QuickReplies, readLearningProgress, teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
 interface SearchStatus {
@@ -167,7 +168,8 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     const next = new AbortController();
     controller.current = next;
     const latestLearner = [...conversation.data.messages].reverse().find((message) => message.role === 'learner');
-    void resumeTeacherTurn(slug, next.signal, (frame) => {
+    const opening = conversation.data.messages.every(message => message.operationId === 'teacher-welcome-v1');
+    void (opening ? startTeacherOpening : resumeTeacherTurn)(slug, next.signal, (frame) => {
       if (frame.type === 'turn-accepted') {
         setLive((current) => current ?? {
           learner: latestLearner ?? { id: String(frame.data.learnerMessageId), role: 'learner', status: 'completed', blocks: [], createdAt: new Date().toISOString() },
@@ -402,7 +404,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         <div className={s.transcriptContent} ref={transcriptContentRef}>
         {conversation.isLoading && <div className={s.loading}>教师正在准备对话…</div>}
         {conversation.hasPrevious && <button type="button" className={s.loadPrevious} onClick={() => void loadPrevious()} disabled={conversation.isLoadingPrevious}>{conversation.isLoadingPrevious ? '正在加载…' : '加载更早对话'}</button>}
-        {(conversation.data?.messages ?? []).filter((message) => message.id !== live?.learner.id).map((message) => (
+        {(conversation.data?.messages ?? []).filter((message) => message.id !== live?.learner.id && message.operationId !== 'teacher-welcome-v1').map((message) => (
           <Message key={message.id} slug={slug} message={message} tasks={(linksByMessage.get(message.id) ?? []).map((id) => tasksById.get(id)).filter(Boolean) as AssistantTask[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} actions={{
             copied: copiedMessageId === message.id,
             onCopy: copyMessage,
@@ -414,7 +416,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         {!live && quickReplyTarget && <QuickReplies suggestions={readLearningProgress(messageMarkdown(quickReplyTarget))?.replies ?? []} onSend={(text) => void send(text)} />}
         {live && (
           <>
-            <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />
+            {live.learner.id !== 'teacher-opening' && <Message slug={slug} message={live.learner} tasks={[]} sourceNames={sourceNames} getReasoningOpen={getReasoningOpen} setReasoningOpen={setReasoningOpen} />}
             {live.reading && <div className={s.searches} role="status">
               {live.reading.operation === 'search' ? '正在查找资料' : '正在查阅'}
               {live.reading.sourceId && <> · {sourceNames.get(live.reading.sourceId) ?? '资料'}</>}
@@ -555,10 +557,9 @@ const Message = memo(function Message({ slug, message, sourceNames, getReasoning
         {streaming && !message.blocks?.some((block) => block.type === 'markdown' && block.source) && <span className={s.thinking} role="status">教师正在生成…</span>}
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
-          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? withoutLearningProgress(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
+          : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
             : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
-        {teacher && !streaming && message.status === 'completed' && <LearningProgress slug={slug} value={readLearningProgress(messageMarkdown(message))} />}
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}        {actions && !streaming && (
           <div className={s.messageActions}>

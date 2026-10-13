@@ -1,8 +1,8 @@
 # Reasoning Primitives
 
-This directory holds the shared library of thinking mechanisms used by LLL agents. Each `.md` file is one primitive, loaded by `backend-go/internal/modules/assistant/internal/prompt` at prompt-build time and inlined into the prompt sent to the native CLI.
+This directory holds reasoning primitives used by retained compatibility-agent code. Current API teaching resources live in learning-prompts/. Each `.md` file is one primitive, loaded by `backend-go/internal/modules/assistant/internal/prompt` at prompt-build time and inlined into the prompt sent to the native CLI.
 
-See `docs/00-product-and-architecture/AGENT_PRIMITIVES.md` for the design rationale, the mechanism-to-agent ownership table, and the file-shape contract.
+See `docs/harness-skill/facts/prompts.md` for current teaching-resource and compatibility boundaries. Registry declarations and the primitive loader own compatibility selection and expansion.
 
 ## Index
 

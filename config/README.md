@@ -2,8 +2,8 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-24
-Source of truth: `config.example.json` (shape) and `backend-go/internal/platform/config` (loader behavior). The iteration-14 data contract is `docs/01-iterations/iteration-14-modular-monolith-architecture/DATA_DESIGN.md`.
+Last reviewed: 2026-10-13
+Source of truth: `config.example.json` (shape) and `backend-go/internal/platform/config` (loader behavior). Current configuration knowledge is maintained in `docs/harness-skill/facts/personalization.md`; the workspace boundary is in `docs/harness-skill/facts/workspace.md`.
 
 ## File
 

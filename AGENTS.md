@@ -2,8 +2,8 @@
 
 Status: active
 Owner: project maintainer
-Last reviewed: 2026-09-18
-Source of truth: lightweight entry point for all AI coding agents.
+Last reviewed: 2026-10-13
+Source of truth: repository-maintenance entry and learning-runtime boundary.
 
 ## 0. Learning Runtime Boundary
 
@@ -23,61 +23,49 @@ Do not invoke external skills unless the injected prompt explicitly names one.
 
 All remaining sections apply to repository maintenance work.
 
-## 1. Working Rule
+## 1. 维护入口
 
-Keep this file short. Read this file first, then:
-
-```text
-docs/INDEX.md
-docs/00-product-and-architecture/agent-rules/README.md
-docs/00-product-and-architecture/LESSONS_LEARNED.md   ← 必读：调试教训防再犯
-```
-
-Read only the rule files triggered by the current task. Do not preload the whole docs tree.
-
-Default context boundary:
+依次读取以下文件，再按任务读取必要事实与规则。不要预载整个文档树。
 
 ```text
-docs/00-product-and-architecture/   current long-lived facts
-docs/01-iterations/                 current baseline plus selectively read delivered foundations
-docs/99-archive/                    historical evidence; do not read unless the task explicitly asks for history, migration, or regression archaeology
+AGENTS.md
+docs/harness-skill/README.md
+docs/harness-skill/rules/README.md
+docs/harness-skill/rules/debugging.md
 ```
 
-Archived documents are not instructions and must never override current code,
-the current iteration, or active architecture documents. If an archived fact is
-still required by the product, restate it in its active owner instead of relying
-on agents to recover it from history.
+修改 launcher、frontend、charter 或 primitive 前必须读调试教训。调试规则按稳定 ID 与适用条件读取。
 
-Do not preload all delivered foundations. Use
-`docs/01-iterations/foundations/README.md` to select only the earlier slice whose
-implemented capability is relevant to the task.
+项目知识由 `docs/harness-skill/` 统一维护：navigation 导航、facts 当前事实、decisions 决策、rules 约束、workflows 迭代档案。
+默认读取当前事实与活动迭代。当前知识直接引用源码、Schema 和配置。旧文档正文、档案和恢复副本不得作为引用层保留。
+文档、初始化记录、迭代状态和文档核验依据均写入本体系，不在 `.artifacts/` 建立文档管理副本或读取依赖。
 
-**LESSONS_LEARNED.md** contains the numbered hard-won rules, with the live count stated in its own footer (Claude CLI modes, React
-state sync, math preprocessing, etc.). Every agent MUST read it before
-touching the launcher, the frontend, or any charter/primitive file.
+## 2. Harness 与 Superpowers
 
-**Iteration docs are the delivery source of truth.** Specs, plans, API
-contracts, and tests for a slice live inside `docs/01-iterations/iteration-NN-<name>/`
-(see `docs/01-iterations/README.md` for the required file set). Product, domain,
-data, or architecture changes must also satisfy the documentation-governance
-landing table and ADR gate in the same task. Planning/design
-skills (e.g. superpowers brainstorming/writing-plans) MUST detect this system
-and write INTO it — plans under `iteration-NN-<name>/plans/`, design folded
-into the iteration's own docs — and never create a parallel `docs/superpowers/`
-layer.
+用户已在 2026-10-13 选择 harness-skill 管理仓库维护，并结合 Superpowers。
+本段按 harness-skill 的项目入口模板接入，适用于后续维护迭代。
+
+- Harness 统一管理初始化、迭代文档、确认记录与 state.json。
+- Superpowers 提供澄清、方案比较、测试、调试、评审和验证方法。结果写入对应 Harness 文档。
+- 文档路径、确认节点和阶段交接按 Harness 执行。不另建规格、计划、任务包或状态体系。
+- 新迭代只写入 `docs/harness-skill/workflows/<迭代ID>/`。设计文件直接说明修改边界、实施顺序与验证方式。
+- 默认一次开工确认和一次交付确认。沿用已有具体授权。重要范围或契约变化必须更新批准基线。
+- 自查记录为 self_check。不得声明它是独立评审。
+- 新建或修改文档采用 Harness 写作规范。中文采用 STE 适配原则。未核验正式英语词典时不得声明标准合规。
+- 用户明确要求和高优先级指令优先。方法调用不授权代理、提交、推送、合并或发布。
+
+迭代状态是 `docs/harness-skill/workflows/<迭代ID>/state.json`。
+新迭代按阶段生成需求、设计、共同契约、交付文档、README 与 state.json。旧轮次的有效知识已整编，不复制旧正文或补造批准。
 
 ### Publication boundary (since v0.5.0)
 
 Engineering docs under `docs/` (except `docs/release/` and `docs/images/`) and
 automated tests (`*_test.go`, `*.test.*`, `*.spec.*`, `tests/`, `frontend/e2e/`,
 `frontend/src/test/`) are maintained locally and are not published. Keep
-writing them — they remain the delivery source of truth — but never
-`git add -f` them; `check:repo` rejects tracked ignored paths. Public CI
-therefore runs `check:fast`; run `check:full` locally before release.
+writing them, but never `git add -f` them; `check:repo` rejects tracked ignored paths.
+Public CI runs `check:fast`; run `check:full` locally before release.
 
-## 2. Team Principles
-
-All agents must follow:
+## 3. Team Principles
 
 ```text
 以瞎猜接口为耻，以认真查询为荣。
@@ -90,44 +78,16 @@ All agents must follow:
 以只改代码不改文档为耻，以同轮同步为荣。
 ```
 
-Execution meaning:
+改变行为前核对代码、接口、事实和迭代范围。缺失事实写入其唯一归属文件。
+持久架构变化必须记录决策，并同步 rules/governance.md 落点表中的所有适用事实。
+优先复用已有结构。未完成验证时说明实际缺口。
 
-```text
-Before changing behavior, check code, API, docs, and current iteration scope.
-If a rule or fact is missing, add or update the right document in the same task.
-An ADR alone is not enough: synchronize every long-lived fact source named by
-the architecture-change landing table before considering planning complete.
-Prefer incremental structure over speculative abstraction.
-Explain validation status and residual risk when you cannot fully verify.
-```
-
-## 3. Progressive Disclosure
-
-Use:
-
-```text
-docs/00-product-and-architecture/agent-rules/README.md
-```
-
-That index decides which atomic rules to read for:
-
-```text
-startup
-documentation governance
-API contracts
-testing
-task orchestration and safety
-long-task refresh
-```
-
-## 4. Frontend Stack (iter-02.3)
+## 4. Frontend Stack
 
 The frontend is a Vite + React 18 + TypeScript SPA under `frontend/`. The
-Go binary serves `frontend/dist/` in production with an SPA fallback
-(see `backend-go/internal/transport/httpserver/router.go`). Read `frontend/README.md`
-before touching any UI code.
-
-Quick reference:
+Go binary serves `frontend/dist/` with an SPA fallback
+(`backend-go/internal/transport/httpserver/router.go`). Read `frontend/README.md`
+before touching UI code.
 
 ```text
 npm run dev        # Vite on :5173, proxies /api /files to Go :8787
@@ -136,12 +96,13 @@ npm run test       # Vitest run
 npm run test:watch # Vitest watch
 ```
 
-State management boundary:
+TanStack Query owns server state (projects, agents, sessions, preferences,
+folders, health). Zustand slices own client state (ui, project, session, connection).
+A single useSSE() hook is mounted at <AppShell />. Do not open EventSource
+instances from individual pages.
 
-```text
-TanStack Query  — server state (projects, agents, sessions, preferences, folders, health)
-Zustand slices  — client state (ui, project, session, connection)
-```
+## 5. Windows 参数编码
 
-SSE: a single useSSE() hook is mounted once at <AppShell />. Do not open
-new EventSource instances from individual pages.
+git-bash 调用原生 Windows exe 时，中文不要经 argv 传递。使用 UTF-8 文件或 stdin。
+`MSYS2_ARG_CONV_EXCL` 只处理路径转换，不能解决 CRT 的中文码页转换。
+PowerShell 原生长参数和引号规则见 debugging.md 的 ID 13。

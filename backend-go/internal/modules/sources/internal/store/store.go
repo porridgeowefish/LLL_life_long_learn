@@ -17,6 +17,7 @@ import (
 
 	"github.com/xmz14/lll/backend-go/internal/idgen"
 	workspace "github.com/xmz14/lll/backend-go/internal/modules/projects"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 )
 
 const (
@@ -26,6 +27,7 @@ const (
 )
 
 type Source struct {
+	Coverage            *TextCoverage    `json:"coverage,omitempty"`
 	SchemaVersion       int              `json:"schemaVersion"`
 	SourceID            string           `json:"sourceId"`
 	DisplayName         string           `json:"displayName"`
@@ -44,6 +46,45 @@ type Source struct {
 	Retrieval           *RetrievalStatus `json:"retrieval,omitempty"`
 	CreatedAt           time.Time        `json:"createdAt"`
 	UpdatedAt           time.Time        `json:"updatedAt"`
+}
+
+type TextCoverage struct {
+	Complete       bool `json:"complete"`
+	ExtractedPages int  `json:"extractedPages"`
+	TotalPages     int  `json:"totalPages"`
+	UnreadPages    int  `json:"unreadPages"`
+}
+
+func (s *Store) textCoverageLocked(source Source, revision Revision) *TextCoverage {
+	for _, ref := range revision.DerivedFiles {
+		if ref.Key != "structure" || ref.Bytes > 16<<20 {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(s.root, source.SourceID, "revisions", revision.RevisionID, filepath.FromSlash(ref.Path)))
+		if err != nil || len(data) > 16<<20 || digest(data) != ref.SHA256 {
+			continue
+		}
+		var st parser.Structure
+		if json.Unmarshal(data, &st) != nil {
+			continue
+		}
+		pages, read := map[int]bool{}, map[int]bool{}
+		for _, unit := range st.Units {
+			if unit.Kind != "page" {
+				continue
+			}
+			pages[unit.Number] = true
+			if len(unit.Blocks) > 0 {
+				read[unit.Number] = true
+			}
+		}
+		for _, page := range st.Coverage.UnreadUnits {
+			pages[page] = true
+			delete(read, page)
+		}
+		return &TextCoverage{Complete: st.Coverage.CompleteWithinScope, ExtractedPages: len(read), TotalPages: len(pages), UnreadPages: len(pages) - len(read)}
+	}
+	return nil
 }
 
 // ParseDisposition decides whether source-processing may inspect a regular
@@ -231,6 +272,7 @@ func (s *Store) List() ([]Source, error) {
 			if source.Status != "deleted" && source.Status != "tombstoned" {
 				var rev Revision
 				if readJSON(filepath.Join(s.root, source.SourceID, "revisions", source.CurrentRevisionID, "revision.json"), &rev) == nil {
+					source.Coverage = s.textCoverageLocked(source, rev)
 					source.DerivedVersionID = rev.DerivedVersionID
 					if source.DerivedVersionID == "" {
 						source.DerivedVersionID = "unparsed"

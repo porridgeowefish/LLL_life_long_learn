@@ -150,7 +150,7 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		if u.Kind == "page" {
 			valid[u.Number] = true
 			for _, b := range u.Blocks {
-				if b.Provenance == "vision" {
+				if b.Provenance == "vision" || b.Provenance == "local-ocr" {
 					recognized[u.Number] = true
 				}
 			}
@@ -160,14 +160,23 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		valid[n] = true
 	}
 	if len(pages) == 0 {
+		// Missing text comes first. Do not spend the first batch on a cover
+		// already read locally, or overwrite good text to fill a gap elsewhere.
+		for _, n := range structure.Coverage.UnreadUnits {
+			if !recognized[n] {
+				pages = append(pages, n)
+			}
+		}
+	}
+	if len(pages) == 0 {
 		for n := range valid {
 			if !recognized[n] {
 				pages = append(pages, n)
 			}
 		}
-		sort.Ints(pages)
-		pages = pages[:min(8, len(pages))]
 	}
+	sort.Ints(pages)
+	pages = pages[:min(8, len(pages))]
 	if len(pages) == 0 {
 		return store.StructureJob{}, errors.New("no-candidate-pages")
 	}
@@ -187,12 +196,21 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 	return j, nil
 }
 func Automatic(slug string, st *store.Store, sourceID string) {
-	if _, e := ocr.ResolvePageProvider("", ""); e != nil {
+	provider, e := ocr.ResolvePageProvider("", "")
+	if e != nil {
 		return
 	}
-	_, rev, e := st.Get(sourceID)
+	source, rev, e := st.Get(sourceID)
 	if e != nil || !strings.HasSuffix(strings.ToLower(rev.Original.Filename), ".pdf") {
 		return
+	}
+	// System OCR supplements missing text only. A complete text layer must
+	// not be replaced by less reliable recognition merely because it is free.
+	if provider.Kind == "windows-local" && source.Status == "ready" {
+		structure, err := st.ReadStructure(sourceID, rev.RevisionID, "")
+		if err != nil || len(structure.Coverage.UnreadUnits) == 0 {
+			return
+		}
 	}
 	ctx, c := context.WithTimeout(context.Background(), 45*time.Second)
 	defer c()
@@ -370,7 +388,11 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 		replacements[page] = fmt.Sprintf("## 第 %d 页\n\n%s\n\n", page, result.Content)
 		images[fmt.Sprintf("images/page-%d.png", page)] = image
 	}
-	content, structure := merge(body, baseline, replacements)
+	provenance := "vision"
+	if provider.Kind == "windows-local" {
+		provenance = "local-ocr"
+	}
+	content, structure := merge(body, baseline, replacements, provenance)
 	if len(content) > 4<<20 {
 		return "", nil, nil, errors.New("vision-output-limit")
 	}
@@ -423,7 +445,11 @@ func CancelSource(slug, sourceID string) error {
 	}
 	return nil
 }
-func merge(body string, baseline *parser.Structure, replacements map[int]string) (string, *parser.Structure) {
+func merge(body string, baseline *parser.Structure, replacements map[int]string, replacementProvenance ...string) (string, *parser.Structure) {
+	ocrProvenance := "vision"
+	if len(replacementProvenance) > 0 {
+		ocrProvenance = replacementProvenance[0]
+	}
 	var out strings.Builder
 	result := &parser.Structure{SchemaVersion: 1, ParserVersion: parser.ParserVersion}
 	pages := append([]parser.Unit(nil), baseline.Units...)
@@ -443,7 +469,7 @@ func merge(body string, baseline *parser.Structure, replacements map[int]string)
 		text := replacements[u.Number]
 		provenance := "local"
 		if text != "" {
-			provenance = "vision"
+			provenance = ocrProvenance
 			recognized[u.Number] = true
 		} else if oldEnd > oldStart && oldEnd <= len(body) {
 			text = body[oldStart:oldEnd]

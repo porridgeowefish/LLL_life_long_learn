@@ -1,9 +1,35 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const os = require("node:os");
 const crypto = require("node:crypto");
 const { spawnSync } = require("node:child_process");
 const { repoRoot } = require("./package-layout");
 const WIX_VERSION = "6.0.2";
+const DOTNET_SDK_VERSION = "8.0.415";
+function toolchainPaths(environment = process.env) {
+  const root = environment.LLL_WINDOWS_TOOLCHAIN_DIR || path.join(
+    environment.LOCALAPPDATA || path.join(os.homedir(), "AppData", "Local"),
+    "learn-with-ai-build-tools",
+  );
+  if (!path.isAbsolute(root)) throw new Error("Windows toolchain path must be absolute");
+  const resolved = path.resolve(root);
+  const relative = path.relative(repoRoot, resolved);
+  if (relative === "" || (relative !== ".." && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative))) {
+    throw new Error("Windows toolchain must be outside the repository");
+  }
+  safePath(resolved);
+  const dotnetDirectory = path.join(resolved, "dotnet");
+  const wixDirectory = path.join(resolved, "wix", WIX_VERSION);
+  return {
+    root: resolved,
+    dotnetDirectory,
+    dotnet: path.join(dotnetDirectory, "dotnet.exe"),
+    dotnetSdkVersion: DOTNET_SDK_VERSION,
+    wixDirectory,
+    wix: path.join(wixDirectory, "wix.exe"),
+    wixVersion: WIX_VERSION,
+  };
+}
 function guid(value) {
   const h = crypto
     .createHash("sha256")
@@ -92,6 +118,7 @@ function generateWxs(payload, version, arch, icon, options = {}) {
  </UI></Package></Wix>`;
 }
 function run(bin, args, environment = {}) {
+  const tools = toolchainPaths();
   const r = spawnSync(bin, args, {
     cwd:
       path.basename(bin).toLowerCase() === "wix.exe"
@@ -102,11 +129,10 @@ function run(bin, args, environment = {}) {
     env: {
       ...process.env,
       ...environment,
-      ...(fs.existsSync(
-        path.join(repoRoot, ".artifacts", "tooling", "dotnet", "dotnet.exe"),
-      )
+      ...(fs.existsSync(tools.dotnet)
         ? {
-            DOTNET_ROOT: path.join(repoRoot, ".artifacts", "tooling", "dotnet"),
+            DOTNET_ROOT: tools.dotnetDirectory,
+            [`DOTNET_ROOT_${process.arch.toUpperCase()}`]: tools.dotnetDirectory,
           }
         : {}),
     },
@@ -115,20 +141,13 @@ function run(bin, args, environment = {}) {
     throw r.error || new Error(`${bin} failed: ${r.status}`);
 }
 function wixTool() {
-  const location = path.join(repoRoot, ".artifacts", "tooling", "wix"),
-    exe = path.join(location, "wix.exe");
+  const tools = toolchainPaths();
+  const location = tools.wixDirectory, exe = tools.wix;
   safePath(exe);
   if (!fs.existsSync(exe)) {
     fs.mkdirSync(location, { recursive: true });
-    const local = path.join(
-      repoRoot,
-      ".artifacts",
-      "tooling",
-      "dotnet",
-      "dotnet.exe",
-    );
     safePath(location);
-    run(fs.existsSync(local) ? local : "dotnet", [
+    run(fs.existsSync(tools.dotnet) ? tools.dotnet : "dotnet", [
       "tool",
       "install",
       "wix",
@@ -251,9 +270,13 @@ function buildMsi(payload, output, version, arch, options = {}) {
   return [msi];
 }
 module.exports = {
+  toolchainPaths,
   msiIdentity,
   generateWxs,
   buildMsi,
   WIX_VERSION,
   licenseRtf,
 };
+if (require.main === module && process.argv.includes("--toolchain")) {
+  console.log(JSON.stringify(toolchainPaths()));
+}

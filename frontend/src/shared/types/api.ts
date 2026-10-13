@@ -89,6 +89,8 @@ export interface DisciplineOverviewResponse {
 }
 
 export interface DisciplineTopicScope {
+
+  priority?: 'I' | 'II' | 'III';
   id: string;
   title: string;
   chapterTitle: string;

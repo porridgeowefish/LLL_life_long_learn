@@ -25,7 +25,7 @@ type OutputTarget struct {
 // Primitives declares which reasoning primitive .md files the agent requires
 // or optionally uses. Required primitives are always expanded into the prompt
 // by promptassembly; optional primitives are activated by charter rules.
-// See docs/00-product-and-architecture/AGENT_PRIMITIVES.md.
+// See docs/harness-skill/facts/prompts.md.
 type Primitives struct {
 	Required []string `json:"required,omitempty"`
 	Optional []string `json:"optional,omitempty"`

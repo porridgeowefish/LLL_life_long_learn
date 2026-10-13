@@ -11,6 +11,7 @@ export interface MessageBlock {
 }
 
 export interface ConversationMessage {
+  operationId?: string;
   id: string;
   role: 'learner' | 'teacher' | 'system';
   status: 'completed' | 'failed' | 'interrupted';
@@ -123,7 +124,7 @@ export interface LearningSource {
   status: 'stored' | 'processing' | 'ready' | 'opaque' | 'failed' | 'tombstoned' | 'deleted';
   currentRevisionId: string;
   derivedVersionId?: string;
-  coverage?: { complete?: boolean; gaps?: string[] };
+  coverage?: { complete?: boolean; gaps?: string[]; extractedPages?: number; totalPages?: number; unreadPages?: number };
   failureCode?: string;
   parser?: string;
   extractedBytes?: number;
@@ -334,6 +335,14 @@ export async function resumeTeacherTurn(slug: string, signal: AbortSignal, onFra
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/responses/active`, { signal });
   if (response.status === 204) return false;
   if (!response.ok || !response.body) throw new ApiError(response.status, '教师响应无法恢复', await response.text());
+  await consumeSSE(response, onFrame);
+  return true;
+}
+
+export async function startTeacherOpening(slug: string, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
+  const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/opening`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal });
+  if (response.status === 204) return false;
+  if (!response.ok || !response.body) throw new ApiError(response.status, '教师开场无法开始', await response.text());
   await consumeSSE(response, onFrame);
   return true;
 }

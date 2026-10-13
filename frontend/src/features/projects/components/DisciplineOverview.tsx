@@ -180,6 +180,13 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
       heading.dataset.outlineId = item.id;
       if (!item.actionable) return;
       heading.classList.add(s.actionableHeading);
+      const priority = topicCatalogByTitle.get(item.title)?.priority;
+      const badge = document.createElement('span');
+      badge.className = `${s.priority} ${priority ? s[`priority${priority}`] : s.priorityUnknown}`;
+      badge.textContent = priority ? { I: 'Ⅰ', II: 'Ⅱ', III: 'Ⅲ' }[priority] : '待评级';
+      badge.title = priority ? { I: '关键必学', II: '中等深度', III: '深入选学' }[priority] : '重新生成地图后可获得优先级';
+      badge.setAttribute('aria-label', `学习优先级：${badge.title}`);
+      heading.appendChild(badge);
       const planButton = document.createElement('button');
       planButton.type = 'button';
       planButton.className = s.inlinePlan;
@@ -203,12 +210,13 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
         planButton.remove();
         button.removeEventListener('click', handleClick);
         button.remove();
+        badge.remove();
         heading.classList.remove(s.actionableHeading);
         delete heading.dataset.outlineId;
       });
     });
     return () => cleanups.forEach((cleanup) => cleanup());
-  }, [outline, plannedTopics, addTopicToPlan, saveLearningPlan.isPending, topicCatalogByTitle]);
+  }, [outline, plannedTopics, addTopicToPlan, saveLearningPlan.isPending, topicCatalogByTitle, activeView]);
 
   const scrollToOutline = (id: string) => {
     articleRef.current
@@ -244,7 +252,14 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
             <button type="button" role="tab" aria-selected={activeView==='sources'} onClick={()=>setActiveView('sources')}>参考资料</button>
           </div>
         </div>
-        <div className={s.actionStack}><GenerationControl slug={slug} kind="discipline-map"/><SourceImportControl slug={slug}/></div>
+        <div className={s.headerTools}>
+          {activeView === 'overview' && <div className={s.priorityLegend} aria-label="学习优先级图例">
+            <span><b className={`${s.priority} ${s.priorityI}`}>Ⅰ</b>关键必学</span>
+            <span><b className={`${s.priority} ${s.priorityII}`}>Ⅱ</b>中等深度</span>
+            <span><b className={`${s.priority} ${s.priorityIII}`}>Ⅲ</b>深入选学</span>
+          </div>}
+          <div className={s.actions}><GenerationControl slug={slug} kind="discipline-map"/><SourceImportControl slug={slug}/></div>
+        </div>
       </header>
 
       {launchNotice&&<p role="status">{launchNotice}</p>}

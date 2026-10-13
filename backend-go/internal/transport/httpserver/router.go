@@ -198,6 +198,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/turns", s.handleTeacherTurn)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/opening", s.handleTeacherOpening)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/turns/queue", s.handleQueueTeacherTurn)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/responses/active", s.handleActiveTeacherResponse)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/responses/{responseId}/stop", s.handleStopTeacherResponse)

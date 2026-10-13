@@ -37,8 +37,21 @@ func normalizePageUsage(raw map[string]int) (map[string]int, bool) {
 }
 
 func ResolvePageProvider(providerID, model string) (PageProvider, error) {
+	if providerID == "windows-local-ocr" {
+		if local, ok := localPageProvider(); ok {
+			return local, nil
+		}
+		if providerID == "windows-local-ocr" {
+			return PageProvider{}, errors.New("windows-ocr-unavailable")
+		}
+	}
 	settings, ok, e := config.LoadAI()
 	if e != nil || !ok {
+		if providerID == "" {
+			if local, available := localPageProvider(); available {
+				return local, nil
+			}
+		}
 		return PageProvider{}, errors.New("vision-binding-required")
 	}
 	binding, has := settings.Bindings["documentStructure"]
@@ -47,6 +60,9 @@ func ResolvePageProvider(providerID, model string) (PageProvider, error) {
 	}
 	if providerID == "" {
 		if !has || binding.ProviderID == "" {
+			if local, available := localPageProvider(); available {
+				return local, nil
+			}
 			return PageProvider{}, errors.New("vision-binding-required")
 		}
 		providerID = binding.ProviderID
@@ -76,6 +92,9 @@ func ResolvePageProvider(providerID, model string) (PageProvider, error) {
 func ExtractPage(ctx context.Context, p PageProvider, image []byte) (PageResult, error) {
 	if len(image) > 8<<20 {
 		return PageResult{}, errors.New("image-limit")
+	}
+	if p.Kind == "windows-local" {
+		return extractLocalPage(ctx, image)
 	}
 	ctx, c := context.WithTimeout(ctx, 120*time.Second)
 	defer c()

@@ -102,6 +102,9 @@ func contextBudgets(providerID ...string) (threshold int, recent int) {
 func sequencedTokens(messages []conversationstore.SequencedMessage) int {
 	total := 0
 	for _, item := range messages {
+		if item.Message.OperationID == "teacher-welcome-v1" {
+			continue
+		}
 		total += estimateMessageTokens(item.Message)
 	}
 	return total

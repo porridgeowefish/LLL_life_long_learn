@@ -221,7 +221,7 @@ func validateNewMap(out *MapProjection) error {
 				return problem("invalid-map-output", 409)
 			}
 			topic := out.Topics.Topics[topicIndex]
-			if topic.ChapterTitle != chapter || topic.TeachingOutline == "" || topic.Title != strings.TrimSpace(strings.TrimPrefix(line, "#### ")) {
+			if topic.Priority == "" || topic.ChapterTitle != chapter || topic.TeachingOutline == "" || topic.Title != strings.TrimSpace(strings.TrimPrefix(line, "#### ")) {
 				return problem("invalid-map-output", 409)
 			}
 			chapters[chapter]++

@@ -37,6 +37,7 @@ type Source struct {
 type Topic struct {
 	ID              string   `json:"id"`
 	Title           string   `json:"title"`
+	Priority        string   `json:"priority,omitempty"`
 	ChapterTitle    string   `json:"chapterTitle"`
 	Goal            string   `json:"goal"`
 	TeachingOutline string   `json:"teachingOutline,omitempty"`
@@ -162,6 +163,9 @@ func ValidateCatalog(catalog *Catalog) error {
 	for i := range catalog.Topics {
 		topic := &catalog.Topics[i]
 		normalizeTopic(topic)
+		if topic.Priority != "" && topic.Priority != "I" && topic.Priority != "II" && topic.Priority != "III" {
+			return errors.New("invalid_topic_priority")
+		}
 		if topic.ID == "" || len(topic.ID) > 120 || !topicIDPattern.MatchString(topic.ID) ||
 			topic.Title == "" || len(topic.Title) > 180 ||
 			topic.ChapterTitle == "" || len(topic.ChapterTitle) > 180 ||

@@ -63,7 +63,7 @@ async function main(binary){
    const chapterTitle='领域'+chapter;map.overviewMarkdown+='### '+chapterTitle+'\n';
    for(let topic=1;topic<=2;topic++){
     const title='主题'+chapter+'-'+topic;map.overviewMarkdown+='#### '+title+'\nObjects, prerequisites and relationships.\n';
-    map.topics.topics.push({id:`topic-${chapter}-${topic}`,title,chapterTitle,goal:'Explain',teachingOutline:'Definitions, evidence and boundaries',inScope:[title],outOfScope:[],prerequisites:[],ownedConcepts:[title],reusedConcepts:[]});
+    map.topics.topics.push({id:`topic-${chapter}-${topic}`,title,priority:topic===1?'I':'II',chapterTitle,goal:'Explain',teachingOutline:'Definitions, evidence and boundaries',inScope:[title],outOfScope:[],prerequisites:[],ownedConcepts:[title],reusedConcepts:[]});
    }
   }
   map.overviewMarkdown+='## 领域之间如何关联\nRelationships.\n## 常用研究方法与证据\nMethods.\n## 典型应用\nApplications.\n';
@@ -126,6 +126,7 @@ async function main(binary){
   const mapDone=await completed(mapEndpoint+'/'+mapJob.id);
   const projection=await (await fetch(base+'/api/projects/map-smoke/discipline-map')).json();
   assert.equal(projection.mapVersionId,mapDone.resultRefs[0]);assert.equal(projection.topics.topics.length,8);
+  assert(projection.topics.topics.every(topic=>['I','II','III'].includes(topic.priority)),'map priorities were not published');
   const {revision}=await (await fetch(url+'/'+pdf.sourceId)).json();
   const structureEndpoint='/api/projects/parser-smoke/sources/'+pdf.sourceId+'/structure-jobs';
   const {job:structureJob}=await json(structureEndpoint,{operationId:crypto.randomUUID(),revisionId:revision.revisionId,baseDerivedVersionId:revision.derivedVersionId,pages:[1]});

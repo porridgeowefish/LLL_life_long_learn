@@ -31,7 +31,7 @@ export function SourceImportControl({ slug, compact = false }: { slug: string; c
       } else {
         try {
           const response = await upload.mutateAsync({ file });
-          result = { name: file.name, failed: false, message: response.source.status === 'ready' ? '已保存并完成解析' : '已保存，正在自动解析' };
+          result = { name: file.name, failed: false, message: response.source.status === 'ready' ? '已保存并提取文字，请在资料页查看提取范围' : '已保存，正在自动解析' };
         } catch (error) {
           result = { name: file.name, failed: true, message: error instanceof Error ? error.message : '导入失败，请重试' };
         }

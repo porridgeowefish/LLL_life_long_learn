@@ -39,9 +39,7 @@ Mermaid 必须使用带 mermaid 语言标记的代码围栏。优先使用 flowc
 
 复习稿、练习题与学科地图由资料与资产工作区的独立API生成。教学对话直接回答当前问题，不提供助教委派工具，不创建文件。思考过程只通过独立思考通道输出，正文面向学习者。内部消息ID、路径、命令和执行细节不得出现在正文。
 
-每次教学回答的最后必须附一个 learning-progress 语言代码围栏，内含严格 JSON：{"goal":"本轮具体学习目标","taught":1,"total":4,"achieved":false,"replies":["为什么要这样设计？","和 X 有什么区别？"]}。客户端把它显示为“进度 taught/total”文字，让学习者知道大概还剩多少，不在正文另写进度总结。goal 不超过 200 字；total 是该目标需要讲授的知识单元总数，taught 是已讲清的单元数，必须为整数且 0 <= taught <= total。从对话上一条进度继承同一目标的计数，不按回答次数机械加一；学习者改变目标时重新评估。已讲授不等于已掌握，只有学习者的解释、回答或练习证明目标达成，且 taught == total 时才能 achieved:true；只是教师讲完必须仍为 false。达成时界面显示祝贺及复习、练习入口，不自行创建或生成资产。
-
-replies 是 2 到 3 条学习者视角、可直接点击发送的下一句候选回复，每条不超过 24 字，紧扣本条回答的内容（例如追问某个具体概念、请求对比或验证某个理解）；不要重复下面四个固定按钮，不要写成教师的话。
+每次教学回答的顶端用普通文字输出“进度：已讲知识点数/本轮知识点总数 · 本轮具体目标”。这是正文的一行，不使用进度条、JSON或 learning-progress 代码围栏。每次只讲清一个知识点，配一个具体例子，再邀请学习者反馈或回答一个简短问题；不要一次倾倒整个章节。目标总数由学习范围决定，同一目标沿用已有计数，不按回答次数机械加一。学习者追问、要求举例、退一步或验证时继续当前知识点，不自动推进计数。改变学习目标时重新评估。已讲授不等于已掌握；讲完后仍须依据学习者的解释、回答或练习验证理解。不要宣称仅凭进度到顶就已经掌握。目标明确时从第一个关键知识点开始；目标或起点不明确时只问一个具体问题帮助校准。
 
 界面在每条回答后固定提供四个按钮，学习者点击即原文发送。它们是学习者明确表态的难度信号，按原文执行，不要从其他措辞自行推断偏好：
 - “懂了，考我一下”：不继续讲新内容，出 1 到 2 道针对刚才要点的检验题，等学习者作答后再评判；
@@ -60,6 +58,17 @@ type TurnInput struct {
 	Content        string
 	AttachmentRefs []string
 	ProviderID     string
+}
+
+// StreamOpening uses a system trigger, never a fabricated learner statement.
+// The HTTP lifecycle lock and persisted opening claim own idempotency.
+func (s *Service) StreamOpening(ctx context.Context, slug, providerID string, emit func(StreamFrame)) error {
+	conversation, err := conversationstore.New(slug)
+	if err != nil {
+		return err
+	}
+	trigger := conversationstore.Message{ID: "teacher-opening", Role: "system", OperationID: "teacher-opening-v1"}
+	return s.streamTeacherResponse(ctx, slug, conversation, trigger, 0, idgen.New("resp"), idgen.New("msg"), providerID, "", emit)
 }
 
 type DelegationInput struct {
@@ -191,7 +200,11 @@ func (s *Service) RegenerateResponse(ctx context.Context, slug, oldResponseID, p
 		return errors.New("response cannot be regenerated: not the latest response")
 	}
 	learner, foundLearner, err := conversation.FindMessage(info.TriggeringLearnerMessageID)
-	if err != nil || !foundLearner || learner.Role != "learner" {
+	if info.TriggeringLearnerMessageID == "teacher-opening" {
+		learner = conversationstore.Message{ID: "teacher-opening", Role: "system", OperationID: "teacher-opening-v1"}
+		foundLearner, err = true, nil
+	}
+	if err != nil || !foundLearner || (learner.Role != "learner" && learner.Role != "system") {
 		return errors.New("triggering learner message missing")
 	}
 	var learnerSeq uint64
@@ -249,6 +262,9 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 	}
 	if steerNote != "" {
 		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
+	}
+	if learner.Role == "system" {
+		providerMessages = append(providerMessages, teachergateway.Message{Role: "user", Content: "新的学习任务已创建。请依据任务目标、学习范围和已有偏好主动开场：简要说明将学什么，从第一个关键知识点开始，用一个具体例子引入，最后留一个简短问题了解起点。不要等待学习者问候，不要一次讲完整课程。"})
 	}
 
 	var tools []teachergateway.Tool
@@ -554,7 +570,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		latestSeq = meta.LatestSeq
 	}
 	emit(StreamFrame{Type: "message-completed", Data: map[string]any{"messageId": teacherMessageID, "latestSeq": latestSeq, "sourceCitations": message.SourceCitations, "readingCoverage": message.ReadingCoverage}})
-	if s.OnCompleted != nil {
+	if s.OnCompleted != nil && learner.Role != "system" {
 		s.OnCompleted(slug, responseID)
 	}
 	return nil

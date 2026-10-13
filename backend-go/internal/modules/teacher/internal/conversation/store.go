@@ -205,6 +205,24 @@ func (s *Store) Append(eventType string, data any) (Event, error) {
 	return s.appendLocked(eventType, data)
 }
 
+// ClaimOpening is durable before dispatch, including across a process restart.
+// A failed dispatched opening is not silently retried or billed again.
+func (s *Store) ClaimOpening() (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, events, err := s.loadLocked()
+	if err != nil {
+		return false, err
+	}
+	for _, event := range events {
+		if event.Type == "teacher-opening-requested" || event.Type == "teacher-response-started" {
+			return false, nil
+		}
+	}
+	_, err = s.appendLocked("teacher-opening-requested", map[string]any{"operationId": "teacher-opening-v1"})
+	return err == nil, err
+}
+
 func (s *Store) appendLocked(eventType string, data any) (Event, error) {
 	meta, events, err := s.loadLocked()
 	if err != nil {

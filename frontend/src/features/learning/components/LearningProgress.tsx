@@ -37,6 +37,15 @@ export function withoutLearningProgress(source: string) {
   return source.replace(/(?:^|\n)```learning-progress[^\n]*\n[\s\S]*?(?:\n```|$)/g, '').trimEnd();
 }
 
+/** Historical metadata becomes ordinary prose; current answers supply their own first line. */
+export function teacherMarkdown(source: string) {
+  const progress = readLearningProgress(source);
+  const body = withoutLearningProgress(source);
+  if (!progress || /^\s*进度[：:]/.test(body)) return body;
+  const goal = progress.goal.replace(/[\r\n]/g, ' ').replace(/([\\`*_{}[\]<>])/g, '\\$1');
+  return `进度：${progress.taught}/${progress.total} · ${goal}\n\n${body}`;
+}
+
 /** Progress is the model's own count, shown as text ("进度 2/4") so the learner
  * sees roughly how much is left. Missing or invalid metadata is never guessed. */
 export function LearningProgress({ value, slug }: { value?: LearningProgressValue; slug: string }) {
