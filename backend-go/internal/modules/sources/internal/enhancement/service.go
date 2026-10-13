@@ -20,9 +20,10 @@ import (
 )
 
 type task struct {
-	slug, sourceID string
-	st             *store.Store
-	job            store.StructureJob
+	slug, sourceID    string
+	st                *store.Store
+	job               store.StructureJob
+	providerID, model string
 }
 
 var manager = struct {
@@ -37,15 +38,19 @@ var automaticQueue = make(chan task, 16)
 var automaticOnce sync.Once
 
 func NotifyAutomatic(slug string, st *store.Store, sourceID string) {
+	providerID, model := ocr.AutomaticPageSelection()
 	automaticOnce.Do(func() {
 		go func() {
 			for t := range automaticQueue {
-				Automatic(t.slug, t.st, t.sourceID)
+				provider, err := ocr.ResolvePageProvider(t.providerID, t.model)
+				if err == nil {
+					automatic(t.slug, t.st, t.sourceID, provider)
+				}
 			}
 		}()
 	})
 	select {
-	case automaticQueue <- task{slug: slug, st: st, sourceID: sourceID}:
+	case automaticQueue <- task{slug: slug, st: st, sourceID: sourceID, providerID: providerID, model: model}:
 	default:
 	}
 }
@@ -201,7 +206,7 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		return j, e
 	}
 	manager.once.Do(func() { go loop() })
-	manager.queue <- task{slug, sourceID, st, j}
+	manager.queue <- task{slug: slug, sourceID: sourceID, st: st, job: j}
 	return j, nil
 }
 func Automatic(slug string, st *store.Store, sourceID string) {
@@ -209,6 +214,9 @@ func Automatic(slug string, st *store.Store, sourceID string) {
 	if e != nil {
 		return
 	}
+	automatic(slug, st, sourceID, provider)
+}
+func automatic(slug string, st *store.Store, sourceID string, provider ocr.PageProvider) {
 	source, rev, e := st.Get(sourceID)
 	if e != nil || !strings.HasSuffix(strings.ToLower(rev.Original.Filename), ".pdf") {
 		return
@@ -223,7 +231,7 @@ func Automatic(slug string, st *store.Store, sourceID string) {
 	}
 	ctx, c := context.WithTimeout(context.Background(), 45*time.Second)
 	defer c()
-	_, _ = Create(ctx, slug, sourceID, store.StructureRequest{OperationID: "automatic_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID}, true)
+	_, _ = Create(ctx, slug, sourceID, store.StructureRequest{OperationID: "automatic_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: provider.ID, Model: provider.Model}, true)
 }
 func Get(slug, sourceID, jobID string) (store.StructureJob, error) {
 	st, e := store.New(slug)
@@ -593,7 +601,7 @@ func recoverJobs() {
 				} else if j.Status == "queued" {
 					manager.Lock()
 					select {
-					case manager.queue <- task{unit.Slug, src.SourceID, st, j}:
+					case manager.queue <- task{slug: unit.Slug, sourceID: src.SourceID, st: st, job: j}:
 					default:
 					}
 					manager.Unlock()

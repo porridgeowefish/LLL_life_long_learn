@@ -22,6 +22,31 @@ func LocalPageAvailable() bool {
 	return available
 }
 
+// Capture the selected purpose before queueing. Do not run the potentially
+// slow system probe here, and never let a later cloud binding adopt this task.
+func AutomaticPageSelection() (providerID, model string) {
+	settings, ok, err := config.LoadAI()
+	if err == nil && ok {
+		binding, exists := settings.Bindings["documentStructure"]
+		if !exists {
+			binding = settings.Bindings["ocr"]
+		}
+		if binding.ProviderID != "" {
+			model = binding.Model
+			if model == "" {
+				for _, provider := range settings.Providers {
+					if provider.ID == binding.ProviderID {
+						model = provider.Model
+						break
+					}
+				}
+			}
+			return binding.ProviderID, model
+		}
+	}
+	return "windows-local-ocr", "windows-zh-Hans"
+}
+
 // These GLM flagship IDs accept text only. Unknown/custom routes remain
 // provider-controlled; do not guess capabilities from arbitrary model names.
 func knownTextOnlyModel(baseURL, model string) bool {
