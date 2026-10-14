@@ -152,14 +152,26 @@ async function main(binary){
   assert.equal((await erase.json()).status,'deleted');
   assert(!fs.existsSync(path.join(workspace,'projects','map-smoke','sources',plain.sourceId,'revisions')),'parsed versions survived deletion');
   assert((await (await fetch(base+'/api/projects/map-smoke/discipline-map')).json()).mapVersionId===plainDone.resultRefs[0],'delete removed generated map');
-  if(process.platform==='darwin'||process.platform==='linux'){
+  if(process.platform==='darwin'||process.platform==='linux'||process.env.LLL_SMOKE_NATIVE_OCR==='1'){
     const capability=(await (await fetch(base+structureEndpoint)).json()).localOCR;
-    assert(capability.available,JSON.stringify(capability));assert.equal(capability.platform,process.platform==='darwin'?'darwin':'linux');
-    const latest=(await (await fetch(url+'/'+pdf.sourceId)).json()).revision;
-    const {job:native}=await json(structureEndpoint,{operationId:crypto.randomUUID(),providerId:capability.providerId,revisionId:latest.revisionId,baseDerivedVersionId:latest.derivedVersionId,pages:[1]});
-    const nativeDone=await completed(structureEndpoint+'/'+native.id);
-    assert.equal(nativeDone.providerId,capability.providerId);assert(nativeDone.resultDerivedVersionId,'native OCR published no result');
-    const nativeText=await (await fetch(url+'/'+pdf.sourceId+'/revisions/'+latest.revisionId+'/content')).text();assert(nativeText.trim().length>0&&!nativeText.includes('Installed vision result'),'native OCR did not replace the cloud fixture with recognized text');
+    assert(capability.available,JSON.stringify(capability));assert.equal(capability.platform,{darwin:'darwin',linux:'linux',win32:'windows'}[process.platform]);
+    // Use genuine visible Chinese glyphs, not the geometric ToUnicode fixture.
+    // Remove only the synthetic cloud OCR binding before uploading this page;
+    // the automatically captured native provider must remain local.
+    const nativeBindings={...bindings};delete nativeBindings.documentStructure;
+    await json('/api/settings/ask-ai',{default:provider.id,providers:[provider],bindings:nativeBindings},'PUT',200);
+    const nativeResponse=await upload('ocr-chinese.pdf',fs.readFileSync(path.join(fixtures,'ocr-chinese.pdf')));assert.equal(nativeResponse.status,201);
+    const nativeSource=(await nativeResponse.json()).source;
+    const nativeEndpoint='/api/projects/parser-smoke/sources/'+nativeSource.sourceId+'/structure-jobs';
+    let native;const nativeDeadline=Date.now()+60000;
+    while(Date.now()<nativeDeadline){const jobs=(await (await fetch(base+nativeEndpoint)).json()).jobs;native=jobs[0];if(native)break;await pause()}
+    assert(native,'automatic native OCR was not created');
+    const nativeDone=await completed(nativeEndpoint+'/'+native.id);
+    assert.equal(nativeDone.providerId,capability.providerId);assert(nativeDone.resultDerivedVersionId,'native OCR published no result');assert.equal((nativeDone.emptyPages??[]).length,0,'readable Chinese page treated as blank');
+    const current=(await (await fetch(url+'/'+nativeSource.sourceId)).json()).source;
+    const nativeText=await (await fetch(url+'/'+nativeSource.sourceId+'/revisions/'+current.currentRevisionId+'/content')).text();
+    assert(nativeText.length>20&&/中文|学习/.test(nativeText)&&/函数|方程/.test(nativeText)&&!nativeText.includes('Installed vision result'),'native OCR failed to recognize genuine Chinese: '+nativeText);
+
   }
   assert.deepEqual(fakeErrors,[]);assert.deepEqual(received,['smoke-review','smoke-practice','smoke-discipline-map','smoke-vision','smoke-discipline-map']);
   const taskResponse=await fetch(base+'/api/projects/parser-smoke/assistant-tasks');assert.equal(taskResponse.status,200);

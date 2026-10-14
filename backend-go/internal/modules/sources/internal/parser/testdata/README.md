@@ -21,3 +21,9 @@ then run `python generate.py` in this directory. Python and these libraries
 are not runtime or installer dependencies. Parsing uses only compiled Go
 code. Regenerated ZIP metadata may differ while fixture content remains the
 same.
+
+`ocr-chinese.pdf` is a single scanned page with original Chinese/English test
+sentences, for native OCR smokes. It contains only a raster image and no text
+layer or embedded font. The image was rendered with the Windows system font;
+no font program is distributed. Fixture text is CC0. Unlike the geometric
+font decoding fixture, this page has visually readable glyphs.
