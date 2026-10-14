@@ -52,6 +52,8 @@ const STREAM_SCROLL_MS = 96;
 export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const queryClient = useQueryClient();
   const conversation = useConversation(slug);
+  const conversationRef = useRef(conversation.data);
+  conversationRef.current = conversation.data;
   const tasksQuery = useAssistantTasks(slug);
   const sourcesQuery = useSources(slug);
   const modelSettings = useAskAiSettings();
@@ -113,6 +115,10 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     // Preserve provider ordering when a tool or completion frame follows text
     // that is still waiting in the small render buffer.
     flushDeltas();
+    if (frame.type === 'turn-accepted') {
+      const learner = conversationRef.current?.messages.find(message => message.id === frame.data.learnerMessageId);
+      if (learner) setLive(current => current ? { ...current, learner } : current);
+    }
     handleFrame(frame, setLive);
   }, [flushDeltas]);
 
@@ -153,7 +159,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   }, [conversationReady, slug]);
 
   useEffect(() => () => {
+    // Release ownership too: a StrictMode remount must be able to reattach.
     controller.current?.abort();
+    controller.current = null;
     if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
     if (scrollTimer.current !== null) window.clearTimeout(scrollTimer.current);
     if (deltaTimer.current !== null) window.clearTimeout(deltaTimer.current);
@@ -161,15 +169,14 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
 
   // A refresh must not create a second teacher turn. Reattach to the durable
   // backend run and replay its frames into the same live response UI.
-  const recoveryStarted = useRef(false);
   useEffect(() => {
-    if (!conversation.data || live || recoveryStarted.current) return;
-    recoveryStarted.current = true;
+    if (!conversation.data || live || controller.current) return;
     const next = new AbortController();
     controller.current = next;
     const latestLearner = [...conversation.data.messages].reverse().find((message) => message.role === 'learner');
     const opening = conversation.data.messages.every(message => message.operationId === 'teacher-welcome-v1');
     void (opening ? startTeacherOpening : resumeTeacherTurn)(slug, next.signal, (frame) => {
+      if (controller.current !== next || next.signal.aborted) return;
       if (frame.type === 'turn-accepted') {
         setLive((current) => current ?? {
           learner: latestLearner ?? { id: String(frame.data.learnerMessageId), role: 'learner', status: 'completed', blocks: [], createdAt: new Date().toISOString() },
@@ -177,12 +184,14 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         });
       }
       handleTeacherFrame(frame);
-    }).then((found) => {
-      if (found) void queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+    }).then(async (found) => {
+      if (found && controller.current === next && !next.signal.aborted) {
+        flushDeltas();
+        await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
+      }
     }).catch((cause) => {
-      if (!next.signal.aborted) setError((cause as Error).message || '教师响应恢复失败');
+      if (controller.current === next && !next.signal.aborted) setError((cause as Error).message || '教师响应恢复失败');
     }).finally(() => {
-      recoveryStarted.current = false;
       // Only the stream that still owns the controller may clear live; a
       // superseded recovery attempt must not stomp an in-flight turn.
       if (controller.current === next) {
@@ -190,28 +199,28 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
         if (!next.signal.aborted) setLive(null);
       }
     });
-    return () => {
-      next.abort();
-      recoveryStarted.current = false;
-      if (controller.current === next) controller.current = null;
-    };
-  }, [conversation.data, handleTeacherFrame, queryClient, slug]);
+    // Projection refreshes and turn-accepted both rerun this effect. Neither
+    // owns stream cleanup; only unmount, stop or explicit steer aborts it.
+  }, [conversation.data, live, flushDeltas, handleTeacherFrame, queryClient, slug]);
 
   // runStream owns the AbortController + post-stream refresh shared by every
   // stream origin (direct send, steer, regenerate). Returns false on failure.
   const runStream = useCallback(async (run: (signal: AbortSignal) => Promise<void>): Promise<boolean> => {
+    controller.current?.abort();
     const next = new AbortController();
     controller.current = next;
     try {
       await run(next.signal);
+      if (controller.current !== next || next.signal.aborted) return false;
       flushDeltas();
       await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
-      setLive(null);
+      if (controller.current === next) setLive(null);
       return true;
     } catch (cause) {
-      if (!next.signal.aborted) setError((cause as Error).message || '教师暂时无法响应');
+      if (controller.current !== next || next.signal.aborted) return false;
+      setError((cause as Error).message || '教师暂时无法响应');
       await queryClient.resetQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
-      setLive(null);
+      if (controller.current === next) setLive(null);
       return false;
     } finally {
       if (controller.current === next) controller.current = null;
@@ -255,9 +264,15 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       text: '', reasoning: '', taskIds: [], searches: [],
     };
     setLive(temporary);
-    await runStream(async (signal) => {
-      await streamTeacherTurn(slug, { operationId, content, attachmentRefs, providerId: providerId || undefined }, signal, handleTeacherFrame);
+    let accepted = false;
+    const succeeded = await runStream(async (signal) => {
+      await streamTeacherTurn(slug, { operationId, content, attachmentRefs, providerId: providerId || undefined }, signal, frame => {
+        if (signal.aborted) return;
+        if (frame.type === 'turn-accepted' || frame.type === 'turn-queued') accepted = true;
+        handleTeacherFrame(frame);
+      });
     });
+    if (!succeeded && !accepted) setInput(current => current || content);
   };
 
   // Steer interrupts the active response server-side; we detach from the old
@@ -276,7 +291,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       text: '', reasoning: '', taskIds: [], searches: [],
     });
     await runStream(async (signal) => {
-      await steerQueuedTurn(slug, item.queueId, signal, handleTeacherFrame);
+      await steerQueuedTurn(slug, item.queueId, signal, frame => { if (!signal.aborted) handleTeacherFrame(frame); });
     });
   };
 
@@ -290,7 +305,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     pendingDeltas.current = { text: '', reasoning: '' };
     setLive({ learner: trigger, text: '', reasoning: '', taskIds: [], searches: [] });
     await runStream(async (signal) => {
-      await regenerateTeacherResponse(slug, responseId, signal, handleTeacherFrame);
+      await regenerateTeacherResponse(slug, responseId, signal, frame => { if (!signal.aborted) handleTeacherFrame(frame); });
     });
   }, [conversation.data?.messages, runStream, slug]);
 

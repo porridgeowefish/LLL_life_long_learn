@@ -41,6 +41,7 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
       subscribeToSSE(SSE_EVENTS.teacherNoteUpdated, forProject(() => {void queryClient.invalidateQueries({ queryKey: ['learning-workspace',project.slug,'notes'] });void queryClient.invalidateQueries({queryKey:['usage']});})),
       subscribeToSSE(SSE_EVENTS.learningAssetUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.assets(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.sourceUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),
+      subscribeToSSE(SSE_EVENTS.conversationQueueUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.sourceStructureJobUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.sources(project.slug) }); })),
       subscribeToSSE(SSE_EVENTS.annotationUpdated, forProject(() => { void queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.annotations(project.slug) }); })),
     ];

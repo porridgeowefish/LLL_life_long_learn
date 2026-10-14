@@ -184,6 +184,7 @@ export function useConversation(slug: string) {
     initialPageParam: 0,
     getNextPageParam: (page) => page.hasPrevious && page.pageFromSeq > 0 ? page.pageFromSeq : undefined,
     enabled: Boolean(slug),
+    refetchInterval: (query) => query.state.data?.pages[0]?.queue?.length ? 1500 : false,
   });
   const data = useMemo(() => {
     const pages = query.data?.pages;
@@ -325,7 +326,16 @@ export function usePermanentlyDeleteSource(slug: string) {
 
 export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; providerId?: string }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/turns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
-  if (!response.ok || !response.body) throw new ApiError(response.status, '教师响应无法开始', await response.text());
+  // A server-owned queued run may begin before the client learns about it.
+  // The rejected direct request was not recorded. Preserve its operation ID
+  // in the durable queue once; never retry the provider request blindly.
+  if (response.status === 409) {
+    const queued = await http.post<{ queueId: string }>(`/api/projects/${encodeURIComponent(slug)}/conversation/turns/queue`, input, { signal });
+    onFrame({ type: 'turn-queued', data: { queueId: queued.queueId } });
+    await resumeTeacherTurn(slug, signal, onFrame);
+    return;
+  }
+  if (!response.ok || !response.body) throw new ApiError(response.status, `教师响应无法开始（HTTP ${response.status}），请重试`, await response.text());
   await consumeSSE(response, onFrame);
 }
 

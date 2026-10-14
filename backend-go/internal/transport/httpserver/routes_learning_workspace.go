@@ -71,6 +71,9 @@ func (s *Server) startTeacherRunLocked(slug string, start func(ctx context.Conte
 		responseID := ""
 		emit := func(frame teacher.StreamFrame) {
 			run.Append(frame)
+			if frame.Type == "message-started" {
+				s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
+			}
 			if frame.Type == "turn-accepted" {
 				if id, _ := frame.Data["responseId"].(string); id != "" && responseID == "" {
 					responseID = id
@@ -83,6 +86,7 @@ func (s *Server) startTeacherRunLocked(slug string, start func(ctx context.Conte
 		}
 		activeTeacher.Finish(slug, responseID, run)
 		s.advanceTeacherQueue(slug)
+		s.broadcaster.Emit("conversation-queue-updated", map[string]any{"projectSlug": slug})
 	}()
 	return run
 }

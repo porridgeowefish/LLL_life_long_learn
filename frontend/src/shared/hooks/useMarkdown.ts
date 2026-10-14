@@ -22,6 +22,7 @@ import { useMemo } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import katex from 'katex';
+import { extractMathHTML } from '@/shared/lib/mathMarkup';
 
 export interface MermaidBlock {
   id: string;
@@ -243,11 +244,14 @@ export function renderMarkdown(input: string, options?: { streaming?: boolean })
 
   // GUI scripts remain opaque to marked/math and never enter host innerHTML.
   const interactive: MarkdownRender['interactive'] = [];
-  const withoutGUI = input.replace(/```[ \t]*html-interactive[ \t]*\r?\n([\s\S]*?)```/gi, (_, code: string) => {
+  const register = (code: string) => {
     if (interactive.length >= 8 || code.length > 200_000) return '<p>交互图示超过显示预算。</p>';
     const id = `gui-${interactive.length}`; interactive.push({ id, code });
-    return `<div data-interactive-id="${id}" class="interactive-placeholder"></div>`;
-  }).replace(/```[ \t]*html-interactive[ \t]*\r?\n[\s\S]*$/i, '<div class="mermaid-placeholder">交互图示正在生成…</div>');
+    return `<div data-interactive-id="${id}" class="interactive-placeholder">${streaming ? '交互图示将在回复完成后显示…' : ''}</div>`;
+  };
+  const withoutFencedGUI = input.replace(/```[ \t]*html-interactive[ \t]*\r?\n([\s\S]*?)```/gi, (_, code: string) => register(code))
+    .replace(/```[ \t]*html-interactive[ \t]*\r?\n[\s\S]*$/i, '<div class="mermaid-placeholder">交互图示正在生成…</div>');
+  const withoutGUI = extractMathHTML(withoutFencedGUI, register);
 
   // Step 1: extract math BEFORE marked touches anything.
   const { stripped, placeholders } = extractMath(withoutGUI);

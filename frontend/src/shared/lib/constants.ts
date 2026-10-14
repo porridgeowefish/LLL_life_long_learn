@@ -30,6 +30,7 @@ export const SSE_EVENTS = {
   sourceUpdated: 'source-updated',
   generationJobUpdated: 'generation-job-updated',
   sourceStructureJobUpdated: 'source-structure-job-updated',
+  conversationQueueUpdated: 'conversation-queue-updated',
 } as const;
 
 export type SSEEventName = (typeof SSE_EVENTS)[keyof typeof SSE_EVENTS];

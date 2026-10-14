@@ -36,12 +36,12 @@
       "sha256": "9ac8ceea58566238f2cfe117f9192b8d652902f6dce1b2ee5f3072fc13183324"
     }
   ],
-  "version": "iteration-23.4",
+  "version": "iteration-23.5",
   "schemaVersion": 1,
   "resources": [
     {
       "path": "learning-prompts/common.md",
-      "sha256": "e0a309b96ee28f4d838aa41c211ac6c3013e20b650732d282245ab7a0d8592a6"
+      "sha256": "8224c78ccf7db125782dfa6ba4c1a33c1a531fae83b97e8d878214e0d146ff22"
     },
     {
       "path": "learning-prompts/discipline-map.md",

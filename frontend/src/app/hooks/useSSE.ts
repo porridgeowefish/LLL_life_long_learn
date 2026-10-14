@@ -71,6 +71,7 @@ function ensureConnection() {
     SSE_EVENTS.annotationUpdated,
     SSE_EVENTS.generationJobUpdated,
     SSE_EVENTS.sourceStructureJobUpdated,
+    SSE_EVENTS.conversationQueueUpdated,
   ];
   for (const name of fanoutNames) {
     es.addEventListener(name, (e) => {
