@@ -1,186 +1,210 @@
 <div align="center">
 
-<img src="frontend/public/app-icon.png" width="96" alt="Learn-With-AI" />
+<img src="frontend/public/app-icon.png" width="80" alt="Learn-With-AI 应用图标" />
 
 # Learn-With-AI
 
-**本地优先的 AI 学习工作台：和 AI 教师对话，把理解沉淀成自己的复习稿、练习题和笔记。**
+**从“看过了”，到“能讲清楚”。**
 
-*A local-first AI learning workbench — learn by talking with an AI teacher, keep what you understood.*
+导入自己的教材，让 AI 教师陪你理解；用复习稿、练习和讲解，检查自己到底懂了多少。
+
+*Your materials. An AI teacher. A learning journey you can keep.*
 
 [![Release](https://img.shields.io/github/v/release/porridgeowefish/LLL_life_long_learn?label=release&color=4f6b55)](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)
 [![CI](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-c9a35c)](./LICENSE)
 ![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6c746b)
-![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
 
-[下载安装](#-下载安装) · [使用流程](#-使用流程) · [从源码构建](#-从源码构建) · [常见问题](#-常见问题)
+**[下载安装](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)** · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
 
-<img src="docs/images/teacher.png" alt="Learn-With-AI 教师对话界面" width="100%" />
+![教师用恒温空调和反馈回路图解释开环与闭环，并提出理解检查问题](docs/images/teacher.png)
+
+<sub>当前界面 · 自动控制原理演示项目。下方截图的教材名称、对话与学习内容均为人工编排的演示数据，不是现场模型生成结果。点击图片可查看大图。</sub>
 
 </div>
 
-## ✨ 特性
+## 为什么用它学习
 
-- **AI 教师对话**：围绕一个学习单元持续提问、澄清、验证；支持流式回复、Markdown、表格、代码、LaTeX、Mermaid，模型可在对话框内随时切换。
-- **资料即上下文**：导入 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，本地解析成文本，上传后自动可查阅，教师按目录、检索和连续原文逐步读取，提供可核对的引用；本地解析不经过云端服务。
-- **自动笔记**：每 3 个成功回合（可调）由教师模型总结一次，记录关键概念、易错点与待复习项。
-- **复习稿与练习题**：在资料页独立调用 API 生成，可选模型、资料与题数，显示生成进度；答案折叠在题目下。可编辑、回溯版本，支持分页阅读、划词批注与 Ask AI。
-- **按资料组织学科地图**：选择模型直接生成章节，或先导入参考资料再生成；保持已有学习计划。
-- **学习节律与用量**：首页热力图记录每日投入，Token 用量按项目统计输入与输出。
-- **本地优先**：所有项目、对话、资料和配置都是本机上的普通文件，无数据库、无账号；API Key 只保存在本地配置中。
-- **原生桌面应用**：Windows 提供标准 MSI 安装包与独立应用窗口（WebView2），支持版本检测、覆盖确认、修复与卸载，并能在应用内一键更新。
+学一门新知识，往往卡在几个地方：不知道先学什么、读懂了却说不清、聊完一大段又找不到重点。Learn-With-AI 把这些环节放进同一个本地工作台。
 
-## 📸 截图
-
-| 资料库：本地解析，教师可读取 | 自动笔记：每 3 轮沉淀一次 |
+| 你遇到的问题 | 可以怎么做 |
 | --- | --- |
-| <img src="docs/images/sources.png" alt="资料库" /> | <img src="docs/images/notes.png" alt="自动笔记" /> |
-| **统一设置：服务预置与默认模型** | **Token 用量与学习投入** |
-| <img src="docs/images/api-models.png" alt="API 模型配置" /> | <img src="docs/images/usage.png" alt="Token 用量" /> |
+| 一本教材很厚，不知道从哪开始 | 导入资料，生成学科地图，选择优先级和学习主题 |
+| 定义看懂了，遇到例子还是不会 | 让教师换个例子、退一步讲，或用图示说明关系 |
+| 对答案觉得会了，自己做却出错 | 先作答再提交测试，查看得分、正确答案与解析 |
+| 聊过很多，第二天记不住 | 回看自动笔记，生成复习稿，留下批注与追问 |
+| 想知道自己是否真的理解 | 反过来讲给教师听，让它从新手视角追问 |
 
-<sub>截图使用示例项目「Go 并发编程」的演示数据。</sub>
+**资料、对话、笔记和学习资产保存在本机普通文件中。** 应用不需要自有云账号；模型连接由你选择。
 
-## 📦 下载安装
+## 开始使用
 
-前往 [**Releases**](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest) 下载与系统对应的安装包。安装包已包含前端、后端和文档解析器，无需另装 Go、Node.js、Python 或 Office。
+前往 [**Releases 下载页**](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)，选择对应系统与架构的安装包。安装包包含前端、后端和文档解析器，无需安装 Go、Node.js、Python 或 Office。
 
-| 系统 | 安装包 | 说明 |
+| 系统 | 选择的文件 | 启动方式 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `learn-with-ai-<版本>-windows-amd64.msi` | 推荐。原生应用窗口 |
-| Windows on ARM | `learn-with-ai-<版本>-windows-arm64.msi` | 原生应用窗口 |
-| macOS | `…-darwin-<arch>.pkg` / `…-app.tar.gz` | 当前在默认浏览器中打开界面 |
+| Windows 10/11 x64 | `…-windows-amd64.msi` | 从桌面或开始菜单打开原生应用窗口 |
+| Windows on ARM | `…-windows-arm64.msi` | 原生应用窗口 |
+| macOS Intel / Apple Silicon | `…-darwin-<arch>.pkg` / `…-app.tar.gz` | 界面在默认浏览器中打开 |
 | Debian / Ubuntu | `…-linux-<arch>.deb` | `sudo apt install ./文件名.deb` |
 | 其他 Linux | `…-linux-<arch>-install.tar.gz` | 解压后运行 `./install.sh` |
 
-每个版本都附带 `SHA256SUMS`，可用 `Get-FileHash`（Windows）或 `sha256sum -c`（Linux/macOS）校验。
+1. **先体验，再配置。** 打开主页的「体验示例」，跟着梯度下降示例试问答、复习和练习，无需 API Key。
+2. **接入自己的模型。** 在「设置」添加连接，选择提供方与模型，填写 Key，探测后保存。
+3. **选一种起点。** 想弄懂一个具体问题，新建学习单元；想系统学习一门学科，新建学科地图。
+4. **带上自己的资料。** 导入教材、讲义或笔记，再开始提问、复习与测试。
 
-### Windows 安装
+> 教师对话和内容生成需要可用的模型连接，费用取决于你选择的服务。自带示例和本地文档解析无需模型请求；扫描页的本机 OCR 无需 API Key，具体可用性取决于系统环境。
 
-1. 双击 `learn-with-ai-<版本>-windows-amd64.msi`。
-2. 按向导阅读许可协议，安装到固定目录（`%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户，无需管理员权限，不能修改安装地址）。
-3. 完成后从**桌面**或**开始菜单**打开 **Learn-With-AI**。
+<details>
+<summary><b>Windows 安装、更新与卸载</b></summary>
 
-> 应用依赖 Microsoft Edge **WebView2 Runtime**（Windows 11 与大多数 Windows 10 已自带）。缺少时安装程序会明确提示，可从 [微软官方页面](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime 后重试。当前安装包尚未代码签名，SmartScreen 提示时选择“更多信息 → 仍要运行”。
+双击 MSI，按向导阅读许可并安装。程序固定安装到 `%LOCALAPPDATA%\Programs\learn-with-ai`，仅当前用户使用，无需管理员权限。Windows 窗口依赖 [Microsoft WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)；缺少时，安装程序会提示安装。当前包尚未代码签名，系统可能显示 SmartScreen 提示，请先核对下载来源。
 
-### 自动更新
+应用启动时会检查新版本；可点击侧栏「立即更新」，或在「设置 → 版本与数据」手动检查。下载会按 Release 的 `SHA256SUMS` 校验。也可以运行新版本 MSI，在确认升级或覆盖后替换程序文件。
 
-从 0.5.2 起，应用启动时会检查 GitHub 上的新版本。发现新版本后，侧栏底部会出现“发现新版本”提示；点击 **立即更新**，应用会下载安装包、用 Release 的 `SHA256SUMS` 校验、在后台静默安装，并在完成后自动重新打开。也可以在 **设置 → 版本与数据** 中手动检查更新。
+同版本 MSI 提供修复或删除；降级会被拒绝。关闭应用窗口会隐藏到托盘，右键托盘图标可退出。
 
-### 学习数据保存在哪里
+卸载可通过 Windows「设置 → 应用 → 已安装的应用」，或再次运行同版本 MSI 选择删除。卸载仅移除程序及快捷方式，学习数据保留。每个 Release 都提供 `SHA256SUMS`；Windows 可用 `Get-FileHash` 核对下载文件。
 
-项目、对话、笔记、资料、学习偏好和 API 配置都保存在 `%LOCALAPPDATA%\learn-with-ai`（在 **设置 → 版本与数据** 中可以看到完整路径）。更新、修复和卸载都不会修改或删除这个目录。
+</details>
 
-### 升级与覆盖安装
+## 功能演示
 
-也可以直接运行新版本 MSI。安装程序会**检测已安装的版本**，弹出“确认升级或覆盖安装”对话框，确认后才替换程序文件；选择取消则不做任何修改。
+以「自动控制原理」为例，从一份讲义开始，走到能解释反馈为什么起作用。教师问答见上方主图；下面展示如何把一次对话接到长期学习中。
 
-- 同一版本再次运行 MSI 会进入**维护模式**，可选择修复或删除；
-- 不允许用旧版本覆盖新版本（降级会被拒绝）；
-- 检测到旧版 EXE 安装时会先征求确认再迁移；
-- 学习数据始终保留。
+### 1. 把教材带进来
 
-### 查看本地已安装版本
+导入 PDF、Markdown、TXT、PPTX、DOCX、XLSX 或 CSV，教师就可以查阅解析后的资料，并在对话中提供原文引用。每份文件最大 100 MiB。
 
-- **设置 → 应用 → 已安装的应用**，搜索 Learn-With-AI，可看到版本号；
-- 或在 PowerShell 中执行：
+扫描资料可用本机免费 OCR，每批最多 8 页，完成后继续下一批。**已有的正文就能用于地图生成，不必先手工整理出目录。** 复杂公式仍需对照原页核验。
 
-  ```powershell
-  Get-ItemProperty HKCU:\Software\learn-with-ai\Installer | Select-Object Version, InstallLocation
-  ```
+![资料库展示课程讲义、扫描笔记和实验记录，扫描笔记可继续免费识别](docs/images/sources.png)
 
-### 卸载
+### 2. 先看全局，再选一个主题深入
 
-以下任一方式均可：
+学科地图梳理研究问题、主要领域和具体主题，并区分「关键必学」「中等深度」「深入选学」。把感兴趣的主题加入学习计划，或从地图进入独立学习单元。
 
-- **设置 → 应用 → 已安装的应用 → Learn-With-AI → 卸载**；
-- 再次运行同版本 MSI，选择“删除”；
-- 命令行：`msiexec /x learn-with-ai-<版本>-windows-amd64.msi`。
+比如先学「开环与闭环」，再连接到「动态响应」和「稳定性」。你知道这一节在整个体系中的位置，也知道接下来可以学什么。
 
-卸载只移除程序文件和快捷方式。学习项目、笔记、资料和 API 配置保存在 `%LOCALAPPDATA%\learn-with-ai`，不会被删除；确认不再需要后可手动删除该文件夹。
+![自动控制原理学科地图展示学习优先级、主题解释、加入计划和深入学习入口](docs/images/discipline-map.png)
 
-## 🧭 使用流程
+### 3. 把理解留下来，复习时接着追问
 
-1. **配置模型**：进入「设置」，点击添加连接，在弹窗选择提供方和模型、填写 Key，探测并保存；自定义连接可填写完整参数。
-2. **新建项目**：点击侧栏「项目」旁的 `+`，为一个主题创建学习单元，例如「Go 并发编程」。
-3. **导入资料**：在项目右上角「导入资料」，上传讲义、课件或表格。解析完成后自动供教师使用，无需另点添加或引用。
-4. **和教师对话**：在「教师」标签提问。教师会结合资料讲解、给出示例，并用小问题检查你的理解。
-5. **回顾与沉淀**：选择资料与模型生成复习稿或练习题，设置题数并查看进度；展开每题下方答案，或在复习稿中划词批注和追问。
-6. **组织学科**：在学科地图选择直接生成或按参考资料生成章节，再进入相应学习单元。
+在资产页选择资料和模型，生成复习稿。正文支持分页、编辑、版本记录和划词批注；遇到一句没弄懂的话，可以直接 Ask AI。公式、表格与 Mermaid 图示都可以保留在学习内容中。
 
-数据默认位置：Windows `%LOCALAPPDATA%\learn-with-ai`；macOS `~/Library/Application Support/learn-with-ai`；Linux `$XDG_DATA_HOME/learn-with-ai` 或 `~/.local/share/learn-with-ai`。
+![复习稿用目标、输出、反馈的对照表和反例解释开环与闭环，支持分页和批注](docs/images/review.png)
 
-## 🏗 工作原理
+<details>
+<summary><b>还有自动笔记：记录理解变化与待复习项</b></summary>
 
-```mermaid
-flowchart LR
-  subgraph App["Learn-With-AI（单进程）"]
-    UI["React 界面<br/>WebView2 窗口"] -- "HTTP / SSE（127.0.0.1 私有端口）" --> Go["Go 服务"]
-  end
-  Go -- "教师 · 笔记 · Ask AI · 独立教学生成" --> LLM["OpenAI / Anthropic 兼容 API"]
-  Go -- "本地解析" --> Parser["PDF · DOCX · PPTX · XLSX · CSV · MD"]
-  Go -- "有限页识别" --> Vision["本机免费 OCR / 可选视觉 API"]
-  Go <--> FS[("工作区文件<br/>项目 · 对话 · 资料 · 资产")]
-```
+教师默认每 3 个成功对话回合总结一次，可在设置中调整。笔记记录关键概念、易错点与下一次复习的问题，保存在该学习单元中。
 
-- **后端**：Go 1.26，标准库 HTTP 服务，文件即数据库，重启后从文件恢复任务状态。
-- **前端**：Vite + React 18 + TypeScript，TanStack Query 管理服务端状态，单一 SSE 通道推送事件。
-- **桌面**：Windows 版在同一进程内启动 Go 服务并用 WebView2 打开原生窗口；关闭窗口后留在后台，单击托盘图标恢复，右键托盘图标选择退出。同一工作区只允许一个实例。
-- **打包**：GitHub Actions 在各平台原生构建；Windows MSI 由 WiX 生成，并在发布前完成真实的安装、修复、升级、降级拒绝、启动和卸载测试。
+![自动笔记记录已经理解的概念、反馈与稳定的易错点和下次复习问题](docs/images/notes.png)
 
-## 🛠 从源码构建
+</details>
 
-前置：Go ≥ 1.26、Node.js ≥ 20。
+### 4. 先做题，再看自己错在哪里
+
+按资料生成练习，可选择模型和题数，并查看生成进度。客观题提交后自动判分，再显示答案和解析；多轮练习与已保存成绩可以回看，也可以重新测试。
+
+下面特意答错了「只要有反馈就一定稳定」：**绿色标出正确题，红色标出错误题，帮你找到需要再理解的概念。**
+
+![练习提交后得分为1分共2分，标出正确答案和错误判断，并可展开解析](docs/images/practice.png)
+
+### 5. 换你当老师，看看能不能讲清楚
+
+打开「讲给教师听」，用自己的话解释刚学的内容。AI 教师扮演新手继续追问；讲完点击「我讲完了，请点评」，它会对照复习稿检查讲漏或讲错的地方。
+
+从“反馈就是把结果送回来”，继续讲到“传感器坏了怎么办”“为什么有反馈还会振荡”，把模糊的熟悉感变成可以检查的解释。
+
+![讲给教师听界面中学习者解释恒温空调，教师追问传感器故障与稳定性](docs/images/feynman.png)
+
+**想先试一次？** [下载安装](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)，打开主页的「体验示例」，不用配置模型也能体验主要阅读和练习交互。
+
+## 数据与使用边界
+
+- **本地保存。** 项目、对话、资料、笔记与配置以普通文件保存，更新、修复和卸载保留学习数据。
+- **自己选择模型。** 应用支持 OpenAI / Anthropic 兼容 API；教师模型可在对话中切换，用量按项目统计。
+- **明确联网范围。** 本地解析和本机 OCR 不需要把文档传到云端。教师对话、Ask AI、内容生成或可选云端识别，会向你配置的服务发送所需内容；本地优先不等于模型离线运行。
+- **保留判断。** 模型讲解、答案和 OCR 结果都可能有误，重要内容应对照原文核验。
+
+| 系统 | 学习数据默认位置 |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\learn-with-ai` |
+| macOS | `~/Library/Application Support/learn-with-ai` |
+| Linux | `$XDG_DATA_HOME/learn-with-ai` 或 `~/.local/share/learn-with-ai` |
+
+完整路径可在「设置 → 版本与数据」查看。API Key 保存在本机工作区的 `config.local.json`，仅用于请求你配置的模型服务。
+
+## 从源码构建
+
+需要 Go ≥ 1.26、Node.js ≥ 20。
 
 ```bash
 git clone https://github.com/porridgeowefish/LLL_life_long_learn.git
 cd LLL_life_long_learn
 npm install --prefix frontend
-npm run build      # 构建前端到 frontend/dist/，并编译后端到 dist/dev/
-npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
+npm run build
+npm run start
 ```
 
-| 命令 | 作用 |
+构建产物位于 `frontend/dist/` 与 `dist/dev/`；源码服务默认打开 `http://127.0.0.1:8787/`。数据默认写入仓库内被 Git 忽略的 `workspace/`，可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
+
+| 命令 | 用途 |
 | --- | --- |
-| `npm run dev --prefix frontend` | 前端热更新（:5173，代理到 Go :8787） |
-| `npm run run` | 直接 `go run` 后端 |
-| `npm run build:desktop` | Windows：构建带图标的原生桌面开发版 |
-| `npm run stop` | 停止本地服务 |
-| `node tools/release/build-release.js --version 0.6.1 --installers` | 在本机生成发布包（Windows 上生成 MSI） |
-
-源码运行时数据默认写入仓库内的 `workspace/`（已被 Git 忽略），可用 `--workspace` 或 `LLL_WORKSPACE_ROOT` 指定其他目录。
-
-## ❓ 常见问题
+| `npm run dev --prefix frontend` | 前端热更新，默认 :5173，代理到 Go :8787 |
+| `npm run run` | 直接运行 Go 后端 |
+| `npm run build:desktop` | Windows 原生桌面开发版 |
+| `npm run stop` | 停止本地源码服务 |
 
 <details>
-<summary><b>打开后提示需要 WebView2 Runtime</b></summary>
+<summary><b>工作原理</b></summary>
 
-安装微软官方的 WebView2 Evergreen Runtime 后重新打开即可。应用不会退回到普通浏览器标签页。
+```mermaid
+flowchart LR
+  UI["React 学习界面"] --> Go["本机 Go 服务"]
+  Go --> Parser["本地文档解析 / 本机 OCR"]
+  Go --> LLM["你配置的模型 API"]
+  Go <--> FS["本机文件：资料、对话与学习资产"]
+```
+
+后端使用 Go 标准库 HTTP 服务，以文件保存状态。前端为 Vite + React 18 + TypeScript，通过 HTTP / SSE 更新界面。Windows 在同一进程内运行 Go 服务和 WebView2 窗口；macOS 与 Linux 在默认浏览器打开本地界面。同一工作区只允许一个写入实例。
+
+</details>
+
+## 常见问题
+
+<details>
+<summary><b>没有 API Key，能先体验吗？</b></summary>
+
+可以。主页「体验示例」包含预置问答、复习、练习、笔记、资料与地图，无需 API。本次体验的数据关闭后重置。自己的教师对话与内容生成仍需配置可用模型连接。
+
 </details>
 
 <details>
-<summary><b>提示“workspace is already open”</b></summary>
+<summary><b>扫描 PDF 能识别吗？旧版 Office 格式呢？</b></summary>
 
-同一个工作区只能被一个 Learn-With-AI 实例使用。已打开的窗口会被切换到前台；如果是源码版服务占用，先执行 `npm run stop`。
+扫描件可使用 Windows 系统中文 OCR、macOS Vision 或 Linux Tesseract。缺少中文语言包或识别引擎时，资料页会提示。也可以配置云端文档识别模型；公式与复杂排版需要对照原件核验。旧版 DOC/PPT/XLS 请先另存为 DOCX/PPTX/XLSX。
+
 </details>
 
 <details>
-<summary><b>扫描版 PDF 或旧版 DOC/PPT/XLS 无法读取</b></summary>
+<summary><b>关闭窗口后，程序还在运行吗？</b></summary>
 
-扫描件可使用免费本地 OCR：Windows 系统中文 OCR、macOS Vision 或 Linux Tesseract。程序按系统检测，缺少中文语言包或引擎时在资料页提示；云端文档公式识别模型仍可选配。已识别的普通正文可用于地图生成，无需现成章节目录；复杂公式需要按原页核对。资料行提供原件和历史解析文字的永久删除确认。旧版 Office 格式请另存为 DOCX/PPTX/XLSX 后再导入。单个文件上限100MiB。
+Windows 关闭窗口会隐藏到托盘，点击托盘图标恢复，右键选择退出。提示「workspace is already open」说明同一个工作区已被实例占用；源码版可执行 `npm run stop`。
+
 </details>
 
 <details>
-<summary><b>API Key 存在哪里？会上传吗？</b></summary>
+<summary><b>可以删除导入的资料吗？</b></summary>
 
-API Key 只保存在本机工作区的 `config.local.json` 中，仅用于直接请求你配置的模型服务。项目本身没有服务器，也不收集任何数据。
+资料行提供永久删除确认，会删除原件、解析文字、识别页图和历史解析版本，无法恢复。已生成的地图和学习内容会保留。
+
 </details>
 
-## 🤝 参与贡献
+## 参与贡献
 
-欢迎通过 [Issues](https://github.com/porridgeowefish/LLL_life_long_learn/issues) 报告问题或提出建议，Pull Request 的流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
-
-## 📄 许可证
+欢迎通过 [Issues](https://github.com/porridgeowefish/LLL_life_long_learn/issues) 报告问题或提出建议。贡献流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 [MIT](./LICENSE) © 2026 Xiong Minzhe
