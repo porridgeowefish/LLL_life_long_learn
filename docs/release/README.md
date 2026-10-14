@@ -4,8 +4,8 @@ Windows 下载与 CPU 匹配的 MSI，双击完成安装，从桌面或开始菜
 
 | 系统 | 分发文件 | 安装与打开 |
 | --- | --- | --- |
-| Windows Intel / AMD 64 位 | learn-with-ai-0.7.14-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
-| Windows ARM64 | learn-with-ai-0.7.14-windows-arm64.msi | 同上，需要 Windows ARM64 |
+| Windows Intel / AMD 64 位 | learn-with-ai-0.7.15-windows-amd64.msi | 双击 MSI，按当前用户安装；从图标打开原生应用窗口 |
+| Windows ARM64 | learn-with-ai-0.7.15-windows-arm64.msi | 同上，需要 Windows ARM64 |
 | macOS | darwin-…-app.tar.gz / 原生 CI 生成的 .pkg | 放进 Applications 后打开；当前 macOS 版本仍使用默认浏览器界面 |
 | Debian / Ubuntu | linux-….deb | sudo apt install ./文件名.deb；当前 Linux 版本仍使用默认浏览器界面 |
 | 其他 Linux | linux-…-install.tar.gz | 解压后运行 ./install.sh，从应用菜单打开；界面同上 |
@@ -26,7 +26,9 @@ Windows 在独立 WebView2 窗口中运行，Go 服务位于同一进程，绑�
 
 API 与默认模型在侧栏「设置」同页配置，配色在顶部。连接只显示预览，点击打开详情弹窗；提供方预置自动填写地址，可选择模型、填写 Key，自行配置可编辑完整连接参数。复习稿、练习题和学科地图独立调用所选 API，不需要 CLI 助教；练习支持选择题数，答案折叠在每道题下。学科地图可直接生成或根据上传参考资料组织章节。小节优先级为红色Ⅰ（关键必学）、黄色Ⅱ（中等深度）与绿色Ⅲ（深入选学），右上角有图例；旧地图重新生成后获得评级。新任务的教师会主动开始教学，正文顶部直接给出文字进度，每次讲一个知识点。
 
-PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV 自动本地解析，单文件最大100MiB，上传后自动可供教师查阅。教师按目录、检索和连续原文逐步读取，提供可核对的引用。Office 公式保留结构；PDF 尽量保留位置与数学表达。未绑定云端文档识别连接时，扫描页使用对应平台的免费本地 OCR；准备条件见下方表格，无需 API Key。每批最多八页，优先补未读页，可以继续分批识别。已绑定的视觉模型仍按原配置调用，可能产生 API 费用。资料页显示实际已读和未读页数，不能把只读到封面视为整本已解析。识别结果需要按原页核对，不保证任意教材公式完全恢复。旧 DOC/PPT/XLS 请转换为 DOCX/PPTX/XLSX。
+PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV 自动本地解析，单文件最大100MiB，上传后自动可供教师查阅。教师按目录、检索和连续原文逐步读取，提供可核对的引用。Office 公式保留结构；PDF 尽量保留位置与数学表达。未绑定云端文档识别连接时，扫描页使用对应平台的免费本地 OCR；准备条件见下方表格，无需 API Key。本地 OCR 在后台连续处理整份未读页面，显示进度并支持取消，重启后从已保存的进度恢复，无需逐批点击。资料页也可手动启动整份识别。已绑定的视觉模型仍按原配置调用，模型整份识别逐页请求并可能产生 API 费用；云端自动识别保留费用预算，已发送请求不会自动重试。资料页显示实际已读和未读页数，不能把只读到封面视为整本已解析。识别结果需要按原页核对，不保证任意教材公式和化学结构完全恢复。旧 DOC/PPT/XLS 请转换为 DOCX/PPTX/XLSX。
+
+创建系统学习项目时，特殊要求可以不填。教师页的“附加信息”支持持续保存、修改或清空当前对话的要求，保存后从下一次回答生效，刷新和重启后保留。
 
 教师、复习稿、练习题和笔记使用统一富文本渲染，支持矩阵、Mermaid 和 SVG；图示可缩放、平移、全屏和导出。交互图形在隔离环境中运行。
 
@@ -38,7 +40,7 @@ macOS 默认数据为 ~/Library/Application Support/learn-with-ai；Linux 为 $X
 
 仓库 Start-LLL / npm run build / npm start 是快速源码验证工具，保留在仓库中，不进入公开 MSI。开发二进制统一生成到 dist/dev/，发布包位于 dist/releases/，dist/ 根目录不保留 EXE。npm run build:desktop 生成带图标的本机原生开发应用；只有显式执行 npm run desktop:install 才创建原生开发快捷方式，目标是 exe。安装版 MSI 只管理一个正式桌面入口。
 
-使用 node tools/release/build-release.js --version 0.7.14 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
+使用 node tools/release/build-release.js --version 0.7.15 --installers 在各原生系统通过 --targets 选择该系统的目标构建。Windows MSI 使用固定版本 WiX；首次运行 npm run release:tools 恢复 .NET SDK、WiX 和 UI 扩展。工具默认放在仓库外的 %LOCALAPPDATA%/learn-with-ai-build-tools，不作为应用运行依赖分发。可用 LLL_WINDOWS_TOOLCHAIN_DIR 指定其他仓库外绝对路径；清理仓库 .artifacts 不会删除打包工具。macOS PKG 仍由 macOS 原生任务生成。Windows 资源嵌入需要 Windows 主机，CI 采用各操作系统自己的目标。
 
 GitHub Actions 在 v 开头的标签或勾选 publish 的手动运行中发布 Release（全部平台冒烟测试通过后才发布）；不勾选时只生成构件。本地包附带 SHA256SUMS 与 THIRD_PARTY_NOTICES.txt。当前构件未进行代码签名。
 

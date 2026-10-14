@@ -19,7 +19,7 @@ export function SourcesView({ slug }: { slug: string }) {
   return (
     <section className={s.sources}>
       <header>
-        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；每次最多 8 页，批次结束后可继续，直到待识别页处理完毕。当前已提取的正文即可用于地图生成，无需预先整理目录。公式需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
+        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；一次启动后在后台处理整份资料，离开此页也会继续。可以查看进度或取消，本地识别重启后恢复。模型识别整份资料会逐页调用已配置的文档模型，按服务商计费。已提取正文可直接用于学习，公式和化学结构仍需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
         <SourceImportControl slug={slug} />
       </header>
       {sources.isError && <div className={s.error} role="alert">资料列表读取失败。<button type="button" onClick={() => void sources.refetch()}>重试</button></div>}

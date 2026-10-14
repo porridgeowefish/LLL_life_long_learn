@@ -214,6 +214,9 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	if !ValidateProjectType(projectType) {
 		return fmt.Errorf("invalid project type: %q", in.ProjectType)
 	}
+	if len(in.SystemPrompt) > 32*1024 {
+		return errors.New("conversation instructions exceed 32768 UTF-8 bytes")
+	}
 
 	// Folder tree. Discipline maps deliberately do not own learning zones.
 	dirs := []string{"", "runs", "runs/_index", "assets"}
@@ -254,6 +257,9 @@ func CreateProjectSkeletonWithInput(slug, title string, parentSlug string, in Pr
 	}
 
 	if projectType == ProjectTypeSystemLearning {
+		if err := AtomicWriteFile(filepath.Join(root, "conversation", "system-prompt.txt"), []byte(in.SystemPrompt), 0o644); err != nil {
+			return err
+		}
 		var scope any = newDraftLearningScope(title, parsed)
 		if in.LearningScope != nil {
 			scope = in.LearningScope
@@ -575,6 +581,7 @@ func defaultProjectMdBody() string {
 // ProjectInput captures creation-time context. Why/Current/Target/Standard seed
 // only system-learning project briefs; discipline-map briefs ignore them.
 type ProjectInput struct {
+	SystemPrompt  string // learner-owned conversation instructions
 	ProjectType   ProjectType
 	Why           string // motivation: why this topic matters
 	Current       string // current ability self-assessment
@@ -629,6 +636,9 @@ _由学习者维护；智能体未经确认不得覆盖本文件。_`
 	}
 
 	why := strings.TrimSpace(in.Why)
+	if why == "" && strings.TrimSpace(in.Current) == "" && strings.TrimSpace(in.Target) == "" && strings.TrimSpace(in.Standard) == "" {
+		return "## 学习主题\n\n围绕项目标题学习。特殊要求可在教师页的附加信息中填写、修改或清空；可以不填。\n\n## 备注\n\n_由学习者维护；智能体未经确认不得覆盖本文件。_"
+	}
 	if why == "" {
 		why = "_尚未填写：为什么这个主题值得学。_"
 	}

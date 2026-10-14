@@ -49,6 +49,7 @@ export interface ZoneResponse {
 
 // Requests
 export interface CreateProjectRequest {
+	 systemPrompt?: string;
   title: string;
   projectType: ProjectType;
   slug?: string;

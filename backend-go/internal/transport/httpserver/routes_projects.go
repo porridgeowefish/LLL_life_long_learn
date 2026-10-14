@@ -85,14 +85,15 @@ var validEditableFilename = regexp.MustCompile(`^[A-Za-z0-9._\-]+$`)
 // Why/Current/Target/Standard seed only system-learning project.md files.
 // Discipline-map creation ignores them at the workspace boundary.
 type createProjectRequest struct {
-	Title       string                      `json:"title"`
-	Slug        string                      `json:"slug,omitempty"`
-	ProjectType workspace.ProjectType       `json:"projectType,omitempty"`
-	Why         string                      `json:"why,omitempty"`
-	Current     string                      `json:"current,omitempty"`
-	Target      string                      `json:"target,omitempty"`
-	Standard    string                      `json:"standard,omitempty"`
-	ScopeSource *learningScopeSourceRequest `json:"scopeSource,omitempty"`
+	SystemPrompt string                      `json:"systemPrompt,omitempty"`
+	Title        string                      `json:"title"`
+	Slug         string                      `json:"slug,omitempty"`
+	ProjectType  workspace.ProjectType       `json:"projectType,omitempty"`
+	Why          string                      `json:"why,omitempty"`
+	Current      string                      `json:"current,omitempty"`
+	Target       string                      `json:"target,omitempty"`
+	Standard     string                      `json:"standard,omitempty"`
+	ScopeSource  *learningScopeSourceRequest `json:"scopeSource,omitempty"`
 }
 
 type learningScopeSourceRequest struct {
@@ -123,6 +124,10 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "title is required")
 		return
 	}
+	if len(req.SystemPrompt) > 32*1024 {
+		httpx.Error(w, http.StatusBadRequest, "conversation instructions exceed 32768 UTF-8 bytes")
+		return
+	}
 	slug := strings.TrimSpace(req.Slug)
 	if slug == "" {
 		slug = workspace.Slugify(title)
@@ -150,6 +155,7 @@ func (s *Server) handleCreateProject(w http.ResponseWriter, r *http.Request) {
 		scope = &resolved
 	}
 	if err := workspace.CreateProjectSkeletonWithInput(slug, title, "", workspace.ProjectInput{
+		SystemPrompt:  req.SystemPrompt,
 		ProjectType:   projectType,
 		Why:           req.Why,
 		Current:       req.Current,

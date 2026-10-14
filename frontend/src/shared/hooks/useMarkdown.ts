@@ -48,16 +48,24 @@ interface ExtractedMath {
   placeholders: Map<string, string>; // id → rendered KaTeX HTML
 }
 
+const svgPurifier = DOMPurify(window);
+svgPurifier.addHook('uponSanitizeAttribute', (_node, data) => {
+  const name = data.attrName.toLowerCase();
+  const value = data.attrValue.trim();
+  if ((name === 'href' || name === 'xlink:href') && !/^(?:#|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i.test(value)) data.keepAttr = false;
+  // Keep local markers and clipping paths, without allowing external SVG resources.
+  if (/url\s*\(/i.test(value) && !/^url\(\s*['"]?#[\w:.-]+['"]?\s*\)$/i.test(value)) data.keepAttr = false;
+});
+
 function extractSVG(md: string): { stripped: string; placeholders: Map<string, string> } {
   const placeholders = new Map<string, string>();
   let index = 0;
   let stripped = md.replace(/```svg\s*\n([\s\S]*?)```/gi, (_, source: string) => {
     const id = `INLINEVECTOR${index++}X`;
-    const clean = DOMPurify.sanitize(source.trim(), {
+    const clean = svgPurifier.sanitize(source.trim(), {
       USE_PROFILES: { svg: true, svgFilters: true, html: false },
       FORBID_TAGS: ['script', 'foreignObject', 'iframe', 'object', 'embed', 'style', 'animate', 'set'],
       FORBID_ATTR: ['onload', 'onclick', 'onerror', 'onbegin', 'style'],
-      ALLOWED_URI_REGEXP: /^(?:#|data:image\/(?:png|jpeg|jpg|gif|webp);base64,)/i,
     });
     placeholders.set(id, clean);
     return `<div class="inline-svg" data-inline-svg="svg-${index - 1}">${id}</div>`;

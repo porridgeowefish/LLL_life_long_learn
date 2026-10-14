@@ -264,7 +264,7 @@ func (s *Service) streamTeacherResponse(ctx context.Context, slug string, conver
 		systemPrompt += "\n\n【生成中引导】学习者在你上一条回复未完成时插入了：" + steerNote + "\n上一条 interrupted 消息是中断稿：吸收其中仍然有效的部分，按引导方向继续教学。"
 	}
 	if learner.Role == "system" {
-		providerMessages = append(providerMessages, teachergateway.Message{Role: "user", Content: "新的学习任务已创建。请依据任务目标、学习范围和已有偏好主动开场：简要说明将学什么，从第一个关键知识点开始，用一个具体例子引入，最后留一个简短问题了解起点。不要等待学习者问候，不要一次讲完整课程。"})
+		providerMessages = append(providerMessages, teachergateway.Message{Role: "user", Content: "新的学习任务已创建。请依据任务目标、学习范围和已有偏好主动开场：先简短询问有无特殊要求，说明可以不填，且可以随时通过教师页的‘附加信息’修改并保存在当前对话中。若已保存要求，确认会采用即可，不重复询问。不等待填写，继续简要说明将学什么，从第一个关键知识点开始，用一个具体例子引入，最后留一个简短问题了解起点。不要等待学习者问候，不要一次讲完整课程。"})
 	}
 
 	var tools []teachergateway.Tool

@@ -4,6 +4,7 @@ import { NavLink, useNavigate, useParams } from 'react-router-dom';
 
 import type { ProjectState } from '@/shared/types/domain';
 import { TeacherView } from './TeacherView';
+import { ConversationInstructions } from './ConversationInstructions';
 import { AssetsView } from './AssetsView';
 import { SourcesView } from './SourcesView';
 import { SourceImportControl } from './SourceImportControl';
@@ -63,6 +64,7 @@ export function LearningWorkspace({ project }: { project: ProjectState }) {
           ))}
         </nav>
         <div className={s.headerActions}>
+          {active === 'teacher' && <ConversationInstructions key={project.slug} slug={project.slug} />}
           <SourceImportControl key={project.slug} slug={project.slug} compact />
           {active === 'teacher' && <a href={conversationExportURL(project.slug)} download aria-label="导出全部对话" title="导出全部对话为 Markdown"><DownloadIcon /><span>导出对话</span></a>}
         </div>

@@ -13,45 +13,13 @@ import { ProjectTypeAdvisorDialog } from './ProjectTypeAdvisorDialog';
 
 import s from './CreateProjectModal.module.css';
 
-// Form schema — title is always required; why and the learning ladders apply
-// only to system-learning projects.
-// "当前水平" describes exposure (where the learner is now); "目标水平" describes
-// mastery (where they want to land). Two distinct ladders — previously shared,
-// which made the two selectors render identical options.
-const CURRENT_LEVELS = ['暂不确定', '未接触', '了解概念', '动手做过', '能独立完成'] as const;
-const TARGET_LEVELS = ['暂不设置', '看懂原理', '能上手用起来', '能独立解决问题', '融会贯通·能教别人'] as const;
-
-const LEARNING_TEMPLATES = [
-  {
-    label: '建立基础理解',
-    target: '看懂原理',
-    why: (title: string) => `建立对「${title}」的基础理解，弄清核心概念、关键关系和适用边界。`,
-    standard: (title: string) => `能用自己的话解释「${title}」的核心概念，并判断一个简单案例是否适用。`,
-  },
-  {
-    label: '解决实际问题',
-    target: '能上手用起来',
-    why: (title: string) => `希望把「${title}」用于实际问题，能够识别问题并选择合适的方法。`,
-    standard: (title: string) => `能运用「${title}」完成一个实际练习，并说明方法选择和结果。`,
-  },
-  {
-    label: '系统掌握',
-    target: '融会贯通·能教别人',
-    why: (title: string) => `希望系统掌握「${title}」，形成能够迁移和讲解的知识结构。`,
-    standard: (title: string) => `能讲清「${title}」的概念关系、适用边界，并独立解决一个综合问题。`,
-  },
-] as const;
-
 const schema = z.object({
   projectType: z.enum(['discipline-map', 'system-learning'], {
     required_error: '请选择学科地图或系统学习',
     invalid_type_error: '请选择学科地图或系统学习',
   }),
   title: z.string().trim().min(1, '请填写项目标题'),
-  why: z.string().trim().optional().default(''),
-  current: z.enum(CURRENT_LEVELS).default('暂不确定'),
-  target: z.enum(TARGET_LEVELS).default('暂不设置'),
-  standard: z.string().trim().optional().default(''),
+  systemPrompt: z.string().optional().default(''),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -90,10 +58,7 @@ export function CreateProjectModal({
     defaultValues: {
       title: initialTitle,
       projectType: fixedProjectType,
-      why: '',
-      current: '暂不确定',
-      target: '暂不设置',
-      standard: '',
+      systemPrompt: '',
     },
   });
 
@@ -103,10 +68,7 @@ export function CreateProjectModal({
       reset({
         title: initialTitle,
         projectType: fixedProjectType,
-        why: '',
-        current: '暂不确定',
-        target: '暂不设置',
-        standard: '',
+        systemPrompt: '',
       });
     } else {
       setAdvisorOpen(false);
@@ -127,12 +89,6 @@ export function CreateProjectModal({
 
   const formId = fromDisciplineMap ? 'deep-dive-project-form' : 'create-project-form';
   const currentDraft = getValues();
-  const applyLearningTemplate = (template: typeof LEARNING_TEMPLATES[number]) => {
-    const topicTitle = getValues('title').trim() || '这个主题';
-    setValue('why', template.why(topicTitle), { shouldDirty: true });
-    setValue('target', template.target, { shouldDirty: true });
-    setValue('standard', template.standard(topicTitle), { shouldDirty: true });
-  };
 
   return (
     <Modal
@@ -204,78 +160,10 @@ export function CreateProjectModal({
         </div>
 
         {selectedType === 'system-learning' && (
-          <div className={s.learningFields}>
-            <div className={s.templateBlock}>
-              <div>
-                <strong>快速填入</strong>
-                <span>选一个学习目标模板，内容仍可修改；也可以全部留空。</span>
-              </div>
-              <div className={s.templateRow}>
-                {LEARNING_TEMPLATES.map((template) => (
-                  <button
-                    key={template.label}
-                    type="button"
-                    className={s.templateButton}
-                    onClick={() => applyLearningTemplate(template)}
-                  >
-                    {template.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className={s.field}>
-              <label htmlFor="cp-why">
-                为什么学这个？
-              </label>
-              <textarea
-                id="cp-why"
-                rows={3}
-                placeholder="一句话说明动机。例如：希望理解统计推断，能判断现实数据中的不确定性。"
-                {...register('why')}
-              />
-              <div className={s.hint}>选填；这段背景会帮助学习智能体理解你的目标。</div>
-              {errors.why && <div className={s.error}>{errors.why.message}</div>}
-            </div>
-
-            <div className={s.fieldRow}>
-              <div className={s.field}>
-                <label>当前水平</label>
-                <div className={s.radioRow}>
-                  {CURRENT_LEVELS.map((lvl) => (
-                    <label key={lvl} className={s.radio}>
-                      <input type="radio" value={lvl} {...register('current')} />
-                      <span>{lvl}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className={s.fieldRow}>
-              <div className={s.field}>
-                <label>目标水平</label>
-                <div className={s.radioRow}>
-                  {TARGET_LEVELS.map((lvl) => (
-                    <label key={lvl} className={s.radio}>
-                      <input type="radio" value={lvl} {...register('target')} />
-                      <span>{lvl}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className={s.field}>
-              <label htmlFor="cp-standard">完成标准</label>
-              <textarea
-                id="cp-standard"
-                rows={2}
-                placeholder='怎样的成果算“学完”？例如：能独立解释三条核心规则并完成一个小练习。'
-                {...register('standard')}
-              />
-              <div className={s.hint}>可选；用于判断何时进入下一阶段。</div>
-            </div>
+          <div className={s.field}>
+            <label htmlFor="cp-instructions">有无特殊要求？（选填）</label>
+            <textarea id="cp-instructions" rows={3} placeholder="例如：先讲直觉，再讲公式；多用生活中的例子。可以不填。" {...register('systemPrompt')} />
+            <div className={s.hint}>附加信息会保存在当前对话中，后续回答持续使用。开始学习后，可随时在“附加信息”中修改或清空。</div>
           </div>
         )}
 
@@ -290,7 +178,7 @@ export function CreateProjectModal({
           onOpenChange={setAdvisorOpen}
           draft={{
             title: currentDraft.title,
-            why: currentDraft.why,
+            why: currentDraft.systemPrompt,
           }}
           onAdopt={(projectType) => setValue('projectType', projectType, { shouldValidate: true })}
         />

@@ -7,10 +7,12 @@ import (
 	"github.com/xmz14/lll/backend-go/internal/modules/sources/internal/parser"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 type StructureRequest struct {
+	AllPages             bool   `json:"allPages,omitempty"`
 	OperationID          string `json:"operationId"`
 	RevisionID           string `json:"revisionId"`
 	BaseDerivedVersionID string `json:"baseDerivedVersionId"`
@@ -19,6 +21,8 @@ type StructureRequest struct {
 	Model                string `json:"model,omitempty"`
 }
 type StructureJob struct {
+	AllPages               bool                     `json:"allPages,omitempty"`
+	CompletedPages         []int                    `json:"completedPages,omitempty"`
 	SourceID               string                   `json:"sourceId"`
 	ID                     string                   `json:"id"`
 	OperationID            string                   `json:"operationId"`
@@ -145,10 +149,14 @@ func (s *Store) ReserveStructureRequest(sourceID string, j *StructureJob, page i
 	if current.Status == "cancelled" {
 		return errors.New("cancelled")
 	}
-	if len(current.Requests) >= 8 {
+	limit := 8
+	if j.AllPages {
+		limit = 2000
+	}
+	if len(current.Requests) >= limit {
 		return errors.New("vision-request-limit")
 	}
-	if j.Automatic {
+	if j.Automatic && !strings.HasSuffix(j.ProviderID, "-local-ocr") {
 		budgetPath := filepath.Join(filepath.Dir(filepath.Dir(p)), "automatic-budget.json")
 		var b automaticBudget
 		if e = readJSON(budgetPath, &b); e != nil && !errors.Is(e, os.ErrNotExist) {
@@ -204,6 +212,35 @@ func (s *Store) CommitStructureJob(sourceID, jobID, content string, structure *p
 	}
 	return j, writeJSON(p, j)
 }
+
+// Checkpoint keeps the job running while publishing readable pages. Cancellation,
+// revision changes and deletion share the same lock as the final commit.
+func (s *Store) CheckpointStructureJob(sourceID string, staged StructureJob, content string, structure *parser.Structure, images map[string][]byte) (StructureJob, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, err := s.jobPathLocked(sourceID, staged.ID)
+	if err != nil {
+		return staged, err
+	}
+	var current StructureJob
+	if err = readJSON(p, &current); err != nil {
+		return staged, err
+	}
+	if current.Status != "running" {
+		return current, errors.New("cancelled")
+	}
+	rev, err := s.commitEnhancedLocked(sourceID, current.RevisionID, current.BaseDerivedVersionID, current.ID, content, structure, images)
+	if err != nil {
+		return current, err
+	}
+	current.BaseDerivedVersionID = rev.DerivedVersionID
+	current.ResultDerivedVersionID = rev.DerivedVersionID
+	current.CompletedPages = append([]int(nil), staged.CompletedPages...)
+	current.EmptyPages = append([]int(nil), staged.EmptyPages...)
+	current.Coverage = structure.Coverage
+	current.UpdatedAt = time.Now().UTC()
+	return current, writeJSON(p, current)
+}
 func (s *Store) AppendStructureUsage(sourceID, jobID string, record any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -249,10 +286,24 @@ func (s *Store) RecoverStructureJob(sourceID, jobID string) (StructureJob, error
 	base := filepath.Join(s.root, sourceID, "revisions", j.RevisionID, "derived")
 	var ptr derivedPointer
 	var m DerivedManifest
+	if j.AllPages && strings.HasSuffix(j.ProviderID, "-local-ocr") {
+		if readJSON(filepath.Join(base, "current.json"), &ptr) == nil && safeID(ptr.VersionID, "derived_") && readJSON(filepath.Join(base, "versions", ptr.VersionID, "manifest.json"), &m) == nil && m.JobID == j.ID {
+			j.BaseDerivedVersionID = ptr.VersionID
+		}
+		j.Status = "queued"
+		j.ErrorCode = ""
+		j.UpdatedAt = time.Now().UTC()
+		return j, writeJSON(p, j)
+	}
 	if readJSON(filepath.Join(base, "current.json"), &ptr) == nil && safeID(ptr.VersionID, "derived_") && readJSON(filepath.Join(base, "versions", ptr.VersionID, "manifest.json"), &m) == nil && m.JobID == j.ID {
 		j.Status = "succeeded"
 		j.ResultDerivedVersionID = m.DerivedVersionID
 		j.ErrorCode = ""
+		if j.AllPages && len(j.CompletedPages) < len(j.Pages) {
+			j.Status = "interrupted"
+			j.ErrorCode = "structure-interrupted"
+			j.BaseDerivedVersionID = ptr.VersionID
+		}
 	} else {
 		j.Status = "interrupted"
 		j.ErrorCode = "structure-interrupted"

@@ -7,6 +7,9 @@ import type { LearningSource } from '../api/learningWorkspace';
 import s from './SourceStructureControl.module.css';
 
 interface StructureJob {
+	allPages?: boolean;
+	pages?: number[];
+	completedPages?: number[];
   id: string;
   revisionId: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
@@ -75,6 +78,7 @@ export function SourceStructureControl({ slug, source }: { slug: string; source:
     mutationFn: (mode: 'cancel' | 'local' | 'configured') => mode === 'cancel'
       ? http.post<{ job: StructureJob }>(`${endpoint}/${encodeURIComponent(job!.id)}/cancel`, {})
       : http.post<{ job: StructureJob }>(endpoint, {
+        allPages: true,
         operationId: operation.current || (operation.current = crypto.randomUUID()),
         revisionId: source.currentRevisionId, baseDerivedVersionId: source.derivedVersionId,
         ...(mode === 'local' ? { providerId: query.data?.localOCR?.providerId ?? 'windows-local-ocr' } : {}),
@@ -97,17 +101,18 @@ export function SourceStructureControl({ slug, source }: { slug: string; source:
   return <div className={s.control}>
     <div className={s.actions}>
       {active ? <>
-        <small role="status">{job.status === 'queued' ? '等待识别' : '正在识别扫描页'} · {job.providerId.endsWith('-local-ocr') ? query.data?.localOCR?.name ?? '免费系统 OCR' : job.model || '文档模型'}</small>
+        <small role="status">{job.status === 'queued' ? '等待后台识别' : '正在后台识别'}{job.allPages && ` · ${job.completedPages?.length ?? 0}/${job.pages?.length ?? 0} 页已处理`} · {job.providerId.endsWith('-local-ocr') ? query.data?.localOCR?.name ?? '免费系统 OCR' : job.model || '文档模型'}</small>
         <button type="button" disabled={action.isPending} onClick={() => action.mutate('cancel')}>取消识别</button>
       </> : <>
-        <button type="button" disabled={action.isPending || query.isLoading || Boolean(query.data?.localOCR && !local && !query.data.configuredOCRAvailable)} onClick={() => action.mutate(local ? 'local' : 'configured')}>{action.isPending ? '正在准备…' : local ? job?.status === 'succeeded' && source.coverage?.unreadPages ? '继续免费识别' : '免费识别' : failed ? '重试识别' : '识别扫描页'}</button>
-        {local && query.data?.configuredOCRAvailable && <button type="button" className={s.secondary} disabled={action.isPending} onClick={() => action.mutate('configured')}>模型识别</button>}
+        <button type="button" disabled={action.isPending || query.isLoading || Boolean(query.data?.localOCR && !local && !query.data.configuredOCRAvailable)} onClick={() => action.mutate(local ? 'local' : 'configured')}>{action.isPending ? '正在准备…' : local ? '整份免费识别' : failed ? '重试整份识别' : '识别整份资料'}</button>
+        {local && query.data?.configuredOCRAvailable && <button type="button" className={s.secondary} disabled={action.isPending} onClick={() => action.mutate('configured')}>模型识别整份</button>}
       </>}
     </div>
     {query.data?.localOCR && <small>{local ? `${query.data.localOCR.name} · 本机免费识别` : query.data.localOCR.setupHint}{!local && <button type="button" onClick={() => void query.refetch()}>刷新状态</button>}</small>}
     {query.isError && <small role="alert">任务状态读取失败。<button type="button" onClick={() => void query.refetch()}>刷新状态</button></small>}
     {action.isError ? <small role="alert" className={s.failure}>{errorMessage(action.error)}</small>
       : failed && <small role="alert" className={s.failure}>{messages[job.errorCode ?? ''] ?? '本批识别失败，原有文字和原件已保留。可使用免费识别或检查文档模型。'}</small>}
-    {job?.status === 'succeeded' && <small role="status">本次识别已结束{source.coverage?.unreadPages ? `，整份资料仍有 ${source.coverage.unreadPages} 页待识别，可继续下一批。` : '，请核对提取文字。'}{job.emptyPages?.length ? ` ${job.emptyPages.length} 页未识别到文字，仍标为未读。` : ''}</small>}
+    {active && job.allPages && <small>离开此页后仍在后台继续。可以随时取消；本地识别重启后从已保存进度恢复。</small>}
+    {job?.status === 'succeeded' && <small role="status">本次识别已结束{source.coverage?.unreadPages ? `，${source.coverage.unreadPages} 页仍未提取到文字，请对照原件核查。` : '，请核对提取文字。'}{job.emptyPages?.length ? ` ${job.emptyPages.length} 页未识别到文字，仍标为未读。` : ''}</small>}
   </div>;
 }

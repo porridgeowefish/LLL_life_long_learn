@@ -109,6 +109,32 @@ func extractPDF(ctx context.Context, f io.ReaderAt, size int64, out *boundedText
 		case pdf.WarningStreamLimit, pdf.WarningWorkLimit:
 			return failure("resource_limit", err)
 		case pdf.WarningUnsupported:
+			// A recoverable page feature must not discard earlier readable pages.
+			// Remaining pages already appear in UnreadUnits and can be rendered
+			// by PDFium for OCR, even when their font cannot be decoded here.
+			if document != nil && document.PageCount > 0 {
+				if page := strict.Warning.Page; page > 0 {
+					found := false
+					for _, n := range structure.Coverage.UnreadUnits {
+						if n == page {
+							found = true
+						}
+					}
+					if !found {
+						structure.Coverage.UnreadUnits = append([]int{page}, structure.Coverage.UnreadUnits...)
+					}
+					extracted := structure.Coverage.ExtractedUnits[:0]
+					for _, n := range structure.Coverage.ExtractedUnits {
+						if n != page {
+							extracted = append(extracted, n)
+						}
+					}
+					structure.Coverage.ExtractedUnits = extracted
+				}
+				structure.Coverage.CompleteWithinScope = false
+				structure.Coverage.Reasons = append(structure.Coverage.Reasons, "unsupported-page-feature-requires-ocr")
+				return nil
+			}
 			return failure("unsupported_format", err)
 		}
 	}

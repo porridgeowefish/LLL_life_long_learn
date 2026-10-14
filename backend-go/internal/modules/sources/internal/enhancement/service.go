@@ -90,6 +90,9 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 	if len(pages) > 8 {
 		return store.StructureJob{}, errors.New("invalid-pages")
 	}
+	if req.AllPages && len(pages) > 0 {
+		return store.StructureJob{}, errors.New("invalid-pages")
+	}
 	st, e := store.New(slug)
 	if e != nil {
 		return store.StructureJob{}, e
@@ -182,7 +185,7 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 			}
 		}
 	}
-	if len(pages) == 0 {
+	if len(pages) == 0 && !req.AllPages {
 		for n := range valid {
 			if !recognized[n] {
 				pages = append(pages, n)
@@ -190,7 +193,13 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		}
 	}
 	sort.Ints(pages)
-	pages = pages[:min(8, len(pages))]
+	if req.AllPages {
+		if len(pages) > 2000 {
+			return store.StructureJob{}, errors.New("resource-limit")
+		}
+	} else {
+		pages = pages[:min(8, len(pages))]
+	}
 	if len(pages) == 0 {
 		return store.StructureJob{}, errors.New("no-candidate-pages")
 	}
@@ -200,7 +209,7 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 		}
 	}
 	now := time.Now().UTC()
-	j := store.StructureJob{ID: idgen.New("structure"), OperationID: req.OperationID, Status: "queued", RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: p.ID, Model: p.Model, Pages: pages, Automatic: automatic, OriginalHash: rev.Original.SHA256, Intent: req, CreatedAt: now, UpdatedAt: now}
+	j := store.StructureJob{AllPages: req.AllPages, ID: idgen.New("structure"), OperationID: req.OperationID, Status: "queued", RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: p.ID, Model: p.Model, Pages: pages, Automatic: automatic, OriginalHash: rev.Original.SHA256, Intent: req, CreatedAt: now, UpdatedAt: now}
 	j, e = st.SaveStructureJob(sourceID, j)
 	if e != nil {
 		return j, e
@@ -231,7 +240,7 @@ func automatic(slug string, st *store.Store, sourceID string, provider ocr.PageP
 	}
 	ctx, c := context.WithTimeout(context.Background(), 45*time.Second)
 	defer c()
-	_, _ = Create(ctx, slug, sourceID, store.StructureRequest{OperationID: "automatic_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: provider.ID, Model: provider.Model}, true)
+	_, _ = Create(ctx, slug, sourceID, store.StructureRequest{AllPages: ocr.IsLocal(provider), OperationID: "automatic_" + rev.RevisionID, RevisionID: rev.RevisionID, BaseDerivedVersionID: rev.DerivedVersionID, ProviderID: provider.ID, Model: provider.Model}, true)
 }
 func Get(slug, sourceID, jobID string) (store.StructureJob, error) {
 	st, e := store.New(slug)
@@ -267,7 +276,11 @@ func run(t task) {
 	if e != nil || j.Status != "queued" {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
+	timeout := 600 * time.Second
+	if j.AllPages {
+		timeout = 12 * time.Hour
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	manager.Lock()
 	manager.running[j.ID] = cancel
@@ -378,30 +391,82 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 	}
 	replacements := map[int]string{}
 	images := map[string][]byte{}
+	completed := append([]int(nil), j.CompletedPages...)
+	done := map[int]bool{}
+	for _, page := range completed {
+		done[page] = true
+	}
+	provenance := "vision"
+	if ocr.IsLocal(provider) {
+		provenance = "local-ocr"
+	}
+	checkpoint := func() error {
+		if !j.AllPages || len(completed) == len(j.CompletedPages) {
+			return nil
+		}
+		content, structure := merge(body, baseline, replacements, provenance)
+		if strings.TrimSpace(content) == "" {
+			j.CompletedPages = append([]int(nil), completed...)
+			updated, err := t.st.SaveStructureJob(t.sourceID, *j)
+			if err != nil {
+				return err
+			}
+			*j = updated
+			emit(t.slug, *j)
+			return nil
+		}
+		if len(content) > 4<<20 {
+			return errors.New("vision-output-limit")
+		}
+		j.CompletedPages = append([]int(nil), completed...)
+		updated, err := t.st.CheckpointStructureJob(t.sourceID, *j, content, structure, images)
+		if err != nil {
+			return err
+		}
+		*j = updated
+		body = content
+		baseline = structure
+		replacements = map[int]string{}
+		images = map[string][]byte{}
+		emit(t.slug, *j)
+		return nil
+	}
+	fail := func(err error) (string, *parser.Structure, map[string][]byte, error) {
+		if saveErr := checkpoint(); saveErr != nil {
+			err = saveErr
+		}
+		return "", nil, nil, err
+	}
 	renderDuration := time.Duration(0)
 	for _, page := range j.Pages {
+		if done[page] {
+			continue
+		}
 		if ctx.Err() != nil {
-			return "", nil, nil, ctx.Err()
+			return fail(ctx.Err())
 		}
 		start := time.Now()
 		remaining := 60*time.Second - renderDuration
+		if j.AllPages {
+			remaining = 15 * time.Second
+		}
 		if remaining <= 0 {
-			return "", nil, nil, errors.New("render-batch-limit")
+			return fail(errors.New("render-batch-limit"))
 		}
 		renderCtx, stop := context.WithTimeout(ctx, min(15*time.Second, remaining))
 		image, e := render.Render(renderCtx, document, page)
 		stop()
 		renderDuration += time.Since(start)
 		if e != nil {
-			return "", nil, nil, e
+			return fail(e)
 		}
 		if e = t.st.ReserveStructureRequest(t.sourceID, j, page); e != nil {
-			return "", nil, nil, e
+			return fail(e)
 		}
 		requestID := j.Requests[len(j.Requests)-1]
 		record := usage{RequestID: requestID, JobID: j.ID, Attempt: 1, ProviderID: j.ProviderID, Model: j.Model, State: "request-started", CreatedAt: time.Now().UTC(), Kind: "document-structure"}
 		if e = t.st.AppendStructureUsage(t.sourceID, j.ID, record); e != nil {
-			return "", nil, nil, e
+			return fail(e)
 		}
 		result, callErr := ocr.ExtractPage(ctx, provider, image)
 		record.State = "request-finished"
@@ -409,28 +474,39 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 		record.Known = result.Known
 		record.CreatedAt = time.Now().UTC()
 		if e = t.st.AppendStructureUsage(t.sourceID, j.ID, record); e != nil {
-			return "", nil, nil, e
+			return fail(e)
 		}
 		if callErr != nil {
 			if ocr.IsLocal(provider) && (callErr.Error() == "windows-ocr-no-text" || callErr.Error() == "local-ocr-no-text") {
 				j.EmptyPages = append(j.EmptyPages, page)
 				*j, e = t.st.SaveStructureJob(t.sourceID, *j)
 				if e != nil {
-					return "", nil, nil, e
+					return fail(e)
+				}
+				completed = append(completed, page)
+				if len(completed)%8 == 0 {
+					if err := checkpoint(); err != nil {
+						return fail(err)
+					}
 				}
 				continue
 			}
-			return "", nil, nil, callErr
+			return fail(callErr)
 		}
 		replacements[page] = fmt.Sprintf("## 第 %d 页\n\n%s\n\n", page, result.Content)
 		images[fmt.Sprintf("images/page-%d.png", page)] = image
+		completed = append(completed, page)
+		if j.AllPages && len(completed)%8 == 0 {
+			if err := checkpoint(); err != nil {
+				return fail(err)
+			}
+		}
+	}
+	if e := checkpoint(); e != nil {
+		return "", nil, nil, e
 	}
 	if len(replacements) == 0 && strings.TrimSpace(body) == "" {
 		return "", nil, nil, errors.New("local-ocr-no-text")
-	}
-	provenance := "vision"
-	if ocr.IsLocal(provider) {
-		provenance = "local-ocr"
 	}
 	content, structure := merge(body, baseline, replacements, provenance)
 	if len(content) > 4<<20 {
@@ -598,8 +674,9 @@ func recoverJobs() {
 			}
 			for _, j := range jobs {
 				if j.Status == "running" {
-					_, _ = st.RecoverStructureJob(src.SourceID, j.ID)
-				} else if j.Status == "queued" {
+					j, _ = st.RecoverStructureJob(src.SourceID, j.ID)
+				}
+				if j.Status == "queued" {
 					manager.Lock()
 					select {
 					case manager.queue <- task{slug: unit.Slug, sourceID: src.SourceID, st: st, job: j}:
