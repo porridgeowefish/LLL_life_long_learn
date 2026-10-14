@@ -8,4 +8,4 @@ Markdown固定语义：H1学科名；H2依次为“这门学科研究什么”�
 
 返回唯一JSON对象 {"overviewMarkdown":"正文","topics":{"schemaVersion":1,"topics":[...]}}。每主题包含唯一稳定kebab-case id、title、chapterTitle、goal、teachingOutline、inScope、outOfScope、prerequisites、ownedConcepts、reusedConcepts。topics数量、顺序、标题、章归属与H4完全一致；所有字段必须真实且完整。teachingOutline是讲解次序的字符串，其他范围与概念字段也是字符串数组。不接受模型指定路径或版本/时间元数据。
 
-general模式依据学科边界组织，不自动读取任何项目资料。sources模式以注入的真实完整结构目录组织章节，有限正文用于核验；保留目录体系，区分参考书与补充。实际覆盖有限时不能冒称读完参考书；目录不可得或预算不足时无法发布完整地图。不能替学习者安排计划、自动创建学习单元、重写既有范围或 learning-plan。
+general模式依据学科边界组织，不自动读取任何项目资料。sources 模式依据 sourceVerificationSamples 中的真实正文与 sourceOutlines 中的可选导航提示组织章节。OCR 正文可能只有页标题和普通文字，没有 Markdown 目录；这不妨碍生成地图。优先辨认正文中的目录、章名与知识点；缺少明确目录时按内容归纳章节，在概述中说明组织依据。不能把页标题当章节，也不能把推断的结构说成原书目录。通过资料读取工具和 next 续读可核查更多内容。正文样本仅覆盖实际引用范围；资料快照的 extractionCoverage 表示已提取范围，未识别页不在可用正文中。实际覆盖有限时不得冒称已读全书或完整覆盖原件；在概述中清楚说明未读范围与补充知识来源。通用模式允许生成完整学科框架，但要区分学科知识与资料证据。

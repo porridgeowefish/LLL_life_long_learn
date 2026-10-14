@@ -36,7 +36,7 @@
       "sha256": "9ac8ceea58566238f2cfe117f9192b8d652902f6dce1b2ee5f3072fc13183324"
     }
   ],
-  "version": "iteration-23.2",
+  "version": "iteration-23.3",
   "schemaVersion": 1,
   "resources": [
     {
@@ -45,7 +45,7 @@
     },
     {
       "path": "learning-prompts/discipline-map.md",
-      "sha256": "ac8f6c42e21eb8d8f29b6f2d59eef4f13fad3b22dc2f7a78847a11817a1010d5"
+      "sha256": "8f995a6da1f6d7273d60e5a10e4cef7a53fa747dfc4cf8764f486cfba89addea"
     },
     {
       "path": "learning-prompts/practice.md",

@@ -291,6 +291,7 @@ export function DisciplineOverview({ slug, title }: DisciplineOverviewProps) {
           </section>
         ) : (
           <article ref={articleRef} className={s.paper}>
+            {projection.data?.coverage?.gap && <aside className={s.coverageNotice} aria-label="资料覆盖范围"><strong>资料依据</strong><p>{projection.data.coverage.gap}</p>{projection.data.coverage.sources?.map((source, index) => <small key={index}>{source.name}{source.extractionCoverage?.unreadUnits?.length ? ` · ${source.extractionCoverage.unreadUnits.length} 处内容未提取` : ''}</small>)}</aside>}
             {outline.length > 0 && (
               <nav className={s.tableOfContents} aria-label="学科总览目录">
                 <h2>目录</h2>

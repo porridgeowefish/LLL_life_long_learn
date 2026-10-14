@@ -120,7 +120,7 @@ flowchart LR
   end
   Go -- "教师 · 笔记 · Ask AI · 独立教学生成" --> LLM["OpenAI / Anthropic 兼容 API"]
   Go -- "本地解析" --> Parser["PDF · DOCX · PPTX · XLSX · CSV · MD"]
-  Go -- "可选有限页识别" --> Vision["单独绑定的视觉 API"]
+  Go -- "有限页识别" --> Vision["本机免费 OCR / 可选视觉 API"]
   Go <--> FS[("工作区文件<br/>项目 · 对话 · 资料 · 资产")]
 ```
 
@@ -168,7 +168,7 @@ npm run start      # 启动服务，浏览器打开 http://127.0.0.1:8787/
 <details>
 <summary><b>扫描版 PDF 或旧版 DOC/PPT/XLS 无法读取</b></summary>
 
-扫描件没有可提取文字层时，可在设置中绑定文档公式识别模型，再使用有限页识别；复杂公式需要按原页核对。旧版 Office 格式请另存为 DOCX/PPTX/XLSX 后再导入。单个文件上限100MiB。
+扫描件可使用免费本地 OCR：Windows 系统中文 OCR、macOS Vision 或 Linux Tesseract。程序按系统检测，缺少中文语言包或引擎时在资料页提示；云端文档公式识别模型仍可选配。已识别的普通正文可用于地图生成，无需现成章节目录；复杂公式需要按原页核对。资料行提供原件和历史解析文字的永久删除确认。旧版 Office 格式请另存为 DOCX/PPTX/XLSX 后再导入。单个文件上限100MiB。
 </details>
 
 <details>

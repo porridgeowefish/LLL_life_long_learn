@@ -19,9 +19,10 @@
 .trailing details { position: relative; }
 .trailing summary { cursor: pointer; color: var(--muted); font-size: 10px; list-style: none; }
 .trailing details > div { position: absolute; z-index: 5; top: 20px; right: 0; min-width: 120px; padding: 5px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); box-shadow: var(--shadow-lg); }
-.trailing button { display: block; width: 100%; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--fg); background: transparent; text-align: left; font-size: 10px; }
+.trailing button { display: block; width: auto; flex: 0 0 auto; padding: 7px 8px; border: 0; border-radius: 5px; color: var(--fg); background: transparent; text-align: left; font-size: 10px; }
 .trailing button:hover { background: var(--surface-raised); }
 .trailing .danger { color: var(--pink); }
+.deleteName { font-weight: 650; overflow-wrap: anywhere; }
 .trailing .retryButton { width: auto; flex: 0 0 auto; border: 1px solid var(--border); color: var(--accent-ink); }
 .librarySection { display: grid; gap: 13px; margin-top: 24px; }
 .sectionHeading { display: flex; align-items: end; justify-content: space-between; gap: 16px; }

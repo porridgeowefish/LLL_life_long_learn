@@ -15,13 +15,15 @@ interface StructureJob {
   errorCode?: string;
   emptyPages?: number[];
 }
-interface JobList { jobs: StructureJob[]; localOCRAvailable: boolean; configuredOCRAvailable?: boolean }
+interface JobList { jobs: StructureJob[]; localOCRAvailable: boolean; configuredOCRAvailable?: boolean; localOCR?: {platform:string; providerId:string; name:string; available:boolean; setupHint?:string} }
 
 const messages: Record<string, string> = {
   'structure-active': '已有识别任务，正在同步状态，请等待完成。',
   'vision-model-unsupported': '当前文档模型不支持图片输入，请使用免费识别或选择视觉模型。',
   'vision-binding-required': '未配置文档识别模型，且系统中文 OCR 不可用。',
   'windows-ocr-unavailable': '系统中文 OCR 不可用，请检查 Windows 简体中文 OCR 语言包。',
+  'local-ocr-unavailable': '本地识别引擎不可用，请按下方提示检查安装并刷新状态。',
+  'local-ocr-no-text': '本批页面未识别到文字，原件已保留。',
   'provider-unavailable': '文档模型连接不可用，请检查其配置。',
   'vision-provider-error': '文档模型拒绝了图片请求，请检查图片能力、接口和额度。',
   'vision-request-failed': '文档模型连接失败，请检查网络后重试。',
@@ -75,13 +77,14 @@ export function SourceStructureControl({ slug, source }: { slug: string; source:
       : http.post<{ job: StructureJob }>(endpoint, {
         operationId: operation.current || (operation.current = crypto.randomUUID()),
         revisionId: source.currentRevisionId, baseDerivedVersionId: source.derivedVersionId,
-        ...(mode === 'local' ? { providerId: 'windows-local-ocr' } : {}),
+        ...(mode === 'local' ? { providerId: query.data?.localOCR?.providerId ?? 'windows-local-ocr' } : {}),
       }),
     onSuccess: result => {
       operation.current = '';
       qc.setQueryData<JobList>(queryKey, previous => ({
         localOCRAvailable: previous?.localOCRAvailable ?? false,
         configuredOCRAvailable: previous?.configuredOCRAvailable,
+        localOCR: previous?.localOCR,
         jobs: [result.job, ...(previous?.jobs ?? []).filter(item => item.id !== result.job.id)],
       }));
       void query.refetch();
@@ -94,16 +97,17 @@ export function SourceStructureControl({ slug, source }: { slug: string; source:
   return <div className={s.control}>
     <div className={s.actions}>
       {active ? <>
-        <small role="status">{job.status === 'queued' ? '等待识别' : '正在识别扫描页'} · {job.providerId === 'windows-local-ocr' ? '免费系统 OCR' : job.model || '文档模型'}</small>
+        <small role="status">{job.status === 'queued' ? '等待识别' : '正在识别扫描页'} · {job.providerId.endsWith('-local-ocr') ? query.data?.localOCR?.name ?? '免费系统 OCR' : job.model || '文档模型'}</small>
         <button type="button" disabled={action.isPending} onClick={() => action.mutate('cancel')}>取消识别</button>
       </> : <>
-        <button type="button" disabled={action.isPending || query.isLoading} onClick={() => action.mutate(local ? 'local' : 'configured')}>{action.isPending ? '正在准备…' : local ? '免费识别' : failed ? '重试识别' : '识别扫描页'}</button>
+        <button type="button" disabled={action.isPending || query.isLoading || Boolean(query.data?.localOCR && !local && !query.data.configuredOCRAvailable)} onClick={() => action.mutate(local ? 'local' : 'configured')}>{action.isPending ? '正在准备…' : local ? job?.status === 'succeeded' && source.coverage?.unreadPages ? '继续免费识别' : '免费识别' : failed ? '重试识别' : '识别扫描页'}</button>
         {local && query.data?.configuredOCRAvailable && <button type="button" className={s.secondary} disabled={action.isPending} onClick={() => action.mutate('configured')}>模型识别</button>}
       </>}
     </div>
+    {query.data?.localOCR && <small>{local ? `${query.data.localOCR.name} · 本机免费识别` : query.data.localOCR.setupHint}{!local && <button type="button" onClick={() => void query.refetch()}>刷新状态</button>}</small>}
     {query.isError && <small role="alert">任务状态读取失败。<button type="button" onClick={() => void query.refetch()}>刷新状态</button></small>}
     {action.isError ? <small role="alert" className={s.failure}>{errorMessage(action.error)}</small>
       : failed && <small role="alert" className={s.failure}>{messages[job.errorCode ?? ''] ?? '本批识别失败，原有文字和原件已保留。可使用免费识别或检查文档模型。'}</small>}
-    {job?.status === 'succeeded' && <small role="status">本批已完成{job.emptyPages?.length ? ` · ${job.emptyPages.length} 页未识别到文字，仍保留为未读` : ''}；其余页可继续分批识别</small>}
+    {job?.status === 'succeeded' && <small role="status">本次识别已结束{source.coverage?.unreadPages ? `，整份资料仍有 ${source.coverage.unreadPages} 页待识别，可继续下一批。` : '，请核对提取文字。'}{job.emptyPages?.length ? ` ${job.emptyPages.length} 页未识别到文字，仍标为未读。` : ''}</small>}
   </div>;
 }

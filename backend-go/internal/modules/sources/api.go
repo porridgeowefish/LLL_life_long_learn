@@ -75,11 +75,15 @@ func ListStructureJobs(slug, sourceID string) ([]StructureJob, error) {
 	return jobs, nil
 }
 
+type LocalOCRCapability = ocr.LocalCapability
+
+func OCRCapability() LocalOCRCapability { return ocr.LocalPageCapability() }
+
 func LocalOCRAvailable() bool { return ocr.LocalPageAvailable() }
 
 func ConfiguredPageOCRAvailable() bool {
 	provider, err := ocr.ResolvePageProvider("", "")
-	return err == nil && provider.Kind != "windows-local"
+	return err == nil && !ocr.IsLocal(provider)
 }
 func CancelStructureJob(slug, sourceID, jobID string) (StructureJob, error) {
 	return enhancement.Cancel(slug, sourceID, jobID)

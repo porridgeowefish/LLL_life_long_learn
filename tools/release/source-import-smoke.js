@@ -87,6 +87,10 @@ async function main(binary){
      res.end(JSON.stringify({choices:[{message:{content:'## Installed vision result\nRendered PDF page.\n\n$$x^2+y^2=z^2$$\n'},finish_reason:'stop'}],usage:{prompt_tokens:11,completion_tokens:12}}));return;
     }
     assert(['review','practice','discipline-map'].includes(kind),'unexpected model/default fallback: '+request.model);
+    if(kind==='discipline-map'){
+      const input=JSON.parse(request.messages.find(m=>m.role==='user').content);
+      if(input.mapMode==='sources')assert(input.sourceVerificationSamples?.some(sample=>sample.body.includes('没有 Markdown 目录')),'source map omitted OCR body');
+    }
     const system=request.messages.find(m=>m.role==='system')?.content;assert.equal(typeof system,'string');
     const resources=['common',kind];
     if(kind==='review')resources.push(...['research_question_frame','prerequisite_scaffold','misconception','boundary_map','analogy','mece_decompose','first_principles','concept_graph'].map(n=>'primitives/'+n));
@@ -134,7 +138,30 @@ async function main(binary){
   assert(structureDone.resultDerivedVersionId&&structureDone.resultDerivedVersionId!==revision.derivedVersionId,'enhancement did not publish a new derived version');
   const enhanced=await (await fetch(url+'/'+pdf.sourceId+'/revisions/'+revision.revisionId+'/content')).text();
   assert(enhanced.includes('Installed vision result'),'rendered page recognition was not published');
-  assert.deepEqual(fakeErrors,[]);assert.deepEqual(received,['smoke-review','smoke-practice','smoke-discipline-map','smoke-vision']);
+  // Plain OCR-like text does not have a chapter heading tree. It must still
+  // seed a source-based map with frozen citations in the installed runtime.
+  const plainForm=new FormData();plainForm.set('operationId',crypto.randomUUID());plainForm.set('file',new Blob(['目录\n二次函数与一元二次方程\n圆、相似和概率\n没有 Markdown 目录的识别正文。']),'ocr-notes.txt');
+  const plainResponse=await fetch(base+'/api/projects/map-smoke/sources',{method:'POST',body:plainForm});assert.equal(plainResponse.status,201);
+  const plain=(await plainResponse.json()).source;
+  const plainURL=base+'/api/projects/map-smoke/sources/'+plain.sourceId;
+  for(let i=0;i<150;i++){const current=(await (await fetch(plainURL)).json()).source;if(current.status==='ready')break;await pause()}
+  const {job:plainMap}=await json(mapEndpoint,{operationId:crypto.randomUUID(),kind:'discipline-map',mapMode:'sources',sourceIds:[plain.sourceId]});
+  const plainDone=await completed(mapEndpoint+'/'+plainMap.id);
+  assert(plainDone.coverage.readRanges.length>0,'plain text not actually read');assert(plainDone.coverage.gap,'source coverage not stated');
+  const erase=await fetch(plainURL+'/permanent-delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmation:'PERMANENT_DELETE',operationId:crypto.randomUUID()})});assert.equal(erase.status,200);
+  assert.equal((await erase.json()).status,'deleted');
+  assert(!fs.existsSync(path.join(workspace,'projects','map-smoke','sources',plain.sourceId,'revisions')),'parsed versions survived deletion');
+  assert((await (await fetch(base+'/api/projects/map-smoke/discipline-map')).json()).mapVersionId===plainDone.resultRefs[0],'delete removed generated map');
+  if(process.platform==='darwin'||process.platform==='linux'){
+    const capability=(await (await fetch(base+structureEndpoint)).json()).localOCR;
+    assert(capability.available,JSON.stringify(capability));assert.equal(capability.platform,process.platform==='darwin'?'darwin':'linux');
+    const latest=(await (await fetch(url+'/'+pdf.sourceId)).json()).revision;
+    const {job:native}=await json(structureEndpoint,{operationId:crypto.randomUUID(),providerId:capability.providerId,revisionId:latest.revisionId,baseDerivedVersionId:latest.derivedVersionId,pages:[1]});
+    const nativeDone=await completed(structureEndpoint+'/'+native.id);
+    assert.equal(nativeDone.providerId,capability.providerId);assert(nativeDone.resultDerivedVersionId,'native OCR published no result');
+    const nativeText=await (await fetch(url+'/'+pdf.sourceId+'/revisions/'+latest.revisionId+'/content')).text();assert(nativeText.trim().length>0&&!nativeText.includes('Installed vision result'),'native OCR did not replace the cloud fixture with recognized text');
+  }
+  assert.deepEqual(fakeErrors,[]);assert.deepEqual(received,['smoke-review','smoke-practice','smoke-discipline-map','smoke-vision','smoke-discipline-map']);
   const taskResponse=await fetch(base+'/api/projects/parser-smoke/assistant-tasks');assert.equal(taskResponse.status,200);
   const tasks=(await taskResponse.json()).tasks;assert(tasks===null||Array.isArray(tasks),'invalid task response');assert.equal((tasks??[]).length,0,'upload created assistant task');
   const stopped=await fetch(base+'/api/system/shutdown',{method:'POST'});assert.equal(stopped.status,202);

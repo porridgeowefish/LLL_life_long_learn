@@ -737,6 +737,7 @@ func (s *Server) handlePermanentDeleteSource(w http.ResponseWriter, r *http.Requ
 		learningWorkspaceError(w, err)
 		return
 	}
+	s.broadcaster.Emit("source-updated", map[string]any{"projectSlug": r.PathValue("id"), "source": source})
 	httpx.WriteJSON(w, http.StatusOK, source)
 }
 

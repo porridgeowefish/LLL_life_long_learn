@@ -550,25 +550,12 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 		}
 		f.BaseMapVersionID = m.MapVersionID
 		if in.MapMode == "sources" {
-			outline, e := completeOutline(ctx, slug, f.Sources)
+			outline, samples, e := sourceMapContext(ctx, slug, f.Sources)
 			if e != nil {
 				return Job{}, e
 			}
 			payload["sourceOutlines"] = outline
-			st, err := sources.New(slug)
-			if err != nil {
-				return Job{}, err
-			}
-			reader := sources.NewReader(st)
-			samples := []sources.SourceReadData{}
-			for _, doc := range f.Sources {
-				nodes := outline[doc.SourceID]
-				result := reader.Read(ctx, f.Sources, sources.ReadSourceArgs{SourceID: doc.SourceID, RevisionID: doc.RevisionID, Locator: nodes[0].Locator, MaxTokens: 512})
-				sample, ok := result.Data.(sources.SourceReadData)
-				if result.Status == "error" || !ok || strings.TrimSpace(sample.Body) == "" {
-					return Job{}, problem("source-verification-unavailable", 409)
-				}
-				samples = append(samples, sample)
+			for _, sample := range samples {
 				f.InitialReadRanges = append(f.InitialReadRanges, sample.Citation)
 			}
 			payload["sourceVerificationSamples"] = samples
@@ -614,6 +601,9 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	now := time.Now().UTC()
 	id := idgen.New("gen")
 	j := Job{SchemaVersion: 1, ID: id, RootJobID: id, Attempt: 1, OperationID: in.OperationID, Kind: in.Kind, Status: "queued", Phase: "waiting", ProviderID: p.ID, Model: p.Model, QuestionCount: in.QuestionCount, MapMode: in.MapMode, Progress: Progress{Indeterminate: true}, Coverage: Coverage{Sources: f.Sources, ReadRanges: append([]sources.SourceCitation{}, f.InitialReadRanges...)}, ResultRefs: []string{}, CreatedAt: now, UpdatedAt: now, Intent: in}
+	if in.Kind == "discipline-map" && in.MapMode == "sources" {
+		j.Coverage.Gap = "地图依据当前已提取文字与有限阅读整理；章节可由正文归纳，不表示已读完整份原件。未识别页和公式仍需核对。"
+	}
 	if in.Kind != "discipline-map" {
 		more, _ := payload["hasMoreConversation"].(bool)
 		j.Checkpoint = &Checkpoint{AfterSeq: f.BaseAsset.Meta.ConversationCursor, ThroughSeq: f.ThroughSeq, HasMoreConversation: more}
@@ -631,49 +621,6 @@ func (s *Service) createLocked(ctx context.Context, slug string, in Input, paren
 	}
 	s.wake()
 	return j, nil
-}
-func completeOutline(ctx context.Context, slug string, docs []sources.SourceDocument) (map[string][]sources.SourceOutlineNode, error) {
-	st, e := sources.New(slug)
-	if e != nil {
-		return nil, e
-	}
-	reader := sources.NewReader(st)
-	out := map[string][]sources.SourceOutlineNode{}
-	for _, d := range docs {
-		if d.ExtractionCoverage.ExtractionTruncated {
-			return nil, problem("source-structure-incomplete", 409)
-		}
-		cursor := ""
-		for n := 0; n < 32; n++ {
-			r := reader.Outline(ctx, docs, sources.OutlineSourceArgs{SourceID: d.SourceID, RevisionID: d.RevisionID, Cursor: cursor, Limit: 50, MaxTokens: 6000})
-			if r.Status == "error" {
-				return nil, problem("source-structure-unavailable", 409)
-			}
-			data, ok := r.Data.(sources.SourceOutlineData)
-			if !ok {
-				return nil, problem("source-structure-unavailable", 409)
-			}
-			for _, node := range data.Nodes {
-				if (node.Confidence == "high" || node.Confidence == "extracted") && node.Title != "" && !regexp.MustCompile(`^第\s*\d+\s*(页|张幻灯片)$`).MatchString(node.Title) {
-					out[d.SourceID] = append(out[d.SourceID], node)
-				}
-			}
-			if r.Continuation == "" {
-				if r.Truncated {
-					return nil, problem("source-structure-incomplete", 409)
-				}
-				break
-			}
-			cursor = r.Continuation
-			if n == 31 {
-				return nil, problem("source-structure-budget", 409)
-			}
-		}
-		if len(out[d.SourceID]) < 2 {
-			return nil, problem("source-structure-unavailable", 409)
-		}
-	}
-	return out, nil
 }
 func (s *Service) saveLocked(slug, root string, j *Job) error {
 	j.UpdatedAt = time.Now().UTC()

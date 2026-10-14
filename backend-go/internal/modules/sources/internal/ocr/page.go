@@ -44,7 +44,7 @@ func AutomaticPageSelection() (providerID, model string) {
 			return binding.ProviderID, model
 		}
 	}
-	return "windows-local-ocr", "windows-zh-Hans"
+	return localIdentity()
 }
 
 // These GLM flagship IDs accept text only. Unknown/custom routes remain
@@ -88,13 +88,14 @@ func normalizePageUsage(raw map[string]int) (map[string]int, bool) {
 }
 
 func ResolvePageProvider(providerID, model string) (PageProvider, error) {
-	if providerID == "windows-local-ocr" {
-		if local, ok := localPageProvider(); ok {
+	if providerID == "windows-local-ocr" || providerID == "macos-local-ocr" || providerID == "linux-local-ocr" || providerID == "system-local-ocr" {
+		if local, ok := localPageProvider(); ok && local.ID == providerID {
 			return local, nil
 		}
 		if providerID == "windows-local-ocr" {
 			return PageProvider{}, errors.New("windows-ocr-unavailable")
 		}
+		return PageProvider{}, errors.New("local-ocr-unavailable")
 	}
 	settings, ok, e := config.LoadAI()
 	if e != nil || !ok {
@@ -147,7 +148,7 @@ func ExtractPage(ctx context.Context, p PageProvider, image []byte) (PageResult,
 	if len(image) > 8<<20 {
 		return PageResult{}, errors.New("image-limit")
 	}
-	if p.Kind == "windows-local" {
+	if IsLocal(p) {
 		return extractLocalPage(ctx, image)
 	}
 	ctx, c := context.WithTimeout(ctx, 120*time.Second)

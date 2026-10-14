@@ -154,7 +154,7 @@ func Create(ctx context.Context, slug, sourceID string, req store.StructureReque
 	// Empty system OCR results remain unread in the document, but must not
 	// repeatedly occupy the next default batch. Explicit page requests can retry.
 	for _, previous := range jobs {
-		if p.Kind == "windows-local" && previous.Status == "succeeded" && previous.ProviderID == "windows-local-ocr" {
+		if ocr.IsLocal(p) && previous.Status == "succeeded" && previous.ProviderID == p.ID {
 			for _, n := range previous.EmptyPages {
 				recognized[n] = true
 			}
@@ -223,7 +223,7 @@ func automatic(slug string, st *store.Store, sourceID string, provider ocr.PageP
 	}
 	// System OCR supplements missing text only. A complete text layer must
 	// not be replaced by less reliable recognition merely because it is free.
-	if provider.Kind == "windows-local" && source.Status == "ready" {
+	if ocr.IsLocal(provider) && source.Status == "ready" {
 		structure, err := st.ReadStructure(sourceID, rev.RevisionID, "")
 		if err != nil || len(structure.Coverage.UnreadUnits) == 0 {
 			return
@@ -314,6 +314,7 @@ func failureCode(err error) string {
 			"vision-request-failed", "vision-provider-error", "vision-no-text", "vision-invalid-response",
 			"vision-output-truncated", "vision-output-limit", "vision-request-limit", "automatic-budget-limit",
 			"windows-ocr-unavailable", "windows-ocr-invalid-output", "windows-ocr-no-text",
+			"local-ocr-unavailable", "local-ocr-no-text",
 			"render-batch-limit", "render-input-limit", "render-image-limit", "renderer-unavailable", "resource-limit":
 			return err.Error()
 		}
@@ -411,7 +412,7 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 			return "", nil, nil, e
 		}
 		if callErr != nil {
-			if provider.Kind == "windows-local" && callErr.Error() == "windows-ocr-no-text" {
+			if ocr.IsLocal(provider) && (callErr.Error() == "windows-ocr-no-text" || callErr.Error() == "local-ocr-no-text") {
 				j.EmptyPages = append(j.EmptyPages, page)
 				*j, e = t.st.SaveStructureJob(t.sourceID, *j)
 				if e != nil {
@@ -425,10 +426,10 @@ func execute(ctx context.Context, t task, j *store.StructureJob) (string, *parse
 		images[fmt.Sprintf("images/page-%d.png", page)] = image
 	}
 	if len(replacements) == 0 && strings.TrimSpace(body) == "" {
-		return "", nil, nil, errors.New("windows-ocr-no-text")
+		return "", nil, nil, errors.New("local-ocr-no-text")
 	}
 	provenance := "vision"
-	if provider.Kind == "windows-local" {
+	if ocr.IsLocal(provider) {
 		provenance = "local-ocr"
 	}
 	content, structure := merge(body, baseline, replacements, provenance)

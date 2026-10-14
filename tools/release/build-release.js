@@ -44,6 +44,13 @@ function main() {
       if (process.platform !== 'win32') throw new Error('Windows GUI resource embedding requires Windows');
       run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'windows-manifest.ps1'), '-Executable', binary, '-IconPath', path.join(repoRoot, 'scripts', 'assets', 'learn-with-ai.ico'), '-Version', version]);
     }
+    if (goos === 'darwin') {
+      if (process.platform !== 'darwin') throw new Error('macOS Vision component requires the native macOS build job');
+      const helper = path.join(staging, 'libexec', 'lll-vision-ocr');
+      fs.mkdirSync(path.dirname(helper), { recursive: true });
+      run('xcrun', ['clang', '-fobjc-arc', '-O2', '-arch', arch === 'amd64' ? 'x86_64' : 'arm64', '-mmacosx-version-min=12.0', '-framework', 'Foundation', '-framework', 'Vision', path.join(__dirname, 'native', 'mac-vision.m'), '-o', helper]);
+      fs.chmodSync(helper, 0o755);
+    }
     fs.chmodSync(binary, 0o755);
     for (const name of names.slice(1)) {
       const destination = path.join(staging, name.startsWith('docs/release/') ? path.basename(name) : name);
@@ -57,7 +64,7 @@ function main() {
     const output = path.join(releaseRoot, filename);
     if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('Linked archive output forbidden');
     if (goos === 'windows') archive.zip(staging, prefix, output);
-    else archive.tarGzip(staging, prefix, output);
+    else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'libexec/lll-vision-ocr'] : ['learn-with-ai']);
     checksums.push(`${crypto.createHash('sha256').update(fs.readFileSync(output)).digest('hex')}  ${filename}`);
     console.log(`Packaged ${filename}`);
   }

@@ -1,4 +1,7 @@
-import { useRetrySource, useSources, type LearningSource } from '@/features/learning/api/learningWorkspace';
+import { useEffect, useState } from 'react';
+import { Modal } from '@/shared/primitive/Modal';
+import { Button } from '@/shared/primitive/Button';
+import { usePermanentlyDeleteSource, useRetrySource, useSources, type LearningSource } from '@/features/learning/api/learningWorkspace';
 import { SourceImportControl } from './SourceImportControl';
 import { SourceStructureControl } from './SourceStructureControl';
 
@@ -8,12 +11,15 @@ import s from './SourcesView.module.css';
 export function SourcesView({ slug }: { slug: string }) {
   const sources = useSources(slug);
   const retry = useRetrySource(slug);
+  const remove = usePermanentlyDeleteSource(slug);
+  const [selected, setSelected] = useState<LearningSource>();
+  useEffect(() => { setSelected(undefined); remove.reset?.(); }, [slug]);
   const visible = (sources.data ?? []).filter((source) => source.status !== 'tombstoned' && source.status !== 'deleted');
 
   return (
     <section className={s.sources}>
       <header>
-        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>未设置云端文档连接时，Windows 可使用系统中文 OCR 免费识别扫描页，无需 API Key。每次最多识别 8 页，可继续分批识别；公式需核对。其它系统可配置文档识别模型。旧版 DOC 请另存为 DOCX 后导入。</p></div>
+        <div><span>资料库</span><h2>当前文件</h2><p>导入后自动在本地提取文本，可供教师读取。支持 PDF、Markdown、TXT、PPTX、DOCX、XLSX、CSV，每份不超过 100 MiB。</p><p>免费识别使用本机 OCR，无需 API Key；每次最多 8 页，批次结束后可继续，直到待识别页处理完毕。当前已提取的正文即可用于地图生成，无需预先整理目录。公式需对照原件核对。旧版 DOC 请另存为 DOCX 后导入。</p></div>
         <SourceImportControl slug={slug} />
       </header>
       {sources.isError && <div className={s.error} role="alert">资料列表读取失败。<button type="button" onClick={() => void sources.refetch()}>重试</button></div>}
@@ -24,11 +30,14 @@ export function SourcesView({ slug }: { slug: string }) {
           {visible.map((source) => <article key={source.sourceId}>
             <div className={s.fileIcon}>{extension(source.displayName)}</div>
             <div className={s.fileDetails}><strong>{source.displayName}</strong><span className={source.status === 'failed' ? s.failure : ''}>{statusLabel(source)}</span>{source.extractionTruncated && <span className={s.warning}>文本过长，仅提取了部分内容；原文件已保留。</span>}<SourceStructureControl slug={slug} source={source}/></div>
-            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}</div>
+            <div className={s.trailing}><time>{new Date(source.updatedAt).toLocaleString()}</time>{canRetry(source) && <button type="button" className={s.retryButton} disabled={retry.isPending} aria-label={`重试解析 ${source.displayName}`} onClick={() => retry.mutate(source.sourceId)}>{retry.isPending && retry.variables === source.sourceId ? '正在重试…' : '重试解析'}</button>}<button type="button" className={s.danger} aria-label={`删除资料 ${source.displayName}`} onClick={() => { remove.reset?.(); setSelected(source); }}>删除</button></div>
           </article>)}
           {!sources.isLoading && !visible.length && <div className={s.empty}>尚未上传资料</div>}
         </div>
       </section>
+      <Modal open={Boolean(selected)} onOpenChange={open => { if (!open && !remove.isPending) setSelected(undefined); }} title="删除资料" description="永久删除这份资料及其解析文字。" footer={<><Button onClick={() => setSelected(undefined)} disabled={remove.isPending}>取消</Button><Button variant="danger" loading={remove.isPending} onClick={() => selected && remove.mutate(selected.sourceId, { onSuccess: () => setSelected(undefined) })}>永久删除</Button></>}>
+        <p className={s.deleteName}>{selected?.displayName}</p><p>原件、解析文字、识别页图、历史解析版本与检索缓存将永久删除，无法恢复。</p><p>已生成的地图和学习内容会保留。</p>{remove.isError && <p role="alert" className={s.error}>删除失败：{remove.error.message}</p>}
+      </Modal>
     </section>
   );
 }
@@ -49,6 +58,7 @@ function statusLabel(source: LearningSource) {
     parse_cancelled: '解析被中断，可以重试。',
     parse_failed: '解析未完成，可以重试。',
   };
+  if (source.status === 'failed' && source.failureCode === 'no_extractable_text') return '扫描资料：没有可直接提取的文字，请识别扫描页。';
   if (source.status === 'failed') return `解析失败：${failures[source.failureCode ?? ''] ?? '请检查文件是否损坏、加密或没有可提取文字，再重新导入。'}`;
   if (source.status === 'ready' && source.coverage?.totalPages) {
     const coverage = source.coverage;
