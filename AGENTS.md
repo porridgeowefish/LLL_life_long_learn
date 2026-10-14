@@ -65,6 +65,8 @@ automated tests (`*_test.go`, `*.test.*`, `*.spec.*`, `tests/`, `frontend/e2e/`,
 writing them, but never `git add -f` them; `check:repo` rejects tracked ignored paths.
 Public CI runs `check:fast`; run `check:full` locally before release.
 
+冒烟测试完成、失败或中断后，必须按 [testing.md](docs/harness-skill/rules/testing.md) 清理并核验本轮临时产物；清理未完成不得声明测试收尾完成。
+
 ## 3. Team Principles
 
 ```text

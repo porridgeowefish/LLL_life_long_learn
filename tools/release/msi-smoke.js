@@ -33,6 +33,7 @@ function main(input) {
     throw new Error("MSI smoke requires Windows");
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), "learn-msi-smoke-"));
   const identity = `learn-with-ai-smoke-${process.pid}`;
+  const folder = path.join(process.env.LOCALAPPDATA, "Programs", identity);
   let installed;
   try {
     const metadata = ps(
@@ -58,7 +59,6 @@ function main(input) {
       `learn-with-ai-${match[1]}-windows-${match[2]}`,
     );
     assert(fs.existsSync(payload));
-    const folder = path.join(process.env.LOCALAPPDATA, "Programs", identity);
     const override = path.join(scratch, "ignored-override");
     const props = [`INSTALLFOLDER=${override}`];
     const base = buildMsi(payload, scratch, "0.5.0", match[2], { identity })[0];
@@ -162,15 +162,26 @@ function main(input) {
     assert(fs.existsSync(path.join(defaultFolder, "learn-with-ai.exe")), `Default install missing in ${defaultFolder}`);
     install(base, ["/x"], path.join(scratch, "default-uninstall.log"));
     installed = null;
-    console.log(
-      `MSI table inventory, isolated install/reinstall/repair/upgrade/same-version-rebuild/downgrade/uninstall, native rendered window and icon, source import and data retention passed. Logs: ${scratch}`,
-    );
   } finally {
-    if (installed)
-      spawnSync("msiexec.exe", ["/x", installed, "/qn", "/norestart"], {
+    if (installed) {
+      const uninstall = spawnSync("msiexec.exe", ["/x", installed, "/qn", "/norestart"], {
         windowsHide: true,
+        timeout: 120000,
       });
+      // Keep the recovery MSI only when Windows Installer could not remove it.
+      if (![0, 3010, 1605].includes(uninstall.status))
+        throw new Error(`MSI smoke cleanup failed (${uninstall.status}): ${uninstall.error?.message || 'uninstall failed'}; recovery package: ${installed}; scratch: ${scratch}`);
+    }
+    const relative = path.relative(os.tmpdir(), scratch);
+    assert(relative.startsWith("learn-msi-smoke-") && !relative.includes(path.sep), "Unsafe MSI smoke scratch path");
+    assert.equal(path.dirname(folder), path.join(process.env.LOCALAPPDATA, "Programs"));
+    assert.equal(path.basename(folder), identity);
+    // The preserved learner note is synthetic data created by this smoke run.
+    fs.rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    fs.rmSync(scratch, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+    assert(!fs.existsSync(folder) && !fs.existsSync(scratch), "MSI smoke cleanup left files behind");
   }
+  console.log("MSI table inventory, isolated install/reinstall/repair/upgrade/same-version-rebuild/downgrade/uninstall, native rendered window and icon, source import, data retention and scratch cleanup passed");
 }
 module.exports = { main };
 if (require.main === module) main(process.argv[2]);
