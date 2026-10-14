@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Modal } from '@/shared/primitive/Modal';
 import { Button } from '@/shared/primitive/Button';
+import { MarkdownView } from '@/shared/primitive/MarkdownView';
 import { describeGenerationError } from '../api/generationError';
 import { useAskAiSettings } from '@/features/settings';
 import { useSources } from '../api/learningWorkspace';
-import { isGenerationActive, useGenerationAction, useGenerationJobs, type GenerationKind } from '../api/generation';
+import { isGenerationActive, useGenerationAction, useGenerationCandidate, useGenerationJobs, type GenerationKind } from '../api/generation';
 import { SourceImportControl } from './SourceImportControl';
 import s from './GenerationControl.module.css';
 
@@ -19,6 +20,14 @@ export function GenerationControl({slug, kind, disabled = false}: {slug:string;k
  const candidates=[...(jobs.data?.jobs??[])].filter(item=>item.kind===kind).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
  const job=candidates.find(isGenerationActive)??candidates[0];
  const active=Boolean(job&&isGenerationActive(job));
+ const [candidateOpen,setCandidateOpen]=useState(false);
+ const candidate=useGenerationCandidate(slug,job?.id,candidateOpen);
+ useEffect(()=>{setCandidateOpen(false);},[slug,kind,job?.id]);
+ const exportCandidate=()=>{
+  if(!candidate.data)return;
+  const url=URL.createObjectURL(new Blob([candidate.data.content],{type:'text/plain;charset=utf-8'}));
+  const anchor=document.createElement('a');anchor.href=url;anchor.download=`map-draft-${job?.id}.txt`;anchor.click();URL.revokeObjectURL(url);
+ };
  useEffect(()=>{if(open){operation.current=undefined;setProvider('');setModel('');setSourceIds((sources.data??[]).filter(item=>item.status==='ready').slice(0,32).map(item=>item.sourceId));action.reset();}},[open]);
  useEffect(()=>{ if(sources.data) setSourceIds(ids=>ids.filter(id=>sources.data!.some(item=>item.sourceId===id&&item.status==='ready'))); },[sources.data]);
  const submit=()=>{
@@ -34,7 +43,8 @@ export function GenerationControl({slug, kind, disabled = false}: {slug:string;k
    {Number(job.progress?.outputTokens)>0&&<small>{job.progress.tokensEstimated?'约 ':''}{job.progress.outputTokens?.toLocaleString()} token{job.progress.tokensEstimated?'（估算）':''}</small>}
    {active&&<>{measured?<progress max={job.progress.totalUnits} value={job.progress.completedUnits}/>:<progress/>}{measured&&<small>{job.progress.completedUnits}/{job.progress.totalUnits} {job.progress.unitLabel}</small>}<button type="button" disabled={action.isPending} onClick={()=>action.mutate({id:job.id,action:'cancel'})}>取消生成</button></>}
    {(job.status==='failed'||job.status==='interrupted')&&<button type="button" disabled={action.isPending} onClick={()=>action.mutate({id:job.id,action:'retry',operationId:crypto.randomUUID()})}>重试</button>}
-   {job.errorCode&&<small>{describeGenerationError(job.errorCode)}</small>}
+   {job.errorCode&&<small>{job.validation?.message??describeGenerationError(job.errorCode)}</small>}
+   {job.candidateAvailable&&<button type="button" onClick={()=>setCandidateOpen(true)}>查看失败草稿</button>}
    {job.status==='succeeded'&&job.checkpoint?.hasMoreConversation&&<small>本批已保存，还有对话可继续{kind==='practice'?'生成下一轮':'总结'}。</small>}
   </div>}
   {!open&&action.isError&&<span role="alert">{describeGenerationError(action.error)}</span>}
@@ -46,6 +56,10 @@ export function GenerationControl({slug, kind, disabled = false}: {slug:string;k
     {(kind!=='discipline-map'||mode==='sources')&&<fieldset><legend>本次资料（最多32份）</legend>{(sources.data??[]).filter(item=>item.status!=='deleted'&&item.status!=='tombstoned').map(item=><label key={item.sourceId} className={s.source}><input type="checkbox" disabled={item.status!=='ready'||(!sourceIds.includes(item.sourceId)&&sourceIds.length>=32)} checked={sourceIds.includes(item.sourceId)} onChange={event=>setSourceIds(ids=>event.target.checked?[...ids,item.sourceId]:ids.filter(id=>id!==item.sourceId))}/>{item.displayName}{item.coverage?.totalPages&&<small>已提取 {item.coverage.extractedPages}/{item.coverage.totalPages} 页{item.coverage.unreadPages?` · ${item.coverage.unreadPages} 页待识别`:''}</small>}{item.status!=='ready'&&<small>准备好后可选</small>}</label>)}{!sources.data?.length&&<p>尚无资料，可先生成或上传资料。</p>}</fieldset>}
     {action.isError&&<p role="alert">{describeGenerationError(action.error)}</p>}
    </div>
+  </Modal>
+  <Modal open={candidateOpen} onOpenChange={setCandidateOpen} title="失败草稿" description="已保留这次模型返回的正文，查看和导出不会调用模型。草稿未替换正式地图。" size="lg" footer={<Button disabled={!candidate.data} onClick={exportCandidate}>导出原始返回</Button>}>
+   {job?.validation&&<p role="status">{job.validation.message}</p>}
+   {candidate.isLoading?<p>正在读取本地草稿…</p>:candidate.isError?<p role="alert">草稿读取失败，请重试。<button type="button" onClick={()=>void candidate.refetch()}>重试读取</button></p>:candidate.data&&<div className={s.draft}>{candidate.data.overviewMarkdown?<MarkdownView source={candidate.data.overviewMarkdown}/>:<pre>{candidate.data.content}</pre>}</div>}
   </Modal>
  </div>;
 }

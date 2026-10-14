@@ -23,7 +23,7 @@ const messages: Record<string,string> = {
  'output-limit':'提供方返回输出截断。应用单次输出上限为 100,000 token；提供方仍可能有更低限制。未完成内容没有覆盖原稿，可重试或换模型。',
  'empty-output':'模型没有返回正文，请重试或检查模型的思考与输出配置。',
  'invalid-practice-output':'练习题未完整满足题数、答案或解析要求，请减少题数后重试。',
- 'invalid-map-output':'地图正文与主题目录不一致，未替换旧地图，请重试。',
+ 'invalid-map-output':'模型返回的地图未通过格式或结构校验；旧任务未保存具体原因。重新生成会再次调用模型。',
  'invalid-review-output':'复习稿缺少完整章节，未替换旧稿，请重试。',
  'edit-conflict':'生成期间原稿已修改，旧稿已保留，请重新生成。',
  'request-interrupted':'生成已中断，可重新发起。',

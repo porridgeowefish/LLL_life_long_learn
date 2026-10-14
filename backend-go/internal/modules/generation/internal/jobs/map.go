@@ -191,8 +191,26 @@ func mapResultForJob(slug, job string) ([]string, error) {
 	return nil, nil
 }
 func validateNewMap(out *MapProjection) error {
-	if learning.ValidateCatalog(&out.Topics) != nil {
+	if inspectNewMap(out) != nil {
 		return problem("invalid-map-output", 409)
+	}
+	return nil
+}
+func inspectNewMap(out *MapProjection) *MapValidationIssue {
+	if err := learning.ValidateCatalog(&out.Topics); err != nil {
+		messages := map[string]string{
+			"unsupported_discipline_topics_schema": "主题目录的版本字段不正确。",
+			"discipline_topics_too_large":          "主题目录超过 500 个小节。",
+			"invalid_topic_priority":               "小节优先级不是 I、II 或 III。",
+			"invalid_discipline_topic":             "小节的必填字段缺失或长度不符合要求。",
+			"duplicate_discipline_topic":           "主题目录包含重复的小节名称或标识。",
+			"duplicate_owned_concept":              "不同小节重复声明了同一个核心概念的归属。",
+		}
+		message := messages[err.Error()]
+		if message == "" {
+			message = "主题目录字段未通过校验。"
+		}
+		return mapIssue(err.Error(), message)
 	}
 	required := []string{"这门学科研究什么", "学科边界", "主要研究领域与知识架构", "领域之间如何关联", "常用研究方法与证据", "典型应用"}
 	headings := []string{}
@@ -208,37 +226,55 @@ func validateNewMap(out *MapProjection) error {
 		}
 		if strings.HasPrefix(line, "### ") {
 			if !inside {
-				return problem("invalid-map-output", 409)
+				return mapIssue("chapter-position", "章节标题出现在知识架构区域之外。")
 			}
 			chapter = strings.TrimSpace(strings.TrimPrefix(line, "### "))
 			if _, ok := chapters[chapter]; ok {
-				return problem("invalid-map-output", 409)
+				return mapIssue("duplicate-chapter", "地图包含重复的章节标题。")
 			}
 			chapters[chapter] = 0
 		}
 		if strings.HasPrefix(line, "#### ") {
-			if !inside || chapter == "" || topicIndex >= len(out.Topics.Topics) {
-				return problem("invalid-map-output", 409)
+			if !inside || chapter == "" {
+				return mapIssue("topic-position", "小节标题没有位于知识架构的章节下。")
+			}
+			if topicIndex >= len(out.Topics.Topics) {
+				return mapIssue("topic-count", "正文小节数量多于主题目录。")
 			}
 			topic := out.Topics.Topics[topicIndex]
-			if topic.Priority == "" || topic.ChapterTitle != chapter || topic.TeachingOutline == "" || topic.Title != strings.TrimSpace(strings.TrimPrefix(line, "#### ")) {
-				return problem("invalid-map-output", 409)
+			if topic.Priority == "" {
+				return mapIssue("missing-priority", "主题目录有小节缺少优先级。")
+			}
+			if topic.TeachingOutline == "" {
+				return mapIssue("missing-teaching-outline", "主题目录有小节缺少教学次序。")
+			}
+			if topic.ChapterTitle != chapter {
+				return mapIssue("chapter-mismatch", "正文与主题目录的小节章节归属不一致。")
+			}
+			if topic.Title != strings.TrimSpace(strings.TrimPrefix(line, "#### ")) {
+				return mapIssue("topic-title-mismatch", "正文小节的名称或顺序与主题目录不一致。")
 			}
 			chapters[chapter]++
 			topicIndex++
 		}
 	}
-	if len(headings) != len(required) || len(chapters) < 4 || len(chapters) > 8 || topicIndex != len(out.Topics.Topics) {
-		return problem("invalid-map-output", 409)
+	if len(headings) != len(required) {
+		return mapIssue("section-count", "地图的六个总览部分不完整或包含额外部分。")
 	}
 	for i, title := range required {
 		if headings[i] != title {
-			return problem("invalid-map-output", 409)
+			return mapIssue("section-order", "地图总览部分的名称或顺序不符合要求。")
 		}
+	}
+	if len(chapters) < 4 || len(chapters) > 8 {
+		return mapIssue("chapter-count", "地图章节数量不符合要求（应为 4–8 章）。")
+	}
+	if topicIndex != len(out.Topics.Topics) {
+		return mapIssue("topic-count", "正文小节数量少于主题目录。")
 	}
 	for _, n := range chapters {
 		if n < 2 || n > 6 {
-			return problem("invalid-map-output", 409)
+			return mapIssue("chapter-topic-count", "有章节的小节数量不符合要求（每章应为 2–6 节）。")
 		}
 	}
 	return nil

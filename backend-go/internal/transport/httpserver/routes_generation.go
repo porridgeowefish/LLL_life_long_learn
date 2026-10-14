@@ -90,6 +90,18 @@ func (s *Server) handleCancelGeneration(w http.ResponseWriter, r *http.Request) 
 	}
 	httpx.WriteJSON(w, 200, map[string]any{"job": j})
 }
+func (s *Server) handleGenerationCandidate(w http.ResponseWriter, r *http.Request) {
+	g := s.generationService(w)
+	if g == nil {
+		return
+	}
+	candidate, err := g.Candidate(r.PathValue("id"), r.PathValue("jobId"))
+	if err != nil {
+		generationError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, 200, candidate)
+}
 func (s *Server) handleRetryGeneration(w http.ResponseWriter, r *http.Request) {
 	g := s.generationService(w)
 	if g == nil {

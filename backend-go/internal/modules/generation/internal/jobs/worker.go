@@ -498,8 +498,10 @@ func (s *Service) execute(parent context.Context, slug string, j Job) {
 	}
 	var mapOutput MapProjection
 	if j.Kind == "discipline-map" {
-		if json.Unmarshal([]byte(cleanOutput(text)), &mapOutput) != nil || validateNewMap(&mapOutput) != nil {
-			s.fail(slug, j, "invalid-map-output")
+		var issue *MapValidationIssue
+		mapOutput, issue = decodeMapOutput(text)
+		if issue != nil {
+			s.failMap(slug, j, text, issue)
 			return
 		}
 	}
@@ -641,6 +643,11 @@ func cleanOutput(s string) string {
 	s = strings.TrimSpace(s)
 	if strings.HasPrefix(s, "```json") && strings.HasSuffix(s, "```") {
 		s = strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(s, "```json"), "```"))
+	} else if newline := strings.Index(s, "\n"); newline >= 0 && strings.HasSuffix(s, "\n```") {
+		header := strings.TrimSpace(s[:newline])
+		if header == "```" || strings.EqualFold(header, "```json") {
+			s = strings.TrimSpace(s[newline+1 : len(s)-3])
+		}
 	}
 	return s
 }

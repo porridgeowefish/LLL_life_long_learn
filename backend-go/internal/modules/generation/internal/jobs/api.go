@@ -51,28 +51,30 @@ type Coverage struct {
 	Gap                 string                   `json:"gap,omitempty"`
 }
 type Job struct {
-	Checkpoint    *Checkpoint `json:"checkpoint,omitempty"`
-	SchemaVersion int         `json:"schemaVersion"`
-	ID            string      `json:"id"`
-	RootJobID     string      `json:"rootJobId"`
-	RetryOf       string      `json:"retryOf,omitempty"`
-	Attempt       int         `json:"attempt"`
-	OperationID   string      `json:"operationId"`
-	Kind          string      `json:"kind"`
-	Status        string      `json:"status"`
-	Phase         string      `json:"phase"`
-	ProviderID    string      `json:"providerId"`
-	Model         string      `json:"model"`
-	QuestionCount int         `json:"questionCount,omitempty"`
-	MapMode       string      `json:"mapMode,omitempty"`
-	Progress      Progress    `json:"progress"`
-	Coverage      Coverage    `json:"coverage"`
-	ResultRefs    []string    `json:"resultRefs"`
-	ErrorCode     string      `json:"errorCode,omitempty"`
-	CreatedAt     time.Time   `json:"createdAt"`
-	UpdatedAt     time.Time   `json:"updatedAt"`
-	Intent        Input       `json:"intent"`
-	RequestIDs    []string    `json:"requestIds,omitempty"`
+	Checkpoint         *Checkpoint         `json:"checkpoint,omitempty"`
+	SchemaVersion      int                 `json:"schemaVersion"`
+	ID                 string              `json:"id"`
+	RootJobID          string              `json:"rootJobId"`
+	RetryOf            string              `json:"retryOf,omitempty"`
+	Attempt            int                 `json:"attempt"`
+	OperationID        string              `json:"operationId"`
+	Kind               string              `json:"kind"`
+	Status             string              `json:"status"`
+	Phase              string              `json:"phase"`
+	ProviderID         string              `json:"providerId"`
+	Model              string              `json:"model"`
+	QuestionCount      int                 `json:"questionCount,omitempty"`
+	MapMode            string              `json:"mapMode,omitempty"`
+	Progress           Progress            `json:"progress"`
+	Coverage           Coverage            `json:"coverage"`
+	ResultRefs         []string            `json:"resultRefs"`
+	ErrorCode          string              `json:"errorCode,omitempty"`
+	Validation         *MapValidationIssue `json:"validation,omitempty"`
+	CandidateAvailable bool                `json:"candidateAvailable,omitempty"`
+	CreatedAt          time.Time           `json:"createdAt"`
+	UpdatedAt          time.Time           `json:"updatedAt"`
+	Intent             Input               `json:"intent"`
+	RequestIDs         []string            `json:"requestIds,omitempty"`
 }
 type Checkpoint struct {
 	AfterSeq            uint64 `json:"afterSeq"`

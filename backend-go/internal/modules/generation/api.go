@@ -14,6 +14,8 @@ type Service = jobs.Service
 type APIError = jobs.APIError
 type MapProjection = jobs.MapProjection
 type Usage = jobs.Usage
+type MapCandidate = jobs.MapCandidate
+type MapValidationIssue = jobs.MapValidationIssue
 
 func New(gateway teacher.Gateway) *Service                { return jobs.New(gateway) }
 func ReadMap(slug, version string) (MapProjection, error) { return jobs.ReadMap(slug, version) }

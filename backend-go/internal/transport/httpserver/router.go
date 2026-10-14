@@ -190,6 +190,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/generation-jobs", s.handleCreateGeneration)
 	mux.HandleFunc("GET /api/projects/{id}/generation-jobs", s.handleListGeneration)
 	mux.HandleFunc("GET /api/projects/{id}/generation-jobs/{jobId}", s.handleGetGeneration)
+	mux.HandleFunc("GET /api/projects/{id}/generation-jobs/{jobId}/candidate", s.handleGenerationCandidate)
 	mux.HandleFunc("POST /api/projects/{id}/generation-jobs/{jobId}/cancel", s.handleCancelGeneration)
 	mux.HandleFunc("POST /api/projects/{id}/generation-jobs/{jobId}/retry", s.handleRetryGeneration)
 	mux.HandleFunc("GET /api/projects/{id}/learning-plan", s.handleGetDisciplineLearningPlan)

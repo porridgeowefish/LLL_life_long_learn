@@ -13,6 +13,8 @@ export interface GenerationJob {
   providerId: string; model: string; questionCount?: number;
   progress: { indeterminate?: boolean; completedUnits?: number; totalUnits?: number; unitLabel?: string; outputTokens?: number; tokensEstimated?: boolean };
   errorCode?: string; updatedAt: string;
+  candidateAvailable?: boolean;
+  validation?: {code:string; message:string; line?:number; column?:number};
   checkpoint?: { afterSeq:number; throughSeq:number; hasMoreConversation:boolean };
 }
 export interface GenerationRequest { operationId: string; kind: GenerationKind; providerId?: string; model?: string; sourceIds?: string[]; questionCount?: number; mapMode?: 'general' | 'sources' }
@@ -46,4 +48,8 @@ export function useGenerationAction(slug: string) {
     ? http.post<{job: GenerationJob}>(endpoint(slug), action.request)
     : http.post<{job: GenerationJob}>(`${endpoint(slug)}/${encodeURIComponent(action.id)}/${action.action}`, action.operationId ? {operationId: action.operationId} : {}),
     onSettled: () => { void qc.invalidateQueries({queryKey: generationKey(slug)}); }});
+}
+export function useGenerationCandidate(slug:string,jobId:string|undefined,enabled:boolean) {
+ return useQuery({queryKey:['learning-workspace',slug,'generation-candidate',jobId],enabled:enabled&&Boolean(jobId),retry:false,
+ queryFn:()=>http.get<{content:string;overviewMarkdown?:string}>(`${endpoint(slug)}/${encodeURIComponent(jobId!)}/candidate`)});
 }
