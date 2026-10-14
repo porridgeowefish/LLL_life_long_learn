@@ -6,20 +6,20 @@
 
 **从“看过了”，到“能讲清楚”。**
 
-导入自己的教材，让 AI 教师陪你理解；用复习稿、练习和讲解，检查自己到底懂了多少。
+用学科地图看清知识体系，用文字、公式、图解与交互演示理解概念，再通过笔记、复习、练习和「讲给教师听」检验掌握。可以带上自己的教材，也可以从一个问题开始。
 
-*Your materials. An AI teacher. A learning journey you can keep.*
+*Map the subject. Explore the idea. Explain it in your own words.*
 
-[![Release](https://img.shields.io/github/v/release/porridgeowefish/LLL_life_long_learn?label=release&color=4f6b55)](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)
-[![CI](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/LLL_life_long_learn/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-c9a35c)](./LICENSE)
-![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-6c746b)
+[![Release](https://img.shields.io/github/v/release/porridgeowefish/Learn-With-AI?label=release&color=477fa8)](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)
+[![CI](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/porridgeowefish/Learn-With-AI/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-9ecdf3)](./LICENSE)
+![Platforms](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-163957)
 
-**[下载安装](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)** · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
+**[下载安装](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)** · [看一次完整学习过程](#功能演示) · [从源码构建](#从源码构建)
 
-![教师用恒温空调和反馈回路图解释开环与闭环，并提出理解检查问题](docs/images/teacher.png)
+<img src="docs/images/learn-with-ai-poster.png" width="900" alt="淡蓝色软件宣传海报：学科地图、结构化讲解与学习闭环" />
 
-<sub>当前界面 · 自动控制原理演示项目。下方截图的教材名称、对话与学习内容均为人工编排的演示数据，不是现场模型生成结果。点击图片可查看大图。</sub>
+<sub>海报为功能示意。下方界面截图来自自动控制原理演示项目，教材名称、对话与学习内容均为人工编排的演示数据，不是现场模型生成结果。点击图片可查看大图。</sub>
 
 </div>
 
@@ -29,17 +29,32 @@
 
 | 你遇到的问题 | 可以怎么做 |
 | --- | --- |
-| 一本教材很厚，不知道从哪开始 | 导入资料，生成学科地图，选择优先级和学习主题 |
-| 定义看懂了，遇到例子还是不会 | 让教师换个例子、退一步讲，或用图示说明关系 |
+| 想系统学一门学科，不知道边界和路线 | 生成学科地图，看领域关系、先修知识与学习优先级 |
+| 一本教材很厚，不知道从哪开始 | 导入资料，按已识别正文组织地图，再选择主题深入 |
+| 定义看懂了，脑中却没有画面 | 让教师用公式、表格、关系图或 SVG 图解说明 |
+| 想知道改变一个参数会发生什么 | 请教师生成交互演示，拖动滑块、点击按钮观察变化 |
 | 对答案觉得会了，自己做却出错 | 先作答再提交测试，查看得分、正确答案与解析 |
 | 聊过很多，第二天记不住 | 回看自动笔记，生成复习稿，留下批注与追问 |
 | 想知道自己是否真的理解 | 反过来讲给教师听，让它从新手视角追问 |
 
 **资料、对话、笔记和学习资产保存在本机普通文件中。** 应用不需要自有云账号；模型连接由你选择。
 
+### 核心能力一览
+
+| 能力 | 你能得到什么 |
+| --- | --- |
+| **学科地图** | 学科边界、主要领域、主题关系、先修知识与三级优先级；主题可加入计划或进入独立学习单元 |
+| **结构化讲解** | 文字、数学公式、表格、代码、关系图与 SVG 图解；内置数学交互引擎，支持2D函数、3D曲面与梯度演示 |
+| **AI 教师** | 新学习单元主动开场，逐个知识点讲解；可以追问、换例子、补基础 |
+| **自己的参考资料** | 多格式导入、本地解析、原文引用、免费本机 OCR；显示真实识别范围，支持删除原件与解析文字 |
+| **自动笔记与复习稿** | 记录理解变化与疑问；复习稿支持分页、编辑、版本记录、划词批注和 Ask AI |
+| **练习与反馈** | 按学习内容生成题目，选择题量，提交客观题后查看得分、答案、解析与历史成绩 |
+| **讲给教师听** | 用自己的话解释，接受新手视角的追问，再获取讲解点评 |
+| **连接与用量管理** | 自选兼容模型连接、切换教师模型、按项目查看用量；学习成果保存在本机 |
+
 ## 开始使用
 
-前往 [**Releases 下载页**](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)，选择对应系统与架构的安装包。安装包包含前端、后端和文档解析器，无需安装 Go、Node.js、Python 或 Office。
+前往 [**Releases 下载页**](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)，选择对应系统与架构的安装包。安装包包含前端、后端和文档解析器，无需安装 Go、Node.js、Python 或 Office。
 
 | 系统 | 选择的文件 | 启动方式 |
 | --- | --- | --- |
@@ -71,7 +86,7 @@
 
 ## 功能演示
 
-以「自动控制原理」为例，从一份讲义开始，走到能解释反馈为什么起作用。教师问答见上方主图；下面展示如何把一次对话接到长期学习中。
+以「自动控制原理」为例，从一份讲义开始，走到能解释反馈为什么起作用。你也可以先生成学科地图，再带着选好的主题开始学习。
 
 ### 1. 把教材带进来
 
@@ -83,28 +98,57 @@
 
 ### 2. 先看全局，再选一个主题深入
 
-学科地图梳理研究问题、主要领域和具体主题，并区分「关键必学」「中等深度」「深入选学」。把感兴趣的主题加入学习计划，或从地图进入独立学习单元。
+**学科地图是整门学科的总览入口。** 它说明这门学科研究什么、边界在哪里、有哪些主要领域、领域之间怎样联系，以及常用方法与典型应用。小节按自然段展开，帮助你理解每个主题的作用。
+
+生成地图可以选择两种组织方式：
+
+- **按学科组织：** 无需先上传教材，围绕学科本身建立知识体系。
+- **按参考资料组织：** 选择自己的教材或讲义，从已解析、已识别的正文归纳结构。普通 OCR 文字也能使用，无需手工提供结构化目录；资料尚未识别完整时会说明覆盖缺口。
+
+每个小节带有学习优先级，页面右上角提供图例：**红色 Ⅰ = 关键必学，黄色 Ⅱ = 中等深度，绿色 Ⅲ = 深入选学。** 主题的学习目标、知识范围与先修关系帮助你选择下一步。
+
+把感兴趣的主题「加入计划」，或点击「深入学习」进入独立学习单元。重新生成地图会保留已有学习计划。
 
 比如先学「开环与闭环」，再连接到「动态响应」和「稳定性」。你知道这一节在整个体系中的位置，也知道接下来可以学什么。
 
 ![自动控制原理学科地图展示学习优先级、主题解释、加入计划和深入学习入口](docs/images/discipline-map.png)
 
-### 3. 把理解留下来，复习时接着追问
+### 3. 用结构化讲解，把抽象概念看明白
+
+**教师的回复可以包含文字、公式、图解和可操作的演示。** 新建学习单元后，教师会主动开场，按知识点推进；你可以随时要求换个例子、补充先修知识或进一步解释。
+
+| 回复形式 | 适合怎样的学习 |
+| --- | --- |
+| Markdown 文字、表格与代码 | 拆解步骤、比较概念、展示推导或程序 |
+| 数学公式 | 阅读方程、符号、计算过程与数学推导 |
+| Mermaid 关系图与流程图 | 看清反馈回路、概念联系和执行顺序 |
+| SVG 图解 | 直观说明几何关系、系统结构或示意图 |
+| 交互 HTML 演示 | 拖动参数、点击按钮、观察曲线或模拟变化；可展开图示查看 |
+| 2D / 3D 数学控件 | 调节函数参数、旋转曲面，观察函数值、梯度与沿负梯度的变化 |
+
+例如，可以问：“用反馈回路图说明恒温空调怎么工作”，也可以问：“做一个可调参数的演示，让我观察二次函数的图像如何变化。”模型生成符合格式的内容后，应用会直接渲染；具体形式和质量取决于模型与问题。
+
+数学交互引擎基于 [JSXGraph](https://jsxgraph.org/)，随应用提供并按需加载。AI可以直接写代码创建函数图像和可旋转的三维曲面，不用另装插件或连接CDN。例如：“演示二元函数的梯度，让我调节当前点，并沿负梯度走一步。”控件会联动显示函数值、梯度与坐标；使用数值近似时会标明，仍需对照数学定义核验。
+
+![本地数学控件展示二元函数曲面、当前点、梯度与坐标和步长控制](docs/images/structured-math.png)
+
+<sub>数学控件示例：使用固定函数与解析梯度运行真实渲染器，无模型请求。图中按钮和滑块在应用内可操作。</sub>
+
+![教师用恒温空调和反馈回路图解释开环与闭环，并提出理解检查问题](docs/images/teacher.png)
+
+### 4. 把理解留下来，复习时接着追问
 
 在资产页选择资料和模型，生成复习稿。正文支持分页、编辑、版本记录和划词批注；遇到一句没弄懂的话，可以直接 Ask AI。公式、表格与 Mermaid 图示都可以保留在学习内容中。
 
 ![复习稿用目标、输出、反馈的对照表和反例解释开环与闭环，支持分页和批注](docs/images/review.png)
 
-<details>
-<summary><b>还有自动笔记：记录理解变化与待复习项</b></summary>
+**自动笔记记录理解变化与待复习项。**
 
 教师默认每 3 个成功对话回合总结一次，可在设置中调整。笔记记录关键概念、易错点与下一次复习的问题，保存在该学习单元中。
 
 ![自动笔记记录已经理解的概念、反馈与稳定的易错点和下次复习问题](docs/images/notes.png)
 
-</details>
-
-### 4. 先做题，再看自己错在哪里
+### 5. 先做题，再看自己错在哪里
 
 按资料生成练习，可选择模型和题数，并查看生成进度。客观题提交后自动判分，再显示答案和解析；多轮练习与已保存成绩可以回看，也可以重新测试。
 
@@ -112,7 +156,7 @@
 
 ![练习提交后得分为1分共2分，标出正确答案和错误判断，并可展开解析](docs/images/practice.png)
 
-### 5. 换你当老师，看看能不能讲清楚
+### 6. 换你当老师，看看能不能讲清楚
 
 打开「讲给教师听」，用自己的话解释刚学的内容。AI 教师扮演新手继续追问；讲完点击「我讲完了，请点评」，它会对照复习稿检查讲漏或讲错的地方。
 
@@ -120,7 +164,7 @@
 
 ![讲给教师听界面中学习者解释恒温空调，教师追问传感器故障与稳定性](docs/images/feynman.png)
 
-**想先试一次？** [下载安装](https://github.com/porridgeowefish/LLL_life_long_learn/releases/latest)，打开主页的「体验示例」，不用配置模型也能体验主要阅读和练习交互。
+**想先试一次？** [下载安装](https://github.com/porridgeowefish/Learn-With-AI/releases/latest)，打开主页的「体验示例」，不用配置模型也能体验主要阅读和练习交互。
 
 ## 数据与使用边界
 
@@ -139,11 +183,11 @@
 
 ## 从源码构建
 
-需要 Go ≥ 1.26、Node.js ≥ 20。
+需要 Go ≥ 1.26、Node.js ≥ 20.19。
 
 ```bash
-git clone https://github.com/porridgeowefish/LLL_life_long_learn.git
-cd LLL_life_long_learn
+git clone https://github.com/porridgeowefish/Learn-With-AI.git
+cd Learn-With-AI
 npm install --prefix frontend
 npm run build
 npm run start
@@ -205,6 +249,6 @@ Windows 关闭窗口会隐藏到托盘，点击托盘图标恢复，右键选择
 
 ## 参与贡献
 
-欢迎通过 [Issues](https://github.com/porridgeowefish/LLL_life_long_learn/issues) 报告问题或提出建议。贡献流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+欢迎通过 [Issues](https://github.com/porridgeowefish/Learn-With-AI/issues) 报告问题或提出建议。贡献流程见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
 
 [MIT](./LICENSE) © 2026 Xiong Minzhe

@@ -20,7 +20,6 @@ import { Button } from '@/shared/primitive/Button';
 import { clearDeletedProjectClientData } from '@/features/projects/lib/projectDeletion';
 
 import s from './Sidebar.module.css';
-import { ConnectionBadge } from './ConnectionBadge';
 import { UpdateNotice } from './UpdateNotice';
 
 const QUICK_LINKS: ReadonlyArray<{ to: string; label: string; icon: IconName }> = [
@@ -288,7 +287,7 @@ export function Sidebar() {
           />
         )}
       </div>
-      <div className={s.foot}><UpdateNotice/><ConnectionBadge/><div className={s.utilities}><a href="https://github.com/porridgeowefish/LLL_life_long_learn" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a></div></div>
+      <div className={s.foot}><UpdateNotice/><div className={s.utilities}><a href="https://github.com/porridgeowefish/Learn-With-AI" target="_blank" rel="noreferrer" aria-label="在 GitHub 查看 Learn-With-AI 源码">GitHub</a></div></div>
       <Modal
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}

@@ -19,7 +19,7 @@ import (
 	websearch "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/websearch"
 )
 
-const SystemPrompt = `你是 LLL 的教师。你的首要职责是与学习者进行清晰、耐心、有针对性的教学对话，而不是生产文件或代替 IDE。
+const teacherBasePrompt = `你是 LLL 的教师。你的首要职责是与学习者进行清晰、耐心、有针对性的教学对话，而不是生产文件或代替 IDE。
 
 你可以自然地使用五种教学动作，但它们是柔性的教学方法，不是必须逐项展示的流程：
 - 引导：帮助学习者形成问题、方向和动机；
