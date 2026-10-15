@@ -104,7 +104,7 @@ function main() {
     else {
       const app=buildMacApp(payload,output,version,arch);
       const tar=safeOutput(path.join(output,`learn-with-ai-${version}-darwin-${arch}-app.tar.gz`));
-      archive.tarGzip(path.dirname(app),`learn-with-ai-${version}-darwin-${arch}`,tar,['learn-with-ai.app/Contents/MacOS/learn-with-ai','learn-with-ai.app/Contents/MacOS/libexec/lll-vision-ocr']);
+      archive.tarGzip(path.dirname(app),`learn-with-ai-${version}-darwin-${arch}`,tar,['learn-with-ai.app/Contents/MacOS/learn-with-ai','learn-with-ai.app/Contents/MacOS/libexec/lll-vision-ocr','learn-with-ai.app/Contents/MacOS/libexec/lll-speech']);
       files.push(tar);
       if (process.platform==='darwin') {
         const pkg=safeOutput(path.join(output,`learn-with-ai-${version}-darwin-${arch}.pkg`));

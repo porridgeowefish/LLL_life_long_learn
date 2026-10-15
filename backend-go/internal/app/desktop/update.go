@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -22,17 +23,21 @@ import (
 // Releases are published by the repository's release workflow; the desktop app
 // only ever installs an MSI from that release whose SHA256 matches the
 // release's SHA256SUMS.
-var releaseAPI = "https://api.github.com/repos/porridgeowefish/LLL_life_long_learn/releases/latest"
+var releaseAPI = "https://api.github.com/repos/porridgeowefish/Learn-With-AI/releases/latest"
 
 type UpdateInfo struct {
-	Current    string         `json:"current"`
-	Latest     string         `json:"latest,omitempty"`
-	Available  bool           `json:"available"`
-	CanInstall bool           `json:"canInstall"`
-	NotesURL   string         `json:"notesUrl,omitempty"`
-	Asset      string         `json:"asset,omitempty"`
-	Error      string         `json:"error,omitempty"`
-	LastResult *UpdateAttempt `json:"lastResult,omitempty"`
+	Current         string         `json:"current"`
+	Latest          string         `json:"latest,omitempty"`
+	Available       bool           `json:"available"`
+	CanInstall      bool           `json:"canInstall"`
+	NotesURL        string         `json:"notesUrl,omitempty"`
+	Asset           string         `json:"asset,omitempty"`
+	Error           string         `json:"error,omitempty"`
+	LastResult      *UpdateAttempt `json:"lastResult,omitempty"`
+	Phase           string         `json:"phase"`
+	Downloaded      int64          `json:"downloaded"`
+	Total           int64          `json:"total"`
+	PreparedVersion string         `json:"preparedVersion,omitempty"`
 }
 
 // UpdateAttempt is written by the installer helper after msiexec exits.
@@ -57,18 +62,26 @@ type release struct {
 }
 
 type updater struct {
-	current   string
-	workspace string
-	client    *http.Client
-	mu        sync.Mutex
-	checked   time.Time
-	info      UpdateInfo
-	release   *release
-	installed bool
+	current         string
+	workspace       string
+	client          *http.Client
+	mu              sync.Mutex
+	checked         time.Time
+	info            UpdateInfo
+	release         *release
+	installed       bool
+	phase           string
+	updateError     string
+	preparedPath    string
+	preparedVersion string
+	downloaded      int64
+	total           int64
+	preparedSum     string
+	launch          func(string, string, string) error
 }
 
 func newUpdater(current, workspace string) *updater {
-	return &updater{current: current, workspace: workspace, client: &http.Client{Timeout: 10 * time.Minute}}
+	return &updater{current: current, workspace: workspace, phase: "idle", client: &http.Client{Timeout: 10 * time.Minute}, launch: launchInstaller}
 }
 
 // parseVersion accepts "v1.2.3" or "1.2.3-dev"; the pre-release suffix is ignored.
@@ -131,6 +144,10 @@ func (u *updater) check(ctx context.Context, force bool) UpdateInfo {
 }
 
 func (u *updater) withLastResult(info UpdateInfo) UpdateInfo {
+	info.Phase, info.Downloaded, info.Total, info.PreparedVersion = u.phase, u.downloaded, u.total, u.preparedVersion
+	if u.updateError != "" {
+		info.Error = u.updateError
+	}
 	data, err := os.ReadFile(u.statusPath())
 	if err == nil {
 		var attempt UpdateAttempt
@@ -178,7 +195,16 @@ func (rel *release) asset(name string) (releaseAsset, bool) {
 }
 
 func trustedAssetURL(raw string) bool {
-	return strings.HasPrefix(raw, "https://github.com/porridgeowefish/LLL_life_long_learn/releases/download/")
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "github.com" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return false
+	}
+	for _, repo := range []string{"Learn-With-AI", "LLL_life_long_learn"} {
+		if strings.HasPrefix(parsed.Path, "/porridgeowefish/"+repo+"/releases/download/") && !strings.Contains(parsed.Path, "..") {
+			return true
+		}
+	}
+	return false
 }
 
 // download fetches the release MSI into a private temp folder and verifies it
@@ -193,19 +219,23 @@ func (u *updater) download(ctx context.Context) (string, string, error) {
 	name := msiAssetName(rel.Tag)
 	msi, ok := rel.asset(name)
 	sums, okSums := rel.asset("SHA256SUMS")
-	if !ok || !okSums || !trustedAssetURL(msi.URL) || !trustedAssetURL(sums.URL) {
+	if !ok || !okSums {
 		return "", "", fmt.Errorf("新版本缺少安装包 %s 或校验文件", name)
+	}
+	if !trustedAssetURL(msi.URL) || !trustedAssetURL(sums.URL) {
+		return "", "", errors.New("更新下载地址不属于官方 GitHub Release")
 	}
 	expected, err := u.expectedSum(ctx, sums.URL, name)
 	if err != nil {
 		return "", "", err
 	}
-	dir := filepath.Join(os.TempDir(), "learn-with-ai-update")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	dir, err := os.MkdirTemp("", "learn-with-ai-update-")
+	if err != nil {
 		return "", "", err
 	}
 	target := filepath.Join(dir, name)
 	if err := u.fetchTo(ctx, msi.URL, target, expected); err != nil {
+		_ = os.RemoveAll(dir)
 		return "", "", err
 	}
 	return target, strings.TrimPrefix(rel.Tag, "v"), nil
@@ -228,6 +258,9 @@ func (u *updater) expectedSum(ctx context.Context, url, name string) (string, er
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) == 2 && fields[1] == name && len(fields[0]) == 64 {
+			if _, err := hex.DecodeString(fields[0]); err != nil {
+				return "", errors.New("发布校验摘要无效")
+			}
 			return strings.ToLower(fields[0]), nil
 		}
 	}
@@ -247,24 +280,62 @@ func (u *updater) fetchTo(ctx context.Context, url, target, expected string) err
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("下载更新失败：%d", resp.StatusCode)
 	}
+	u.mu.Lock()
+	u.total, u.downloaded = resp.ContentLength, 0
+	u.mu.Unlock()
 	partial := target + ".partial"
 	file, err := os.OpenFile(partial, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
 	hash := sha256.New()
-	_, copyErr := io.Copy(io.MultiWriter(file, hash), io.LimitReader(resp.Body, 512<<20))
+	count, copyErr := io.Copy(io.MultiWriter(file, hash, updateProgress{u}), io.LimitReader(resp.Body, (512<<20)+1))
 	closeErr := file.Close()
 	if copyErr != nil || closeErr != nil {
 		os.Remove(partial)
 		return fmt.Errorf("下载更新失败：%v", errors.Join(copyErr, closeErr))
 	}
+	if count > 512<<20 {
+		_ = os.Remove(partial)
+		return errors.New("更新安装包超过大小限制")
+	}
 	if got := hex.EncodeToString(hash.Sum(nil)); got != expected {
 		os.Remove(partial)
 		return errors.New("安装包校验失败，已丢弃下载的文件")
 	}
+	u.mu.Lock()
+	u.preparedSum = expected
+	u.mu.Unlock()
 	os.Remove(target)
 	return os.Rename(partial, target)
+}
+
+type updateProgress struct{ u *updater }
+
+func (p updateProgress) Write(data []byte) (int, error) {
+	p.u.mu.Lock()
+	p.u.downloaded += int64(len(data))
+	p.u.mu.Unlock()
+	return len(data), nil
+}
+
+func (u *updater) prepare() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	var path, version string
+	var err error
+	if info := u.check(ctx, true); info.Error != "" {
+		err = errors.New(info.Error)
+	} else {
+		path, version, err = u.download(ctx)
+	}
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	if err != nil {
+		u.phase, u.updateError = "failed", err.Error()
+		return
+	}
+	u.preparedPath, u.preparedVersion, u.phase = path, version, "ready"
 }
 
 // handler serves GET /api/system/update and POST /api/system/update/install.
@@ -273,7 +344,35 @@ func (u *updater) fetchTo(ctx context.Context, url, target, expected string) err
 func (u *updater) handler(origin string, closeApp func()) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/system/update", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, u.check(r.Context(), r.URL.Query().Get("force") == "1"))
+		u.mu.Lock()
+		busy := u.phase == "downloading" || u.phase == "ready" || u.phase == "installing"
+		info := u.withLastResult(u.info)
+		info.Current, info.CanInstall = u.current, runtime.GOOS == "windows"
+		u.mu.Unlock()
+		if !busy {
+			info = u.check(r.Context(), r.URL.Query().Get("force") == "1")
+		}
+		writeJSON(w, http.StatusOK, info)
+	})
+	mux.HandleFunc("POST /api/system/update/prepare", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Origin") != origin || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "请从应用页面开始更新"})
+			return
+		}
+		if runtime.GOOS != "windows" {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "请从 GitHub 下载适合当前系统的安装包"})
+			return
+		}
+		u.mu.Lock()
+		if u.phase == "downloading" || u.phase == "ready" || u.phase == "installing" {
+			u.mu.Unlock()
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "更新已在准备或安装中"})
+			return
+		}
+		u.phase, u.updateError, u.downloaded, u.total = "downloading", "", 0, 0
+		u.mu.Unlock()
+		go u.prepare()
+		writeJSON(w, http.StatusAccepted, map[string]string{"phase": "downloading"})
 	})
 	mux.HandleFunc("POST /api/system/update/install", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Origin") != origin || !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
@@ -281,27 +380,38 @@ func (u *updater) handler(origin string, closeApp func()) http.Handler {
 			return
 		}
 		u.mu.Lock()
-		busy := u.installed
-		u.installed = true
+		busy := u.installed || u.phase != "ready"
+		msi, version := u.preparedPath, u.preparedVersion
+		expected := u.preparedSum
+		if !busy {
+			u.installed, u.phase = true, "installing"
+		}
 		u.mu.Unlock()
 		if busy {
-			writeJSON(w, http.StatusConflict, map[string]string{"error": "更新已在进行中"})
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "请先下载并校验更新，再重启安装"})
 			return
 		}
-		var msi, version string
 		var err error
-		if info := u.check(r.Context(), true); info.Error != "" {
-			err = errors.New(info.Error)
+		// Recheck the staged bytes immediately before executing the helper.
+		file, statErr := os.Open(msi)
+		if statErr != nil {
+			err = errors.New("更新安装包已丢失，请重新下载")
 		} else {
-			msi, version, err = u.download(r.Context())
+			hash := sha256.New()
+			_, copyErr := io.Copy(hash, io.LimitReader(file, (512<<20)+1))
+			closeErr := file.Close()
+			if copyErr != nil || closeErr != nil || hex.EncodeToString(hash.Sum(nil)) != expected {
+				err = errors.New("更新安装包校验失败，请重新下载")
+			}
 		}
 		if err == nil {
 			_ = os.Remove(u.statusPath())
-			err = launchInstaller(msi, version, u.statusPath())
+			err = u.launch(msi, version, u.statusPath())
 		}
 		if err != nil {
 			u.mu.Lock()
 			u.installed = false
+			u.phase, u.updateError = "failed", err.Error()
 			u.mu.Unlock()
 			writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 			return

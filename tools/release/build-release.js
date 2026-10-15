@@ -50,6 +50,9 @@ function main() {
       fs.mkdirSync(path.dirname(helper), { recursive: true });
       run('xcrun', ['clang', '-fobjc-arc', '-O2', '-arch', arch === 'amd64' ? 'x86_64' : 'arm64', '-mmacosx-version-min=12.0', '-framework', 'Foundation', '-framework', 'Vision', path.join(__dirname, 'native', 'mac-vision.m'), '-o', helper]);
       fs.chmodSync(helper, 0o755);
+      const speech = path.join(staging, 'libexec', 'lll-speech');
+      run('xcrun', ['clang', '-fobjc-arc', '-fblocks', '-O2', '-arch', arch === 'amd64' ? 'x86_64' : 'arm64', '-mmacosx-version-min=12.0', '-framework', 'Foundation', '-framework', 'Speech', '-Wl,-sectcreate,__TEXT,__info_plist,' + path.join(__dirname, 'native', 'mac-speech.plist'), path.join(__dirname, 'native', 'mac-speech.m'), '-o', speech]);
+      fs.chmodSync(speech, 0o755);
     }
     fs.chmodSync(binary, 0o755);
     for (const name of names.slice(1)) {
@@ -64,7 +67,7 @@ function main() {
     const output = path.join(releaseRoot, filename);
     if (fs.existsSync(output) && fs.lstatSync(output).isSymbolicLink()) throw new Error('Linked archive output forbidden');
     if (goos === 'windows') archive.zip(staging, prefix, output);
-    else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'libexec/lll-vision-ocr'] : ['learn-with-ai']);
+    else archive.tarGzip(staging, prefix, output, goos === 'darwin' ? ['learn-with-ai', 'libexec/lll-vision-ocr', 'libexec/lll-speech'] : ['learn-with-ai']);
     checksums.push(`${crypto.createHash('sha256').update(fs.readFileSync(output)).digest('hex')}  ${filename}`);
     console.log(`Packaged ${filename}`);
   }

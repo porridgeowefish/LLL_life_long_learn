@@ -3,9 +3,13 @@ package teacher
 
 import (
 	"context"
+	"errors"
+	"github.com/xmz14/lll/backend-go/internal/modules/sources"
 	noteservice "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/noteservice"
 	notestore "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/notestore"
+	"github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/speech"
 	config "github.com/xmz14/lll/backend-go/internal/platform/config"
+	"strings"
 
 	aiconfig "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/aiconfig"
 	conversation "github.com/xmz14/lll/backend-go/internal/modules/teacher/internal/conversation"
@@ -94,6 +98,32 @@ func ConfiguredWebSearch() WebSearcher { return websearch.Configured() }
 func NewActiveResponses() *ActiveResponses { return service.NewActiveResponses() }
 
 func NewConversation(slug string) (*ConversationStore, error) { return conversation.New(slug) }
+
+type ChatAttachment = conversation.Attachment
+type SpeechCapability = speech.Capability
+
+const MaxChatAttachmentBytes = conversation.MaxAttachmentBytes
+
+func LocalSpeechCapability(ctx context.Context) SpeechCapability { return speech.Probe(ctx) }
+func ParseChatAttachment(ctx context.Context, slug, name, language string, data []byte) (ChatAttachment, error) {
+	st, err := conversation.New(slug)
+	if err != nil {
+		return ChatAttachment{}, err
+	}
+	return st.AddAttachment(ctx, name, language, data, func(ctx context.Context, kind, language string, data []byte) (string, error) {
+		if kind == "audio" {
+			return speech.Recognize(ctx, language, data)
+		}
+		text, err := sources.ExtractChatImage(ctx, data, language)
+		if err != nil {
+			if strings.Contains(err.Error(), "limit") {
+				return "", errors.New("图片尺寸超过系统OCR限制，请缩小图片后重试")
+			}
+			return "", errors.New("系统文字提取不可用，请安装中文或英文OCR语言包后重试")
+		}
+		return text, nil
+	})
+}
 
 func ListTeacherUsage() ([]UsageConversation, error) { return usage.ListAll() }
 

@@ -79,6 +79,10 @@ type LocalOCRCapability = ocr.LocalCapability
 
 func OCRCapability() LocalOCRCapability { return ocr.LocalPageCapability() }
 
+func ExtractChatImage(ctx context.Context, image []byte, language string) (string, error) {
+	return ocr.ExtractChatImage(ctx, image, language)
+}
+
 func LocalOCRAvailable() bool { return ocr.LocalPageAvailable() }
 
 func ConfiguredPageOCRAvailable() bool {

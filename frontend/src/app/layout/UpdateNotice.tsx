@@ -1,30 +1,34 @@
-import { failedAttempt, useInstallUpdate, useUpdateInfo } from '@/features/settings/update';
+import { failedAttempt, useInstallUpdate, usePrepareUpdate, useUpdateInfo } from '@/features/settings/update';
 
 import s from './UpdateNotice.module.css';
 
 // Sidebar notice: shows the running version and, when GitHub has a newer
-// release, offers a one-click download + silent install + relaunch.
+// release, prepares a download and waits for an explicit restart.
 export function UpdateNotice() {
   const { data: info } = useUpdateInfo();
   const install = useInstallUpdate();
+  const prepare = usePrepareUpdate();
   if (!info) return null;
   const failed = failedAttempt(info);
   const start = () => {
-    if (window.confirm(`更新到 Learn-With-AI ${info.latest}？\n\n将自动下载并校验安装包，应用会关闭并在安装完成后自动重新打开。学习数据不受影响。`)) install.mutate();
+    if (info.phase !== 'ready') { prepare.mutate(); return; }
+    if (window.confirm(`重启并更新到 Learn-With-AI ${info.preparedVersion || info.latest}？\n\n安装完成后自动重新打开，学习数据会保留。`)) install.mutate();
   };
   return (
     <div className={s.root}>
       {info.available && (
         <div className={s.card} role="status">
           <strong>发现新版本 {info.latest}</strong>
-          {install.isPending && <span>正在下载并校验安装包…</span>}
+          {info.phase === 'downloading' && <span>正在下载并校验安装包…</span>}
           {install.isSuccess && <span>正在安装，完成后会自动重新打开。</span>}
           {install.isError && <span className={s.error}>{(install.error as Error).message}</span>}
+          {prepare.isError && <span className={s.error}>{(prepare.error as Error).message}</span>}
+          {info.error && <span className={s.error}>{info.error}</span>}
           {!install.isPending && !install.isSuccess && (
             <div className={s.actions}>
               {info.canInstall
-                ? <button className={s.primary} onClick={start}>立即更新</button>
-                : <a className={s.primary} href={info.notesUrl} target="_blank" rel="noreferrer">前往下载</a>}
+                ? <button className={s.primary} disabled={prepare.isPending || info.phase === 'downloading' || info.phase === 'installing'} onClick={start}>{info.phase === 'ready' ? '重启并更新' : info.phase === 'downloading' ? '正在下载…' : '下载更新'}</button>
+                : <a className={s.primary} href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest" target="_blank" rel="noreferrer">前往下载</a>}
               {info.notesUrl && <a href={info.notesUrl} target="_blank" rel="noreferrer">更新内容</a>}
             </div>
           )}

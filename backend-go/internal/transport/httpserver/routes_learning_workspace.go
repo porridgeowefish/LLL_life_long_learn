@@ -125,19 +125,24 @@ func (s *Server) handleTeacherTurn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		OperationID    string   `json:"operationId"`
-		Content        string   `json:"content"`
-		AttachmentRefs []string `json:"attachmentRefs"`
-		ProviderID     string   `json:"providerId"`
+		OperationID               string   `json:"operationId"`
+		Content                   string   `json:"content"`
+		AttachmentRefs            []string `json:"attachmentRefs"`
+		ConversationAttachmentIDs []string `json:"conversationAttachmentIds"`
+		ProviderID                string   `json:"providerId"`
 	}
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid teacher turn")
 		return
 	}
 	lock := s.teacherTurnLock(slug)
+	if _, err := conversation.AttachmentBlocks(in.ConversationAttachmentIDs); err != nil {
+		httpx.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	lock.Lock()
 	run := s.startTeacherRunLocked(slug, func(ctx context.Context, emit func(teacher.StreamFrame)) error {
-		return s.teacher.StreamTurn(ctx, slug, teacher.TurnInput{OperationID: in.OperationID, Content: in.Content, AttachmentRefs: in.AttachmentRefs, ProviderID: in.ProviderID}, emit)
+		return s.teacher.StreamTurn(ctx, slug, teacher.TurnInput{OperationID: in.OperationID, Content: in.Content, AttachmentRefs: in.AttachmentRefs, ConversationAttachmentIDs: in.ConversationAttachmentIDs, ProviderID: in.ProviderID}, emit)
 	})
 	lock.Unlock()
 	if run == nil {
@@ -159,21 +164,22 @@ func (s *Server) handleQueueTeacherTurn(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var in struct {
-		OperationID    string   `json:"operationId"`
-		Content        string   `json:"content"`
-		AttachmentRefs []string `json:"attachmentRefs"`
-		ProviderID     string   `json:"providerId"`
+		OperationID               string   `json:"operationId"`
+		Content                   string   `json:"content"`
+		AttachmentRefs            []string `json:"attachmentRefs"`
+		ConversationAttachmentIDs []string `json:"conversationAttachmentIds"`
+		ProviderID                string   `json:"providerId"`
 	}
 	if err := httpx.ReadJSON(r, &in); err != nil {
 		httpx.Error(w, http.StatusBadRequest, "invalid queued turn")
 		return
 	}
 	content := strings.TrimSpace(in.Content)
-	if in.OperationID == "" || content == "" || len([]byte(content)) > 64<<10 {
+	if in.OperationID == "" || (content == "" && len(in.ConversationAttachmentIDs) == 0) || len([]byte(content)) > 64<<10 {
 		httpx.Error(w, http.StatusBadRequest, "invalid queued turn")
 		return
 	}
-	item, err := conversation.Enqueue(content, in.AttachmentRefs, in.OperationID, in.ProviderID)
+	item, err := conversation.Enqueue(content, in.AttachmentRefs, in.OperationID, in.ProviderID, in.ConversationAttachmentIDs)
 	if err != nil {
 		learningWorkspaceError(w, err)
 		return

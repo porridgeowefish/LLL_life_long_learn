@@ -20,7 +20,9 @@ function Await-WinRT($operation, [Type]$resultType) {
 }
 
 $request = [Console]::In.ReadToEnd() | ConvertFrom-Json
-$language = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | Where-Object { $_.LanguageTag -like 'zh-Hans*' } | Select-Object -First 1
+$languagePattern = 'zh-Hans*'
+if ($request.language -eq 'en-US') { $languagePattern = 'en-*' }
+$language = [Windows.Media.Ocr.OcrEngine]::AvailableRecognizerLanguages | Where-Object { $_.LanguageTag -like $languagePattern } | Select-Object -First 1
 if ($null -eq $language) { throw 'windows-ocr-language-unavailable' }
 if ($request.mode -eq 'probe') {
     @{ available = $true; language = $language.LanguageTag } | ConvertTo-Json -Compress

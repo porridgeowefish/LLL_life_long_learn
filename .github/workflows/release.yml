@@ -8,7 +8,7 @@ on:
       version:
         description: Release version (numeric major.minor.patch)
         required: true
-        default: '0.7.15'
+        default: '0.7.16'
       publish:
         description: Publish GitHub Release v<version> from this commit after all smokes pass
         type: boolean
@@ -102,6 +102,8 @@ jobs:
           sudo installer -pkg "dist/releases/$version/learn-with-ai-$version-darwin-$architecture.pkg" -target /
           node tools/release/ci-run.js -- node tools/release/smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
           node tools/release/ci-run.js -- node tools/release/source-import-smoke.js /Applications/learn-with-ai.app/Contents/MacOS/learn-with-ai
+          # Probe the shipped system Speech helper without requesting permission or opening a microphone.
+          printf '%s' '{"mode":"probe"}' | /Applications/learn-with-ai.app/Contents/MacOS/libexec/lll-speech
           # The ephemeral runner owns this package installation; no learner data is deleted.
           sudo rm -rf /Applications/learn-with-ai.app
       - uses: actions/upload-artifact@v4

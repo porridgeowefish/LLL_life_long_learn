@@ -375,7 +375,7 @@
 }
 
 .openSourceActions { display: flex; gap: 8px; flex-wrap: wrap; }
-.openSourceActions a {
+.openSourceActions a, .openSourceActions button {
   padding: 6px 9px;
   color: var(--accent-ink);
   font-size: 0.74rem;
@@ -385,7 +385,9 @@
   background: var(--card);
   text-decoration: none;
 }
-.openSourceActions a:hover { border-color: var(--accent); }
+.openSourceActions a:hover, .openSourceActions button:hover { border-color: var(--accent); }
+.openSourceActions button { cursor: pointer; }
+.openSourceActions button:disabled { opacity: .55; cursor: default; }
 
 @media (max-width: 720px) {
   .openSource { align-items: flex-start; flex-direction: column; }

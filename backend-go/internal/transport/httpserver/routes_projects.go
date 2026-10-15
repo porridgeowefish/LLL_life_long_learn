@@ -41,6 +41,9 @@ func contentTypeFor(name string) string {
 // owns validation, active-run protection, and associated reference cleanup.
 func (s *Server) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("id")
+	mediaLock := s.chatMediaLock(slug)
+	mediaLock.Lock()
+	defer mediaLock.Unlock()
 	if !workspace.ValidateSlug(slug) {
 		httpx.Error(w, http.StatusBadRequest, "invalid slug")
 		return

@@ -16,6 +16,10 @@ export interface UpdateInfo {
   notesUrl?: string;
   error?: string;
   lastResult?: UpdateAttempt;
+  phase?: 'idle' | 'downloading' | 'ready' | 'installing' | 'failed';
+  downloaded?: number;
+  total?: number;
+  preparedVersion?: string;
 }
 
 const updateKey = ['system', 'update'] as const;
@@ -35,7 +39,7 @@ export function useUpdateInfo() {
     queryKey: updateKey,
     queryFn: () => fetchUpdate(false),
     staleTime: 30 * 60 * 1000,
-    refetchInterval: 6 * 60 * 60 * 1000,
+    refetchInterval: query => query.state.data?.phase === 'downloading' ? 1000 : 6 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -52,6 +56,14 @@ export function useCheckUpdate() {
 export function useInstallUpdate() {
   return useMutation({
     mutationFn: () => http.post<{ version: string }>('/api/system/update/install', {}),
+  });
+}
+
+export function usePrepareUpdate() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => http.post('/api/system/update/prepare', {}),
+    onSuccess: () => { client.setQueryData<UpdateInfo | null>(updateKey, info => info ? { ...info, phase: 'downloading', error: undefined } : info); void client.invalidateQueries({ queryKey: updateKey }); },
   });
 }
 

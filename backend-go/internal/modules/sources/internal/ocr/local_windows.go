@@ -82,9 +82,13 @@ func runWindowsOCR(ctx context.Context, request map[string]string, image []byte)
 }
 
 func extractLocalPage(ctx context.Context, image []byte) (PageResult, error) {
+	return extractChatImage(ctx, image, "zh-CN")
+}
+
+func extractChatImage(ctx context.Context, image []byte, language string) (PageResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	result, err := runWindowsOCR(ctx, map[string]string{"mode": "recognize"}, image)
+	result, err := runWindowsOCR(ctx, map[string]string{"mode": "recognize", "language": language}, image)
 	if err != nil {
 		return PageResult{}, err
 	}

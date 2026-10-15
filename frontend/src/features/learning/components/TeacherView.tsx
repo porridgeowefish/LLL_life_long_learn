@@ -25,6 +25,7 @@ import {
 import { useAskAiSettings } from '@/features/settings';
 
 import { SourceCitations } from './SourceCitations';
+import { ChatMediaInput, ChatMediaBlock, useChatMedia } from './ChatMediaInput';
 import { QuickReplies, readLearningProgress, teacherMarkdown } from './LearningProgress';
 import s from './TeacherView.module.css';
 
@@ -58,6 +59,9 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const sourcesQuery = useSources(slug);
   const modelSettings = useAskAiSettings();
   const [input, setInput] = useState('');
+  const media = useChatMedia(slug);
+  const currentSlug = useRef(slug);
+  currentSlug.current = slug;
   const [providerId, setProviderId] = useState(() => localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
   const [live, setLive] = useState<LiveResponse | null>(null);
   const [error, setError] = useState('');
@@ -81,6 +85,12 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const availableSources = useMemo(() => (sourcesQuery.data ?? []).filter((source) => source.status === 'ready'), [sourcesQuery.data]);
   const availableModels = useMemo(() => (modelSettings.data?.providers ?? []).filter((provider) => provider.id && provider.model && provider.baseURL), [modelSettings.data?.providers]);
   const conversationReady = Boolean(conversation.data);
+
+  useEffect(() => {
+    setInput(''); setLive(null); setError(''); setEditingQueue(null);
+    setProviderId(localStorage.getItem(`lll.teacher.provider.${slug}`) ?? '');
+    pendingDeltas.current = { text: '', reasoning: '' };
+  }, [slug]);
 
 
   useEffect(() => {
@@ -165,7 +175,8 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
     if (scrollTimer.current !== null) window.clearTimeout(scrollTimer.current);
     if (deltaTimer.current !== null) window.clearTimeout(deltaTimer.current);
-  }, []);
+    scrollFrame.current = null; scrollTimer.current = null; deltaTimer.current = null;
+  }, [slug]);
 
   // A refresh must not create a second teacher turn. Reattach to the durable
   // backend run and replay its frames into the same live response UI.
@@ -230,13 +241,18 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const content = input.trim();
-    if (!content) return;
+    if ((!content && !media.attachments.length) || media.pending || media.recording) return;
     await send(content);
   };
 
   // Typed messages and quick-reply buttons share one send path, so a button
   // click is recorded exactly like the learner typing the same words.
   const send = async (content: string) => {
+    if (media.pending || media.recording) return;
+    const sendingSlug = slug;
+    const sentMedia = media.attachments;
+    const conversationAttachmentIds = sentMedia.map(a => a.attachmentId);
+    media.clear();
     setError('');
     const attachmentRefs: string[] = [];
     if (live) {
@@ -244,9 +260,11 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
       // above the composer reflect and edit that state.
       setInput((current) => current.trim() === content ? '' : current);
       try {
-        await queueTeacherTurn(slug, { operationId: crypto.randomUUID(), content, attachmentRefs, providerId: providerId || undefined });
+        await queueTeacherTurn(slug, { operationId: crypto.randomUUID(), content, attachmentRefs, conversationAttachmentIds, providerId: providerId || undefined });
         await queryClient.invalidateQueries({ queryKey: learningWorkspaceKeys.conversation(slug) });
       } catch (cause) {
+        if (currentSlug.current !== sendingSlug) return;
+        media.restore(sentMedia);
         setError((cause as Error).message || '排队失败，请稍后重试');
         setInput(content);
       }
@@ -259,6 +277,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     const temporary: LiveResponse = {
       learner: { id: `local-${operationId}`, role: 'learner', status: 'completed', blocks: [
         { id: 'local', type: 'markdown', source: content },
+        ...sentMedia.map(a => ({ id: a.attachmentId, type: `chat-${a.kind}` as 'chat-image' | 'chat-audio', artifactRef: a.attachmentId, name: a.name, source: a.text })),
         ...attachmentRefs.map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
       text: '', reasoning: '', taskIds: [], searches: [],
@@ -266,13 +285,13 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     setLive(temporary);
     let accepted = false;
     const succeeded = await runStream(async (signal) => {
-      await streamTeacherTurn(slug, { operationId, content, attachmentRefs, providerId: providerId || undefined }, signal, frame => {
+      await streamTeacherTurn(slug, { operationId, content, attachmentRefs, conversationAttachmentIds, providerId: providerId || undefined }, signal, frame => {
         if (signal.aborted) return;
         if (frame.type === 'turn-accepted' || frame.type === 'turn-queued') accepted = true;
         handleTeacherFrame(frame);
       });
     });
-    if (!succeeded && !accepted) setInput(current => current || content);
+    if (!succeeded && !accepted && currentSlug.current === sendingSlug) { setInput(current => current || content); media.restore(sentMedia); }
   };
 
   // Steer interrupts the active response server-side; we detach from the old
@@ -286,6 +305,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
     setLive({
       learner: { id: `local-steer-${item.queueId}`, role: 'learner', status: 'completed', blocks: [
         { id: 'local', type: 'markdown', source: item.content },
+        ...(item.mediaBlocks ?? []),
         ...(item.attachmentRefs ?? []).map((sourceId) => ({ id: `local-${sourceId}`, type: 'attachment' as const, artifactRef: sourceId })),
       ], createdAt: new Date().toISOString() },
       text: '', reasoning: '', taskIds: [], searches: [],
@@ -472,7 +492,7 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
               </div>
             ) : (
               <div key={item.queueId} className={s.queueChip}>
-                <span className={s.queueContent}>{item.content}</span>
+                <span className={s.queueContent}>{item.content || item.mediaBlocks?.map(block => block.name).join('、')}</span>
                 <span className={s.queueActions}>
                   <button type="button" className={s.iconButton} title="编辑这条排队消息" aria-label={`编辑排队消息 ${item.content}`} onClick={() => setEditingQueue({ queueId: item.queueId, content: item.content })}><EditIcon /></button>
                   <button type="button" className={s.iconButton} title="立即引导：打断当前回答，先回应这条" aria-label={`立即引导 ${item.content}`} onClick={() => void steer(item)} disabled={Boolean(live && !live.responseId)}><SteerIcon /></button>
@@ -483,12 +503,13 @@ export function TeacherView({ slug, title }: { slug: string; title: string }) {
           </div>
         )}
 
-      <form className={s.composer} onSubmit={submit}>
+      <form className={s.composer} onSubmit={submit} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault(); }} onDrop={media.onDrop} onPaste={media.onPaste}>
         <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); }
         }} placeholder={live ? '教师正在回答…发送将进入等待队列' : `和 ${title} 的教师继续讨论…`} rows={1} />
-        {live ? <button type="submit" className={s.stop} disabled={!input.trim()}>排队</button> : <button type="submit" disabled={!input.trim()}>发送</button>}
+        {live ? <button type="submit" className={s.stop} disabled={(!input.trim() && !media.attachments.length) || media.pending || media.recording}>排队</button> : <button type="submit" disabled={(!input.trim() && !media.attachments.length) || media.pending || media.recording}>发送</button>}
         {live?.responseId && <button type="button" className={s.stop} onClick={stop}>停止</button>}
+        <ChatMediaInput media={media} />
         <div className={s.composerMeta}>
           {availableModels.length > 0 && <label className={s.modelSelect}>模型
             <select value={providerId} onChange={(event) => { setProviderId(event.target.value); localStorage.setItem(`lll.teacher.provider.${slug}`, event.target.value); }}>
@@ -573,7 +594,8 @@ const Message = memo(function Message({ slug, message, sourceNames, getReasoning
         {(message.blocks ?? []).map((block) => block.type === 'reasoning-summary'
           ? <ReasoningBlock key={block.id} messageID={message.id} source={block.source ?? ''} streaming={streaming} initialOpen={getReasoningOpen(message.id)} onOpenChange={setReasoningOpen} />
           : block.type === 'markdown' ? <MarkdownView key={block.id} source={citationSource(teacher ? teacherMarkdown(block.source ?? '') : block.source ?? '')} className={s.markdown} streaming={streaming} />
-            : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span> : null)}
+            : block.type === 'attachment' ? <span key={block.id} className={s.attachment}>资料 · {sourceNames.get(block.artifactRef ?? '') ?? '已选择资料'}</span>
+              : block.type === 'chat-image' || block.type === 'chat-audio' ? <ChatMediaBlock key={block.id} slug={slug} id={block.artifactRef ?? ''} kind={block.type === 'chat-image' ? 'image' : 'audio'} name={block.name} text={block.source} /> : null)}
         {teacher && !streaming && <SourceCitations slug={slug} citations={citations} sourceNames={sourceNames} selected={selectedEvidence} onSelect={setSelectedEvidence} />}
         {notice && <div className={s.notice}>{notice}</div>}
         {teacher && !streaming && message.status === 'failed' && <div className={s.notice} role="alert">这条回复未完成，请重新生成或继续提问。</div>}        {actions && !streaming && (

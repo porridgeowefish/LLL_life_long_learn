@@ -25,6 +25,7 @@ type Block struct {
 	Type        string `json:"type"`
 	Source      string `json:"source,omitempty"`
 	ArtifactRef string `json:"artifactRef,omitempty"`
+	Name        string `json:"name,omitempty"`
 }
 
 type Message struct {
@@ -90,6 +91,7 @@ type QueueItem struct {
 	QueueID        string    `json:"queueId"`
 	Content        string    `json:"content"`
 	AttachmentRefs []string  `json:"attachmentRefs,omitempty"`
+	MediaBlocks    []Block   `json:"mediaBlocks,omitempty"`
 	OperationID    string    `json:"operationId,omitempty"`
 	ProviderID     string    `json:"providerId,omitempty"`
 	QueuedAt       time.Time `json:"queuedAt"`
@@ -727,7 +729,7 @@ func hiddenTeacherMessages(events []Event) map[string]bool {
 
 var ErrQueueItemNotFound = errors.New("queue item not found")
 
-func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, providerID string) (QueueItem, error) {
+func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, providerID string, mediaIDs ...[]string) (QueueItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	_, events, err := s.loadLocked()
@@ -746,6 +748,12 @@ func (s *Store) Enqueue(content string, attachmentRefs []string, operationID, pr
 		}
 	}
 	item := QueueItem{QueueID: idgen.New("q"), Content: content, AttachmentRefs: attachmentRefs, OperationID: operationID, ProviderID: providerID, QueuedAt: time.Now().UTC()}
+	if len(mediaIDs) > 0 {
+		item.MediaBlocks, err = s.attachmentBlocksLocked(mediaIDs[0])
+		if err != nil {
+			return QueueItem{}, err
+		}
+	}
 	if _, err := s.appendLocked("learner-queued", item); err != nil {
 		return QueueItem{}, err
 	}
@@ -835,6 +843,7 @@ func (s *Store) PromoteQueueHead(mode string) (PromotedTurn, bool, error) {
 
 func (s *Store) promoteLocked(item QueueItem, mode string) (PromotedTurn, error) {
 	blocks := []Block{{Type: "markdown", Source: item.Content}}
+	blocks = append(blocks, item.MediaBlocks...)
 	for _, ref := range item.AttachmentRefs {
 		blocks = append(blocks, Block{Type: "attachment", ArtifactRef: ref})
 	}

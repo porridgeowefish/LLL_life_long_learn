@@ -5,7 +5,8 @@ import { ApiError, http } from '@/shared/client';
 
 export interface MessageBlock {
   id: string;
-  type: 'markdown' | 'reasoning-summary' | 'attachment';
+  type: 'markdown' | 'reasoning-summary' | 'attachment' | 'chat-image' | 'chat-audio';
+  name?: string;
   source?: string;
   artifactRef?: string;
 }
@@ -59,6 +60,7 @@ export interface QueuedTurn {
   queueId: string;
   content: string;
   attachmentRefs?: string[];
+  mediaBlocks?: MessageBlock[];
   queuedAt: string;
 }
 
@@ -324,7 +326,7 @@ export function usePermanentlyDeleteSource(slug: string) {
   });
 }
 
-export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; providerId?: string }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
+export async function streamTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string }, signal: AbortSignal, onFrame: (frame: TeacherStreamFrame) => void) {
   const response = await fetch(`/api/projects/${encodeURIComponent(slug)}/conversation/turns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal });
   // A server-owned queued run may begin before the client learns about it.
   // The rejected direct request was not recorded. Preserve its operation ID
@@ -364,7 +366,7 @@ export async function stopTeacherResponse(slug: string, responseId: string) {
 // Queued turns: durable server-side waiting line for messages sent while the
 // teacher is streaming. promoted=true means no response was active and the
 // item already became a normal turn (reattach via resumeTeacherTurn).
-export async function queueTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; providerId?: string }) {
+export async function queueTeacherTurn(slug: string, input: { operationId: string; content: string; attachmentRefs?: string[]; conversationAttachmentIds?: string[]; providerId?: string }) {
   return http.post<{ queueId: string; promoted: boolean }>(`/api/projects/${encodeURIComponent(slug)}/conversation/turns/queue`, input);
 }
 

@@ -4,7 +4,7 @@ import { TeacherNotesSettings } from './TeacherNotesSettings';
 import { Icon } from '@/shared/primitive/Icon';
 import type { ThemePreference } from '@/shared/lib/theme';
 import { useHealth } from '@/app/api/health';
-import { failedAttempt, useCheckUpdate, useInstallUpdate, useUpdateInfo } from './update';
+import { failedAttempt, useCheckUpdate, useInstallUpdate, usePrepareUpdate, useUpdateInfo } from './update';
 import s from './SettingsPage.module.css';
 
 export function SettingsPage() {
@@ -62,12 +62,15 @@ function VersionAndDataSection() {
   const { data: info } = useUpdateInfo();
   const check = useCheckUpdate();
   const install = useInstallUpdate();
-  const current = check.data ?? info;
+  const prepare = usePrepareUpdate();
+  const current = info;
   const failed = failedAttempt(current);
   let status = '';
   if (check.isPending) status = '正在检查…';
   else if (check.isError) status = `检查失败：${(check.error as Error).message}`;
   else if (current?.error) status = current.error;
+  else if (current?.phase === 'downloading') status = current.total && current.downloaded ? `正在下载并校验…${Math.min(100, Math.floor(current.downloaded / current.total * 100))}%` : '正在下载并校验…';
+  else if (current?.phase === 'ready') status = '更新已准备好，重启后安装';
   else if (current?.available) status = `发现新版本 ${current.latest}`;
   else if (current) status = '已是最新版本';
   return (
@@ -75,25 +78,22 @@ function VersionAndDataSection() {
       <div>
         <h2 id="version-data-title">版本与数据</h2>
         <p>
-          {current ? <>当前版本 <strong>{current.current}</strong>{status && <> · {status}</>}</> : '版本信息仅在桌面应用中提供。'}
+          {current ? <>当前版本 <strong>{current.current}</strong>{status && <> · {status}</>}</> : '前往 GitHub 下载最新版本。macOS 下载对应芯片的安装包，安装后重新打开应用。'}
         </p>
         {failed && <p role="alert">上次更新到 {failed.version} 未完成（安装程序返回 {failed.exitCode}）。</p>}
         <p>
           学习数据目录 <code>{health?.workspace ?? '…'}</code>。项目、笔记、资料、偏好与 API 配置都保存在这里，升级和卸载都不会删除。
         </p>
       </div>
-      {current && (
         <div className={s.openSourceActions}>
-          <a href="#check" onClick={(event) => { event.preventDefault(); check.mutate(); }}>检查更新</a>
-          {current.available && current.canInstall && !install.isSuccess && (
-            <a href="#install" onClick={(event) => { event.preventDefault(); if (!install.isPending && window.confirm(`更新到 ${current.latest}？应用会自动关闭并在安装后重新打开，学习数据不受影响。`)) install.mutate(); }}>
-              {install.isPending ? '正在下载…' : '立即更新'}
-            </a>
-          )}
+          <a href="https://github.com/porridgeowefish/Learn-With-AI/releases/latest" target="_blank" rel="noreferrer">GitHub 下载与安装指引</a>
+          {current && <a href="#check" onClick={(event) => { event.preventDefault(); if (current.phase !== 'downloading') check.mutate(); }}>检查更新</a>}
+          {current?.available && current.canInstall && current.phase !== 'ready' && current.phase !== 'installing' && !install.isSuccess && <button type="button" disabled={prepare.isPending || current.phase === 'downloading'} onClick={() => prepare.mutate()}>{current.phase === 'downloading' ? '正在下载…' : '下载更新'}</button>}
+          {current?.phase === 'ready' && !install.isSuccess && <button type="button" disabled={install.isPending} onClick={() => { if (window.confirm(`重启并更新到 ${current.preparedVersion || current.latest}？学习数据会保留。`)) install.mutate(); }}>重启并更新</button>}
           {install.isSuccess && <span>正在安装，完成后自动重新打开</span>}
           {install.isError && <span role="alert">{(install.error as Error).message}</span>}
+          {prepare.isError && <span role="alert">{(prepare.error as Error).message}</span>}
         </div>
-      )}
     </section>
   );
 }

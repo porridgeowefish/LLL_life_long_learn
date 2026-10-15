@@ -57,6 +57,7 @@ type Server struct {
 	infographicJobs  sync.Map
 	practiceEvalJobs sync.Map
 	teacherTurnMu    sync.Map // project slug → *sync.Mutex for turn lifecycle
+	chatMediaMu      sync.Map // serializes media writes with project deletion
 	mu               sync.RWMutex
 }
 
@@ -199,6 +200,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/projects/{id}/activity", s.handlePostActivity)
 	mux.HandleFunc("GET /api/projects/{id}/conversation", s.handleGetConversation)
 	mux.HandleFunc("GET /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)
+	mux.HandleFunc("GET /api/system/speech", s.handleSpeechCapability)
+	mux.HandleFunc("POST /api/projects/{id}/conversation/attachments", s.handleChatAttachment)
+	mux.HandleFunc("GET /api/projects/{id}/conversation/attachments/{attachmentId}/file", s.handleChatAttachmentFile)
 	mux.HandleFunc("PUT /api/projects/{id}/conversation/instructions", s.handleConversationInstructions)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/turns", s.handleTeacherTurn)
 	mux.HandleFunc("POST /api/projects/{id}/conversation/opening", s.handleTeacherOpening)

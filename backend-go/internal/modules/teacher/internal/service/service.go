@@ -54,10 +54,11 @@ type StreamFrame struct {
 }
 
 type TurnInput struct {
-	OperationID    string
-	Content        string
-	AttachmentRefs []string
-	ProviderID     string
+	OperationID               string
+	Content                   string
+	AttachmentRefs            []string
+	ConversationAttachmentIDs []string
+	ProviderID                string
 }
 
 // StreamOpening uses a system trigger, never a fabricated learner statement.
@@ -119,7 +120,7 @@ func New(gateway teachergateway.Gateway) *Service {
 
 func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emit func(StreamFrame)) error {
 	in.Content = strings.TrimSpace(in.Content)
-	if in.OperationID == "" || in.Content == "" || len([]byte(in.Content)) > 64<<10 {
+	if in.OperationID == "" || (in.Content == "" && len(in.ConversationAttachmentIDs) == 0) || len([]byte(in.Content)) > 64<<10 {
 		return errors.New("invalid learner turn")
 	}
 	conversation, err := conversationstore.New(slug)
@@ -137,6 +138,11 @@ func (s *Service) StreamTurn(ctx context.Context, slug string, in TurnInput, emi
 		}
 	}
 	learnerBlocks := []conversationstore.Block{{Type: "markdown", Source: in.Content}}
+	mediaBlocks, err := conversation.AttachmentBlocks(in.ConversationAttachmentIDs)
+	if err != nil {
+		return err
+	}
+	learnerBlocks = append(learnerBlocks, mediaBlocks...)
 	for _, ref := range in.AttachmentRefs {
 		learnerBlocks = append(learnerBlocks, conversationstore.Block{Type: "attachment", ArtifactRef: ref})
 	}
